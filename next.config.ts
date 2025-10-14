@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     ppr: true,
+    nodeMiddleware: true,
   },
 };
 
