@@ -1,10 +1,25 @@
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
+import { useState } from 'react';
 
 export default function ChatPage() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading } =
-    useChat();
+  const { messages, sendMessage, status, error } = useChat();
+  const [input, setInput] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    const userMessage = input;
+    setInput('');
+    await sendMessage({
+      role: 'user',
+      parts: [{ type: 'text', text: userMessage }],
+    });
+  };
+
+  const isLoading = status === 'submitted' || status === 'streaming';
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -23,12 +38,8 @@ export default function ChatPage() {
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-gray-500">
-              <p className="text-lg font-medium mb-2">
-                Начните разговор
-              </p>
-              <p className="text-sm">
-                Задайте вопрос о проекте MIR.TRADE
-              </p>
+              <p className="text-lg font-medium mb-2">Начните разговор</p>
+              <p className="text-sm">Задайте вопрос о проекте MIR.TRADE</p>
             </div>
           </div>
         )}
@@ -47,7 +58,14 @@ export default function ChatPage() {
                   : 'bg-white text-gray-900 border border-gray-200'
               }`}
             >
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <div className="text-sm whitespace-pre-wrap">
+                {message.parts.map((part, index) => {
+                  if (part.type === 'text') {
+                    return <span key={index}>{part.text}</span>;
+                  }
+                  return null;
+                })}
+              </div>
             </div>
           </div>
         ))}
@@ -63,6 +81,16 @@ export default function ChatPage() {
             </div>
           </div>
         )}
+
+        {error && (
+          <div className="flex justify-center">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+              <p className="text-sm">
+                Ошибка: {error.message || 'Произошла ошибка'}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input Form */}
@@ -70,7 +98,7 @@ export default function ChatPage() {
         <form onSubmit={handleSubmit} className="flex space-x-4">
           <input
             value={input}
-            onChange={handleInputChange}
+            onChange={(e) => setInput(e.target.value)}
             placeholder="Введите ваше сообщение..."
             disabled={isLoading}
             className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"

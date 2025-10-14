@@ -1,7 +1,7 @@
-import { streamText } from 'ai';
+import { streamText, convertToModelMessages } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 
-// Initialize Anthropic provider for Vercel AI SDK
+// Initialize Anthropic provider
 const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
@@ -19,16 +19,19 @@ export async function POST(req: Request) {
       });
     }
 
-    // Stream chat completion using Vercel AI SDK
+    // Convert UI messages to model messages
+    const modelMessages = convertToModelMessages(messages);
+
+    // Stream chat completion
     const result = streamText({
       model: anthropic('claude-sonnet-4-20250514'),
-      messages,
+      messages: modelMessages,
       maxTokens: 4096,
       temperature: 1,
     });
 
-    // Return streaming response
-    return result.toDataStreamResponse();
+    // Return UI message stream response (for useChat compatibility)
+    return result.toUIMessageStreamResponse();
   } catch (error) {
     console.error('Error in chat API:', error);
 
