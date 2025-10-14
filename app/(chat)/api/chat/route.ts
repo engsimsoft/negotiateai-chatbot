@@ -259,7 +259,13 @@ export async function POST(request: Request) {
           messages: messages.map((currentMessage) => ({
             id: currentMessage.id,
             role: currentMessage.role,
-            parts: currentMessage.parts,
+            // Filter out tool results to prevent context overflow
+            // Tool results are needed only during response generation, not in history
+            parts: currentMessage.parts.filter((part: any) => {
+              const type = part.type;
+              // Keep only text and step markers, remove tool-call and tool results
+              return type === 'text' || type === 'step-start' || type === 'step-finish';
+            }),
             createdAt: new Date(),
             attachments: [],
             chatId: id,
