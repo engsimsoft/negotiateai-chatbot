@@ -1,69 +1,103 @@
 # NegotiateAI Chatbot
 
-AI-ассистент для переговоров по проекту MIR.TRADE на базе Claude Sonnet 4.
+AI чат-бот для переговоров (MIR.TRADE) на базе Claude Sonnet 4.
 
-**Production:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
-
-**Основано на:** [Vercel AI Chatbot Template](https://github.com/vercel/ai-chatbot)
+**Production:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app  
+**Версия:** 1.0.5  
+**Статус:** ✅ Deployed, работает
 
 ---
 
-## 🚀 Быстрый старт
+## 🎯 Текущее состояние
+
+**Что работает:**
+- ✅ Next.js 15.3 + TypeScript
+- ✅ Claude Sonnet 4.5 API (streaming)
+- ✅ NextAuth (PostgreSQL + guest mode)
+- ✅ Vercel deployment (middleware fixed)
+
+**В разработке:**
+- [ ] AI Tools: read_document, web_search, get_current_date
+- [ ] Knowledge base integration (~40 DOCX/PDF)
+- [ ] System prompt + index.md
+
+---
+
+## 🚀 Разработка
 
 ```bash
-# 1. Клонировать и установить зависимости
-git clone <repo-url>
 npm install
-
-# 2. Настроить .env.local
-cp .env.example .env.local
-# Добавить API ключи (см. .env.example)
-
-# 3. Запустить локально
-npm run dev
+cp .env.example .env.local  # Добавить API ключи
+npm run dev                 # http://localhost:3000
 ```
 
-Откройте [http://localhost:3000](http://localhost:3000)
+**Требуется в .env.local:**
+- `ANTHROPIC_API_KEY` - https://console.anthropic.com
+- `AUTH_SECRET` - `openssl rand -base64 32`
+- `POSTGRES_URL` - neon.tech или vercel.com/storage
+- `BLOB_READ_WRITE_TOKEN` - vercel.com/storage
+
+Детали: [docs/setup.md](docs/setup.md)
 
 ---
 
-## 🎯 Возможности
+## 📁 Ключевые файлы
 
-- **Чат с Claude Sonnet 4** - AI-ассистент для переговоров
-- **Чтение документов** - ~40 DOCX/PDF через Anthropic API (планируется)
-- **Web search** - Поиск актуальной информации (планируется)
-- **История чатов** - PostgreSQL + NextAuth
-- **Streaming UI** - Быстрые ответы
+**AI/Chat:**
+- `app/(chat)/api/chat/route.ts` - Chat endpoint (streaming)
+- `lib/ai/providers.ts` - Claude Sonnet 4.5 configuration
+- `lib/ai/tools/` - AI tools (в разработке)
+
+**Auth/DB:**
+- `app/(auth)/` - NextAuth 5.0 setup
+- `lib/db/queries.ts` - Database queries (Drizzle ORM)
+
+**Config:**
+- `.env.local` - API keys (НЕ коммитить!)
+- `next.config.ts` - Next.js config (experimental.ppr)
+- `drizzle.config.ts` - Database config
 
 ---
 
 ## 📖 Документация
 
-**Для разработки:**
+**Обязательно читать:**
 - [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md) - Правила документации (SSOT)
-- [CLAUDE.md](CLAUDE.md) - Инструкция для Claude Code
+- [CLAUDE.md](CLAUDE.md) - Быстрая навигация для AI
 - [CHANGELOG.md](CHANGELOG.md) - История изменений
 
 **Техническая:**
 - [docs/setup.md](docs/setup.md) - Детальная установка
 - [docs/architecture.md](docs/architecture.md) - Архитектура
-- [docs/deployment.md](docs/deployment.md) - Деплой
+- [docs/deployment.md](docs/deployment.md) - Vercel deployment
 - [docs/troubleshooting.md](docs/troubleshooting.md) - Решение проблем
-- [docs/vercel-deploy-debug.md](docs/vercel-deploy-debug.md) - История отладки Vercel
+- [docs/vercel-deploy-debug.md](docs/vercel-deploy-debug.md) - История отладки v1.0.5
+
+**Решения:**
+- [docs/decisions/](docs/decisions/) - Architecture Decision Records
+
+---
+
+## ⚙️ Конфигурация моделей
+
+**Модель:** Claude Sonnet 4.5 (`claude-sonnet-4-20250514`)  
+**Где:** `lib/ai/providers.ts:28-30`  
+**Цена:** $3/1M input, $15/1M output tokens
+
+**Параметры:** Настраиваются в `app/(chat)/api/chat/route.ts`
 
 ---
 
 ## 🔧 Технологии
 
-- Next.js 15.3 (App Router)
-- TypeScript
-- Claude Sonnet 4.5 (Anthropic API)
-- NextAuth 5.0 (authentication)
-- PostgreSQL (Neon)
+- Next.js 15.3 (App Router, RSC)
+- Claude Sonnet 4.5 (@anthropic-ai/sdk)
+- NextAuth 5.0-beta.25
+- PostgreSQL (Neon) + Drizzle ORM
 - Vercel Blob Storage
+
+**Основано на:** [Vercel AI Chatbot Template](https://github.com/vercel/ai-chatbot)
 
 ---
 
-## 📄 License
-
-Проект для внутреннего использования MIR.TRADE.
+**Для пользователей:** См. [USER_GUIDE.md](USER_GUIDE.md) (создать при необходимости)
