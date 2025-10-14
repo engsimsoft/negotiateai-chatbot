@@ -2,6 +2,8 @@ import { tool } from "ai";
 import { z } from "zod";
 import * as fs from "fs/promises";
 import * as path from "path";
+// @ts-ignore - pdf-parse is a CommonJS module
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
 
 /**
  * Security: Only allow reading files from the knowledge/ directory
@@ -87,8 +89,32 @@ Example usage:
           content,
           encoding: "utf-8",
         };
+      } else if (ext === ".pdf") {
+        // For PDF, extract text using pdf-parse (prevents 200K token overflow from base64)
+        try {
+          const buffer = await fs.readFile(absolutePath);
+          const pdfData = await pdfParse(buffer);
+          
+          return {
+            success: true,
+            filepath,
+            fileType: ext,
+            fileSizeKB,
+            content: pdfData.text,
+            encoding: "text",
+            pages: pdfData.numpages,
+            info: pdfData.info,
+          };
+        } catch (pdfError) {
+          // If PDF parsing fails, return error
+          return {
+            success: false,
+            error: `Failed to parse PDF: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}`,
+            suggestion: "The PDF file may be corrupted or encrypted.",
+          };
+        }
       } else {
-        // For DOCX and PDF, read as base64 for Claude's document understanding
+        // For DOCX, still use base64 (TODO: add docx parser)
         const buffer = await fs.readFile(absolutePath);
         const base64Content = buffer.toString("base64");
 
@@ -99,7 +125,7 @@ Example usage:
           fileSizeKB,
           content: base64Content,
           encoding: "base64",
-          mimeType: ext === ".pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         };
       }
     } catch (error) {

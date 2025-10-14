@@ -98,14 +98,34 @@ export function sanitizeText(text: string) {
 }
 
 export function convertToUIMessages(messages: DBMessage[]): ChatMessage[] {
-  return messages.map((message) => ({
-    id: message.id,
-    role: message.role as 'user' | 'assistant' | 'system',
-    parts: message.parts as UIMessagePart<CustomUIDataTypes, ChatTools>[],
-    metadata: {
-      createdAt: formatISO(message.createdAt),
-    },
-  }));
+  return messages.map((message) => {
+    const parts = message.parts as UIMessagePart<CustomUIDataTypes, ChatTools>[];
+    
+    // Truncate large parts to prevent context overflow
+    // Tool results (especially readDocument) can be very large (15KB+)
+    // and cause 200K+ token errors when accumulated in history
+    const MAX_PART_SIZE = 500; // characters limit for history
+    
+    const filteredParts = parts.map((part) => {
+      // If part has text content that's too large, truncate it
+      if ('text' in part && typeof part.text === 'string' && part.text.length > MAX_PART_SIZE) {
+        return {
+          ...part,
+          text: part.text.substring(0, MAX_PART_SIZE) + '... [truncated for context size]'
+        };
+      }
+      return part;
+    });
+    
+    return {
+      id: message.id,
+      role: message.role as 'user' | 'assistant' | 'system',
+      parts: filteredParts,
+      metadata: {
+        createdAt: formatISO(message.createdAt),
+      },
+    };
+  });
 }
 
 export function getTextFromMessage(message: ChatMessage): string {
