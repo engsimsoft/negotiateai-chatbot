@@ -2,8 +2,19 @@ import { tool } from "ai";
 import { z } from "zod";
 import * as fs from "fs/promises";
 import * as path from "path";
-// @ts-ignore - pdf-parse is a CommonJS module
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
+
+// Dynamic import for pdf-parse
+const getPdfParse = async () => {
+  const pdfParseModule = await import("pdf-parse");
+  // @ts-ignore - pdf-parse has non-standard exports
+  return pdfParseModule.default || pdfParseModule;
+};
+
+// Dynamic import for mammoth (DOCX parser)
+const getMammoth = async () => {
+  const mammoth = await import("mammoth");
+  return mammoth.default || mammoth;
+};
 
 /**
  * Security: Only allow reading files from the knowledge/ directory
@@ -93,6 +104,7 @@ Example usage:
         // For PDF, extract text using pdf-parse (prevents 200K token overflow from base64)
         try {
           const buffer = await fs.readFile(absolutePath);
+          const pdfParse = await getPdfParse();
           const pdfData = await pdfParse(buffer);
           
           return {
@@ -114,19 +126,27 @@ Example usage:
           };
         }
       } else {
-        // For DOCX, still use base64 (TODO: add docx parser)
-        const buffer = await fs.readFile(absolutePath);
-        const base64Content = buffer.toString("base64");
-
-        return {
-          success: true,
-          filepath,
-          fileType: ext,
-          fileSizeKB,
-          content: base64Content,
-          encoding: "base64",
-          mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        };
+        // For DOCX, extract text using mammoth (prevents context overflow from base64)
+        try {
+          const buffer = await fs.readFile(absolutePath);
+          const mammoth = await getMammoth();
+          const result = await mammoth.extractRawText({ buffer });
+          
+          return {
+            success: true,
+            filepath,
+            fileType: ext,
+            fileSizeKB,
+            content: result.value,
+            encoding: "text",
+          };
+        } catch (docxError) {
+          return {
+            success: false,
+            error: `Failed to parse DOCX: ${docxError instanceof Error ? docxError.message : 'Unknown error'}`,
+            suggestion: "The DOCX file may be corrupted or password-protected.",
+          };
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
