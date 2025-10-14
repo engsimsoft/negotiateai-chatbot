@@ -11,7 +11,31 @@
 - Завершить тестирование (осталось 4 теста из 6)
 - Добавление web_search tool (Brave Search API)
 - UI кастомизация (брендинг NegotiateAI)
-- Деплой на Vercel
+
+## [1.0.5] - 2025-10-15 - Vercel Deployment Fixed
+
+### Fixed
+- ✅ **КРИТИЧЕСКАЯ ПРОБЛЕМА: MIDDLEWARE_INVOCATION_FAILED на Vercel решена**
+  - После 14+ попыток исправить проблему в коде, определено что проблема в конфигурации Vercel проекта
+  - Решение: Полное удаление и пересоздание проекта через Vercel CLI
+  - Vercel project удалён: `vercel remove negotiateai-chatbot --yes`
+  - Vercel project создан заново: `vercel --yes`
+  - Environment variables настроены через CLI:
+    - POSTGRES_URL (существующая Neon DB)
+    - AUTH_SECRET
+    - ANTHROPIC_API_KEY
+    - BLOB_READ_WRITE_TOKEN
+  - Результат: Middleware работает корректно, сайт функционален
+
+### Changed
+- Vercel project полностью пересоздан с чистой конфигурацией
+- Все environment variables установлены через Vercel CLI для консистентности
+- Документирована полная история отладки в [docs/vercel-deploy-debug.md](docs/vercel-deploy-debug.md)
+
+### Lessons Learned
+- Иногда проблема не в коде, а в конфигурации на уровне платформы
+- Пересоздание проекта может быть быстрее чем поиск невидимой проблемы
+- Vercel CLI позволяет полностью автоматизировать процесс пересоздания
 
 ## [1.0.4] - 2025-10-14 - Debug Logging Cleanup
 
