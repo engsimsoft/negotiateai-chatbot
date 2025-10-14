@@ -62,11 +62,12 @@
   - Добавлен реальный ANTHROPIC_API_KEY
   - Проверен .gitignore (.env.local корректно игнорируется)
 
-- [ ] **1.4 Создать Anthropic API client** (10-15 мин)
-  - Создать lib/anthropic.ts
-  - Инициализация Anthropic SDK
-  - Базовая функция для streaming chat
-  - Тестовый запрос (console.log)
+- [X] **1.4 Создать Anthropic API client** (10-15 мин) ✅
+  - Создан lib/anthropic.ts
+  - Инициализация Anthropic SDK с API ключом
+  - streamChatCompletion() для streaming ответов
+  - simpleChatCompletion() для тестирования
+  - Модель: claude-sonnet-4-20250514
 
 - [ ] **1.5 Создать Chat API endpoint** (10-15 мин)
   - Создать app/api/chat/route.ts

@@ -12,11 +12,15 @@
   - @anthropic-ai/sdk (^0.65.0) - официальный Anthropic SDK
   - ai (^5.0.70) - Vercel AI SDK для streaming
 - .env.local: настроен с ANTHROPIC_API_KEY (не коммитится в git)
+- lib/anthropic.ts: Anthropic API client
+  - streamChatCompletion() - streaming ответы от Claude
+  - simpleChatCompletion() - простые запросы для тестирования
+  - Модель: claude-sonnet-4-20250514
 
 ### Changed
 - package.json: добавлены AI зависимости
 - package-lock.json: обновлены lockfile записи
-- roadmap.md: отмечена задача 1.3 как завершённая
+- roadmap.md: отмечены задачи 1.3, 1.4 как завершённые
 
 ### In Progress (Phase 1: Базовый чат)
 - Интеграция Anthropic API (Claude Sonnet 4.5)
