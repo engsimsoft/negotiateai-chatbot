@@ -52,10 +52,10 @@
   - Структура готова: app/, public/, конфигурационные файлы
   - README.md восстановлен после перезаписи
 
-- [ ] **1.2 Установка зависимостей** (5 мин)
-  - Установить `@anthropic-ai/sdk`
-  - Установить `ai` (Vercel AI SDK)
-  - Проверить package.json и package-lock.json
+- [X] **1.2 Установка зависимостей** (5 мин) ✅
+  - Установлен `@anthropic-ai/sdk` (^0.65.0)
+  - Установлен `ai` - Vercel AI SDK (^5.0.70)
+  - package.json и package-lock.json обновлены
 
 - [ ] **1.3 Настройка .env.local** (3 мин)
   - Скопировать .env.example → .env.local

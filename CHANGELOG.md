@@ -7,12 +7,14 @@
 
 ## [Unreleased]
 
+### Added
+- Установлены зависимости для AI интеграции:
+  - @anthropic-ai/sdk (^0.65.0) - официальный Anthropic SDK
+  - ai (^5.0.70) - Vercel AI SDK для streaming
+
 ### Changed
-- CLAUDE.md: добавлен раздел "Стратегия коммитов: Часто и по задачам"
-  - Правило: 1 задача из roadmap = 1 коммит
-  - Примеры хороших и плохих коммитов
-  - Когда делать и когда НЕ делать коммит
-  - Структура сообщения коммита
+- package.json: добавлены AI зависимости
+- package-lock.json: обновлены lockfile записи
 
 ### In Progress (Phase 1: Базовый чат)
 - Интеграция Anthropic API (Claude Sonnet 4.5)
