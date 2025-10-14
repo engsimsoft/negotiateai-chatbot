@@ -14,7 +14,14 @@ async function loadSystemPrompt(): Promise<string> {
 
   try {
     const systemPromptPath = join(process.cwd(), "system-prompt.md");
-    cachedSystemPrompt = await readFile(systemPromptPath, "utf-8");
+    const systemPromptTemplate = await readFile(systemPromptPath, "utf-8");
+
+    // Replace placeholder with instruction to read index.md via tool
+    const placeholder = "[ИНДЕКСНЫЙ ФАЙЛ index.md ВСТАВЛЯЕТСЯ СЮДА]";
+    const indexInstruction = "**ВАЖНО:** Для просмотра полного индекса базы знаний используй инструмент read_document('knowledge/index.md')";
+
+    cachedSystemPrompt = systemPromptTemplate.replace(placeholder, indexInstruction);
+
     return cachedSystemPrompt;
   } catch (error) {
     console.error("Failed to load system-prompt.md:", error);
