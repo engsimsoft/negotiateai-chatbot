@@ -1,5 +1,3 @@
-import { generateDummyPassword } from "./db/utils";
-
 export const isProductionEnvironment = process.env.NODE_ENV === "production";
 export const isDevelopmentEnvironment = process.env.NODE_ENV === "development";
 export const isTestEnvironment = Boolean(
@@ -10,4 +8,6 @@ export const isTestEnvironment = Boolean(
 
 export const guestRegex = /^guest-\d+$/;
 
-export const DUMMY_PASSWORD = generateDummyPassword();
+// Edge Runtime compatible: generate dummy password without bcrypt at module level
+// bcrypt-ts or its dependencies may use __dirname which breaks Edge Runtime
+export const DUMMY_PASSWORD = "dummy-password-hash-for-timing-attack-prevention";
