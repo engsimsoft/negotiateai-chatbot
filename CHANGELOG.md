@@ -7,12 +7,67 @@
 
 ## [Unreleased]
 
-### Planned (Phase 0-5 - NEW STRATEGY)
-- Клонирование Vercel AI Chatbot Template
-- Интеграция Anthropic провайдера
+### Planned (Next Steps)
+- Интеграция Anthropic провайдера (заменить placeholder модели)
 - Добавление custom tools (read_document, web_search, get_current_date)
+- Интеграция system-prompt.md с knowledge/index.md
 - UI кастомизация (брендинг NegotiateAI)
 - Деплой на Vercel
+
+## [0.6.0] - 2025-10-14 - Database Integration Complete
+
+### Added
+- ✅ **Neon Postgres Database** успешно интегрирована
+  - Provider: Neon Serverless Postgres
+  - Region: Frankfurt, Germany (West) - оптимально для EU/Russia
+  - Plan: Free tier (достаточно для development и testing)
+  - Database: `neondb`
+  - Connection: Pooled connection с SSL encryption
+- ✅ **Environment Variables** настроены
+  - `POSTGRES_URL`: полная connection string для Neon
+  - Обновлён `.env.local` для локальной разработки
+  - Vercel автоматически получил переменные из Neon integration
+- ✅ **Database Migrations** выполнены успешно
+  - Запущен `npm run db:migrate` через Drizzle ORM
+  - Создана полная схема: Users, Chats, Messages, Documents, Suggestions, Votes
+  - Время выполнения: 3.3 секунды
+  - Миграции применены к облачной Neon базе
+- ✅ **Vercel AI Chatbot Template** полностью функционален
+  - Dev server запускается без ошибок (939ms ready time)
+  - База данных подключена и работает
+  - Auth.js готов к использованию
+  - UI загружается корректно
+  - Sidebar, chat interface, user menu - всё работает
+
+### Changed
+- `.env.local`: заменён Docker Postgres на Neon Postgres
+  - Старый: `postgres://negotiateai:...@localhost:5432/negotiateai`
+  - Новый: `postgresql://neondb_owner:...@ep-dry-voice-ageycpaz-pooler.c-2.eu-central-1.aws.neon.tech/neondb`
+  - SSL mode: require (безопасное соединение)
+
+### Fixed
+- ❌ Решена проблема с локальным Docker Postgres
+  - Проблема: Конфликт портов между локальным Postgres (PID 763) и Docker (PID 89269)
+  - Решение: Переход на Neon Serverless Postgres (managed решение)
+  - Преимущество: Не нужно управлять Docker контейнерами, автоматический деплой
+- ✅ Устранены ошибки Auth.js
+  - Исправлено: `MissingSecret: Please define a 'secret'` (добавлен AUTH_SECRET)
+  - Исправлено: `InvalidProvider: Callback for provider type (credentials) is not supported` (подключена БД)
+
+### Working Now
+- ✅ Next.js 15.3.0 с Turbopack (350ms compilation)
+- ✅ React 19 RC UI components
+- ✅ Neon Postgres database подключена и работает
+- ✅ Auth.js готов (credentials provider требует БД - теперь есть)
+- ✅ Chat interface отображается
+- ✅ История чатов будет сохраняться
+- ✅ Готово к добавлению Anthropic provider
+
+### Next Steps
+- Phase 1 (roadmap.md): Интеграция Anthropic Provider
+  - Заменить placeholder модели на Claude Sonnet 4.5
+  - Настроить streaming через @anthropic-ai/sdk
+  - Протестировать базовый чат
 
 ## [0.5.0] - 2025-10-14 - КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ СТРАТЕГИИ
 
