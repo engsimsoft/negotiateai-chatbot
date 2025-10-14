@@ -12,6 +12,72 @@
 - UI кастомизация (брендинг NegotiateAI)
 - Деплой на Vercel
 
+## [0.8.0] - 2025-10-14 - Vercel Blob Storage Integration
+
+### Added
+- ✅ **Vercel Blob Storage** полностью интегрирован
+  - Создан Blob Store `chatbot-files` в Frankfurt region (FRA1)
+  - Подключен к проекту `negotiateai-chatbot` через Vercel Dashboard
+  - File upload endpoint ([app/(chat)/api/files/upload/route.ts](app/(chat)/api/files/upload/route.ts)) работает
+  - Environment variable: `BLOB_READ_WRITE_TOKEN` добавлен в `.env.local`
+- ✅ **File Upload Functionality** полностью работает
+  - Поддержка изображений: JPEG, PNG (до 5MB)
+  - Upload через UI (кнопка 📎 скрепка)
+  - Файлы сохраняются в Vercel Blob с публичным доступом
+  - Автоматическая генерация URLs для загруженных файлов
+- ✅ **Multimodal Support** (Claude Vision)
+  - Claude Sonnet 4.5 видит и анализирует загруженные изображения
+  - Работает через Anthropic Vision API
+  - Claude корректно интерпретирует визуальный контекст
+- ✅ **Architecture Decision Record**
+  - Создан [ADR 004: Vercel AI Chatbot Template](docs/decisions/004-vercel-ai-chatbot-template.md)
+  - Задокументировано решение использовать template
+  - Описаны причины, альтернативы и последствия
+  - Зафиксирован ключевой урок: "Следуй техзаданию, используй проверенные решения"
+
+### Changed
+- `next.config.ts`: Добавлен hostname `*.public.blob.vercel-storage.com` в `remotePatterns`
+  - Исправлена ошибка Next.js Image: "hostname is not configured"
+  - Теперь изображения из Vercel Blob корректно отображаются
+- `.env.local`: Добавлена переменная `BLOB_READ_WRITE_TOKEN`
+  - Token для доступа к Vercel Blob Storage
+  - Используется upload endpoint для сохранения файлов
+
+### Fixed
+- ❌ Решена проблема с upload endpoint
+  - Проблема: HTTP 500 - "Upload failed" (отсутствие BLOB_READ_WRITE_TOKEN)
+  - Решение: Создан Vercel Blob Store и получен токен
+  - Результат: Upload работает полностью
+- ✅ Исправлена ошибка отображения изображений
+  - Ошибка: "hostname is not configured under images in next.config.js"
+  - Решение: Добавлен wildcard hostname для Blob Storage
+  - Результат: Изображения корректно отображаются через Next.js Image
+
+### Working Now
+- ✅ File uploads (JPEG, PNG) через UI
+- ✅ Vercel Blob Storage сохраняет файлы
+- ✅ Next.js Image отображает загруженные изображения
+- ✅ Claude Sonnet 4.5 видит и анализирует изображения
+- ✅ Multimodal functionality полностью работает
+- ✅ System prompt применяется (Claude понимает контекст проекта при анализе изображений)
+
+### Infrastructure
+**Vercel Services настроены:**
+- ✅ Neon Postgres (database) - Frankfurt region
+- ✅ Vercel Blob Storage (file uploads) - Frankfurt region
+- ✅ Environment variables автоматически добавлены в Vercel project
+
+**Managed Services:**
+- Database: Neon Serverless Postgres
+- File Storage: Vercel Blob Storage
+- Platform: Vercel Edge Network
+
+### Next Steps
+- Phase 2: Добавить custom AI tools для работы с базой знаний
+  - read_document tool для чтения DOCX/PDF из knowledge/
+  - get_current_date tool
+  - web_search tool (Brave Search API)
+
 ## [0.7.0] - 2025-10-14 - Anthropic Integration Complete
 
 ### Added
