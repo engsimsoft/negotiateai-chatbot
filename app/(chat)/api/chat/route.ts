@@ -25,6 +25,7 @@ import { myProvider } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
 import { getCurrentDate } from "@/lib/ai/tools/get-current-date";
 import { getWeather } from "@/lib/ai/tools/get-weather";
+import { readDocument } from "@/lib/ai/tools/read-document";
 import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
 import { updateDocument } from "@/lib/ai/tools/update-document";
 import { isProductionEnvironment } from "@/lib/constants";
@@ -186,9 +187,10 @@ export async function POST(request: Request) {
           stopWhen: stepCountIs(5),
           experimental_activeTools:
             selectedChatModel === "claude-sonnet-4"
-              ? ["getCurrentDate"]
+              ? ["getCurrentDate", "readDocument"]
               : [
                   "getWeather",
+                  "readDocument",
                   "createDocument",
                   "updateDocument",
                   "requestSuggestions",
@@ -197,6 +199,7 @@ export async function POST(request: Request) {
           tools: {
             getCurrentDate,
             getWeather,
+            readDocument,
             createDocument: createDocument({ session, dataStream }),
             updateDocument: updateDocument({ session, dataStream }),
             requestSuggestions: requestSuggestions({
