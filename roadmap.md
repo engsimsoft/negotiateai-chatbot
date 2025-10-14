@@ -57,10 +57,10 @@
   - Установлен `ai` - Vercel AI SDK (^5.0.70)
   - package.json и package-lock.json обновлены
 
-- [ ] **1.3 Настройка .env.local** (3 мин)
-  - Скопировать .env.example → .env.local
-  - Добавить реальный ANTHROPIC_API_KEY
-  - Проверить .gitignore (должен содержать .env.local)
+- [X] **1.3 Настройка .env.local** (3 мин) ✅
+  - Скопирован .env.example → .env.local
+  - Добавлен реальный ANTHROPIC_API_KEY
+  - Проверен .gitignore (.env.local корректно игнорируется)
 
 - [ ] **1.4 Создать Anthropic API client** (10-15 мин)
   - Создать lib/anthropic.ts

@@ -11,10 +11,12 @@
 - Установлены зависимости для AI интеграции:
   - @anthropic-ai/sdk (^0.65.0) - официальный Anthropic SDK
   - ai (^5.0.70) - Vercel AI SDK для streaming
+- .env.local: настроен с ANTHROPIC_API_KEY (не коммитится в git)
 
 ### Changed
 - package.json: добавлены AI зависимости
 - package-lock.json: обновлены lockfile записи
+- roadmap.md: отмечена задача 1.3 как завершённая
 
 ### In Progress (Phase 1: Базовый чат)
 - Интеграция Anthropic API (Claude Sonnet 4.5)
