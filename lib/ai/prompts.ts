@@ -1,5 +1,27 @@
+import { readFile } from "fs/promises";
+import { join } from "path";
 import type { Geo } from "@vercel/functions";
 import type { ArtifactKind } from "@/components/artifact";
+
+// Cache for system prompt to avoid reading file on every request
+let cachedSystemPrompt: string | null = null;
+
+// Load system prompt from system-prompt.md
+async function loadSystemPrompt(): Promise<string> {
+  if (cachedSystemPrompt) {
+    return cachedSystemPrompt;
+  }
+
+  try {
+    const systemPromptPath = join(process.cwd(), "system-prompt.md");
+    cachedSystemPrompt = await readFile(systemPromptPath, "utf-8");
+    return cachedSystemPrompt;
+  } catch (error) {
+    console.error("Failed to load system-prompt.md:", error);
+    // Fallback to basic prompt if file not found
+    return "You are NegotiateAI Assistant, a helpful AI assistant for negotiations on MIR.TRADE project.";
+  }
+}
 
 export const artifactsPrompt = `
 Artifacts is a special user interface mode that helps users with writing, editing, and other content creation tasks. When artifact is open, it is on the right side of the screen, while the conversation is on the left side. When creating or updating documents, changes are reflected in real-time on the artifacts and visible to the user.
@@ -50,20 +72,20 @@ About the origin of user's request:
 - country: ${requestHints.country}
 `;
 
-export const systemPrompt = ({
+export const systemPrompt = async ({
   selectedChatModel,
   requestHints,
 }: {
   selectedChatModel: string;
   requestHints: RequestHints;
 }) => {
+  // Load our custom system prompt from system-prompt.md
+  const customSystemPrompt = await loadSystemPrompt();
   const requestPrompt = getRequestPromptFromHints(requestHints);
 
-  if (selectedChatModel === "chat-model-reasoning") {
-    return `${regularPrompt}\n\n${requestPrompt}`;
-  }
-
-  return `${regularPrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;
+  // For NegotiateAI, we use our custom system prompt
+  // Artifacts functionality is not needed for our use case
+  return `${customSystemPrompt}\n\n${requestPrompt}`;
 };
 
 export const codePrompt = `

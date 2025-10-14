@@ -8,11 +8,54 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- Интеграция Anthropic провайдера (заменить placeholder модели)
 - Добавление custom tools (read_document, web_search, get_current_date)
-- Интеграция system-prompt.md с knowledge/index.md
 - UI кастомизация (брендинг NegotiateAI)
 - Деплой на Vercel
+
+## [0.7.0] - 2025-10-14 - Anthropic Integration Complete
+
+### Added
+- ✅ **Anthropic AI Provider** полностью интегрирован
+  - Установлен `@ai-sdk/anthropic` (v2.0.27)
+  - Модель: Claude Sonnet 4.5 (`claude-sonnet-4-20250514`)
+  - Прямое подключение через Anthropic API (не через Gateway)
+- ✅ **System Prompt Integration** из `system-prompt.md`
+  - Создана функция `loadSystemPrompt()` с кэшированием
+  - System prompt (~1018 строк) загружается автоматически
+  - Fallback на базовый промпт при ошибке
+- ✅ **Model Configuration** обновлена
+  - [lib/ai/models.ts](lib/ai/models.ts): заменён DEFAULT_CHAT_MODEL на `"claude-sonnet-4"`
+  - [lib/ai/providers.ts](lib/ai/providers.ts): настроен Anthropic provider
+  - [lib/ai/prompts.ts](lib/ai/prompts.ts): async загрузка system-prompt.md
+- ✅ **API Schema Validation** исправлена
+  - [app/(chat)/api/chat/schema.ts](app/(chat)/api/chat/schema.ts): обновлен enum для `claude-sonnet-4`
+  - Исправлена ошибка HTTP 400 при валидации
+
+### Changed
+- `lib/ai/models.ts`: убраны Grok модели, добавлен Claude Sonnet 4.5
+- `lib/ai/providers.ts`: заменён `@ai-sdk/gateway` на `@ai-sdk/anthropic`
+- `lib/ai/prompts.ts`: `systemPrompt()` теперь async функция
+- `app/(chat)/api/chat/route.ts`: добавлен await для загрузки system prompt
+- `package.json`: добавлена зависимость `@ai-sdk/anthropic`
+
+### Fixed
+- Исправлена валидация schema для нового model ID
+- Убраны старые модели из experimental_activeTools check
+
+### Working Now
+- ✅ Claude Sonnet 4.5 отвечает через Anthropic API
+- ✅ System prompt загружается из system-prompt.md
+- ✅ Claude представляется как "NegotiateAI Assistant"
+- ✅ Claude понимает роль и проект MIR.TRADE
+- ✅ Streaming работает плавно
+- ✅ Markdown форматирование работает
+- ✅ Базовый чат полностью функционален
+
+### Next Steps
+- Phase 2: Добавить custom AI tools
+  - read_document tool для чтения DOCX/PDF
+  - get_current_date tool
+  - web_search tool (Brave Search API)
 
 ## [0.6.0] - 2025-10-14 - Database Integration Complete
 

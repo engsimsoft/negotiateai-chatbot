@@ -1,10 +1,11 @@
-import { gateway } from "@ai-sdk/gateway";
-import {
-  customProvider,
-  extractReasoningMiddleware,
-  wrapLanguageModel,
-} from "ai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { customProvider } from "ai";
 import { isTestEnvironment } from "../constants";
+
+// Initialize Anthropic provider
+const anthropic = createAnthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
 export const myProvider = isTestEnvironment
   ? (() => {
@@ -16,8 +17,7 @@ export const myProvider = isTestEnvironment
       } = require("./models.mock");
       return customProvider({
         languageModels: {
-          "chat-model": chatModel,
-          "chat-model-reasoning": reasoningModel,
+          "claude-sonnet-4": chatModel,
           "title-model": titleModel,
           "artifact-model": artifactModel,
         },
@@ -25,12 +25,8 @@ export const myProvider = isTestEnvironment
     })()
   : customProvider({
       languageModels: {
-        "chat-model": gateway.languageModel("xai/grok-2-vision-1212"),
-        "chat-model-reasoning": wrapLanguageModel({
-          model: gateway.languageModel("xai/grok-3-mini"),
-          middleware: extractReasoningMiddleware({ tagName: "think" }),
-        }),
-        "title-model": gateway.languageModel("xai/grok-2-1212"),
-        "artifact-model": gateway.languageModel("xai/grok-2-1212"),
+        "claude-sonnet-4": anthropic("claude-sonnet-4-20250514"),
+        "title-model": anthropic("claude-sonnet-4-20250514"),
+        "artifact-model": anthropic("claude-sonnet-4-20250514"),
       },
     });
