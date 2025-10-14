@@ -1,9 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
-
-// Remove lib/constants import to avoid __dirname error
-const guestRegex = /^guest-\d+$/;
-const isDevelopmentEnvironment = process.env.NODE_ENV === "development";
+import { guestRegex, isDevelopmentEnvironment } from "./lib/constants";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
