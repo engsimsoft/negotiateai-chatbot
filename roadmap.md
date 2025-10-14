@@ -77,16 +77,14 @@
   - Edge runtime для быстрого ответа
   - Установлен @ai-sdk/anthropic provider
 
-- [ ] **1.6 Создать UI компоненты чата** (15-20 мин)
-  - Создать components/Chat.tsx (контейнер)
-  - Создать components/Message.tsx (одно сообщение)
-  - Создать components/InputForm.tsx (поле ввода + кнопка)
-  - Базовые Tailwind стили
-
-- [ ] **1.7 Подключить чат к API** (10 мин)
-  - useChat() hook из Vercel AI SDK
-  - Отправка сообщений в /api/chat
-  - Отображение streaming ответов
+- [X] **1.6-1.7 Создать UI и подключить к API** (25-30 мин) ✅
+  - Создан app/page.tsx с полным чат интерфейсом
+  - useChat() hook из Vercel AI SDK интегрирован
+  - Messages list с user/assistant стилями
+  - Input форма с кнопкой отправки
+  - Loading состояние с анимированными точками
+  - Streaming ответы отображаются в реальном времени
+  - Responsive Tailwind стили (мобильные + desktop)
 
 - [ ] **1.8 Запуск и тестирование** (5-10 мин)
   - `npm run dev`

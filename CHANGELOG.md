@@ -21,11 +21,17 @@
   - Edge runtime для низкой латентности
   - Обработка ошибок и валидация
 - @ai-sdk/anthropic: Anthropic provider для Vercel AI SDK
+- app/page.tsx: Chat UI с полным функционалом
+  - useChat() hook для управления чатом
+  - Messages list с пользовательскими и AI сообщениями
+  - Input форма с валидацией и disabled состояниями
+  - Loading индикатор с анимацией
+  - Responsive дизайн для всех экранов
 
 ### Changed
 - package.json: добавлены AI зависимости (@ai-sdk/anthropic)
 - package-lock.json: обновлены lockfile записи
-- roadmap.md: отмечены задачи 1.3, 1.4, 1.5 как завершённые
+- roadmap.md: отмечены задачи 1.3, 1.4, 1.5, 1.6-1.7 как завершённые
 
 ### In Progress (Phase 1: Базовый чат)
 - Интеграция Anthropic API (Claude Sonnet 4.5)
