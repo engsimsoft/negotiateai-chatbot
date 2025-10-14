@@ -7,10 +7,43 @@
 
 ## [Unreleased]
 
-### Planned (Phase 3-4)
-- Интеграция Brave Search API (web_search)
-- UI полировка и error handling
+### Planned (Phase 0-5 - NEW STRATEGY)
+- Клонирование Vercel AI Chatbot Template
+- Интеграция Anthropic провайдера
+- Добавление custom tools (read_document, web_search, get_current_date)
+- UI кастомизация (брендинг NegotiateAI)
 - Деплой на Vercel
+
+## [0.5.0] - 2025-10-14 - КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ СТРАТЕГИИ
+
+### Changed - СМЕНА ПОДХОДА
+**⚠️ ПЕРЕХОД С САМОПИСНОГО РЕШЕНИЯ НА VERCEL AI CHATBOT TEMPLATE**
+
+**Причина смены стратегии:**
+- Техзадание (`Техзадание /negotiateai-tech-spec.md`) **с самого начала указывало** использовать Vercel AI Chatbot Template
+- Потратили весь день (10+ часов) на самописное решение из-за невнимательного чтения документации
+- Столкнулись с множеством проблем: AI SDK API bugs, streaming issues, tools не работают
+- Реализация с нуля НЕ имеет смысла когда есть готовое решение от Vercel
+
+**Что было сделано (самописное - DEPRECATED):**
+- ❌ app/api/chat/route.ts - custom implementation (НЕ РАБОТАЕТ полностью)
+- ❌ lib/tools.ts - tools implementation (tools НЕ ВЫЗЫВАЮТСЯ)
+- ❌ app/page.tsx - basic UI (будет заменен на template UI)
+- ❌ Боролись с AI SDK v5 bugs целый день (НАПРАСНО)
+
+**Что делаем дальше (правильный подход):**
+- ✅ Клонируем Vercel AI Chatbot Template
+- ✅ Адаптируем под наши нужды (custom tools + system prompt)
+- ✅ Получаем auth + database + history из коробки
+- ✅ Все работает БЕЗ борьбы с багами
+
+**Обновлено:**
+- ✅ CLAUDE.md - добавлено **ЖИРНЫМИ БУКВАМИ: ЧИТАЙ ТЕХЗАДАНИЕ ПЕРВЫМ ДЕЛОМ**
+- ✅ roadmap.md - полностью переписан под Vercel AI Chatbot Template (20 новых задач)
+- ✅ README.md - указано что проект основан на Vercel AI Chatbot Template
+- ✅ CHANGELOG.md - добавлена запись о критическом изменении стратегии
+
+**Урок:** Всегда читай техзадание ДО начала кодинга, а не ПОСЛЕ дня мучений.
 
 ## [0.4.1] - 2025-10-14
 
