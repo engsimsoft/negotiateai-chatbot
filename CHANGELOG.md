@@ -8,9 +8,82 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- Добавление custom tools (read_document, web_search, get_current_date)
+- ⚠️ Исправление readDocument tool (убрать загрузку всей папки knowledge/)
+- ⚠️ Вернуть index.md в system-prompt.md (согласно техзаданию)
+- Добавление web_search tool (Brave Search API)
 - UI кастомизация (брендинг NegotiateAI)
 - Деплой на Vercel
+
+## [0.9.0] - 2025-10-14 - getCurrentDate Tool Added (Partial Phase 2)
+
+### Added
+- ✅ **getCurrentDate Tool** полностью работает
+  - Создан [lib/ai/tools/get-current-date.ts](lib/ai/tools/get-current-date.ts)
+  - Использует tool() из "ai" package с Zod schema
+  - Возвращает ISO 8601 дату с timezone
+  - Форматирование на русском языке (дата, время, дата+время)
+  - Интегрирован в [app/(chat)/api/chat/route.ts](app/(chat)/api/chat/route.ts)
+  - Добавлен в experimental_activeTools для claude-sonnet-4
+  - Протестирован - работает идеально!
+
+- ⚠️ **readDocument Tool** создан, но НЕ работает
+  - Создан [lib/ai/tools/read-document.ts](lib/ai/tools/read-document.ts)
+  - Реализована security validation (только knowledge/ folder)
+  - Поддержка DOCX, PDF, TXT, MD файлов
+  - Base64 encoding для бинарных файлов
+  - **ПРОБЛЕМА:** При добавлении в activeTools возникает ошибка 200K токенов
+  - **ОШИБКА:** `prompt is too long: 200281 tokens > 200000 maximum`
+  - **ПРИЧИНА:** Неизвестна - возможно загружается вся папка knowledge/ автоматически
+  - **СТАТУС:** Tool существует, но временно отключен из activeTools
+
+### Changed
+- [app/(chat)/api/chat/route.ts](app/(chat)/api/chat/route.ts):
+  - Добавлен import getCurrentDate
+  - Добавлен "getCurrentDate" в experimental_activeTools
+  - Добавлен getCurrentDate в tools object
+- [lib/ai/prompts.ts](lib/ai/prompts.ts):
+  - Убрана вставка index.md в system prompt (временно)
+  - Добавлена инструкция читать index.md через read_document tool
+  - **ПРОБЛЕМА:** Это нарушает техзадание (линия 227: "Вставь содержимое index.md в маркер")
+
+### Fixed
+- ✅ Решена проблема с 200K токенами (временно)
+  - Проблема: Chat зависал после добавления readDocument tool
+  - Ошибка: `prompt is too long: 200281 tokens > 200000 maximum`
+  - Неправильное решение: Убрал readDocument из activeTools
+  - Результат: Chat работает, но БЕЗ чтения документов
+  - **ВАЖНО:** Это НЕПРАВИЛЬНОЕ решение - нужно исправить root cause
+
+### Working Now
+- ✅ Базовый чат стабилен
+- ✅ getCurrentDate tool работает отлично
+- ✅ Vercel Blob Storage (image uploads)
+- ✅ Claude Sonnet 4.5 отвечает правильно
+- ✅ System prompt применяется (БЕЗ index.md)
+
+### Known Issues
+- ⚠️ **КРИТИЧЕСКАЯ ПРОБЛЕМА:** readDocument tool не работает
+  - Добавление в activeTools вызывает ошибку 200K токенов
+  - Причина неизвестна - требуется исследование
+  - Возможно: Claude пытается загрузить всю папку knowledge/ (90 документов)
+  - Возможно: Tool description примеры вызывают автоматическую загрузку
+- ⚠️ index.md НЕ встроен в system-prompt.md
+  - Нарушает техзадание (линия 227)
+  - Claude не видит полный список документов
+  - Временное решение до исправления readDocument
+- ⚠️ Документация НЕ обновлена перед коммитом
+  - Пользователь указал на эту ошибку
+  - roadmap.md и CHANGELOG.md должны обновляться ДО commit
+
+### Next Steps
+1. **ПРИОРИТЕТ:** Исследовать почему readDocument вызывает 200K токенов
+   - Проверить tool description
+   - Проверить execute функцию
+   - Выяснить что вызывает загрузку всей папки
+2. Исправить readDocument tool правильно
+3. Вернуть index.md в system-prompt.md (как требует техзадание)
+4. Протестировать чтение документов
+5. Добавить web_search tool (Brave Search API)
 
 ## [0.8.0] - 2025-10-14 - Vercel Blob Storage Integration
 
