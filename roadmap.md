@@ -69,11 +69,13 @@
   - simpleChatCompletion() для тестирования
   - Модель: claude-sonnet-4-20250514
 
-- [ ] **1.5 Создать Chat API endpoint** (10-15 мин)
-  - Создать app/api/chat/route.ts
+- [X] **1.5 Создать Chat API endpoint** (10-15 мин) ✅
+  - Создан app/api/chat/route.ts
   - POST handler для сообщений
-  - Streaming response через StreamingTextResponse
+  - Streaming через Vercel AI SDK (streamText)
   - Обработка ошибок (try-catch)
+  - Edge runtime для быстрого ответа
+  - Установлен @ai-sdk/anthropic provider
 
 - [ ] **1.6 Создать UI компоненты чата** (15-20 мин)
   - Создать components/Chat.tsx (контейнер)

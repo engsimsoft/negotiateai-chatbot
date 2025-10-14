@@ -16,11 +16,16 @@
   - streamChatCompletion() - streaming ответы от Claude
   - simpleChatCompletion() - простые запросы для тестирования
   - Модель: claude-sonnet-4-20250514
+- app/api/chat/route.ts: Chat API endpoint
+  - POST handler с streaming через Vercel AI SDK
+  - Edge runtime для низкой латентности
+  - Обработка ошибок и валидация
+- @ai-sdk/anthropic: Anthropic provider для Vercel AI SDK
 
 ### Changed
-- package.json: добавлены AI зависимости
+- package.json: добавлены AI зависимости (@ai-sdk/anthropic)
 - package-lock.json: обновлены lockfile записи
-- roadmap.md: отмечены задачи 1.3, 1.4 как завершённые
+- roadmap.md: отмечены задачи 1.3, 1.4, 1.5 как завершённые
 
 ### In Progress (Phase 1: Базовый чат)
 - Интеграция Anthropic API (Claude Sonnet 4.5)
