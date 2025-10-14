@@ -7,14 +7,88 @@
 
 ## [Unreleased]
 
-### Planned (Phase 2-4)
-- Реализация функции read_document для чтения DOCX/PDF
-- Создание knowledge/index.md (каталог ~40 документов)
+### Planned (Phase 3-4)
 - Интеграция Brave Search API (web_search)
-- Реализация функции get_current_date
-- Создание system-prompt.md
 - UI полировка и error handling
 - Деплой на Vercel
+
+## [0.4.1] - 2025-10-14
+
+### Fixed
+- app/api/chat/route.ts: исправлена обработка messages с полем 'parts' (AI SDK v5 format)
+  - AI SDK v5 отправляет messages с структурой {parts: [{type, text}]} вместо {content}
+  - Добавлена конвертация parts → content для совместимости
+- System prompt успешно загружается и применяется
+- Базовый чат работает с system prompt и streaming
+
+### Changed
+- Временно отключены tools из-за бага AI SDK v5 с Anthropic провайдером
+  - Ошибка: "tools.0.custom.input_schema.type: Field required"
+  - AI SDK неправильно сериализует Zod/JSON schemas для Anthropic API
+  - Требуется решение для включения read_document и get_current_date
+
+### Working
+- ✅ Базовый чат с Claude
+- ✅ Streaming ответов через toUIMessageStreamResponse()
+- ✅ System prompt (~1018 строк) загружается из system-prompt.md
+- ✅ Claude понимает роль NegotiateAI Assistant
+- ✅ Форматирование markdown в ответах
+
+### Blocked
+- ❌ Function calling (tools) - блокировано багом AI SDK
+- ❌ Phase 2.8 тестирование - требует рабочие tools
+
+## [0.4.0] - 2025-10-14
+
+### Added
+- Phase 2: База знаний полностью интегрирована
+- knowledge/index.md: каталог ~25 ключевых документов из ~102 файлов
+  - Описания по категориям: главные, коммерческие, технические, страновые
+  - Для каждого: путь, формат, дата, размер, описание (150-250 символов), ключевые темы
+  - Структура папок (17 стран)
+- lib/tools.ts: полная реализация AI инструментов
+  - read_document(filepath): чтение DOCX/PDF через Anthropic API
+    - Base64 кодирование документов
+    - Поддержка форматов: PDF, DOCX, DOC, TXT, CSV, HTML
+    - Валидация путей (только knowledge/*)
+    - Проверка размера файла (<30MB)
+    - Обработка ошибок
+  - get_current_date(): текущая дата в ISO 8601
+  - toolDefinitions: схемы для function calling
+- system-prompt.md: полный системный промпт (~1018 строк)
+  - Роль NegotiateAI Assistant для MIR.TRADE
+  - Философия "Show, don't tell"
+  - Встроенный полный каталог knowledge/index.md
+  - Детальные инструкции по 3 tools (read_document, web_search, get_current_date)
+  - Формат ответов со ссылками на источники
+  - Специальные сценарии (аргументация, анализ, сравнение)
+  - Примеры создания "вау-эффекта"
+- app/api/chat/route.ts: интеграция системного промпта и tools
+  - getSystemPrompt(): загрузка system-prompt.md с кэшированием
+  - system параметр в streamText
+  - tools интеграция (read_document, get_current_date)
+  - execute функции для каждого tool
+  - Fallback промпт при ошибке загрузки
+
+### Changed
+- app/api/chat/route.ts: runtime изменён с 'edge' на 'nodejs'
+  - Необходимо для file system доступа (fs/promises)
+  - Добавлены импорты fs и path
+- roadmap.md: обновлён прогресс Phase 2 (7/8 задач, 87.5%)
+- roadmap.md: общий прогресс 27/28 задач (96%)
+
+### Completed
+- ✅ Phase 2.1-2.7: База знаний готова (87.5%)
+  - Папка knowledge/ проверена (102 файла)
+  - index.md создан с описанием документов
+  - read_document tool реализован
+  - Function calling интегрирован
+  - Tool calls обработка через AI SDK
+  - System prompt создан и встроен
+  - System prompt подключён к API
+
+### Next
+- Phase 2.8: Тестирование чтения документов (осталось 10 мин)
 
 ## [0.3.0] - 2025-10-14
 
