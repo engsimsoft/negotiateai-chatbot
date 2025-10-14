@@ -9,10 +9,55 @@
 
 ### Planned (Next Steps)
 - Завершить тестирование (осталось 4 теста из 6)
-- Добавить mammoth.js для парсинга DOCX (аналогично PDF)
 - Добавление web_search tool (Brave Search API)
 - UI кастомизация (брендинг NegotiateAI)
 - Деплой на Vercel
+
+## [1.0.4] - 2025-10-14 - Debug Logging Cleanup
+
+### Changed
+- Убраны verbose debug логи из `app/(chat)/api/chat/route.ts`
+  - Удалено детальное логирование message parts
+  - Удалены расчёты TOTAL SIZE
+  - Удалено логирование размера system prompt
+  - Удалено логирование размера model messages
+  - Логи были полезны при отладке, но не нужны в production коде
+
+## [1.0.3] - 2025-10-14 - DOCX Context Overflow Fixed
+
+### Fixed
+- ✅ **КРИТИЧЕСКАЯ ПРОБЛЕМА: DOCX в base64 resolved**
+  - Проблема: DOCX файлы кодировались в base64, раздувая токены
+    - 46KB DOCX → 61KB base64 (+33% увеличение размера)
+    - 3 DOCX файла = 111KB base64 = ~28K токенов
+    - В комбинации с PDF, первый запрос потреблял 113K токенов (56% от лимита 200K)
+  
+- ✅ **Решение: Извлечение текста из DOCX через mammoth.js**
+  - Установлен `mammoth` library (--legacy-peer-deps)
+  - Модифицирован `readDocument` tool для парсинга DOCX в plain text
+  - Извлечение текста значительно компактнее base64 encoding
+  - Добавлена обработка ошибок (поврежденные/защищённые паролем DOCX)
+
+### Changed
+- `lib/ai/tools/read-document.ts`:
+  - Добавлен import mammoth
+  - DOCX теперь парсятся в текст вместо base64
+  - Возвращается plain text вместо base64 content
+  - Добавлена функция getMammoth() для dynamic import
+  
+- `package.json`:
+  - Добавлена зависимость: mammoth (with --legacy-peer-deps)
+
+### Result
+- DOCX файлы теперь возвращают plain text вместо base64
+- Значительно снижено потребление токенов при чтении документов
+- Первый запрос использует ~15-20K токенов вместо 113K
+- Больше нет base64 bloat для Word документов
+
+### Testing
+- ✅ Протестировано: AI может читать DOCX документы
+- ✅ Проверено: нет context overflow
+- ✅ Подтверждено: значительное снижение токенов
 
 ## [1.0.2] - 2025-10-14 - PDF Context Overflow Fixed
 
