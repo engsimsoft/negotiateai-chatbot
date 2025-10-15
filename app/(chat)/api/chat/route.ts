@@ -43,7 +43,7 @@ import {
 import { ChatSDKError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
-import { convertToUIMessages, generateUUID } from "@/lib/utils";
+import { convertToUIMessages, estimateMessageTokens, generateUUID } from "@/lib/utils";
 import { generateTitleFromUserMessage } from "../../actions";
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
@@ -146,8 +146,31 @@ export async function POST(request: Request) {
       });
     }
 
-    const messagesFromDb = await getMessagesByChatId({ id });
+    // Вычисляем токены нового user message
+    const newMessageTokens = estimateMessageTokens(message.parts);
+    console.log(
+      `[Token Aware] Chat ${id}: New user message has ~${newMessageTokens} tokens`
+    );
+
+    // Загружаем сообщения с учётом токенов нового сообщения
+    // maxTokens = 140K, оставляем ~60K для system prompt (10K) + response (50K)
+    const messagesFromDb = await getMessagesByChatId({
+      id,
+      maxTokens: 140000 - newMessageTokens, // Вычитаем токены нового сообщения
+      minMessages: 20,
+    });
+
     const uiMessages = [...convertToUIMessages(messagesFromDb), message];
+
+    // Подсчитываем общее количество токенов в контексте
+    const totalHistoryTokens = messagesFromDb.reduce((sum, msg) => {
+      return sum + (msg.tokenCount || estimateMessageTokens(msg.parts as any));
+    }, 0);
+
+    console.log(
+      `[Token Aware] Chat ${id}: Total context = ${totalHistoryTokens + newMessageTokens} tokens ` +
+      `(${messagesFromDb.length} history messages + 1 new message)`
+    );
 
     const { longitude, latitude, city, country } = geolocation(request);
 
@@ -167,6 +190,7 @@ export async function POST(request: Request) {
           parts: message.parts,
           attachments: [],
           createdAt: new Date(),
+          tokenCount: estimateMessageTokens(message.parts),
         },
       ],
     });
@@ -258,22 +282,35 @@ export async function POST(request: Request) {
       },
       generateId: generateUUID,
       onFinish: async ({ messages }) => {
-        await saveMessages({
-          messages: messages.map((currentMessage) => ({
+        const messagesToSave = messages.map((currentMessage) => {
+          // Filter out tool results to prevent context overflow
+          // Tool results are needed only during response generation, not in history
+          const filteredParts = currentMessage.parts.filter((part: any) => {
+            const type = part.type;
+            // Keep only text and step markers, remove tool-call and tool results
+            return type === 'text' || type === 'step-start' || type === 'step-finish';
+          });
+
+          const tokenCount = estimateMessageTokens(filteredParts);
+
+          return {
             id: currentMessage.id,
             role: currentMessage.role,
-            // Filter out tool results to prevent context overflow
-            // Tool results are needed only during response generation, not in history
-            parts: currentMessage.parts.filter((part: any) => {
-              const type = part.type;
-              // Keep only text and step markers, remove tool-call and tool results
-              return type === 'text' || type === 'step-start' || type === 'step-finish';
-            }),
+            parts: filteredParts,
             createdAt: new Date(),
             attachments: [],
             chatId: id,
-          })),
+            tokenCount,
+          };
         });
+
+        // Логируем сохранение ассистент-сообщений
+        const totalTokens = messagesToSave.reduce((sum, msg) => sum + (msg.tokenCount || 0), 0);
+        console.log(
+          `[Token Aware] Chat ${id}: Saving ${messagesToSave.length} assistant message(s) with ~${totalTokens} tokens`
+        );
+
+        await saveMessages({ messages: messagesToSave });
 
         if (finalMergedUsage) {
           try {

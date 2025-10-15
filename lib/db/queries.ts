@@ -18,7 +18,7 @@ import type { ArtifactKind } from "@/components/artifact";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { ChatSDKError } from "../errors";
 import type { AppUsage } from "../usage";
-import { generateUUID } from "../utils";
+import { estimateMessageTokens, generateUUID } from "../utils";
 import {
   type Chat,
   chat,
@@ -251,14 +251,85 @@ export async function saveMessages({ messages }: { messages: DBMessage[] }) {
   }
 }
 
-export async function getMessagesByChatId({ id }: { id: string }) {
+export async function getMessagesByChatId({
+  id,
+  maxTokens = 140000,
+  minMessages = 20,
+}: {
+  id: string;
+  maxTokens?: number;
+  minMessages?: number;
+}) {
   try {
-    return await db
+    // Загружаем все сообщения от новых к старым
+    const allMessages = await db
       .select()
       .from(message)
       .where(eq(message.chatId, id))
-      .orderBy(asc(message.createdAt));
-  } catch (_error) {
+      .orderBy(desc(message.createdAt));
+
+    if (allMessages.length === 0) {
+      return [];
+    }
+
+    // Стратегия Token-Aware Sliding Window:
+    // 1. Всегда загружаем минимум minMessages последних сообщений
+    // 2. Добавляем старые сообщения, пока не превысим maxTokens
+    // 3. Graceful degradation: если tokenCount = null, оцениваем на лету
+
+    const selectedMessages: DBMessage[] = [];
+    let currentTokens = 0;
+    let messagesWithFallback = 0; // Счётчик сообщений без tokenCount
+
+    console.log(
+      `[Token Aware] Chat ${id}: Starting to load messages (total in DB: ${allMessages.length}, limit: ${maxTokens} tokens, minMessages: ${minMessages})`
+    );
+
+    for (let i = 0; i < allMessages.length; i++) {
+      const msg = allMessages[i];
+
+      // Получаем количество токенов (с fallback на оценку)
+      const msgTokens = msg.tokenCount || estimateMessageTokens(msg.parts as any);
+
+      // Отслеживаем fallback
+      if (!msg.tokenCount) {
+        messagesWithFallback++;
+      }
+
+      // Всегда берём первые minMessages (самые новые)
+      if (i < minMessages) {
+        selectedMessages.push(msg);
+        currentTokens += msgTokens;
+        continue;
+      }
+
+      // После minMessages - проверяем лимит
+      if (currentTokens + msgTokens > maxTokens) {
+        // Достигли лимита - прекращаем загрузку
+        console.log(
+          `[Token Aware] Chat ${id}: Reached token limit! ` +
+          `Loaded ${selectedMessages.length}/${allMessages.length} messages, ~${currentTokens} tokens ` +
+          `(${messagesWithFallback} messages used fallback estimation)`
+        );
+        break;
+      }
+
+      selectedMessages.push(msg);
+      currentTokens += msgTokens;
+    }
+
+    // Если загрузили все сообщения - логируем
+    if (selectedMessages.length === allMessages.length) {
+      console.log(
+        `[Token Aware] Chat ${id}: Loaded ALL ${selectedMessages.length} messages, ~${currentTokens} tokens ` +
+        `(${messagesWithFallback} messages used fallback estimation)`
+      );
+    }
+
+    // Возвращаем в правильном порядке (от старых к новым)
+    return selectedMessages.reverse();
+  } catch (error) {
+    console.error(`[Token Aware] Error in getMessagesByChatId for chat ${id}:`, error);
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get messages by chat id"

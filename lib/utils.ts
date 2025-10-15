@@ -118,3 +118,53 @@ export function getTextFromMessage(message: ChatMessage): string {
     .map((part) => part.text)
     .join('');
 }
+
+/**
+ * Оценка количества токенов для текста с учётом языка
+ * Формула для русского текста: ~1.5-2.0 токена на слово
+ * Формула для английского текста: ~1.3 токена на слово
+ */
+export function estimateTokenCount(text: string): number {
+  if (!text || text.length === 0) {
+    return 0;
+  }
+
+  const words = text.split(/\s+/).length;
+  const chars = text.length;
+
+  // Определяем язык (приблизительно)
+  const cyrillicChars = (text.match(/[а-яёА-ЯЁ]/g) || []).length;
+  const isCyrillic = cyrillicChars > chars * 0.3;
+
+  if (isCyrillic) {
+    // Для русского языка: учитываем среднюю длину слов
+    const avgCharsPerWord = words > 0 ? chars / words : 0;
+    if (avgCharsPerWord > 5) {
+      // Длинные русские слова
+      return Math.ceil(words * 2.0);
+    }
+    return Math.ceil(words * 1.7);
+  }
+
+  // Английский или смешанный текст
+  return Math.ceil(words * 1.3);
+}
+
+/**
+ * Оценка количества токенов для сообщения
+ * Считает токены из text parts + добавляет overhead для метаданных
+ */
+export function estimateMessageTokens(parts: any[]): number {
+  let total = 0;
+
+  for (const part of parts) {
+    if (part.type === 'text' && part.text) {
+      total += estimateTokenCount(part.text);
+    }
+    // tool-call, step-start, step-finish и другие parts игнорируем
+    // (они уже отфильтрованы при сохранении)
+  }
+
+  // Добавляем overhead для метаданных сообщения (role, id, timestamps, etc.)
+  return total + 10;
+}
