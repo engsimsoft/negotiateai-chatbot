@@ -9,8 +9,104 @@
 
 ### Planned (Next Steps)
 - Завершить тестирование (осталось 4 теста из 6)
-- Добавление web_search tool (Brave Search API)
 - UI кастомизация (брендинг NegotiateAI)
+
+## [1.0.8] - 2025-10-15 - Cost Optimization: Claude Haiku 3.5 Added
+
+### Added
+- ✅ **Claude Haiku 3.5 как альтернативная модель для тестирования**
+  - Добавлена в [lib/ai/models.ts](lib/ai/models.ts):
+    - id: `claude-haiku-3.5`
+    - name: "Claude Haiku 3.5"
+    - description: "Fast and cost-effective model for testing and simple tasks (75% cheaper)"
+    - pricing: $0.80 input / $4.00 output per MTok
+  - Настроен provider в [lib/ai/providers.ts](lib/ai/providers.ts):
+    - Model ID: `claude-3-5-haiku-20241022`
+    - Добавлен для production и test environments
+  - Обновлены entitlements в [lib/ai/entitlements.ts](lib/ai/entitlements.ts):
+    - Доступен для guest и regular users
+    - Альтернатива для тестирования и простых задач
+
+### Changed
+- **lib/ai/models.ts**: Добавлено поле `pricing` в тип `ChatModel`
+  - Отображает стоимость input/output токенов
+  - Помогает пользователю выбрать модель осознанно
+- **Sonnet 4.5 остаётся по умолчанию** (`DEFAULT_CHAT_MODEL = "claude-sonnet-4"`)
+  - Максимальное качество для сложных переговорных сценариев
+  - Haiku 3.5 - опция для экономии на тестировании
+
+### Cost Analysis
+**Сравнение моделей:**
+| Модель | Input | Output | Экономия |
+|--------|-------|--------|----------|
+| Sonnet 4.5 | $3.00/MTok | $15.00/MTok | Baseline |
+| Haiku 3.5 | $0.80/MTok | $4.00/MTok | **75% дешевле** |
+
+**Практическая экономия:**
+- На 1000 сообщений с 20% веб-поиска (200 запросов):
+  - Sonnet 4.5: ~$2.40/месяц только на поиск
+  - Haiku 3.5: ~$0.64/месяц
+  - Экономия: **$1.76/месяц (~73%)**
+
+**Рекомендация использования:**
+- **Sonnet 4.5** (по умолчанию): сложные переговорные сценарии, анализ документов
+- **Haiku 3.5**: тестирование, простые вопросы, веб-поиск (когда скорость важнее)
+
+### Technical Details
+- Haiku 3.5 - это последняя версия "быстрой" линейки Claude (Haiku 4 ещё не выпущена)
+- Haiku отлично справляется с:
+  - Формулированием поисковых запросов
+  - Обработкой результатов веб-поиска
+  - Простыми диалогами
+  - Классификацией и фильтрацией
+- Может быть менее эффективна для:
+  - Сложного анализа переговоров
+  - Работы с большим контекстом документов
+  - Креативных задач
+
+### UI
+- Теперь в селекторе модели доступны 2 опции:
+  1. **Claude Sonnet 4.5** (по умолчанию) - "Anthropic's most capable model for complex tasks and analysis ($3.00/$15.00 per MTok)"
+  2. **Claude Haiku 3.5** - "Fast and cost-effective model for testing and simple tasks (75% cheaper) ($0.80/$4.00 per MTok)"
+
+### Testing
+- ✅ Dev server запущен: http://localhost:3000
+- Требуется протестировать:
+  - [ ] Переключение между моделями в UI
+  - [ ] Качество ответов Haiku 3.5 на простые вопросы
+  - [ ] Качество ответов Haiku 3.5 на сложные переговорные сценарии
+  - [ ] Скорость ответов Haiku vs Sonnet
+  - [ ] Веб-поиск через Haiku 3.5
+
+## [1.0.7] - 2025-10-15 - Brave Search Integration
+
+### Added
+- ✅ **web_search tool полностью интегрирован и работает!**
+  - Создан `lib/ai/tools/web-search.ts` с полной поддержкой Brave Search API
+  - Интегрирован в `app/(chat)/api/chat/route.ts`:
+    - Добавлен в imports
+    - Добавлен в `experimental_activeTools` для обеих моделей
+    - Добавлен в объект `tools`
+  - Параметры запроса: `country=US`, `search_lang=en`, `ui_lang=en-US`
+  - API ключ: BSAyJ8IbjSkIIASijGk2Z8SMBnlJRKr (Free tier: 2000 req/month)
+
+### Fixed
+- ✅ **КРИТИЧЕСКАЯ ПРОБЛЕМА: SUBSCRIPTION_TOKEN_INVALID (422) решена**
+  - Причина: Shell environment variable `BRAVE_SEARCH_API_KEY=My_KEY` перекрывала .env.local
+  - Environment variables приоритет: Shell > .env.local (Next.js не перезаписывает существующие)
+  - Решение: Перезагрузка VS Code для очистки shell environment
+  - Debug метод: `echo $BRAVE_SEARCH_API_KEY` и `node -e "console.log(process.env.BRAVE_SEARCH_API_KEY)"`
+
+### Tested
+- ✅ Поиск на русском языке: "ошибка 422 причины" - статус 200
+- ✅ Поиск на английском: "test web search function 2025" - статус 200
+- ✅ Поиск погоды: "San Francisco weather today" - статус 200
+- Claude успешно использует webSearch для актуальной информации
+
+### Documentation
+- Создан ADR: `docs/decisions/004-brave-search-over-perplexity.md`
+- Обновлён `roadmap.md`: задача 2.4 полностью завершена ✅
+- Обновлён `docs/troubleshooting.md`: добавлен раздел про environment variables приоритет
 
 ## [1.0.6] - 2025-10-15 - Documentation SSOT Cleanup
 

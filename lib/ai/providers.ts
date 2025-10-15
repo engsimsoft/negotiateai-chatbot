@@ -18,6 +18,7 @@ export const myProvider = isTestEnvironment
       return customProvider({
         languageModels: {
           "claude-sonnet-4": chatModel,
+          "claude-haiku-3.5": chatModel, // Use same mock for testing
           "title-model": titleModel,
           "artifact-model": artifactModel,
         },
@@ -26,6 +27,7 @@ export const myProvider = isTestEnvironment
   : customProvider({
       languageModels: {
         "claude-sonnet-4": anthropic("claude-sonnet-4-20250514"),
+        "claude-haiku-3.5": anthropic("claude-3-5-haiku-20241022"),
         "title-model": anthropic("claude-sonnet-4-20250514"),
         "artifact-model": anthropic("claude-sonnet-4-20250514"),
       },

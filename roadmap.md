@@ -126,11 +126,17 @@
 - [x] Интегрировать с системой tools
 - [x] Протестировать - работает отлично!
 
-### 2.4 Добавить web_search tool (Brave Search)
-- [ ] Создать файл `lib/tools/web-search.ts`
-- [ ] Интегрировать Brave Search API
-- [ ] Добавить в систему tools
-- [ ] Протестировать поиск
+### 2.4 Добавить web_search tool (Brave Search) ✅
+- [x] Создать файл `lib/ai/tools/web-search.ts`
+- [x] Интегрировать Brave Search API (ключ BSAyJ8IbjSkIIASijGk2Z8SMBnlJRKr)
+- [x] Добавить в систему tools (route.ts)
+- [x] Добавить параметры: country=US, search_lang=en, ui_lang=en-US
+- [x] Решить проблему с environment variables (shell override)
+- [x] Протестировать поиск - **работает отлично!**
+- **СТАТУС:** Tool полностью функционален, протестирован с реальными запросами
+  - ✅ Тест 1: Поиск на русском - статус 200
+  - ✅ Тест 2: Поиск на английском - статус 200
+  - ✅ Тест 3: Погода - статус 200
 
 ---
 

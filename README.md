@@ -2,8 +2,8 @@
 
 AI чат-бот для переговоров (MIR.TRADE) на базе Claude Sonnet 4.
 
-**Production:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app  
-**Версия:** 1.0.5  
+**Production:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
+**Версия:** 1.0.7
 **Статус:** ✅ Deployed, работает
 
 ---
@@ -15,11 +15,13 @@ AI чат-бот для переговоров (MIR.TRADE) на базе Claude 
 - ✅ Claude Sonnet 4.5 API (streaming)
 - ✅ NextAuth (PostgreSQL + guest mode)
 - ✅ Vercel deployment (middleware fixed)
+- ✅ AI Tools: read_document, web_search, get_current_date, get_weather
+- ✅ Brave Search integration (2000 req/month free tier)
 
 **В разработке:**
-- [ ] AI Tools: read_document, web_search, get_current_date
 - [ ] Knowledge base integration (~40 DOCX/PDF)
 - [ ] System prompt + index.md
+- [ ] UI кастомизация (брендинг NegotiateAI)
 
 ---
 
@@ -33,6 +35,7 @@ npm run dev                 # http://localhost:3000
 
 **Требуется в .env.local:**
 - `ANTHROPIC_API_KEY` - https://console.anthropic.com
+- `BRAVE_SEARCH_API_KEY` - https://brave.com/search/api (2000 req/month free)
 - `AUTH_SECRET` - `openssl rand -base64 32`
 - `POSTGRES_URL` - neon.tech или vercel.com/storage
 - `BLOB_READ_WRITE_TOKEN` - vercel.com/storage
@@ -46,7 +49,11 @@ npm run dev                 # http://localhost:3000
 **AI/Chat:**
 - `app/(chat)/api/chat/route.ts` - Chat endpoint (streaming)
 - `lib/ai/providers.ts` - Claude Sonnet 4.5 configuration
-- `lib/ai/tools/` - AI tools (в разработке)
+- `lib/ai/tools/` - AI tools:
+  - `read-document.ts` - Чтение DOCX/PDF из knowledge/ ✅
+  - `get-current-date.ts` - Текущая дата/время ✅
+  - `web-search.ts` - Brave Search API ✅
+  - `get-weather.ts` - Погода (example tool) ✅
 
 **Auth/DB:**
 - `app/(auth)/` - NextAuth 5.0 setup

@@ -177,6 +177,54 @@ const throttledCall = throttle(async () => {
 
 ---
 
+### Brave Search: "422 SUBSCRIPTION_TOKEN_INVALID" ⚠️ ЧАСТАЯ ПРОБЛЕМА
+
+**Симптомы:**
+```
+Error: 422 Unprocessable Entity - SUBSCRIPTION_TOKEN_INVALID
+```
+
+**Причина:** Shell environment variable перекрывает .env.local
+
+**Диагностика:**
+```bash
+# 1. Проверь что в .env.local
+grep BRAVE_SEARCH_API_KEY .env.local
+# Должно быть: BRAVE_SEARCH_API_KEY=BSAyJ8Ibj...
+
+# 2. Проверь что читает Node.js
+echo $BRAVE_SEARCH_API_KEY
+# Если видишь ДРУГОЙ ключ - проблема найдена!
+
+# 3. Проверь переменную через Node
+node -e "console.log(process.env.BRAVE_SEARCH_API_KEY)"
+```
+
+**Решение:**
+
+**Environment variables приоритет:**
+1. **Shell environment** (export BRAVE_SEARCH_API_KEY=...) ← **ВЫСШИЙ ПРИОРИТЕТ**
+2. .env.local файл (Next.js)
+
+Если переменная уже установлена в shell, Next.js **НЕ перезаписывает её** из .env.local!
+
+**Исправление:**
+1. **Перезапусти VS Code** (или Terminal) - очистит shell environment
+2. Или выполни в терминале:
+```bash
+unset BRAVE_SEARCH_API_KEY
+npm run dev
+```
+3. Убедись что в shell configs (~/.zshrc, ~/.bashrc) нет export BRAVE_SEARCH_API_KEY
+
+**Проверка после исправления:**
+```bash
+echo $BRAVE_SEARCH_API_KEY
+# Должен показать ПРАВИЛЬНЫЙ ключ из .env.local
+```
+
+---
+
 ### Brave Search: "403 Forbidden"
 
 **Симптомы:**
