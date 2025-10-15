@@ -267,6 +267,57 @@ const PurePreviewMessage = ({
               );
             }
 
+            if (type === "tool-readDocument") {
+              const { toolCallId, state } = part;
+
+              return (
+                <Tool defaultOpen={true} key={toolCallId}>
+                  <ToolHeader state={state} type="tool-readDocument" />
+                  <ToolContent>
+                    {state === "input-available" && (
+                      <ToolInput input={part.input} />
+                    )}
+                    {state === "output-available" && (
+                      <ToolOutput
+                        errorText={part.output?.error}
+                        output={
+                          part.output?.success ? (
+                            <div className="space-y-2 rounded border p-3 text-sm">
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <span className="font-medium">📄 {part.output.filepath}</span>
+                                <span className="text-xs">({part.output.fileSizeKB} KB)</span>
+                                {part.output.processingTimeMs && (
+                                  <span className="text-xs">
+                                    - {Math.round(part.output.processingTimeMs / 1000)}s
+                                  </span>
+                                )}
+                              </div>
+                              {part.output.note && (
+                                <div className="text-muted-foreground text-xs">
+                                  {part.output.note}
+                                </div>
+                              )}
+                              <div className="max-h-40 overflow-y-auto text-muted-foreground text-xs">
+                                {part.output.content?.substring(0, 500)}
+                                {part.output.content && part.output.content.length > 500 && "..."}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="rounded border p-2 text-red-500 text-sm">
+                              Error: {part.output?.error || "Unknown error"}
+                              {part.output?.suggestion && (
+                                <div className="mt-1 text-xs">💡 {part.output.suggestion}</div>
+                              )}
+                            </div>
+                          )
+                        }
+                      />
+                    )}
+                  </ToolContent>
+                </Tool>
+              );
+            }
+
             return null;
           })}
 

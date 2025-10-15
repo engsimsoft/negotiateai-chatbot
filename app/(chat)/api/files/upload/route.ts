@@ -20,6 +20,8 @@ const FileSchema = z.object({
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // DOCX
           "text/plain",
           "text/markdown",
+          "text/x-markdown", // Alternative MD MIME type
+          "application/octet-stream", // Generic binary (browsers may use this for .md)
         ].includes(file.type),
       {
         message:
@@ -27,6 +29,12 @@ const FileSchema = z.object({
       }
     ),
 });
+
+// Dynamic import for mammoth (DOCX parser)
+const getMammoth = async () => {
+  const mammoth = await import("mammoth");
+  return mammoth.default || mammoth;
+};
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -58,19 +66,71 @@ export async function POST(request: Request) {
     }
 
     // Get filename from formData since Blob doesn't have name property
-    const filename = (formData.get("file") as File).name;
+    const originalFilename = (formData.get("file") as File).name;
     const fileBuffer = await file.arrayBuffer();
+    const fileType = file.type;
+
+    // Get file extension for better type detection
+    const fileExt = originalFilename.toLowerCase().match(/\.(docx|txt|md)$/)?.[1];
 
     try {
-      const data = await put(`${filename}`, fileBuffer, {
+      // Process document files (DOCX, TXT, MD) and extract text
+      // These will be uploaded as text/plain to work with Claude multimodal API
+      const isDocumentFile =
+        fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        fileType === "text/plain" ||
+        fileType === "text/markdown" ||
+        fileType === "text/x-markdown" ||
+        (fileType === "application/octet-stream" && (fileExt === "md" || fileExt === "txt")) ||
+        fileExt === "docx" ||
+        fileExt === "txt" ||
+        fileExt === "md";
+
+      if (isDocumentFile) {
+        let extractedText: string;
+
+        if (fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileExt === "docx") {
+          // Extract text from DOCX
+          const mammoth = await getMammoth();
+          const result = await mammoth.extractRawText({ buffer: Buffer.from(fileBuffer) });
+          extractedText = result.value;
+        } else {
+          // Read TXT/MD as UTF-8 text
+          const decoder = new TextDecoder("utf-8");
+          extractedText = decoder.decode(fileBuffer);
+        }
+
+        // Upload extracted text as .txt file
+        const textFilename = originalFilename.replace(/\.(docx|txt|md)$/i, ".txt");
+        const textBuffer = new TextEncoder().encode(extractedText);
+
+        const data = await put(textFilename, textBuffer, {
+          access: "public",
+          contentType: "text/plain",
+        });
+
+        // Return with metadata indicating this was processed
+        return NextResponse.json({
+          ...data,
+          originalFilename,
+          originalContentType: fileType,
+          processed: true,
+        });
+      }
+
+      // For images and PDFs, upload as-is (they work with Claude multimodal API)
+      const data = await put(originalFilename, fileBuffer, {
         access: "public",
+        contentType: fileType,
       });
 
       return NextResponse.json(data);
-    } catch (_error) {
+    } catch (error) {
+      console.error("[Upload API] Error processing file:", error);
       return NextResponse.json({ error: "Upload failed" }, { status: 500 });
     }
-  } catch (_error) {
+  } catch (error) {
+    console.error("[Upload API] Request processing error:", error);
     return NextResponse.json(
       { error: "Failed to process request" },
       { status: 500 }
