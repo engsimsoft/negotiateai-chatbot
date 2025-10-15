@@ -267,6 +267,7 @@ const PurePreviewMessage = ({
               );
             }
 
+            // @ts-ignore - tool-readDocument is a custom tool not in AI SDK types
             if (type === "tool-readDocument") {
               const { toolCallId, state } = part as any;
 

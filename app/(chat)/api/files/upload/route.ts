@@ -102,7 +102,7 @@ export async function POST(request: Request) {
 
         // Upload extracted text as .txt file
         const textFilename = originalFilename.replace(/\.(docx|txt|md)$/i, ".txt");
-        const textBuffer = new TextEncoder().encode(extractedText);
+        const textBuffer = Buffer.from(extractedText, 'utf-8');
 
         const data = await put(textFilename, textBuffer, {
           access: "public",
