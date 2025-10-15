@@ -23,7 +23,7 @@ export const updateDocument = ({ session, dataStream }: UpdateDocumentProps) =>
     execute: wrapToolExecution(
       {
         name: "updateDocument",
-        timeout: 45000, // 45 seconds for document update
+        timeout: 120000, // 120 seconds (2 minutes) for document update - increased for complex spreadsheets
         enableLogging: true,
       },
       async ({ id, description }) => {

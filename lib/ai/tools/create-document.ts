@@ -25,7 +25,7 @@ export const createDocument = ({ session, dataStream }: CreateDocumentProps) =>
     execute: wrapToolExecution(
       {
         name: "createDocument",
-        timeout: 45000, // 45 seconds for document creation
+        timeout: 120000, // 120 seconds (2 minutes) for document creation - increased for complex documents
         enableLogging: true,
       },
       async ({ title, kind }) => {

@@ -56,7 +56,7 @@ Example usage:
   execute: wrapToolExecution(
     {
       name: "readDocument",
-      timeout: 60000, // 60 seconds for large files
+      timeout: 120000, // 120 seconds (2 minutes) for large files with OCR
       enableLogging: true,
     },
     async ({ filepath }) => {
@@ -78,6 +78,14 @@ Example usage:
       // Get file stats
       const stats = await fs.stat(absolutePath);
       const fileSizeKB = Math.round(stats.size / 1024);
+
+      // Log file reading attempt
+      console.log(`[readDocument] Reading: ${filepath} (${fileSizeKB}KB)`);
+
+      // Warn about large files
+      if (fileSizeKB > 1000) {
+        console.warn(`[readDocument] ⚠️ Large file detected: ${fileSizeKB}KB - OCR may take 60+ seconds`);
+      }
 
       // Check file extension
       const ext = path.extname(absolutePath).toLowerCase();

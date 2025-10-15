@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 
 import "./globals.css";
+import "@/lib/performance-utils";
 import { SessionProvider } from "next-auth/react";
 
 export const metadata: Metadata = {

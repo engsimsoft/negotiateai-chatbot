@@ -47,7 +47,7 @@ import { convertToUIMessages, estimateMessageTokens, generateUUID } from "@/lib/
 import { generateTitleFromUserMessage } from "../../actions";
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
-export const maxDuration = 60;
+export const maxDuration = 180; // 3 minutes - increased for complex document generation
 
 let globalStreamContext: ResumableStreamContext | null = null;
 
