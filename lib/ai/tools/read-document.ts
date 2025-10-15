@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { extractTextFromImage, extractTextFromPDF } from "../vision-ocr";
+import { wrapToolExecution } from "./tool-wrapper";
 
 // Dynamic import for mammoth (DOCX parser)
 const getMammoth = async () => {
@@ -52,7 +53,13 @@ Example usage:
     ),
   }),
 
-  execute: async ({ filepath }) => {
+  execute: wrapToolExecution(
+    {
+      name: "readDocument",
+      timeout: 60000, // 60 seconds for large files
+      enableLogging: true,
+    },
+    async ({ filepath }) => {
     try {
       // Validate and resolve file path
       const absolutePath = validateFilePath(filepath);
@@ -172,5 +179,5 @@ Example usage:
         error: errorMessage,
       };
     }
-  },
+  }),
 });

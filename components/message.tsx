@@ -25,6 +25,26 @@ import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
 import { Weather } from "./weather";
 
+/**
+ * Helper to unwrap ToolResult structure from tool outputs
+ * Some tools return data directly, others wrap it in { success, data, error }
+ */
+function unwrapToolResult<T>(output: any): T {
+  // Check if output is wrapped in ToolResult structure
+  if (output && typeof output === "object" && "success" in output) {
+    // If there's an error, return the output as-is for error handling
+    if (output.error) {
+      return output as T;
+    }
+    // If there's data, unwrap it
+    if (output.data !== undefined) {
+      return output.data as T;
+    }
+  }
+  // Return as-is if not wrapped
+  return output as T;
+}
+
 const PurePreviewMessage = ({
   chatId,
   message,
@@ -204,7 +224,7 @@ const PurePreviewMessage = ({
                 <DocumentPreview
                   isReadonly={isReadonly}
                   key={toolCallId}
-                  result={part.output}
+                  result={unwrapToolResult(part.output)}
                 />
               );
             }
@@ -223,12 +243,13 @@ const PurePreviewMessage = ({
                 );
               }
 
+              const unwrappedOutput = unwrapToolResult(part.output);
               return (
                 <div className="relative" key={toolCallId}>
                   <DocumentPreview
-                    args={{ ...part.output, isUpdate: true }}
+                    args={{ ...(unwrappedOutput as Record<string, any>), isUpdate: true }}
                     isReadonly={isReadonly}
-                    result={part.output}
+                    result={unwrappedOutput}
                   />
                 </div>
               );
@@ -255,7 +276,7 @@ const PurePreviewMessage = ({
                           ) : (
                             <DocumentToolResult
                               isReadonly={isReadonly}
-                              result={part.output}
+                              result={unwrapToolResult(part.output)}
                               type="request-suggestions"
                             />
                           )

@@ -7,6 +7,7 @@ import {
 } from "@/lib/artifacts/server";
 import type { ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
+import { wrapToolExecution } from "./tool-wrapper";
 
 type CreateDocumentProps = {
   session: Session;
@@ -21,7 +22,13 @@ export const createDocument = ({ session, dataStream }: CreateDocumentProps) =>
       title: z.string(),
       kind: z.enum(artifactKinds),
     }),
-    execute: async ({ title, kind }) => {
+    execute: wrapToolExecution(
+      {
+        name: "createDocument",
+        timeout: 45000, // 45 seconds for document creation
+        enableLogging: true,
+      },
+      async ({ title, kind }) => {
       const id = generateUUID();
 
       dataStream.write({
@@ -72,5 +79,5 @@ export const createDocument = ({ session, dataStream }: CreateDocumentProps) =>
         kind,
         content: "A document was created and is now visible to the user.",
       };
-    },
+    }),
   });

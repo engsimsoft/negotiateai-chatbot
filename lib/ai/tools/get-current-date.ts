@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { wrapToolExecution } from "./tool-wrapper";
 
 export const getCurrentDate = tool({
   description:
@@ -7,7 +8,13 @@ export const getCurrentDate = tool({
   inputSchema: z.object({
     // No input parameters needed
   }),
-  execute: async () => {
+  execute: wrapToolExecution(
+    {
+      name: "getCurrentDate",
+      timeout: 1000, // 1 second - this is a simple operation
+      enableLogging: true,
+    },
+    async () => {
     const now = new Date();
 
     return {
@@ -34,5 +41,5 @@ export const getCurrentDate = tool({
         }),
       },
     };
-  },
+  }),
 });

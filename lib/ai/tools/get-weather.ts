@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { wrapToolExecution } from "./tool-wrapper";
 
 async function geocodeCity(city: string): Promise<{ latitude: number; longitude: number } | null> {
   try {
@@ -36,7 +37,13 @@ export const getWeather = tool({
       city: z.string().describe("City name (e.g., 'San Francisco', 'New York', 'London')"),
     }),
   ]),
-  execute: async (input) => {
+  execute: wrapToolExecution(
+    {
+      name: "getWeather",
+      timeout: 10000, // 10 seconds for weather API
+      enableLogging: true,
+    },
+    async (input) => {
     let latitude: number;
     let longitude: number;
 
@@ -63,7 +70,7 @@ export const getWeather = tool({
     if ("city" in input) {
       weatherData.cityName = input.city;
     }
-    
+
     return weatherData;
-  },
+  }),
 });

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { documentHandlersByArtifactKind } from "@/lib/artifacts/server";
 import { getDocumentById } from "@/lib/db/queries";
 import type { ChatMessage } from "@/lib/types";
+import { wrapToolExecution } from "./tool-wrapper";
 
 type UpdateDocumentProps = {
   session: Session;
@@ -19,7 +20,13 @@ export const updateDocument = ({ session, dataStream }: UpdateDocumentProps) =>
         .string()
         .describe("The description of changes that need to be made"),
     }),
-    execute: async ({ id, description }) => {
+    execute: wrapToolExecution(
+      {
+        name: "updateDocument",
+        timeout: 45000, // 45 seconds for document update
+        enableLogging: true,
+      },
+      async ({ id, description }) => {
       const document = await getDocumentById({ id });
 
       if (!document) {
@@ -58,5 +65,5 @@ export const updateDocument = ({ session, dataStream }: UpdateDocumentProps) =>
         kind: document.kind,
         content: "The document has been updated successfully.",
       };
-    },
+    }),
   });

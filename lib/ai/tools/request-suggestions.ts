@@ -6,6 +6,7 @@ import type { Suggestion } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
 import { myProvider } from "../providers";
+import { wrapToolExecution } from "./tool-wrapper";
 
 type RequestSuggestionsProps = {
   session: Session;
@@ -23,7 +24,13 @@ export const requestSuggestions = ({
         .string()
         .describe("The ID of the document to request edits"),
     }),
-    execute: async ({ documentId }) => {
+    execute: wrapToolExecution(
+      {
+        name: "requestSuggestions",
+        timeout: 30000, // 30 seconds for generating suggestions
+        enableLogging: true,
+      },
+      async ({ documentId }) => {
       const document = await getDocumentById({ id: documentId });
 
       if (!document || !document.content) {
@@ -89,5 +96,5 @@ export const requestSuggestions = ({
         kind: document.kind,
         message: "Suggestions have been added to the document",
       };
-    },
+    }),
   });

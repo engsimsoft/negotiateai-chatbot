@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { wrapToolExecution } from "./tool-wrapper";
 
 /**
  * Brave Search API Response Types
@@ -53,7 +54,13 @@ Returns a list of search results with titles, URLs, and descriptions.`,
     count: z.number().min(1).max(20).default(5).optional().describe("Number of results to return (1-20, default: 5)"),
   }),
 
-  execute: async ({ query, count = 5 }) => {
+  execute: wrapToolExecution(
+    {
+      name: "webSearch",
+      timeout: 15000, // 15 seconds for web search
+      enableLogging: true,
+    },
+    async ({ query, count = 5 }) => {
     const apiKey = process.env.BRAVE_SEARCH_API_KEY;
 
     // Debug logging - показываем первые 10 символов ключа
@@ -134,5 +141,5 @@ Returns a list of search results with titles, URLs, and descriptions.`,
         error: `Failed to perform web search: ${error instanceof Error ? error.message : "Unknown error"}`,
       };
     }
-  },
+  }),
 });
