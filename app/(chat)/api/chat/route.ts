@@ -212,7 +212,14 @@ export async function POST(request: Request) {
           stopWhen: stepCountIs(5),
           experimental_activeTools:
             selectedChatModel === "claude-sonnet-4" || selectedChatModel === "claude-haiku-3.5"
-              ? ["getCurrentDate", "readDocument", "webSearch"]
+              ? [
+                  "getCurrentDate",
+                  "readDocument",
+                  "webSearch",
+                  "createDocument",
+                  "updateDocument",
+                  "requestSuggestions",
+                ]
               : [
                   "getWeather",
                   "readDocument",
