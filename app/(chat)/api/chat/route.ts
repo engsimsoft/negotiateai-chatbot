@@ -209,6 +209,10 @@ export async function POST(request: Request) {
           model: myProvider.languageModel(selectedChatModel),
           system: systemPromptText,
           messages: convertToModelMessages(uiMessages),
+          // Model parameters optimized for professional IT assistant
+          // Low temperature (0.3) for precise, consistent, deterministic technical answers
+          // Perfect for specialized assistant requiring accuracy over creativity
+          temperature: 0.3,
           stopWhen: stepCountIs(5),
           experimental_activeTools:
             selectedChatModel === "claude-sonnet-4" || selectedChatModel === "claude-haiku-3.5"
