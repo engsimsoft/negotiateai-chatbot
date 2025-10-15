@@ -2,13 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import * as fs from "fs/promises";
 import * as path from "path";
-
-// Dynamic import for pdf-parse
-const getPdfParse = async () => {
-  const pdfParseModule = await import("pdf-parse");
-  // @ts-ignore - pdf-parse has non-standard exports
-  return pdfParseModule.default || pdfParseModule;
-};
+import { extractTextFromImage, extractTextFromPDF } from "../vision-ocr";
 
 // Dynamic import for mammoth (DOCX parser)
 const getMammoth = async () => {
@@ -43,12 +37,14 @@ function validateFilePath(filepath: string): string {
 
 export const readDocument = tool({
   description: `Read a document from the knowledge base (knowledge/ folder).
-Supports DOCX, PDF, TXT, and MD files. Use the index.md file to find available documents.
-Always cite the source document when using information from it.
+Supports: DOCX, PDF (including scanned/OCR), TXT, MD, JPG, JPEG, PNG.
+PDF and image files are processed using Claude Vision OCR for accurate text extraction.
+Use the index.md file to find available documents. Always cite the source document.
 
 Example usage:
 - To read the main commercial proposal: "knowledge/КП AGORA - Мир Групп от 20.04.2022_КРАТКО.pdf"
-- To read Vietnam tenders info: "knowledge/Вьетнам/тендерные площадки Вьетнама.docx"`,
+- To read Vietnam tenders info: "knowledge/Вьетнам/тендерные площадки Вьетнама.docx"
+- To read scanned documents or photos: "knowledge/photo_document.jpg"`,
 
   inputSchema: z.object({
     filepath: z.string().describe(
@@ -78,7 +74,7 @@ Example usage:
 
       // Check file extension
       const ext = path.extname(absolutePath).toLowerCase();
-      const supportedExtensions = [".pdf", ".docx", ".txt", ".md"];
+      const supportedExtensions = [".pdf", ".docx", ".txt", ".md", ".jpg", ".jpeg", ".png"];
 
       if (!supportedExtensions.includes(ext)) {
         return {
@@ -100,29 +96,50 @@ Example usage:
           content,
           encoding: "utf-8",
         };
-      } else if (ext === ".pdf") {
-        // For PDF, extract text using pdf-parse (prevents 200K token overflow from base64)
+      } else if (ext === ".jpg" || ext === ".jpeg" || ext === ".png") {
+        // For images, use Claude Vision OCR
         try {
           const buffer = await fs.readFile(absolutePath);
-          const pdfParse = await getPdfParse();
-          const pdfData = await pdfParse(buffer);
-          
+          const mediaType = ext === ".png" ? "image/png" : "image/jpeg";
+          const content = await extractTextFromImage(buffer, mediaType);
+
           return {
             success: true,
             filepath,
             fileType: ext,
             fileSizeKB,
-            content: pdfData.text,
-            encoding: "text",
-            pages: pdfData.numpages,
-            info: pdfData.info,
+            content,
+            encoding: "vision-ocr",
+            note: "Text extracted using Claude Vision OCR",
           };
-        } catch (pdfError) {
-          // If PDF parsing fails, return error
+        } catch (ocrError) {
           return {
             success: false,
-            error: `Failed to parse PDF: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}`,
-            suggestion: "The PDF file may be corrupted or encrypted.",
+            error: `Failed to extract text from image: ${ocrError instanceof Error ? ocrError.message : 'Unknown error'}`,
+            suggestion: "The image may be corrupted or unreadable. Try a different image format.",
+          };
+        }
+      } else if (ext === ".pdf") {
+        // For PDF, use Claude Vision OCR (supports both text and scanned PDFs)
+        try {
+          const buffer = await fs.readFile(absolutePath);
+          const result = await extractTextFromPDF(buffer);
+
+          return {
+            success: true,
+            filepath,
+            fileType: ext,
+            fileSizeKB,
+            content: result.text,
+            encoding: "vision-ocr",
+            processingTimeMs: result.processingTimeMs,
+            note: "Text extracted using Claude Vision OCR (supports scanned documents)",
+          };
+        } catch (pdfError) {
+          return {
+            success: false,
+            error: `Failed to process PDF: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}`,
+            suggestion: "The PDF file may be corrupted, encrypted, or too large.",
           };
         }
       } else {
