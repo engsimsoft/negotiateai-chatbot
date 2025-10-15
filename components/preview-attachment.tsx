@@ -15,6 +15,20 @@ export const PreviewAttachment = ({
 }) => {
   const { name, url, contentType } = attachment;
 
+  // Determine file icon based on content type
+  const getFileIcon = () => {
+    if (contentType?.includes("pdf")) {
+      return "📄"; // PDF icon
+    } else if (contentType?.includes("wordprocessingml")) {
+      return "📝"; // DOCX icon
+    } else if (contentType?.includes("text/plain")) {
+      return "📃"; // TXT icon
+    } else if (contentType?.includes("text/markdown")) {
+      return "📋"; // MD icon
+    }
+    return "📎"; // Generic file icon
+  };
+
   return (
     <div
       className="group relative size-16 overflow-hidden rounded-lg border bg-muted"
@@ -29,8 +43,8 @@ export const PreviewAttachment = ({
           width={64}
         />
       ) : (
-        <div className="flex size-full items-center justify-center text-muted-foreground text-xs">
-          File
+        <div className="flex size-full flex-col items-center justify-center text-muted-foreground text-xs">
+          <div className="text-2xl">{getFileIcon()}</div>
         </div>
       )}
 
