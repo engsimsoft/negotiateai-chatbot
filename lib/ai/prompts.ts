@@ -8,7 +8,10 @@ let cachedSystemPrompt: string | null = null;
 
 // Load system prompt from system-prompt.md
 async function loadSystemPrompt(): Promise<string> {
-  if (cachedSystemPrompt) {
+  // In development, skip cache to always get fresh content
+  const isDev = process.env.NODE_ENV === 'development';
+
+  if (cachedSystemPrompt && !isDev) {
     return cachedSystemPrompt;
   }
 
@@ -20,9 +23,14 @@ async function loadSystemPrompt(): Promise<string> {
     const placeholder = "[ИНДЕКСНЫЙ ФАЙЛ index.md ВСТАВЛЯЕТСЯ СЮДА]";
     const indexInstruction = "**ВАЖНО:** Для просмотра полного индекса базы знаний используй инструмент read_document('knowledge/index.md')";
 
-    cachedSystemPrompt = systemPromptTemplate.replace(placeholder, indexInstruction);
+    const processedPrompt = systemPromptTemplate.replace(placeholder, indexInstruction);
 
-    return cachedSystemPrompt;
+    // Only cache in production
+    if (!isDev) {
+      cachedSystemPrompt = processedPrompt;
+    }
+
+    return processedPrompt;
   } catch (error) {
     console.error("Failed to load system-prompt.md:", error);
     // Fallback to basic prompt if file not found
