@@ -22,11 +22,11 @@ export const chatModels: ChatModel[] = [
   },
   {
     id: "claude-haiku-3.5",
-    name: "Claude Haiku 3.5",
-    description: "Fast and cost-effective model for testing and simple tasks (75% cheaper)",
+    name: "Claude Haiku 4.5 (Oct 2025)",
+    description: "Latest fast model (claude-haiku-4-5-20251001) - 2x faster, Sonnet-level coding (67% cheaper)",
     pricing: {
-      input: "$0.80/MTok",
-      output: "$4.00/MTok",
+      input: "$1.00/MTok",
+      output: "$5.00/MTok",
     },
   },
 ];
