@@ -159,7 +159,7 @@ const tools = [
 
 // 4. Отправка в Anthropic API
 const response = await anthropic.messages.create({
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-sonnet-4-5-20250929',
   system: fullPrompt,
   messages: [...conversation],
   tools: tools,
@@ -231,7 +231,7 @@ async function readDocument(filepath: string): Promise<string> {
 
   // 4. Отправляем в Anthropic API для извлечения текста
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-5-20250929',
     messages: [{
       role: 'user',
       content: [
@@ -380,7 +380,7 @@ function getCurrentDate(): string {
 ```typescript
 // Server-side (app/api/chat/route.ts)
 const stream = await anthropic.messages.stream({
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-sonnet-4-5-20250929',
   messages: messages,
   tools: tools
 });

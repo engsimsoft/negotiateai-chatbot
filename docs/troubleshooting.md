@@ -635,7 +635,7 @@ export async function OPTIONS(req: Request) {
 **Решение 2:** Используй caching (Anthropic prompt caching)
 ```typescript
 const response = await anthropic.messages.create({
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-sonnet-4-5-20250929',
   system: [
     {
       type: 'text',
@@ -681,7 +681,7 @@ curl https://api.anthropic.com/v1/messages \
   -H "x-api-key: $ANTHROPIC_API_KEY" \
   -H "anthropic-version: 2023-06-01" \
   -H "content-type: application/json" \
-  -d '{"model":"claude-sonnet-4-20250514","messages":[{"role":"user","content":"Hi"}],"max_tokens":10}'
+  -d '{"model":"claude-sonnet-4-5-20250929","messages":[{"role":"user","content":"Hi"}],"max_tokens":10}'
 
 # Brave Search API
 curl "https://api.search.brave.com/res/v1/web/search?q=test" \

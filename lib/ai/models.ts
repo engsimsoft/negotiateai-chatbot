@@ -13,8 +13,8 @@ export type ChatModel = {
 export const chatModels: ChatModel[] = [
   {
     id: "claude-sonnet-4",
-    name: "Claude Sonnet 4.5",
-    description: "Anthropic's most capable model for complex tasks and analysis",
+    name: "Claude Sonnet 4.5 (Sep 2025)",
+    description: "Latest Anthropic model (claude-sonnet-4-5-20250929) - most capable for complex tasks",
     pricing: {
       input: "$3.00/MTok",
       output: "$15.00/MTok",
