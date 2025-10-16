@@ -26,9 +26,9 @@ export const myProvider = isTestEnvironment
     })()
   : customProvider({
       languageModels: {
-        "claude-sonnet-4": anthropic("claude-sonnet-4-20250514"),
+        "claude-sonnet-4": anthropic("claude-sonnet-4-5-20250929"),
         "claude-haiku-3.5": anthropic("claude-3-5-haiku-20241022"),
-        "title-model": anthropic("claude-sonnet-4-20250514"),
-        "artifact-model": anthropic("claude-sonnet-4-20250514"),
+        "title-model": anthropic("claude-sonnet-4-5-20250929"),
+        "artifact-model": anthropic("claude-sonnet-4-5-20250929"),
       },
     });

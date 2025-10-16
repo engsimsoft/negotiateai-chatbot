@@ -87,8 +87,8 @@ npm run dev                 # http://localhost:3000
 
 ## ⚙️ Конфигурация моделей
 
-**Модель:** Claude Sonnet 4.5 (`claude-sonnet-4-20250514`)  
-**Где:** `lib/ai/providers.ts:28-30`  
+**Модель:** Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`)
+**Где:** `lib/ai/providers.ts:28-30`
 **Цена:** $3/1M input, $15/1M output tokens
 
 **Параметры:** Настраиваются в `app/(chat)/api/chat/route.ts`
