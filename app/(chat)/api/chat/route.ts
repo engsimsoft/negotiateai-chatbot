@@ -232,7 +232,7 @@ export async function POST(request: Request) {
                   "requestSuggestions",
                   "webSearch",
                 ],
-          experimental_transform: smoothStream({ chunking: "word" }),
+          // experimental_transform: smoothStream({ chunking: "word" }),
           tools: {
             getCurrentDate,
             getWeather,
