@@ -47,6 +47,10 @@ export async function extractTextFromImage(
   const startTime = Date.now();
 
   try {
+    // Convert Buffer to base64 data URL to avoid type issues with mimeType property
+    const base64Image = imageBuffer.toString("base64");
+    const dataUrl = `data:${mediaType};base64,${base64Image}`;
+
     const { text } = await generateText({
       model: google("gemini-1.5-pro"),
       messages: [
@@ -54,7 +58,7 @@ export async function extractTextFromImage(
           role: "user",
           content: [
             { type: "text", text: OCR_PROMPT },
-            { type: "image", image: imageBuffer, mimeType: mediaType },
+            { type: "image", image: dataUrl },
           ],
         },
       ],
@@ -100,7 +104,7 @@ export async function extractTextFromPDF(
               type: "file",
               data: pdfBuffer,
               mimeType: "application/pdf",
-            },
+            } as any,
           ],
         },
       ],
