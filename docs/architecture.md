@@ -28,7 +28,7 @@
 │                            │                                │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  Business Logic (lib/)                               │  │
-│  │  ├── anthropic.ts      - Anthropic API client        │  │
+│  │  ├── providers.ts      - AI Provider config          │  │
 │  │  ├── tools.ts          - AI agent tools              │  │
 │  │  └── brave-search.ts   - Brave Search integration    │  │
 │  └──────────────────────────────────────────────────────┘  │
@@ -38,7 +38,7 @@
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  External Services                                          │
-│  ├── Anthropic API      - Claude Sonnet 4.5               │
+│  ├── Google Gemini API  - Gemini 3 Pro / 2.5 Flash        │
 │  └── Brave Search API   - Web search                       │
 └─────────────────────────────────────────────────────────────┘
                      │

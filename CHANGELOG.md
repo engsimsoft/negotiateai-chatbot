@@ -11,6 +11,33 @@
 - Расширить поддержку загрузки файлов через UI (PDF, DOCX)
 - UI кастомизация (брендинг NegotiateAI)
 
+## [1.0.13] - 2025-12-01 - Migration to Google Gemini
+
+### Added
+- ✅ **Интеграция Google Gemini API**
+  - Добавлен пакет `@ai-sdk/google`
+  - Настроены модели `gemini-3-pro-preview` (основная) и `gemini-2.5-flash` (быстрая)
+  - Обновлен `lib/ai/providers.ts` для использования Google провайдера
+- ✅ **Обновленный Vision OCR**
+  - Переписан модуль `lib/ai/vision-ocr.ts` для использования Gemini Vision
+  - Поддержка распознавания текста с изображений и PDF через Google API
+- ✅ **Улучшенный UI приветствия**
+  - Добавлено уведомление о переходе на Gemini 3 Pro
+  - Добавлен индикатор-совет по использованию контекстного окна (рекомендация < 80%)
+
+### Changed
+- **Замена AI провайдера**: Полный отказ от Anthropic в пользу Google
+  - Удалены пакеты `@ai-sdk/anthropic` и `@anthropic-ai/sdk`
+  - Удален ключ `ANTHROPIC_API_KEY` из конфигурации
+  - Добавлен ключ `GOOGLE_GENERATIVE_AI_API_KEY`
+- **Обновление зависимостей**:
+  - Обновлены пакеты `ai`, `@ai-sdk/react` до последних версий
+  - Полная переустановка `node_modules` для чистоты проекта
+
+### Fixed
+- Исправлены ошибки типов в `vision-ocr.ts` (ImagePart/FilePart)
+- Исправлена ошибка сборки, связанная с остатками Anthropic SDK
+
 ## [1.0.12] - 2025-10-15 - Documentation & Cache Fixes
 
 ### Fixed

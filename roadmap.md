@@ -47,7 +47,7 @@
 **Согласно техзаданию (`Техзадание /negotiateai-tech-spec.md`):**
 - ✅ **Использовать Vercel AI Chatbot Template** - готовое решение с auth, database, историей
 - ✅ **НЕ писать с нуля** - адаптировать существующий код
-- ✅ **Anthropic API напрямую** - не через OpenRouter
+- ✅ **Google Gemini API напрямую** - миграция с Anthropic (Dec 2025)
 - ✅ **История, auth, database** - всё это уже есть в template и нужно
 
 **Почему это правильно:**
@@ -82,14 +82,14 @@
 
 ---
 
-## Phase 1: Интеграция Anthropic Provider ✅ ЗАВЕРШЁН
+## Phase 1: Интеграция AI Provider (Gemini) ✅ ЗАВЕРШЁН
 
-### 1.1 Настроить Anthropic как провайдер ✅
+### 1.1 Настроить Google Gemini как провайдер ✅
 - [x] Изучить как template использует провайдеры
-- [x] Установить @ai-sdk/anthropic (v2.0.27)
-- [x] Настроить Anthropic provider в lib/ai/providers.ts
-- [x] Установить модель claude-sonnet-4-20250514
-- [x] Обновить lib/ai/models.ts (DEFAULT_CHAT_MODEL = "claude-sonnet-4")
+- [x] Установить @ai-sdk/google
+- [x] Настроить Google provider в lib/ai/providers.ts
+- [x] Установить модель gemini-3-pro-preview
+- [x] Обновить lib/ai/models.ts (DEFAULT_CHAT_MODEL = "claude-sonnet-4" -> mapped to Gemini)
 - [x] Исправить schema validation в app/(chat)/api/chat/schema.ts
 - [x] Протестировать базовый чат - работает!
 
