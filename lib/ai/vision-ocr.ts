@@ -1,16 +1,17 @@
 /**
- * Claude Vision OCR Module
+ * Google Gemini Vision OCR Module
  *
- * Provides document OCR capabilities using Claude Vision API.
+ * Provides document OCR capabilities using Google Gemini Vision API.
  * Supports: PDFs, images (JPG/PNG), scanned documents
  *
  * @module vision-ocr
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { generateText } from "ai";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 });
 
 /**
@@ -32,7 +33,7 @@ export interface VisionOCRResult {
 }
 
 /**
- * Extract text from a single image using Claude Vision API
+ * Extract text from a single image using Google Gemini Vision API
  *
  * @param imageBuffer - Image buffer (PNG or JPEG)
  * @param mediaType - MIME type ("image/png" or "image/jpeg")
@@ -46,36 +47,18 @@ export async function extractTextFromImage(
   const startTime = Date.now();
 
   try {
-    const base64Image = imageBuffer.toString("base64");
-
-    const response = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022", // Latest vision-capable model
-      max_tokens: 4096,
+    const { text } = await generateText({
+      model: google("gemini-1.5-pro"),
       messages: [
         {
           role: "user",
           content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: mediaType,
-                data: base64Image,
-              },
-            },
-            {
-              type: "text",
-              text: OCR_PROMPT,
-            },
+            { type: "text", text: OCR_PROMPT },
+            { type: "image", image: imageBuffer, mimeType: mediaType },
           ],
         },
       ],
     });
-
-    const text = response.content
-      .filter((block) => block.type === "text")
-      .map((block: any) => block.text)
-      .join("\n");
 
     const processingTime = Date.now() - startTime;
     console.log(
@@ -94,10 +77,7 @@ export async function extractTextFromImage(
 }
 
 /**
- * Extract text from PDF using Claude Vision API
- *
- * NOTE: Currently sends PDF as-is to Claude.
- * Anthropic API supports PDF documents natively via base64 encoding.
+ * Extract text from PDF using Google Gemini Vision API
  *
  * @param pdfBuffer - PDF file buffer
  * @returns OCR result with text and metadata
@@ -109,36 +89,22 @@ export async function extractTextFromPDF(
   const startTime = Date.now();
 
   try {
-    const base64Pdf = pdfBuffer.toString("base64");
-
-    const response = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 8192, // Larger context for multi-page PDFs
+    const { text } = await generateText({
+      model: google("gemini-1.5-pro"),
       messages: [
         {
           role: "user",
           content: [
+            { type: "text", text: OCR_PROMPT },
             {
-              type: "document",
-              source: {
-                type: "base64",
-                media_type: "application/pdf",
-                data: base64Pdf,
-              },
-            } as any, // Type assertion needed for document type
-            {
-              type: "text",
-              text: OCR_PROMPT,
+              type: "file",
+              data: pdfBuffer,
+              mimeType: "application/pdf",
             },
           ],
         },
       ],
     });
-
-    const text = response.content
-      .filter((block) => block.type === "text")
-      .map((block: any) => block.text)
-      .join("\n");
 
     const processingTime = Date.now() - startTime;
     console.log(

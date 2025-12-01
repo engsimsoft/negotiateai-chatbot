@@ -1,10 +1,10 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { customProvider } from "ai";
 import { isTestEnvironment } from "../constants";
 
-// Initialize Anthropic provider
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+// Initialize Google provider
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 });
 
 export const myProvider = isTestEnvironment
@@ -26,9 +26,9 @@ export const myProvider = isTestEnvironment
     })()
   : customProvider({
       languageModels: {
-        "claude-sonnet-4": anthropic("claude-sonnet-4-5-20250929"),
-        "claude-haiku-3.5": anthropic("claude-haiku-4-5-20251001"),
-        "title-model": anthropic("claude-sonnet-4-5-20250929"),
-        "artifact-model": anthropic("claude-sonnet-4-5-20250929"),
+        "claude-sonnet-4": google("gemini-3-pro-preview"),
+        "claude-haiku-3.5": google("gemini-2.5-flash"),
+        "title-model": google("gemini-2.5-flash"),
+        "artifact-model": google("gemini-3-pro-preview"),
       },
     });

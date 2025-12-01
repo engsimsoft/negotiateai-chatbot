@@ -13,20 +13,20 @@ export type ChatModel = {
 export const chatModels: ChatModel[] = [
   {
     id: "claude-sonnet-4",
-    name: "Claude Sonnet 4.5 (Sep 2025)",
-    description: "Latest Anthropic model (claude-sonnet-4-5-20250929) - most capable for complex tasks",
+    name: "gemini-3-pro-preview (Самая умная)",
+    description: "Google's latest experimental model",
     pricing: {
-      input: "$3.00/MTok",
-      output: "$15.00/MTok",
+      input: "Preview",
+      output: "Preview",
     },
   },
   {
     id: "claude-haiku-3.5",
-    name: "Claude Haiku 4.5 (Oct 2025)",
-    description: "Latest fast model (claude-haiku-4-5-20251001) - 2x faster, Sonnet-level coding (67% cheaper)",
+    name: "gemini-2.5-flash (Самая быстрая)",
+    description: "Google's fastest model - low latency",
     pricing: {
-      input: "$1.00/MTok",
-      output: "$5.00/MTok",
+      input: "Preview",
+      output: "Preview",
     },
   },
 ];

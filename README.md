@@ -12,7 +12,7 @@ AI чат-бот для переговоров (MIR.TRADE) на базе Claude 
 
 **Что работает:**
 - ✅ Next.js 15.3 + TypeScript
-- ✅ Claude Sonnet 4.5 API (streaming)
+- ✅ Google Gemini 1.5 Pro API (streaming)
 - ✅ NextAuth (PostgreSQL + guest mode)
 - ✅ Vercel deployment (middleware fixed)
 - ✅ AI Tools: read_document, web_search, get_current_date, get_weather
@@ -87,9 +87,9 @@ npm run dev                 # http://localhost:3000
 
 ## ⚙️ Конфигурация моделей
 
-**Модель:** Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`)
+**Модель:** Google Gemini 1.5 Pro (`gemini-1.5-pro`)
 **Где:** `lib/ai/providers.ts:28-30`
-**Цена:** $3/1M input, $15/1M output tokens
+**Цена:** Free tier available
 
 **Параметры:** Настраиваются в `app/(chat)/api/chat/route.ts`
 
@@ -98,7 +98,7 @@ npm run dev                 # http://localhost:3000
 ## 🔧 Технологии
 
 - Next.js 15.3 (App Router, RSC)
-- Claude Sonnet 4.5 (@anthropic-ai/sdk)
+- Google Gemini SDK (@ai-sdk/google)
 - NextAuth 5.0-beta.25
 - PostgreSQL (Neon) + Drizzle ORM
 - Vercel Blob Storage
