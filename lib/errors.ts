@@ -135,3 +135,36 @@ function getStatusCodeByType(type: ErrorType) {
       return 500;
   }
 }
+
+export enum ClientErrorCategory {
+  NETWORK = "network",
+  AUTH = "auth",
+  RATE_LIMIT = "rate_limit",
+  TIMEOUT = "timeout",
+  API_ERROR = "api_error",
+  UNKNOWN = "unknown",
+}
+
+export const clientErrorMessages: Record<ClientErrorCategory, string> = {
+  [ClientErrorCategory.NETWORK]: "Проблема с подключением. Проверьте интернет и попробуйте снова.",
+  [ClientErrorCategory.AUTH]: "Необходимо войти в систему, чтобы продолжить.",
+  [ClientErrorCategory.RATE_LIMIT]: "Превышен лимит запросов. Подождите немного и повторите попытку.",
+  [ClientErrorCategory.TIMEOUT]: "Запрос занял слишком много времени. Попробуйте ещё раз позже.",
+  [ClientErrorCategory.API_ERROR]: "Ошибка API. Проверьте параметры запроса или настройки.",
+  [ClientErrorCategory.UNKNOWN]: "Что-то пошло не так. Попробуйте повторить позже.",
+};
+
+export function categorizeClientError(error: ChatSDKError): ClientErrorCategory {
+  switch (error.type) {
+    case "offline":
+      return ClientErrorCategory.NETWORK;
+    case "unauthorized":
+      return ClientErrorCategory.AUTH;
+    case "rate_limit":
+      return ClientErrorCategory.RATE_LIMIT;
+    case "bad_request":
+      return ClientErrorCategory.API_ERROR;
+    default:
+      return ClientErrorCategory.UNKNOWN;
+  }
+}

@@ -37,7 +37,7 @@ npm install
 
 Эта команда установит все необходимые пакеты из `package.json`:
 - Next.js и React
-- @anthropic-ai/sdk (официальный SDK для Anthropic API)
+- @ai-sdk/google (официальный SDK для Gemini API)
 - Vercel AI SDK (для streaming и UI компонентов)
 - И другие зависимости
 
@@ -45,18 +45,15 @@ npm install
 
 ## Шаг 3: Получение API ключей
 
-### 3.1 Anthropic API Key
+### 3.1 Google Gemini API Key
 
-1. Перейди на [console.anthropic.com](https://console.anthropic.com/)
-2. Зарегистрируйся или войди в аккаунт
-3. Перейди в раздел **Settings** → **API Keys**
-4. Нажми **Create Key**
-5. Скопируй ключ (он начинается с `sk-ant-api03-...`)
+1. Перейди на [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+2. Зарегистрируйся или войди в свой Google аккаунт.
+3. Нажми **Create API key in new project**.
+4. Скопируй сгенерированный ключ.
 
 **Важно:**
-- Anthropic предоставляет $5 кредитов при регистрации
-- Claude Sonnet 4.5: ~$3 за 1M input tokens, ~$15 за 1M output tokens
-- Для тестирования проекта этого достаточно
+- Google предоставляет бесплатный доступ к Gemini с щедрыми лимитами для разработки.
 
 ### 3.2 Brave Search API Key
 
@@ -67,9 +64,7 @@ npm install
 5. Скопируй ключ (он начинается с `BSA...`)
 
 **Важно:**
-- Бесплатный tier: 2000 запросов в месяц
-- Rate limit: 1 запрос в секунду
-- Для проекта этого достаточно
+- Бесплатный tier: 2000 запросов в месяц. Для проекта этого достаточно.
 
 ---
 
@@ -90,8 +85,8 @@ cp .env.example .env.local
 Открой `.env.local` в редакторе и вставь свои ключи:
 
 ```bash
-# Anthropic API Key
-ANTHROPIC_API_KEY=sk-ant-api03-ТВОЙ_КЛЮЧ_СЮДА
+# Google Gemini API Key
+GOOGLE_GENERATIVE_AI_API_KEY=ТВОЙ_КЛЮЧ_СЮДА
 
 # Brave Search API Key
 BRAVE_SEARCH_API_KEY=BSA_ТВОЙ_КЛЮЧ_СЮДА
@@ -101,9 +96,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 **Проверка:**
-- ANTHROPIC_API_KEY должен начинаться с `sk-ant-api03-`
-- BRAVE_SEARCH_API_KEY должен начинаться с `BSA`
-- Не должно быть пробелов до или после ключей
+- Не должно быть пробелов до или после ключей.
 
 ---
 
@@ -209,28 +202,19 @@ npm run dev
 
 ---
 
-### Проблема: "ANTHROPIC_API_KEY is not defined"
+### Проблема: "GOOGLE_GENERATIVE_AI_API_KEY is not valid"
 
 **Причины:**
 - Забыл создать `.env.local`
 - Опечатка в названии переменной
+- Неверный или неактивный ключ API.
 - Не перезапустил сервер после изменения .env.local
 
 **Решение:**
-1. Проверь что файл `.env.local` существует
-2. Проверь что ключ называется `ANTHROPIC_API_KEY` (без опечаток)
-3. Перезапусти сервер: `Ctrl+C` → `npm run dev`
-
----
-
-### Проблема: "Rate limit exceeded" (Anthropic)
-
-**Причина:** Превышен лимит запросов к API
-
-**Решение:**
-- Бесплатный tier Anthropic: 5 requests per minute
-- Подожди 1 минуту и попробуй снова
-- Или апгрейдни аккаунт на anthropic.com
+1. Проверь что файл `.env.local` существует.
+2. Проверь что ключ называется `GOOGLE_GENERATIVE_AI_API_KEY`.
+3. Сгенерируй новый ключ на [aistudio.google.com](https://aistudio.google.com/app/apikey).
+4. Перезапусти сервер: `Ctrl+C` → `npm run dev`
 
 ---
 
@@ -239,9 +223,8 @@ npm run dev
 **Причина:** Превышен лимит запросов к Brave API
 
 **Решение:**
-- Бесплатный tier: 1 запрос в секунду, 2000 в месяц
-- Делай запросы медленнее
-- Проверь usage на brave.com/search/api
+- Бесплатный tier: 1 запрос в секунду, 2000 в месяц.
+- Делай запросы медленнее.
 
 ---
 
@@ -253,42 +236,6 @@ npm run dev
 1. Проверь что файл существует: `ls knowledge/`
 2. Проверь правильность пути (учитывай подпапки)
 3. Проверь название файла (включая расширение)
-
-**Пример правильного пути:**
-```
-knowledge/База данных Российских производителей.docx  ✅
-База данных Российских производителей.docx            ❌
-```
-
----
-
-### Проблема: Streaming не работает
-
-**Симптомы:** Ответ появляется целиком, а не по частям
-
-**Причина:** Middleware или прокси блокирует streaming
-
-**Решение:**
-- В development это работает из коробки
-- В production проверь настройки Vercel (см. [deployment.md](deployment.md))
-
----
-
-## Дополнительные команды
-
-### Запуск в production mode
-
-```bash
-npm run build    # Сборка проекта
-npm run start    # Запуск production сервера
-```
-
-### Проверка кода
-
-```bash
-npm run lint     # ESLint проверка
-npm run format   # Prettier форматирование
-```
 
 ---
 
@@ -304,7 +251,7 @@ npm run format   # Prettier форматирование
 
 ## Полезные ссылки
 
-- [Anthropic API Docs](https://docs.anthropic.com/)
+- [Google AI for Developers](https://ai.google.dev/)
 - [Brave Search API Docs](https://brave.com/search/api/)
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Vercel AI SDK](https://sdk.vercel.ai/docs)

@@ -36,6 +36,51 @@ function validateFilePath(filepath: string): string {
   return absolutePath;
 }
 
+function normalizeSegment(value: string) {
+  return value
+    .replace(/\\/g, "/")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+async function suggestFilePaths(filepath: string): Promise<string[]> {
+  try {
+    const projectRoot = process.cwd();
+    const normalizedPath = filepath.replace(/\\/g, "/");
+    const directoryPart = path.dirname(normalizedPath);
+    const targetName = path.basename(normalizedPath);
+    const searchRoot = path.join(projectRoot, directoryPart);
+    const entries = await fs.readdir(searchRoot, { withFileTypes: true });
+    const normalizedTarget = normalizeSegment(targetName);
+
+    const matches = entries
+      .filter((entry) => {
+        const normalizedEntry = normalizeSegment(entry.name);
+        return (
+          normalizedEntry === normalizedTarget ||
+          normalizedEntry.includes(normalizedTarget) ||
+          normalizedTarget.includes(normalizedEntry)
+        );
+      })
+      .map((entry) =>
+        path.posix.join(
+          directoryPart === "." ? "" : directoryPart,
+          entry.name
+        )
+      )
+      .filter(Boolean);
+
+    return matches;
+  } catch (error) {
+    console.warn(
+      `[readDocument] Unable to generate suggestions for path ${filepath}:`,
+      error instanceof Error ? error.message : error
+    );
+    return [];
+  }
+}
+
 export const readDocument = tool({
   description: `Read a document from the knowledge base (knowledge/ folder).
 Supports: DOCX, PDF (including scanned/OCR), TXT, MD, JPG, JPEG, PNG.
@@ -68,10 +113,14 @@ Example usage:
       try {
         await fs.access(absolutePath);
       } catch {
+        const alternatives = await suggestFilePaths(filepath);
         return {
           success: false,
           error: `File not found: ${filepath}`,
-          suggestion: "Please check the file path. Use index.md to see available documents.",
+          suggestion:
+            alternatives.length > 0
+              ? `Did you mean: ${alternatives.join(", ")}`
+              : "Please check the file path. Use index.md to see available documents.",
         };
       }
 

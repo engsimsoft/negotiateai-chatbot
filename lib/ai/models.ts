@@ -13,20 +13,20 @@ export type ChatModel = {
 export const chatModels: ChatModel[] = [
   {
     id: "claude-sonnet-4",
-    name: "gemini-3-pro-preview (Самая умная)",
-    description: "Google's latest experimental model",
+    name: "gemini-2.5-pro (Единая модель)",
+    description: "Stable release of Google's flagship model",
     pricing: {
-      input: "Preview",
-      output: "Preview",
+      input: "N/A",
+      output: "N/A",
     },
   },
   {
     id: "claude-haiku-3.5",
-    name: "gemini-2.5-flash (Самая быстрая)",
-    description: "Google's fastest model - low latency",
+    name: "Gemini 2.5 Flash (Быстрый)",
+    description: "Speed-optimized model for quick responses and lower cost",
     pricing: {
-      input: "Preview",
-      output: "Preview",
+      input: "Ниже",
+      output: "Ниже",
     },
   },
 ];

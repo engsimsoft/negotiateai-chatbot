@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { ChatHeader } from "@/components/chat-header";
@@ -21,7 +21,11 @@ import { useArtifactSelector } from "@/hooks/use-artifact";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import type { Vote } from "@/lib/db/schema";
-import { ChatSDKError } from "@/lib/errors";
+import {
+  ChatSDKError,
+  categorizeClientError,
+  clientErrorMessages,
+} from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
@@ -63,10 +67,97 @@ export function Chat({
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   const currentModelIdRef = useRef(currentModelId);
+  const [retryState, setRetryState] = useState({ count: 0, maxRetries: 3 });
+  const [delayState, setDelayState] = useState<"normal" | "slow" | "timeout">(
+    "normal"
+  );
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     currentModelIdRef.current = currentModelId;
   }, [currentModelId]);
+
+  const clearDelayTimers = useCallback(() => {
+    if (slowTimerRef.current) {
+      clearTimeout(slowTimerRef.current);
+      slowTimerRef.current = null;
+    }
+    if (timeoutTimerRef.current) {
+      clearTimeout(timeoutTimerRef.current);
+      timeoutTimerRef.current = null;
+    }
+  }, []);
+
+  const isRetryableError = useCallback((error: unknown) => {
+    return (
+      error instanceof ChatSDKError &&
+      (error.type === "offline" || error.type === "rate_limit")
+    );
+  }, []);
+
+  const retryableFetch = useCallback(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      let attempt = 0;
+      const maxRetries = retryState.maxRetries;
+
+      while (attempt <= maxRetries) {
+        try {
+          if (attempt > 0) {
+            setRetryState({ count: attempt, maxRetries });
+          }
+          const response = await fetchWithErrorHandlers(input, init);
+          if (attempt > 0) {
+            toast({
+              type: "success",
+              description: "Соединение восстановлено",
+            });
+          }
+          setRetryState({ count: 0, maxRetries });
+          return response;
+        } catch (error) {
+          if (!isRetryableError(error) || attempt === maxRetries) {
+            setRetryState({ count: 0, maxRetries });
+            throw error;
+          }
+
+          const delayMs = 1000 * Math.pow(2, attempt);
+          toast({
+            type: "error",
+            description: `Проблемы с сетью. Повтор ${attempt + 1}/${
+              maxRetries
+            } через ${Math.round(delayMs / 1000)}с`,
+          });
+
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          attempt += 1;
+        }
+      }
+
+      return fetchWithErrorHandlers(input, init);
+    },
+    [isRetryableError, retryState.maxRetries]
+  );
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        fetch: retryableFetch,
+        prepareSendMessagesRequest(request) {
+          return {
+            body: {
+              id: request.id,
+              message: request.messages.at(-1),
+              selectedChatModel: currentModelIdRef.current,
+              selectedVisibilityType: visibilityType,
+              ...request.body,
+            },
+          };
+        },
+      }),
+    [retryableFetch, visibilityType]
+  );
 
   const {
     messages,
@@ -81,21 +172,7 @@ export function Chat({
     messages: initialMessages,
     experimental_throttle: 100,
     generateId: generateUUID,
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      fetch: fetchWithErrorHandlers,
-      prepareSendMessagesRequest(request) {
-        return {
-          body: {
-            id: request.id,
-            message: request.messages.at(-1),
-            selectedChatModel: currentModelIdRef.current,
-            selectedVisibilityType: visibilityType,
-            ...request.body,
-          },
-        };
-      },
-    }),
+    transport,
     onData: (dataPart) => {
       setDataStream((ds) => (ds ? [...ds, dataPart] : []));
       if (dataPart.type === "data-usage") {
@@ -104,6 +181,8 @@ export function Chat({
     },
     onFinish: () => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));
+      setRetryState({ count: 0, maxRetries: retryState.maxRetries });
+      setDelayState("normal");
     },
     onError: (error) => {
       if (error instanceof ChatSDKError) {
@@ -113,14 +192,41 @@ export function Chat({
         ) {
           setShowCreditCardAlert(true);
         } else {
+          const category = categorizeClientError(error);
           toast({
             type: "error",
-            description: error.message,
+            description:
+              clientErrorMessages[category] ?? error.message,
           });
         }
+        setDelayState("normal");
       }
     },
   });
+
+  useEffect(() => {
+    if (status === "submitted") {
+      slowTimerRef.current = setTimeout(() => {
+        setDelayState("slow");
+      }, 30_000);
+
+      timeoutTimerRef.current = setTimeout(() => {
+        setDelayState("timeout");
+        toast({
+          type: "error",
+          description: "Запрос занял слишком много времени. Попробуйте снова.",
+        });
+        stop();
+      }, 60_000);
+    } else {
+      setDelayState("normal");
+      clearDelayTimers();
+    }
+
+    return () => {
+      clearDelayTimers();
+    };
+  }, [status, stop, clearDelayTimers]);
 
   const searchParams = useSearchParams();
   const query = searchParams.get("query");
@@ -176,24 +282,26 @@ export function Chat({
         />
 
         <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
-          {!isReadonly && (
-            <MultimodalInput
-              attachments={attachments}
-              chatId={id}
-              input={input}
-              messages={messages}
-              onModelChange={setCurrentModelId}
-              selectedModelId={currentModelId}
-              selectedVisibilityType={visibilityType}
-              sendMessage={sendMessage}
-              setAttachments={setAttachments}
-              setInput={setInput}
-              setMessages={setMessages}
-              status={status}
-              stop={stop}
-              usage={usage}
-            />
-          )}
+            {!isReadonly && (
+              <MultimodalInput
+                attachments={attachments}
+                chatId={id}
+                input={input}
+                messages={messages}
+                retryState={retryState}
+                delayState={delayState}
+                onModelChange={setCurrentModelId}
+                selectedModelId={currentModelId}
+                selectedVisibilityType={visibilityType}
+                sendMessage={sendMessage}
+                setAttachments={setAttachments}
+                setInput={setInput}
+                setMessages={setMessages}
+                status={status}
+                stop={stop}
+                usage={usage}
+              />
+            )}
         </div>
       </div>
 

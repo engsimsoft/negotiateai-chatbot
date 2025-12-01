@@ -205,14 +205,22 @@ export async function POST(request: Request) {
         // Load system prompt asynchronously
         const systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
 
+        const startTime = Date.now();
+        let firstTokenTime: number | null = null;
+
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
           system: systemPromptText,
           messages: convertToModelMessages(uiMessages),
-          // Model parameters optimized for professional IT assistant
-          // Low temperature (0.3) for precise, consistent, deterministic technical answers
-          // Perfect for specialized assistant requiring accuracy over creativity
-          temperature: 0.3,
+          // Gemini works best when creativity budget is not artificially limited
+          temperature: 1.0,
+          providerOptions: {
+            google: {
+              thinkingConfig: {
+                thinkingBudget: 1024,
+              },
+            },
+          },
           stopWhen: stepCountIs(5),
           experimental_activeTools:
             selectedChatModel === "claude-sonnet-4" || selectedChatModel === "claude-haiku-3.5"
@@ -232,7 +240,7 @@ export async function POST(request: Request) {
                   "requestSuggestions",
                   "webSearch",
                 ],
-          // experimental_transform: smoothStream({ chunking: "word" }),
+          experimental_transform: smoothStream({ chunking: "word" }),
           tools: {
             getCurrentDate,
             getWeather,
@@ -250,6 +258,13 @@ export async function POST(request: Request) {
             functionId: "stream-text",
           },
           onFinish: async ({ usage }) => {
+            const totalTime = Date.now() - startTime;
+            if (firstTokenTime === null) {
+              firstTokenTime = totalTime;
+            }
+            console.log(
+              `[Performance] Chat ${id}: TTFT = ${firstTokenTime}ms, Total = ${totalTime}ms`
+            );
             try {
               const providers = await getTokenlensCatalog();
               const modelId =
@@ -285,11 +300,47 @@ export async function POST(request: Request) {
 
         result.consumeStream();
 
-        dataStream.merge(
-          result.toUIMessageStream({
-            sendReasoning: true,
-          })
-        );
+        const baseStream = result.toUIMessageStream({
+          sendReasoning: true,
+        });
+
+        const instrumentedStream = new ReadableStream({
+          async start(controller) {
+            const reader = baseStream.getReader();
+            const ignoredTypes = new Set([
+              "response-metadata",
+              "data-usage",
+              "tool-call",
+              "tool-result",
+              "tool-error",
+            ]);
+
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) {
+                controller.close();
+                break;
+              }
+
+              if (
+                firstTokenTime === null &&
+                value &&
+                typeof value === "object" &&
+                "type" in value &&
+                !ignoredTypes.has((value as any).type)
+              ) {
+                firstTokenTime = Date.now() - startTime;
+                console.log(
+                  `[Performance] Chat ${id}: first chunk = ${firstTokenTime}ms`
+                );
+              }
+
+              controller.enqueue(value);
+            }
+          },
+        });
+
+        dataStream.merge(instrumentedStream);
       },
       generateId: generateUUID,
       onFinish: async ({ messages }) => {

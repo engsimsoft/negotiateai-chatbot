@@ -52,7 +52,7 @@ export async function extractTextFromImage(
     const dataUrl = `data:${mediaType};base64,${base64Image}`;
 
     const { text } = await generateText({
-      model: google("gemini-1.5-pro"),
+      model: google("gemini-2.5-flash"),
       messages: [
         {
           role: "user",
@@ -62,6 +62,13 @@ export async function extractTextFromImage(
           ],
         },
       ],
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        },
+      },
     });
 
     const processingTime = Date.now() - startTime;
@@ -94,7 +101,7 @@ export async function extractTextFromPDF(
 
   try {
     const { text } = await generateText({
-      model: google("gemini-1.5-pro"),
+      model: google("gemini-2.5-flash"),
       messages: [
         {
           role: "user",
@@ -108,6 +115,13 @@ export async function extractTextFromPDF(
           ],
         },
       ],
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        },
+      },
     });
 
     const processingTime = Date.now() - startTime;

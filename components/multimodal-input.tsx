@@ -52,6 +52,8 @@ function PureMultimodalInput({
   input,
   setInput,
   status,
+  retryState,
+  delayState,
   stop,
   attachments,
   setAttachments,
@@ -68,6 +70,8 @@ function PureMultimodalInput({
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
   status: UseChatHelpers<ChatMessage>["status"];
+  retryState?: { count: number; maxRetries: number };
+  delayState?: "normal" | "slow" | "timeout";
   stop: () => void;
   attachments: Attachment[];
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
@@ -327,6 +331,22 @@ function PureMultimodalInput({
             />
           </PromptInputTools>
 
+          {retryState && retryState.count > 0 && (
+            <div className="text-xs text-muted-foreground px-2">
+              Повторная попытка {retryState.count}/{retryState.maxRetries}...
+            </div>
+          )}
+          {delayState === "slow" && (
+            <div className="text-xs text-amber-500 px-2">
+              Ответ занимает больше времени, пожалуйста подождите...
+            </div>
+          )}
+          {delayState === "timeout" && (
+            <div className="text-xs text-destructive px-2">
+              Запрос остановлен. Отправьте ещё раз или измените вопрос.
+            </div>
+          )}
+
           {status === "submitted" ? (
             <StopButton setMessages={setMessages} stop={stop} />
           ) : (
@@ -360,6 +380,12 @@ export const MultimodalInput = memo(
       return false;
     }
     if (prevProps.selectedModelId !== nextProps.selectedModelId) {
+      return false;
+    }
+    if (prevProps.retryState?.count !== nextProps.retryState?.count) {
+      return false;
+    }
+    if (prevProps.delayState !== nextProps.delayState) {
       return false;
     }
 

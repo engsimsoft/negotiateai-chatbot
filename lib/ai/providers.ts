@@ -26,9 +26,9 @@ export const myProvider = isTestEnvironment
     })()
   : customProvider({
       languageModels: {
-        "claude-sonnet-4": google("gemini-3-pro-preview"),
+        "claude-sonnet-4": google("gemini-2.5-pro"),
         "claude-haiku-3.5": google("gemini-2.5-flash"),
         "title-model": google("gemini-2.5-flash"),
-        "artifact-model": google("gemini-3-pro-preview"),
+        "artifact-model": google("gemini-2.5-pro"),
       },
     });

@@ -10,6 +10,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
@@ -60,29 +61,84 @@ const getStatusBadge = (status: ToolUIPart["state"]) => {
   );
 };
 
-export const ToolHeader = ({
-  className,
-  type,
-  state,
-  ...props
-}: ToolHeaderProps) => (
-  <CollapsibleTrigger
-    className={cn(
-      "flex w-full min-w-0 items-center justify-between gap-2 p-3",
-      className
-    )}
-    {...props}
-  >
-    <div className="flex min-w-0 flex-1 items-center gap-2">
-      <WrenchIcon className="size-4 shrink-0 text-muted-foreground" />
-      <span className="truncate font-medium text-sm">{type}</span>
-    </div>
-    <div className="flex shrink-0 items-center gap-2">
-      {getStatusBadge(state)}
-      <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-    </div>
-  </CollapsibleTrigger>
-);
+export const ToolHeader = ({ className, type, state, ...props }: ToolHeaderProps) => {
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [completedMs, setCompletedMs] = useState<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+
+  const isRunning = state === "input-available" || state === "input-streaming";
+  const isFinished = state === "output-available" || state === "output-error";
+
+  useEffect(() => {
+    if (isRunning) {
+      if (startTimeRef.current === null) {
+        startTimeRef.current = Date.now();
+      }
+      timerRef.current = setInterval(() => {
+        if (startTimeRef.current) {
+          setElapsedMs(Date.now() - startTimeRef.current);
+        }
+      }, 1000);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [isRunning]);
+
+  useEffect(() => {
+    if (isFinished && startTimeRef.current) {
+      setCompletedMs(Date.now() - startTimeRef.current);
+      setElapsedMs(0);
+      startTimeRef.current = null;
+    }
+
+    if (isRunning) {
+      setCompletedMs(null);
+    }
+  }, [isFinished, isRunning]);
+
+  const formatSeconds = (ms: number) => Math.max(1, Math.round(ms / 1000));
+
+  let timingLabel: ReactNode = null;
+  if (isRunning && elapsedMs > 0) {
+    timingLabel = (
+      <span className="text-xs text-muted-foreground">
+        {formatSeconds(elapsedMs)}s
+      </span>
+    );
+  } else if (completedMs !== null) {
+    timingLabel = (
+      <span className="text-xs text-emerald-600">
+        {`Готово за ${formatSeconds(completedMs)}s`}
+      </span>
+    );
+  }
+
+  return (
+    <CollapsibleTrigger
+      className={cn(
+        "flex w-full min-w-0 items-center justify-between gap-2 p-3",
+        className
+      )}
+      {...props}
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <WrenchIcon className="size-4 shrink-0 text-muted-foreground" />
+        <span className="truncate font-medium text-sm">{type}</span>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {timingLabel}
+        {getStatusBadge(state)}
+        <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+      </div>
+    </CollapsibleTrigger>
+  );
+};
 
 export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 

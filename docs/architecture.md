@@ -38,7 +38,7 @@
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  External Services                                          │
-│  ├── Google Gemini API  - Gemini 3 Pro / 2.5 Flash        │
+│  ├── Google Gemini API  - Gemini 2.5 Pro (единая модель)  │
 │  └── Brave Search API   - Web search                       │
 └─────────────────────────────────────────────────────────────┘
                      │
@@ -81,13 +81,13 @@
 Отвечает за:
 - Обработку HTTP POST запросов от клиента
 - Валидацию входящих сообщений
-- Вызов Anthropic API
+- Вызов Google Gemini API
 - Streaming ответов клиенту
 - Обработку ошибок
 
 **Поток данных:**
 ```
-User message → POST /api/chat → Anthropic API → Stream response → User
+User message → POST /api/chat → Google Gemini API → Stream response → User
 ```
 
 ---
@@ -96,22 +96,16 @@ User message → POST /api/chat → Anthropic API → Stream response → User
 
 **Папка:** `lib/`
 
-#### lib/anthropic.ts
-- Инициализация Anthropic SDK
-- Конфигурация модели Claude Sonnet 4.5
-- Управление system prompt
-- Обработка function calling
+#### lib/ai/providers.ts
+- Инициализация Google Gemini SDK
+- Конфигурация модели Gemini 2.5 Pro
 
-#### lib/tools.ts
-- Определение AI agent tools (3 функции)
-- Реализация `read_document(filepath)`
-- Реализация `web_search(query)`
-- Реализация `get_current_date()`
+#### lib/ai/tools/
+- Определение и реализация AI agent tools (например, `read-document.ts`)
 
-#### lib/brave-search.ts
+#### lib/integrations/brave-search.ts
 - Интеграция с Brave Search API
 - Форматирование результатов поиска
-- Обработка rate limits
 
 ---
 
@@ -122,7 +116,7 @@ User message → POST /api/chat → Anthropic API → Stream response → User
 - Оригинальные документы (DOCX, PDF)
 - Структура по странам
 - Индекс документов (`index.md`)
-- Прямое чтение через Anthropic API
+- Прямое чтение через Gemini Vision API
 
 ---
 
@@ -138,32 +132,19 @@ const systemPrompt = loadSystemPrompt(); // из system-prompt.md
 const knowledgeIndex = readFile('index.md');
 const fullPrompt = systemPrompt.replace('[ИНДЕКС ВСТАВЛЯЕТСЯ СЮДА]', knowledgeIndex);
 
-// 3. Определение tools
-const tools = [
-  {
-    name: 'read_document',
-    description: 'Читает документ из базы знаний',
-    input_schema: { filepath: 'string' }
-  },
-  {
-    name: 'web_search',
-    description: 'Ищет информацию в интернете',
-    input_schema: { query: 'string' }
-  },
-  {
-    name: 'get_current_date',
-    description: 'Возвращает текущую дату',
-    input_schema: {}
-  }
-];
+// 3. Определение tools (через Vercel AI SDK)
+const tools = {
+  readDocument: { /*...*/ },
+  webSearch: { /*...*/ },
+  getCurrentDate: { /*...*/ }
+};
 
-// 4. Отправка в Anthropic API
-const response = await anthropic.messages.create({
-  model: 'claude-sonnet-4-5-20250929',
+// 4. Отправка в Google Gemini API через Vercel AI SDK
+const { stream } = await streamText({
+  model: google("gemini-2.5-pro"),
   system: fullPrompt,
-  messages: [...conversation],
-  tools: tools,
-  stream: true
+  prompt: last(messages).content,
+  tools: tools
 });
 ```
 
@@ -176,27 +157,22 @@ const response = await anthropic.messages.create({
 ```
 1. User: "Что написано в файле ПОЛЬЗОВАТЕЛЬСКИЙ ПУТЬ ПОСТАВЩИКА.docx?"
 
-2. API Layer: отправляет запрос в Anthropic API
+2. API Layer: отправляет запрос в Google Gemini API
 
-3. Claude анализирует:
+3. Gemini анализирует:
    - Запрос пользователя
    - System prompt (с индексом документов)
    - Доступные tools
 
-4. Claude решает использовать read_document:
-   {
-     "tool": "read_document",
-     "input": {
-       "filepath": "ПОЛЬЗОВАТЕЛЬСКИЙ ПУТЬ ПОСТАВЩИКА.docx"
-     }
-   }
+4. Gemini решает использовать readDocument:
+   // Vercel AI SDK генерирует tool_code, который выполняет readDocument
 
-5. lib/tools.ts выполняет read_document:
+5. lib/ai/tools/read-document.ts выполняет чтение:
    - Находит файл в knowledge/
-   - Читает содержимое через Anthropic API (поддержка DOCX)
+   - Читает содержимое через Gemini Vision API (для DOCX/PDF)
    - Возвращает текст документа
 
-6. Claude получает результат и генерирует ответ:
+6. Gemini получает результат и генерирует ответ:
    "В документе описан путь поставщика:
    1. Регистрация...
    2. Создание профиля...
@@ -215,115 +191,39 @@ const response = await anthropic.messages.create({
 
 ### Принцип работы
 
-Anthropic API поддерживает нативное чтение DOCX и PDF через Messages API:
+Google Gemini Vision API поддерживает нативное чтение DOCX и PDF.
 
 ```typescript
+// lib/ai/vision-ocr.ts
 async function readDocument(filepath: string): Promise<string> {
   // 1. Находим файл
   const fullPath = path.join(process.cwd(), 'knowledge', filepath);
 
   // 2. Читаем как бинарные данные
   const fileBuffer = fs.readFileSync(fullPath);
-  const base64Content = fileBuffer.toString('base64');
 
-  // 3. Определяем MIME type
-  const mimeType = getMimeType(filepath); // .docx → application/vnd.openxmlformats...
-
-  // 4. Отправляем в Anthropic API для извлечения текста
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
-    messages: [{
-      role: 'user',
-      content: [
-        {
-          type: 'document',
-          source: {
-            type: 'base64',
-            media_type: mimeType,
-            data: base64Content
-          }
-        },
-        {
-          type: 'text',
-          text: 'Извлеки и верни полный текст этого документа'
-        }
-      ]
-    }]
+  // 3. Отправляем в Gemini Vision API для извлечения текста
+  const { text } = await experimental_streamText({
+    model: google("gemini-2.5-pro"),
+    prompt: 'Извлеки и верни полный текст из этого документа.',
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Извлеки текст.' },
+          { type: 'image', image: fileBuffer } // SDK обрабатывает Buffer для документов
+        ],
+      },
+    ],
   });
 
-  return response.content[0].text;
+  return text;
 }
 ```
 
 **Преимущества:**
-- Не нужна конвертация DOCX/PDF в TXT
-- Сохраняется форматирование
-- Claude понимает структуру документа
-
----
-
-## Веб-поиск (web_search)
-
-### Интеграция с Brave Search
-
-```typescript
-async function webSearch(query: string): Promise<SearchResult[]> {
-  // 1. Вызов Brave Search API
-  const response = await fetch('https://api.search.brave.com/res/v1/web/search', {
-    headers: {
-      'X-Subscription-Token': process.env.BRAVE_SEARCH_API_KEY
-    },
-    params: {
-      q: query,
-      count: 10  // топ 10 результатов
-    }
-  });
-
-  // 2. Парсинг результатов
-  const data = await response.json();
-
-  // 3. Форматирование для Claude
-  const results = data.web.results.map(r => ({
-    title: r.title,
-    snippet: r.description,
-    url: r.url
-  }));
-
-  return results;
-}
-```
-
-**Когда используется:**
-- Запросы о текущих событиях
-- Актуальная информация (курсы валют, новости)
-- Информация, которой нет в базе знаний
-
----
-
-## Получение даты (get_current_date)
-
-```typescript
-function getCurrentDate(): string {
-  const now = new Date();
-
-  return {
-    date: now.toISOString().split('T')[0],      // 2025-10-14
-    time: now.toTimeString().split(' ')[0],     // 14:30:25
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    dayOfWeek: now.toLocaleDateString('ru-RU', { weekday: 'long' }),
-    formatted: now.toLocaleDateString('ru-RU', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  };
-}
-```
-
-**Когда используется:**
-- Запросы о текущей дате
-- Расчёты временных промежутков
-- Контекст для анализа актуальности документов
+- Не нужна конвертация DOCX/PDF в TXT на стороне сервера
+- Gemini понимает структуру и контекст документа
 
 ---
 
@@ -337,24 +237,13 @@ function getCurrentDate(): string {
 ## РОЛЬ И МИССИЯ
 [Описание роли агента]
 
-## ФИЛОСОФИЯ РАБОТЫ
-[Принципы работы]
-
 ## БАЗА ЗНАНИЙ
 [ИНДЕКСНЫЙ ФАЙЛ index.md ВСТАВЛЯЕТСЯ СЮДА]
 
 ## ИНСТРУКЦИИ ПО ФУНКЦИЯМ
+[Описание как использовать инструменты]
 
-### read_document(filepath)
-[Как использовать]
-
-### web_search(query)
-[Как использовать]
-
-### get_current_date()
-[Как использовать]
-
-## СТРАТЕГИИ РАБОТЫ
+## СТРАТЕГИИ РАБОтЫ
 [Сценарии использования]
 ```
 
@@ -364,91 +253,12 @@ function getCurrentDate(): string {
 1. Читается `system-prompt.md`
 2. Читается `index.md`
 3. Содержимое `index.md` вставляется в маркер
-4. Полный промпт отправляется в Anthropic API
+4. Полный промпт отправляется в Google Gemini API как `system` message.
 
 **Зачем:**
-- Claude видит полный индекс документов
+- Gemini видит полный индекс документов
 - Может навигировать по базе знаний
 - Знает какие документы существуют
-
----
-
-## Streaming Responses
-
-### Как работает streaming
-
-```typescript
-// Server-side (app/api/chat/route.ts)
-const stream = await anthropic.messages.stream({
-  model: 'claude-sonnet-4-5-20250929',
-  messages: messages,
-  tools: tools
-});
-
-// Преобразование в ReadableStream для клиента
-return new Response(stream.toReadableStream(), {
-  headers: {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive'
-  }
-});
-```
-
-```typescript
-// Client-side (components/Chat.tsx)
-const { messages, input, handleSubmit } = useChat({
-  api: '/api/chat',
-  streamMode: 'text'  // Streaming включен
-});
-
-// React автоматически обновляет UI по мере получения токенов
-```
-
-**Преимущества:**
-- Пользователь видит ответ сразу
-- Снижается воспринимаемая задержка
-- Лучший UX для длинных ответов
-
----
-
-## Обработка ошибок
-
-### Уровни обработки
-
-**1. API Layer**
-```typescript
-try {
-  const response = await anthropic.messages.create({...});
-  return response;
-} catch (error) {
-  if (error.status === 429) {
-    return { error: 'Rate limit exceeded. Попробуй через минуту.' };
-  }
-  if (error.status === 401) {
-    return { error: 'Invalid API key. Проверь ANTHROPIC_API_KEY' };
-  }
-  return { error: 'Ошибка API. Попробуй позже.' };
-}
-```
-
-**2. Tools Layer**
-```typescript
-function readDocument(filepath: string) {
-  if (!fs.existsSync(fullPath)) {
-    throw new Error(`Документ не найден: ${filepath}`);
-  }
-  // ... читаем файл
-}
-```
-
-**3. Client Layer**
-```typescript
-// UI показывает ошибку пользователю
-if (error) {
-  return <ErrorMessage>{error.message}</ErrorMessage>;
-}
-```
 
 ---
 
@@ -464,31 +274,6 @@ if (error) {
 - Валидация путей (предотвращение directory traversal)
 - Только чтение (не запись)
 
-### Rate Limiting
-- Anthropic: автоматический retry с backoff
-- Brave Search: ограничение 1 req/sec
-- Client-side: debounce для предотвращения спама
-
----
-
-## Масштабирование
-
-### Текущая архитектура
-- Stateless API (каждый запрос независим)
-- Vercel автоматически масштабирует
-- Нет базы данных (документы в файловой системе)
-
-### Ограничения
-- Размер папки `knowledge/` (Vercel: 50MB limit для функций)
-- Rate limits внешних API
-- Длина контекста Claude (200K токенов)
-
-### Возможные улучшения
-- Добавить векторную БД для больших баз знаний
-- Кэширование частых запросов
-- Redis для session management
-- Разделение на микросервисы
-
 ---
 
 ## Почему такая архитектура?
@@ -498,55 +283,25 @@ if (error) {
 **1. Next.js App Router**
 - Серверные компоненты для безопасности API keys
 - Built-in API routes
-- Оптимизация для production
 - Легкий деплой на Vercel
 
-**2. Прямое подключение к Anthropic API**
-- Нативная поддержка DOCX/PDF
-- Официальный SDK
-- Лучшая документация
-- См. [ADR 001](decisions/001-why-anthropic-direct.md)
+**2. Прямое подключение к Google Gemini API**
+- Нативная поддержка DOCX/PDF через Vision API
+- Официальный SDK от Vercel/Google
+- См. [ADR 001](decisions/001-why-anthropic-direct.md) (устарел, но причина перехода актуальна)
 
 **3. Без векторной БД**
 - Небольшая база знаний (~40 документов)
-- Claude Sonnet 4.5 имеет большой контекст (200K токенов)
+- Gemini 2.5 Pro имеет огромный контекст (1M токенов)
 - Индекс в промпте достаточно эффективен
-- См. [ADR 003](decisions/003-no-vector-db.md)
-
-**4. Function Calling**
-- Claude выбирает нужные инструменты сам
-- Гибкость в использовании
-- Естественная интеграция
-
----
-
-## Дальнейшее развитие
-
-### Roadmap архитектуры
-
-**Phase 1: MVP (текущая)**
-- Базовый чат
-- 3 функции (read_document, web_search, get_current_date)
-- Streaming
-
-**Phase 2: Улучшения**
-- История чатов (БД)
-- Аутентификация пользователей
-- Кэширование ответов
-
-**Phase 3: Advanced**
-- Векторный поиск для больших баз
-- Multi-turn conversations с контекстом
-- Аналитика использования
 
 ---
 
 ## Полезные ссылки
 
-- [Anthropic Messages API](https://docs.anthropic.com/claude/reference/messages_post)
+- [Google AI for Developers](https://ai.google.dev/)
 - [Next.js App Router](https://nextjs.org/docs/app)
 - [Vercel AI SDK](https://sdk.vercel.ai/docs)
-- [Function Calling Guide](https://docs.anthropic.com/claude/docs/tool-use)
 
 ---
 
@@ -555,4 +310,4 @@ if (error) {
 - [setup.md](setup.md) - Установка и настройка
 - [deployment.md](deployment.md) - Деплой на Vercel
 - [troubleshooting.md](troubleshooting.md) - Решение проблем
-- [ADR 001](decisions/001-why-anthropic-direct.md) - Почему Anthropic API
+- [ADR 001](decisions/001-why-anthropic-direct.md) - Почему Anthropic API (УСТАРЕЛ)

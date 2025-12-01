@@ -1,9 +1,9 @@
 # NegotiateAI Chatbot
 
-AI чат-бот для переговоров (MIR.TRADE) на базе Claude Sonnet 4.
+AI чат-бот для переговоров (MIR.TRADE) на базе Google Gemini.
 
 **Production:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
-**Версия:** 1.0.7
+**Версия:** 1.0.14 (стабилизация)
 **Статус:** ✅ Deployed, работает
 
 ---
@@ -12,11 +12,11 @@ AI чат-бот для переговоров (MIR.TRADE) на базе Claude 
 
 **Что работает:**
 - ✅ Next.js 15.3 + TypeScript
-- ✅ Google Gemini 1.5 Pro API (streaming)
+- ✅ Google Gemini 2.5 Pro API (streaming, единая модель)
 - ✅ NextAuth (PostgreSQL + guest mode)
-- ✅ Vercel deployment (middleware fixed)
-- ✅ AI Tools: read_document, web_search, get_current_date, get_weather
-- ✅ Brave Search integration (2000 req/month free tier)
+- ✅ Vercel deployment
+- ✅ AI Tools (детали в `docs/api/tools.md`)
+- ✅ Brave Search integration
 
 **В разработке:**
 - [ ] Knowledge base integration (~40 DOCX/PDF)
@@ -34,8 +34,8 @@ npm run dev                 # http://localhost:3000
 ```
 
 **Требуется в .env.local:**
-- `ANTHROPIC_API_KEY` - https://console.anthropic.com
-- `BRAVE_SEARCH_API_KEY` - https://brave.com/search/api (2000 req/month free)
+- `GOOGLE_GENERATIVE_AI_API_KEY` - https://aistudio.google.com/app/apikey
+- `BRAVE_SEARCH_API_KEY` - https://brave.com/search/api
 - `AUTH_SECRET` - `openssl rand -base64 32`
 - `POSTGRES_URL` - neon.tech или vercel.com/storage
 - `BLOB_READ_WRITE_TOKEN` - vercel.com/storage
@@ -48,12 +48,8 @@ npm run dev                 # http://localhost:3000
 
 **AI/Chat:**
 - `app/(chat)/api/chat/route.ts` - Chat endpoint (streaming)
-- `lib/ai/providers.ts` - Claude Sonnet 4.5 configuration
-- `lib/ai/tools/` - AI tools:
-  - `read-document.ts` - Чтение DOCX/PDF из knowledge/ ✅
-  - `get-current-date.ts` - Текущая дата/время ✅
-  - `web-search.ts` - Brave Search API ✅
-  - `get-weather.ts` - Погода (example tool) ✅
+- `lib/ai/providers.ts` - Конфигурация Gemini 2.5 Pro
+- `lib/ai/tools/` - Реализация AI-инструментов
 
 **Auth/DB:**
 - `app/(auth)/` - NextAuth 5.0 setup
@@ -61,7 +57,7 @@ npm run dev                 # http://localhost:3000
 
 **Config:**
 - `.env.local` - API keys (НЕ коммитить!)
-- `next.config.ts` - Next.js config (experimental.ppr)
+- `next.config.ts` - Next.js config
 - `drizzle.config.ts` - Database config
 
 ---
@@ -78,7 +74,6 @@ npm run dev                 # http://localhost:3000
 - [docs/architecture.md](docs/architecture.md) - Архитектура
 - [docs/deployment.md](docs/deployment.md) - Vercel deployment
 - [docs/troubleshooting.md](docs/troubleshooting.md) - Решение проблем
-- [docs/vercel-deploy-debug.md](docs/vercel-deploy-debug.md) - История отладки v1.0.5
 
 **Решения:**
 - [docs/decisions/](docs/decisions/) - Architecture Decision Records
@@ -87,11 +82,9 @@ npm run dev                 # http://localhost:3000
 
 ## ⚙️ Конфигурация моделей
 
-**Модель:** Google Gemini 1.5 Pro (`gemini-1.5-pro`)
-**Где:** `lib/ai/providers.ts:28-30`
+**Модель:** Google Gemini 2.5 Pro (`gemini-2.5-pro`)
+**Где:** `lib/ai/providers.ts`
 **Цена:** Free tier available
-
-**Параметры:** Настраиваются в `app/(chat)/api/chat/route.ts`
 
 ---
 
@@ -104,7 +97,3 @@ npm run dev                 # http://localhost:3000
 - Vercel Blob Storage
 
 **Основано на:** [Vercel AI Chatbot Template](https://github.com/vercel/ai-chatbot)
-
----
-
-**Для пользователей:** См. [USER_GUIDE.md](USER_GUIDE.md) (создать при необходимости)
