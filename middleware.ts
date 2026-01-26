@@ -24,6 +24,10 @@ export async function middleware(request: NextRequest) {
   });
 
   if (!token) {
+    // Allow access to login and register pages without token
+    if (["/login", "/register"].includes(pathname)) {
+      return NextResponse.next();
+    }
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

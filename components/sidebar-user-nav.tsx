@@ -1,8 +1,6 @@
 "use client";
 
 import { ChevronUp } from "lucide-react";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
 import type { User } from "next-auth";
 import { signOut, useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
@@ -22,8 +20,7 @@ import { LoaderIcon } from "./icons";
 import { toast } from "./toast";
 
 export function SidebarUserNav({ user }: { user: User }) {
-  const router = useRouter();
-  const { data, status } = useSession();
+  const { status } = useSession();
   const { setTheme, resolvedTheme } = useTheme();
 
   return (
@@ -48,13 +45,6 @@ export function SidebarUserNav({ user }: { user: User }) {
                 className="h-10 bg-background data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 data-testid="user-nav-button"
               >
-                <Image
-                  alt={user.email ?? "User Avatar"}
-                  className="rounded-full"
-                  height={24}
-                  src={`https://avatar.vercel.sh/${user.email}`}
-                  width={24}
-                />
                 <span className="truncate" data-testid="user-email">
                   {user?.email}
                 </span>

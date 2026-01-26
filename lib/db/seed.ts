@@ -1,11 +1,19 @@
+import { config } from "dotenv";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { user } from "./schema";
 import { generateHashedPassword } from "./utils";
 
+config({
+  path: ".env.local",
+});
+
 async function main() {
-  // biome-ignore lint: Forbidden non-null assertion.
-  const client = postgres(process.env.POSTGRES_URL!);
+  if (!process.env.POSTGRES_URL) {
+    throw new Error("POSTGRES_URL is not defined");
+  }
+
+  const client = postgres(process.env.POSTGRES_URL);
   const db = drizzle(client);
 
   console.log("🌱 Seeding database...");
