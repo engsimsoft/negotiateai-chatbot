@@ -125,6 +125,7 @@ vercel --prod            # Deploy на production
 - [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md) - Правила документации
 
 **Техническая документация:**
+- [docs/ai-capabilities.md](docs/ai-capabilities.md) - Возможности AI-агентов
 - [docs/setup.md](docs/setup.md) - Установка
 - [docs/architecture.md](docs/architecture.md) - Архитектура
 - [docs/deployment.md](docs/deployment.md) - Deployment

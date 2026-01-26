@@ -29,6 +29,8 @@
 - **Streaming:** Быстрые ответы через streaming API
 - **История:** Сохранение и управление диалогами
 
+**Подробнее:** [docs/ai-capabilities.md](docs/ai-capabilities.md) - полный список возможностей AI-агентов
+
 ---
 
 ## 🚀 Быстрый старт
@@ -85,6 +87,7 @@ npm run db:studio    # Drizzle Studio (UI для БД)
 - [CLAUDE.md](CLAUDE.md) - Навигация для AI
 - [CHANGELOG.md](CHANGELOG.md) - История изменений
 - [ROADMAP.md](ROADMAP.md) - План разработки
+- [docs/ai-capabilities.md](docs/ai-capabilities.md) - Возможности AI-агентов
 - [docs/setup.md](docs/setup.md) - Детальная установка
 - [docs/architecture.md](docs/architecture.md) - Архитектура
 - [docs/decisions/](docs/decisions/) - Architecture Decision Records
