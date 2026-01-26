@@ -64,6 +64,13 @@
       "when": 1760524108772,
       "tag": "0008_abnormal_sir_ram",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1769456871857,
+      "tag": "0009_daily_lockheed",
+      "breakpoints": true
     }
   ]
 }
