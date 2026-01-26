@@ -8,8 +8,154 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- Расширить поддержку загрузки файлов через UI (PDF, DOCX)
-- UI кастомизация (брендинг NegotiateAI)
+- Этап 2: Авторизация и роли (удаление guest режима, добавление ролей в БД, seed скрипт)
+- Этап 3: Персонализация (динамические промпты по ролям, система персональных проектов)
+
+## [2.0.0] - 2026-01-26 - Family AI Assistant Launch
+
+### Changed - PROJECT REBRAND
+**⚠️ КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: NegotiateAI → Family AI Assistant**
+
+**Контекст:**
+- Проект MIR.TRADE закрыт
+- Кодовая база переиспользуется для персонального семейного AI-ассистента
+- Новое назначение: помощник для 2 пользователей с разными ролями (инженер + маркетолог)
+
+**Что изменилось:**
+
+1. **Документация полностью переработана** (Этап 1: Очистка)
+   - ✅ README.md - новое описание проекта Family AI Assistant (94 строки)
+   - ✅ CLAUDE.md - обновлён под новый проект (навигация, технологии, команды)
+   - ✅ docs/setup.md - убраны упоминания MIR.TRADE, обновлены инструкции
+   - ✅ docs/architecture.md - описано новое назначение системы
+   - ✅ docs/deployment.md - проверена актуальность
+   - ✅ .env.example - добавлены AUTH_SECRET, POSTGRES_URL, BLOB_READ_WRITE_TOKEN
+
+2. **Architecture Decision Records созданы**
+   - ✅ docs/decisions/001-why-gemini.md - обоснование выбора Google Gemini
+   - ✅ docs/decisions/002-family-bot-concept.md - концепция семейного ассистента
+   - ✅ docs/decisions/003-no-guest-mode.md - решение убрать guest режим
+
+3. **Архив старого проекта**
+   - ✅ Создана ветка `archive/mir-trade-v1.0.14`
+   - ✅ Архивированы файлы в `_archive/` (PROJECT_OVERVIEW.md, AUTH_ANALYSIS.md)
+
+4. **Roadmap и планирование**
+   - ✅ ROADMAP.md - создан детальный план миграции (3 этапа, 30 задач)
+   - ✅ CHANGELOG.md - обновлён для версии 2.0.0
+
+### Technical Details
+
+**Новая концепция:**
+- Приватный проект для 2 пользователей (без публичного доступа)
+- Разные system prompts для каждой роли
+- Персональные проекты с базой знаний
+- Удаление guest режима (см. ADR 003)
+
+**Пользователи:**
+| Имя | Роль | Специализация ассистента |
+|-----|------|--------------------------|
+| Владимир | Инженер | Технический помощник (код, архитектура, debugging) |
+| Юлия | Маркетолог | Маркетинговый помощник (контент, стратегия, аналитика) |
+
+**Технологический стек остался прежним:**
+- Next.js 15.3 (App Router, RSC)
+- Google Gemini 2.5 Pro (@ai-sdk/google)
+- NextAuth 5.0-beta.25
+- PostgreSQL (Neon) + Drizzle ORM
+- Vercel Blob Storage
+- Vercel (production)
+
+**Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
+
+### Migration Path
+
+**Этап 1: Очистка и подготовка** ✅ ЗАВЕРШЕНО (23/30 задач)
+- Обновлена вся документация
+- Создан архив старого проекта
+- Удалены упоминания MIR.TRADE
+- Созданы ADR для ключевых решений
+
+**Этап 2: Авторизация и роли** 🚧 СЛЕДУЮЩИЙ
+- Удаление guest режима
+- Добавление ролей в БД (engineer, marketer)
+- Seed скрипт с 2 пользователями
+
+**Этап 3: Персонализация** 📝 ЗАПЛАНИРОВАНО
+- Динамические system prompts по ролям
+- Система персональных проектов
+- База знаний per user
+
+### Breaking Changes
+
+**⚠️ Удалено из проекта (будет в Этапе 2):**
+- Guest режим (см. docs/decisions/003-no-guest-mode.md)
+- Функциональность связанная с переговорами MIR.TRADE
+- База знаний MIR.TRADE (будет заменена персональными проектами)
+
+**🔄 Сохранено без изменений:**
+- Вся техническая инфраструктура
+- Google Gemini интеграция
+- NextAuth setup
+- Database schema
+- Vercel Blob Storage
+- UI components
+
+### Files Changed
+
+**Новые файлы:**
+- ROADMAP.md - детальный план разработки
+- docs/decisions/001-why-gemini.md
+- docs/decisions/002-family-bot-concept.md
+- docs/decisions/003-no-guest-mode.md
+- _archive/PROJECT_OVERVIEW.md (перемещён)
+- _archive/AUTH_ANALYSIS.md (перемещён)
+
+**Обновлённые файлы:**
+- README.md (полностью переписан)
+- CLAUDE.md (обновлены инструкции)
+- CHANGELOG.md (добавлена v2.0.0)
+- .env.example (добавлены недостающие переменные)
+- docs/setup.md (убран MIR.TRADE контекст)
+- docs/architecture.md (новое назначение)
+- docs/deployment.md (проверена актуальность)
+
+**Удалённые файлы (планируется в Фазе 2):**
+- knowledge/ - база знаний MIR.TRADE (станет персональной)
+- Старые markdown файлы (6 файлов)
+- Устаревшие ADR (2 файла)
+- docs/api/, docs/implementation-plans/, docs/testing/
+
+### Documentation Quality
+
+**SSOT (Single Source of Truth) принцип:**
+- README.md - описание проекта
+- CLAUDE.md - навигация и workflow
+- DOCUMENTATION_GUIDE.md - правила документации
+- ROADMAP.md - план разработки
+
+**Нет дублирования информации между файлами.**
+
+### Next Steps
+
+После релиза v2.0.0:
+1. **Этап 2 (1-2 недели):** Удаление guest, добавление ролей, seed скрипт
+2. **Этап 3 (2-3 недели):** Динамические промпты, система проектов, база знаний per user
+
+### Migration Notes
+
+**Для пользователей старого NegotiateAI:**
+- Старая версия сохранена в ветке `archive/mir-trade-v1.0.14`
+- Все данные в production базе сохранены
+- Миграция не требует пересоздания БД
+- URL остался прежним (negotiateai-chatbot...)
+
+**Для новых пользователей Family AI Assistant:**
+- Начинайте с чистой установки по docs/setup.md
+- Следуйте инструкциям в README.md
+- Изучите ADR в docs/decisions/ для понимания архитектурных решений
+
+---
 
 ## [1.0.14] - 2025-12-01 - Стабилизация и переход на единую модель Gemini
 

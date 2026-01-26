@@ -1,6 +1,6 @@
 # Детальная установка и настройка
 
-Пошаговое руководство по установке и настройке проекта NegotiateAI Assistant.
+Пошаговое руководство по установке и настройке проекта Family AI Assistant.
 
 ## Prerequisites
 
@@ -39,6 +39,8 @@ npm install
 - Next.js и React
 - @ai-sdk/google (официальный SDK для Gemini API)
 - Vercel AI SDK (для streaming и UI компонентов)
+- NextAuth 5.0 (авторизация)
+- Drizzle ORM (работа с БД)
 - И другие зависимости
 
 ---
@@ -48,12 +50,12 @@ npm install
 ### 3.1 Google Gemini API Key
 
 1. Перейди на [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
-2. Зарегистрируйся или войди в свой Google аккаунт.
-3. Нажми **Create API key in new project**.
-4. Скопируй сгенерированный ключ.
+2. Зарегистрируйся или войди в свой Google аккаунт
+3. Нажми **Create API key in new project**
+4. Скопируй сгенерированный ключ
 
 **Важно:**
-- Google предоставляет бесплатный доступ к Gemini с щедрыми лимитами для разработки.
+- Google предоставляет бесплатный доступ к Gemini с щедрыми лимитами для личного использования
 
 ### 3.2 Brave Search API Key
 
@@ -64,7 +66,21 @@ npm install
 5. Скопируй ключ (он начинается с `BSA...`)
 
 **Важно:**
-- Бесплатный tier: 2000 запросов в месяц. Для проекта этого достаточно.
+- Бесплатный tier: 2000 запросов в месяц
+
+### 3.3 PostgreSQL Database (Neon)
+
+1. Перейди на [neon.tech](https://neon.tech)
+2. Создай новый проект
+3. Скопируй `POSTGRES_URL` (connection string)
+
+**Альтернатива:** Используй Vercel Postgres при деплое на Vercel
+
+### 3.4 Vercel Blob Storage
+
+1. Перейди на [vercel.com/storage](https://vercel.com/storage)
+2. Создай Blob store
+3. Скопируй `BLOB_READ_WRITE_TOKEN`
 
 ---
 
@@ -78,7 +94,7 @@ npm install
 cp .env.example .env.local
 ```
 
-**Важно:** `.env.local` не должен коммититься в Git (он уже в `.gitignore`).
+**Важно:** `.env.local` не должен коммититься в Git (он уже в `.gitignore`)
 
 ### 4.2 Заполнение .env.local
 
@@ -91,29 +107,51 @@ GOOGLE_GENERATIVE_AI_API_KEY=ТВОЙ_КЛЮЧ_СЮДА
 # Brave Search API Key
 BRAVE_SEARCH_API_KEY=BSA_ТВОЙ_КЛЮЧ_СЮДА
 
+# NextAuth Configuration
+AUTH_SECRET=СГЕНЕРИРУЙ_ЧЕРЕЗ_openssl_rand_base64_32
+
+# PostgreSQL Database
+POSTGRES_URL=postgresql://username:password@host/database
+
+# Vercel Blob Storage
+BLOB_READ_WRITE_TOKEN=ТВОЙ_ТОКЕН_СЮДА
+
 # Next.js Configuration
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
+**Генерация AUTH_SECRET:**
+```bash
+openssl rand -base64 32
+```
+
 **Проверка:**
-- Не должно быть пробелов до или после ключей.
+- Не должно быть пробелов до или после ключей
 
 ---
 
-## Шаг 5: Проверка базы знаний
+## Шаг 5: Настройка базы данных
 
-Убедись, что папка `knowledge/` содержит документы:
+### 5.1 Применение миграций
 
 ```bash
-ls knowledge/
+npm run db:migrate
 ```
 
-Должны быть видны:
-- Папки стран (Алжир, Египет, Иран, Китай, ОАЭ, и т.д.)
-- DOCX и PDF файлы в корне
-- Всего ~40+ файлов и папок
+Эта команда создаст необходимые таблицы:
+- `User` - пользователи
+- `Chat` - чаты
+- `Message` - сообщения
+- `Document` - документы
+- И другие таблицы NextAuth
 
-Если папка пустая - скопируй документы из оригинальной папки MIR.TRADE.
+### 5.2 Проверка БД (опционально)
+
+```bash
+npm run db:studio
+```
+
+Откроет Drizzle Studio - UI для просмотра и редактирования БД
 
 ---
 
@@ -128,7 +166,7 @@ npm run dev
 **Ожидаемый вывод:**
 
 ```
-  ▲ Next.js 14.x.x
+  ▲ Next.js 15.3.x
   - Local:        http://localhost:3000
   - Ready in Xs
 ```
@@ -137,7 +175,8 @@ npm run dev
 
 ### Что должно работать:
 
-✅ Страница чата загружается
+✅ Страница логина загружается
+✅ Можно войти (если создали пользователя)
 ✅ Поле ввода активно
 ✅ Можно отправить сообщение
 ✅ Бот отвечает (streaming)
@@ -146,31 +185,30 @@ npm run dev
 
 Отправь в чат:
 ```
-Какие документы доступны в базе знаний?
+Привет! Кто ты?
 ```
 
-Бот должен перечислить категории документов из `index.md`.
+Бот должен ответить согласно своей роли (инженер/маркетолог)
 
 ---
 
 ## Шаг 7: Тестирование функций
 
-### 7.1 Тест read_document
+### 7.1 Тест базового чата
 
 ```
-Прочитай файл "ПОЛЬЗОВАТЕЛЬСКИЙ ПУТЬ ПОСТАВЩИКА.docx" и расскажи что там
+Помоги мне с задачей
 ```
 
 **Ожидаемое поведение:**
-- Бот использует функцию read_document
-- Читает содержимое DOCX файла
-- Анализирует и пересказывает содержание
-- Даёт ссылку на источник
+- Бот отвечает в соответствии с ролью
+- Streaming работает (текст появляется постепенно)
+- Markdown форматирование корректно
 
 ### 7.2 Тест web_search
 
 ```
-Найди актуальную информацию о текущей ситуации с экспортом в Китай
+Найди актуальную информацию о Next.js 15
 ```
 
 **Ожидаемое поведение:**
@@ -207,13 +245,13 @@ npm run dev
 **Причины:**
 - Забыл создать `.env.local`
 - Опечатка в названии переменной
-- Неверный или неактивный ключ API.
+- Неверный или неактивный ключ API
 - Не перезапустил сервер после изменения .env.local
 
 **Решение:**
-1. Проверь что файл `.env.local` существует.
-2. Проверь что ключ называется `GOOGLE_GENERATIVE_AI_API_KEY`.
-3. Сгенерируй новый ключ на [aistudio.google.com](https://aistudio.google.com/app/apikey).
+1. Проверь что файл `.env.local` существует
+2. Проверь что ключ называется `GOOGLE_GENERATIVE_AI_API_KEY`
+3. Сгенерируй новый ключ на [aistudio.google.com](https://aistudio.google.com/app/apikey)
 4. Перезапусти сервер: `Ctrl+C` → `npm run dev`
 
 ---
@@ -223,19 +261,19 @@ npm run dev
 **Причина:** Превышен лимит запросов к Brave API
 
 **Решение:**
-- Бесплатный tier: 1 запрос в секунду, 2000 в месяц.
-- Делай запросы медленнее.
+- Бесплатный tier: 1 запрос в секунду, 2000 в месяц
+- Делай запросы медленнее
 
 ---
 
-### Проблема: "Document not found" при чтении файла
+### Проблема: Database connection error
 
-**Причина:** Файл не найден в папке `knowledge/`
+**Причина:** Неверный `POSTGRES_URL` или БД недоступна
 
 **Решение:**
-1. Проверь что файл существует: `ls knowledge/`
-2. Проверь правильность пути (учитывай подпапки)
-3. Проверь название файла (включая расширение)
+1. Проверь правильность connection string
+2. Убедись что БД доступна
+3. Проверь что миграции применены: `npm run db:migrate`
 
 ---
 
@@ -245,7 +283,7 @@ npm run dev
 
 1. **Изучи архитектуру** - прочитай [architecture.md](architecture.md)
 2. **Настрой деплой** - следуй инструкциям в [deployment.md](deployment.md)
-3. **Кастомизируй промпт** - отредактируй `system-prompt.md` под свои нужды
+3. **Добавь пользователей** - создай seed скрипт или используй Drizzle Studio
 
 ---
 
@@ -255,6 +293,8 @@ npm run dev
 - [Brave Search API Docs](https://brave.com/search/api/)
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Vercel AI SDK](https://sdk.vercel.ai/docs)
+- [NextAuth Documentation](https://next-auth.js.org/)
+- [Drizzle ORM](https://orm.drizzle.team/)
 
 ---
 

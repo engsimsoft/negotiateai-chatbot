@@ -1,6 +1,6 @@
 # Деплой на Vercel
 
-Пошаговое руководство по развертыванию NegotiateAI Assistant на платформе Vercel.
+Пошаговое руководство по развертыванию Family AI Assistant на платформе Vercel.
 
 ## Почему Vercel?
 
@@ -19,7 +19,8 @@
 - ✅ Все функции протестированы
 - ✅ Есть аккаунт на [vercel.com](https://vercel.com)
 - ✅ Репозиторий на GitHub
-- ✅ API ключи (Anthropic, Brave Search)
+- ✅ API ключи (Google Gemini, Brave Search)
+- ✅ PostgreSQL database (Neon)
 
 ---
 
@@ -51,7 +52,7 @@ out/
 ### 1.3 Push в GitHub
 
 ```bash
-git push origin main
+git push origin master
 ```
 
 ---
@@ -67,7 +68,7 @@ git push origin main
 ### 2.2 Импорт проекта
 
 1. На dashboard нажми **Add New** → **Project**
-2. Выбери репозиторий **NegotiateAI Chatbot**
+2. Выбери репозиторий **NegotiateAI Chatbot** (или новое название)
 3. Нажми **Import**
 
 ### 2.3 Настройка проекта
@@ -91,8 +92,11 @@ git push origin main
 В разделе **Environment Variables** добавь:
 
 ```
-ANTHROPIC_API_KEY=sk-ant-api03-ВАШ_КЛЮЧ
+GOOGLE_GENERATIVE_AI_API_KEY=ВАШ_КЛЮЧ_GEMINI
 BRAVE_SEARCH_API_KEY=BSA_ВАШ_КЛЮЧ
+AUTH_SECRET=СГЕНЕРИРОВАННЫЙ_СЕКРЕТ
+POSTGRES_URL=postgresql://username:password@host/database
+BLOB_READ_WRITE_TOKEN=ВАШ_ТОКЕН_BLOB
 NEXT_PUBLIC_APP_URL=https://ваш-проект.vercel.app
 ```
 
@@ -105,15 +109,39 @@ NEXT_PUBLIC_APP_URL=https://ваш-проект.vercel.app
 ### 3.2 Проверка переменных
 
 После добавления у тебя должно быть:
-- ✅ ANTHROPIC_API_KEY
+- ✅ GOOGLE_GENERATIVE_AI_API_KEY
 - ✅ BRAVE_SEARCH_API_KEY
+- ✅ AUTH_SECRET
+- ✅ POSTGRES_URL
+- ✅ BLOB_READ_WRITE_TOKEN
 - ✅ NEXT_PUBLIC_APP_URL
 
 ---
 
-## Шаг 4: Первый деплой
+## Шаг 4: Настройка Vercel Postgres (опционально)
 
-### 4.1 Запуск деплоя
+### 4.1 Создание Postgres Database
+
+Если еще нет БД:
+
+1. В Vercel project → **Storage** → **Create Database**
+2. Выбери **Postgres**
+3. Назови database (например, `family-ai-assistant`)
+4. Выбери регион (ближайший к пользователям)
+5. Нажми **Create**
+
+### 4.2 Подключение к проекту
+
+Vercel автоматически добавит переменные:
+- `POSTGRES_URL`
+- `POSTGRES_PRISMA_URL`
+- `POSTGRES_URL_NON_POOLING`
+
+---
+
+## Шаг 5: Первый деплой
+
+### 5.1 Запуск деплоя
 
 Нажми **Deploy** (синяя кнопка).
 
@@ -125,44 +153,83 @@ Vercel начнёт:
 
 **Время:** ~2-3 минуты
 
-### 4.2 Проверка деплоя
+### 5.2 Проверка деплоя
 
 После завершения:
 1. Увидишь **Deployment Complete** с конфетти 🎉
-2. Получишь URL: `https://negotiate-ai-xxxx.vercel.app`
+2. Получишь URL: `https://family-ai-assistant-xxxx.vercel.app`
 3. Нажми **Visit** чтобы открыть
 
 ---
 
-## Шаг 5: Проверка работы
+## Шаг 6: Применение миграций БД
 
-### 5.1 Тест базового функционала
+После первого деплоя примени миграции:
+
+```bash
+# Локально, подключившись к production БД
+POSTGRES_URL=<production-url> npm run db:migrate
+```
+
+Или используй Vercel CLI:
+
+```bash
+vercel env pull .env.production
+npm run db:migrate
+```
+
+---
+
+## Шаг 7: Создание пользователей
+
+### 7.1 Через Drizzle Studio
+
+```bash
+# Подключись к production БД
+POSTGRES_URL=<production-url> npm run db:studio
+```
+
+Создай двух пользователей:
+- Email: `vladimir@example.com`, Role: `engineer`
+- Email: `julia@example.com`, Role: `marketer`
+
+### 7.2 Через seed скрипт (будущее)
+
+После создания seed скрипта:
+
+```bash
+POSTGRES_URL=<production-url> npm run db:seed
+```
+
+---
+
+## Шаг 8: Проверка работы
+
+### 8.1 Тест базового функционала
 
 Открой деплоенное приложение и протестируй:
 
 **Тест 1: Интерфейс**
 ```
-✅ Страница чата загружается
+✅ Страница логина загружается
 ✅ Поле ввода активно
 ✅ Нет ошибок в консоли (F12)
 ```
 
-**Тест 2: Простой вопрос**
+**Тест 2: Авторизация**
+```
+✅ Можно войти как Владимир
+✅ Можно войти как Юлия
+✅ Session сохраняется
+```
+
+**Тест 3: Простой вопрос**
 ```
 Вопрос: "Привет! Расскажи о себе"
 
-✅ Бот отвечает
+✅ Бот отвечает согласно роли
 ✅ Streaming работает (текст появляется постепенно)
 ✅ Форматирование корректно
-```
-
-**Тест 3: read_document**
-```
-Вопрос: "Прочитай файл ПОЛЬЗОВАТЕЛЬСКИЙ ПУТЬ ПОСТАВЩИКА.docx"
-
-✅ Бот использует функцию read_document
-✅ Находит и читает файл
-✅ Анализирует содержимое
 ```
 
 **Тест 4: web_search**
@@ -182,24 +249,24 @@ Vercel начнёт:
 
 ---
 
-## Шаг 6: Настройка custom domain (опционально)
+## Шаг 9: Настройка custom domain (опционально)
 
-### 6.1 Добавление домена
+### 9.1 Добавление домена
 
 Если у тебя есть домен:
 
 1. В Vercel project settings → **Domains**
 2. Нажми **Add**
-3. Введи домен: `negotiateai.yourdomain.com`
+3. Введи домен: `family.yourdomain.com`
 4. Следуй инструкциям для настройки DNS
 
-### 6.2 Обновление NEXT_PUBLIC_APP_URL
+### 9.2 Обновление NEXT_PUBLIC_APP_URL
 
 После настройки домена:
 
 1. Project Settings → **Environment Variables**
 2. Найди `NEXT_PUBLIC_APP_URL`
-3. Измени на `https://negotiateai.yourdomain.com`
+3. Измени на `https://family.yourdomain.com`
 4. Сохрани
 
 Vercel автоматически сделает redeploy.
@@ -215,8 +282,8 @@ Vercel автоматически сделает redeploy.
 ```bash
 # Локально
 git add .
-git commit -m "Обновление промпта"
-git push origin main
+git commit -m "Обновление промпта для инженера"
+git push origin master
 
 # Vercel автоматически:
 # 1. Детектит push
@@ -230,8 +297,8 @@ git push origin main
 Для feature branches:
 
 ```bash
-git checkout -b feature/new-tool
-git push origin feature/new-tool
+git checkout -b feature/new-role
+git push origin feature/new-role
 ```
 
 Vercel создаст **preview deployment** с отдельным URL для тестирования.
@@ -300,14 +367,14 @@ npm run build
 
 **Симптомы:**
 ```
-Error: ANTHROPIC_API_KEY is not defined
+Error: GOOGLE_GENERATIVE_AI_API_KEY is not defined
 ```
 
 **Решения:**
 
 1. **Проверь названия переменных:**
    - Должны быть ТОЧНО как в `.env.example`
-   - Case-sensitive (ANTHROPIC_API_KEY ≠ anthropic_api_key)
+   - Case-sensitive (GOOGLE_GENERATIVE_AI_API_KEY ≠ google_generative_ai_api_key)
 
 2. **Проверь что выбраны все environments:**
    - Production ✅
@@ -319,26 +386,15 @@ Error: ANTHROPIC_API_KEY is not defined
 
 ---
 
-### Проблема: "Document not found" в production
+### Проблема: Database connection error
 
-**Причина:** Папка `knowledge/` не попала в деплой
+**Причина:** Неверный `POSTGRES_URL` или БД недоступна
 
 **Решение:**
 
-Убедись что в `.vercelignore` НЕТ:
-```
-# ❌ НЕ добавляй это
-knowledge/
-```
-
-Vercel должен включить папку `knowledge/` в деплой.
-
-**Проверка размера:**
-```bash
-du -sh knowledge/
-```
-
-Если > 50MB - нужно оптимизировать (сжать PDF, удалить дубликаты).
+1. Проверь connection string
+2. Убедись что миграции применены
+3. Проверь что БД доступна из Vercel (whitelist IP если нужно)
 
 ---
 
@@ -350,7 +406,7 @@ du -sh knowledge/
 
 **Решение:**
 
-В `app/api/chat/route.ts` добавь:
+В `app/(chat)/api/chat/route.ts` добавь:
 ```typescript
 export const runtime = 'edge';
 ```
@@ -371,9 +427,9 @@ Error: 429 Too Many Requests
 
 **Решения:**
 
-1. **Anthropic rate limits:**
-   - Free tier: 5 requests/min
-   - Upgrade план на anthropic.com
+1. **Gemini rate limits:**
+   - Free tier: щедрые лимиты, но не unlimited
+   - Upgrade план на Google AI Studio
    - Добавь rate limiting на клиенте
 
 2. **Brave Search rate limits:**
@@ -404,9 +460,9 @@ function getCachedResponse(query) {
 **2. Error handling:**
 ```typescript
 try {
-  const response = await anthropic.messages.create({...});
+  const response = await streamText({...});
 } catch (error) {
-  console.error('Anthropic API error:', error);
+  console.error('Gemini API error:', error);
   // Fallback или повтор
 }
 ```
@@ -426,7 +482,8 @@ try {
 - ✅ API ключи только в Vercel Environment Variables
 - ✅ Никогда не хардкодить ключи в коде
 - ✅ Использовать `NEXT_PUBLIC_` только для клиентских переменных
-- ✅ Ограничить доступ к папке `knowledge/` (только read)
+- ✅ Middleware защищает все routes кроме `/login`
+- ✅ Паро ли пользователей хэшированы (bcrypt)
 
 ---
 
@@ -444,7 +501,7 @@ git add .
 git commit -m "Описание изменений"
 
 # 4. Push (автоматический деплой)
-git push origin main
+git push origin master
 
 # 5. Проверь деплой в Vercel dashboard
 # 6. Протестируй на production URL
@@ -505,8 +562,8 @@ vercel domains   # Управление доменами
 
 После успешного деплоя:
 
-1. ✅ Поделись URL с заказчиком
-2. ✅ Протестируй все функции
+1. ✅ Протестируй все функции
+2. ✅ Создай пользователей (Владимир, Юлия)
 3. ✅ Настрой мониторинг
 4. ✅ Документируй изменения в CHANGELOG.md
 

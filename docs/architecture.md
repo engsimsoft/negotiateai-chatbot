@@ -1,12 +1,13 @@
 # Архитектура проекта
 
-Подробное описание архитектуры NegotiateAI Assistant и принципов работы AI-агента.
+Подробное описание архитектуры Family AI Assistant и принципов работы персонализированного AI-ассистента.
 
 ## Общая схема
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    User (Browser)                           │
+│              Владимир (Инженер) / Юлия (Маркетолог)         │
 └────────────────────┬────────────────────────────────────────┘
                      │
                      │ HTTP/WebSocket
@@ -15,7 +16,8 @@
 │              Next.js Application (Vercel)                   │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  App Router (app/)                                   │  │
-│  │  ├── page.tsx          - Главная страница чата       │  │
+│  │  ├── (auth)/           - Auth routes (NextAuth)      │  │
+│  │  ├── (chat)/           - Chat UI                     │  │
 │  │  └── api/chat/route.ts - Chat API endpoint           │  │
 │  └──────────────────────────────────────────────────────┘  │
 │                            │                                │
@@ -28,27 +30,20 @@
 │                            │                                │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  Business Logic (lib/)                               │  │
-│  │  ├── providers.ts      - AI Provider config          │  │
-│  │  ├── tools.ts          - AI agent tools              │  │
-│  │  └── brave-search.ts   - Brave Search integration    │  │
+│  │  ├── ai/providers.ts   - AI Provider config          │  │
+│  │  ├── ai/tools/         - AI agent tools              │  │
+│  │  ├── db/queries.ts     - Database queries            │  │
+│  │  └── db/schema.ts      - Database schema             │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                      │
-                     │ External APIs
+                     │ External Services
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  External Services                                          │
-│  ├── Google Gemini API  - Gemini 2.5 Pro (единая модель)  │
-│  └── Brave Search API   - Web search                       │
-└─────────────────────────────────────────────────────────────┘
-                     │
-                     │ File System
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Knowledge Base (knowledge/)                                │
-│  ├── *.docx            - DOCX документы                    │
-│  ├── *.pdf             - PDF документы                     │
-│  └── [страны]/         - Папки с документацией по странам  │
+│  ├── Google Gemini API  - Gemini 2.5 Pro                  │
+│  ├── Brave Search API   - Web search                       │
+│  └── PostgreSQL (Neon)  - Database                         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -65,58 +60,132 @@
 - Взаимодействие с пользователем
 - Streaming ответов в реальном времени
 - Рендеринг Markdown
+- Auth UI (login/register)
 
 **Технологии:**
-- Next.js 14 (App Router)
+- Next.js 15.3 (App Router, RSC)
 - React 18
 - Tailwind CSS
 - Vercel AI SDK UI компоненты
 
 ---
 
-### 2. API Layer
+### 2. Authentication Layer
 
-**Файл:** `app/api/chat/route.ts`
+**Файлы:** `app/(auth)/`, `middleware.ts`
+
+Отвечает за:
+- Авторизацию пользователей (NextAuth 5.0)
+- Управление сессиями
+- Защиту routes
+- Идентификацию пользователя и его роли
+
+**Поток авторизации:**
+```
+Login → NextAuth → PostgreSQL → Session → Access to Chat
+```
+
+**Роли:**
+- `engineer` - Владимир (технический помощник)
+- `marketer` - Юлия (маркетинговый помощник)
+
+---
+
+### 3. API Layer
+
+**Файл:** `app/(chat)/api/chat/route.ts`
 
 Отвечает за:
 - Обработку HTTP POST запросов от клиента
 - Валидацию входящих сообщений
+- Определение роли пользователя
+- Выбор соответствующего system prompt
 - Вызов Google Gemini API
 - Streaming ответов клиенту
 - Обработку ошибок
 
 **Поток данных:**
 ```
-User message → POST /api/chat → Google Gemini API → Stream response → User
+User message → POST /api/chat → Role detection → Dynamic prompt → Gemini API → Stream response → User
 ```
 
 ---
 
-### 3. Business Logic Layer
+### 4. Business Logic Layer
 
 **Папка:** `lib/`
 
 #### lib/ai/providers.ts
 - Инициализация Google Gemini SDK
 - Конфигурация модели Gemini 2.5 Pro
+- Настройка параметров (temperature, max tokens)
 
 #### lib/ai/tools/
-- Определение и реализация AI agent tools (например, `read-document.ts`)
+- Определение и реализация AI agent tools
+- `web-search.ts` - Поиск через Brave Search
+- `get-current-date.ts` - Текущая дата/время
 
-#### lib/integrations/brave-search.ts
-- Интеграция с Brave Search API
-- Форматирование результатов поиска
+#### lib/db/
+- `schema.ts` - Database schema (Drizzle ORM)
+- `queries.ts` - Database queries (CRUD операции)
+- `migrations/` - Миграции БД
 
 ---
 
-### 4. Data Layer
+### 5. Data Layer
 
-**Папка:** `knowledge/`
+**PostgreSQL Database (Neon)**
 
-- Оригинальные документы (DOCX, PDF)
-- Структура по странам
-- Индекс документов (`index.md`)
-- Прямое чтение через Gemini Vision API
+Основные таблицы:
+- `User` - пользователи (email, role)
+- `Chat` - чаты (userId, title)
+- `Message` - сообщения (chatId, role, content)
+- `Document` - документы (userId, title, content)
+- NextAuth таблицы (sessions, accounts, verification tokens)
+
+**Vercel Blob Storage:**
+- Хранение загруженных файлов
+- Аватары пользователей
+- Attachments
+
+---
+
+## Персонализация и роли
+
+### Как работает персонализация
+
+```typescript
+// Определение роли пользователя
+const user = await getUser(session.userId);
+const userRole = user.role; // 'engineer' or 'marketer'
+
+// Динамический выбор system prompt
+const systemPrompt = userRole === 'engineer'
+  ? engineerPrompt  // "Ты технический ассистент..."
+  : marketerPrompt; // "Ты маркетинговый ассистент..."
+
+// Отправка в Gemini с персонализированным промптом
+const { stream } = await streamText({
+  model: google("gemini-2.5-pro"),
+  system: systemPrompt,
+  messages: userMessages,
+  tools: tools
+});
+```
+
+### System Prompts по ролям
+
+**Инженер (Владимир):**
+- Помощь с кодом, архитектурой, debugging
+- Технические объяснения
+- Code review и рефакторинг
+- Выбор технологий
+
+**Маркетолог (Юлия):**
+- Помощь с контентом, копирайтингом
+- Маркетинговая стратегия
+- Анализ целевой аудитории
+- SMM и SEO рекомендации
 
 ---
 
@@ -125,60 +194,76 @@ User message → POST /api/chat → Google Gemini API → Stream response → Us
 ### Инициализация агента
 
 ```typescript
-// 1. Загрузка system prompt
-const systemPrompt = loadSystemPrompt(); // из system-prompt.md
+// 1. Получение пользователя и роли
+const user = await getUser(sessionId);
 
-// 2. Встраивание index.md в промпт
-const knowledgeIndex = readFile('index.md');
-const fullPrompt = systemPrompt.replace('[ИНДЕКС ВСТАВЛЯЕТСЯ СЮДА]', knowledgeIndex);
+// 2. Загрузка персонализированного system prompt
+const systemPrompt = getSystemPromptForRole(user.role);
 
 // 3. Определение tools (через Vercel AI SDK)
 const tools = {
-  readDocument: { /*...*/ },
-  webSearch: { /*...*/ },
-  getCurrentDate: { /*...*/ }
+  webSearch: tool({
+    description: 'Search the web for current information',
+    parameters: z.object({
+      query: z.string()
+    }),
+    execute: async ({ query }) => await braveSearch(query)
+  }),
+  getCurrentDate: tool({
+    description: 'Get current date and time',
+    parameters: z.object({}),
+    execute: async () => new Date().toISOString()
+  })
 };
 
-// 4. Отправка в Google Gemini API через Vercel AI SDK
+// 4. Отправка в Google Gemini API
 const { stream } = await streamText({
   model: google("gemini-2.5-pro"),
-  system: fullPrompt,
-  prompt: last(messages).content,
+  system: systemPrompt,
+  messages: chatHistory,
   tools: tools
 });
 ```
 
 ---
 
-## Function Calling Flow
+## Tool Calling Flow
 
-### Сценарий: Пользователь спрашивает о документе
+### Сценарий: Поиск информации
 
 ```
-1. User: "Что написано в файле ПОЛЬЗОВАТЕЛЬСКИЙ ПУТЬ ПОСТАВЩИКА.docx?"
+1. User: "Найди информацию о Next.js 15"
 
-2. API Layer: отправляет запрос в Google Gemini API
+2. API Layer:
+   - Определяет роль пользователя
+   - Загружает system prompt для роли
+   - Отправляет запрос в Gemini
 
 3. Gemini анализирует:
    - Запрос пользователя
-   - System prompt (с индексом документов)
+   - System prompt (роль)
    - Доступные tools
 
-4. Gemini решает использовать readDocument:
-   // Vercel AI SDK генерирует tool_code, который выполняет readDocument
+4. Gemini решает использовать webSearch:
+   {
+     "tool": "webSearch",
+     "args": { "query": "Next.js 15 new features" }
+   }
 
-5. lib/ai/tools/read-document.ts выполняет чтение:
-   - Находит файл в knowledge/
-   - Читает содержимое через Gemini Vision API (для DOCX/PDF)
-   - Возвращает текст документа
+5. lib/ai/tools/web-search.ts выполняет поиск:
+   - Вызов Brave Search API
+   - Парсинг результатов
+   - Форматирование в текст
+   - Возврат результата
 
-6. Gemini получает результат и генерирует ответ:
-   "В документе описан путь поставщика:
-   1. Регистрация...
-   2. Создание профиля...
-   [и т.д.]
+6. Gemini получает результаты и генерирует ответ:
+   "Next.js 15 включает следующие новые возможности:
+   1. React Server Components by default
+   2. Улучшенная производительность...
 
-   Источник: knowledge/ПОЛЬЗОВАТЕЛЬСКИЙ ПУТЬ ПОСТАВЩИКА.docx"
+   Источники:
+   - https://nextjs.org/blog/next-15
+   - https://vercel.com/blog/next-15"
 
 7. API Layer стримит ответ клиенту
 
@@ -187,92 +272,58 @@ const { stream } = await streamText({
 
 ---
 
-## Чтение документов (read_document)
+## Database Architecture
 
-### Принцип работы
-
-Google Gemini Vision API поддерживает нативное чтение DOCX и PDF.
+### User Schema
 
 ```typescript
-// lib/ai/vision-ocr.ts
-async function readDocument(filepath: string): Promise<string> {
-  // 1. Находим файл
-  const fullPath = path.join(process.cwd(), 'knowledge', filepath);
-
-  // 2. Читаем как бинарные данные
-  const fileBuffer = fs.readFileSync(fullPath);
-
-  // 3. Отправляем в Gemini Vision API для извлечения текста
-  const { text } = await experimental_streamText({
-    model: google("gemini-2.5-pro"),
-    prompt: 'Извлеки и верни полный текст из этого документа.',
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: 'Извлеки текст.' },
-          { type: 'image', image: fileBuffer } // SDK обрабатывает Buffer для документов
-        ],
-      },
-    ],
-  });
-
-  return text;
-}
+export const User = pgTable("User", {
+  id: text("id").primaryKey(),
+  email: text("email").unique().notNull(),
+  role: text("role").notNull(), // 'engineer' | 'marketer'
+  password: text("password"), // hashed
+  createdAt: timestamp("createdAt").defaultNow()
+});
 ```
 
-**Преимущества:**
-- Не нужна конвертация DOCX/PDF в TXT на стороне сервера
-- Gemini понимает структуру и контекст документа
+### Chat & Message Schema
+
+```typescript
+export const Chat = pgTable("Chat", {
+  id: text("id").primaryKey(),
+  userId: text("userId").references(() => User.id),
+  title: text("title").notNull(),
+  createdAt: timestamp("createdAt").defaultNow()
+});
+
+export const Message = pgTable("Message", {
+  id: text("id").primaryKey(),
+  chatId: text("chatId").references(() => Chat.id),
+  role: text("role").notNull(), // 'user' | 'assistant'
+  content: text("content").notNull(),
+  createdAt: timestamp("createdAt").defaultNow()
+});
+```
 
 ---
 
-## System Prompt Architecture
-
-### Структура промпта
-
-```markdown
-# System Prompt: NegotiateAI Assistant
-
-## РОЛЬ И МИССИЯ
-[Описание роли агента]
-
-## БАЗА ЗНАНИЙ
-[ИНДЕКСНЫЙ ФАЙЛ index.md ВСТАВЛЯЕТСЯ СЮДА]
-
-## ИНСТРУКЦИИ ПО ФУНКЦИЯМ
-[Описание как использовать инструменты]
-
-## СТРАТЕГИИ РАБОтЫ
-[Сценарии использования]
-```
-
-### Встраивание index.md
-
-При инициализации бота:
-1. Читается `system-prompt.md`
-2. Читается `index.md`
-3. Содержимое `index.md` вставляется в маркер
-4. Полный промпт отправляется в Google Gemini API как `system` message.
-
-**Зачем:**
-- Gemini видит полный индекс документов
-- Может навигировать по базе знаний
-- Знает какие документы существуют
-
----
-
-## Безопасность
+## Security
 
 ### API Keys
 - Хранятся в `.env.local` (не коммитятся)
 - Используются только на сервере (server-side)
 - Не передаются клиенту
 
-### File Access
-- Доступ только к папке `knowledge/`
-- Валидация путей (предотвращение directory traversal)
-- Только чтение (не запись)
+### Authentication
+- NextAuth 5.0 с PostgreSQL adapter
+- Хэширование паролей (bcrypt)
+- Secure session cookies
+- CSRF protection
+
+### Authorization
+- Middleware защищает все routes кроме `/login`
+- Пользователи видят только свои чаты
+- Role-based access control (RBAC)
 
 ---
 
@@ -284,16 +335,32 @@ async function readDocument(filepath: string): Promise<string> {
 - Серверные компоненты для безопасности API keys
 - Built-in API routes
 - Легкий деплой на Vercel
+- React Server Components для performance
 
-**2. Прямое подключение к Google Gemini API**
-- Нативная поддержка DOCX/PDF через Vision API
-- Официальный SDK от Vercel/Google
-- См. [ADR 001](decisions/001-why-anthropic-direct.md) (устарел, но причина перехода актуальна)
+**2. Google Gemini API**
+- Free tier для личного использования
+- Отличное качество ответов
+- Мультимодальность (текст, изображения)
+- Долгий контекст (1M токенов)
+- См. [ADR 001](decisions/001-why-gemini.md)
 
-**3. Без векторной БД**
-- Небольшая база знаний (~40 документов)
-- Gemini 2.5 Pro имеет огромный контекст (1M токенов)
-- Индекс в промпте достаточно эффективен
+**3. Персонализация через роли**
+- Разные system prompts для каждой роли
+- Гибкость в добавлении новых ролей
+- Улучшенный user experience
+- См. [ADR 002](decisions/002-family-bot-concept.md)
+
+**4. Без guest режима**
+- Безопасность и приватность
+- Полная персонализация
+- Упрощение auth логики
+- См. [ADR 003](decisions/003-no-guest-mode.md)
+
+**5. PostgreSQL + Drizzle ORM**
+- Type-safe database queries
+- Удобные миграции
+- Отличная интеграция с NextAuth
+- Бесплатный tier на Neon
 
 ---
 
@@ -302,6 +369,8 @@ async function readDocument(filepath: string): Promise<string> {
 - [Google AI for Developers](https://ai.google.dev/)
 - [Next.js App Router](https://nextjs.org/docs/app)
 - [Vercel AI SDK](https://sdk.vercel.ai/docs)
+- [NextAuth Documentation](https://next-auth.js.org/)
+- [Drizzle ORM](https://orm.drizzle.team/)
 
 ---
 
@@ -310,4 +379,6 @@ async function readDocument(filepath: string): Promise<string> {
 - [setup.md](setup.md) - Установка и настройка
 - [deployment.md](deployment.md) - Деплой на Vercel
 - [troubleshooting.md](troubleshooting.md) - Решение проблем
-- [ADR 001](decisions/001-why-anthropic-direct.md) - Почему Anthropic API (УСТАРЕЛ)
+- [ADR 001](decisions/001-why-gemini.md) - Почему Gemini
+- [ADR 002](decisions/002-family-bot-concept.md) - Концепция семейного бота
+- [ADR 003](decisions/003-no-guest-mode.md) - Удаление guest режима
