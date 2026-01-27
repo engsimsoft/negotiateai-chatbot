@@ -11,10 +11,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {
-    ppr: true,
-    nodeMiddleware: true,
-  },
 };
 
 export default nextConfig;
