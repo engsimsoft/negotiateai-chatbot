@@ -28,8 +28,8 @@
 ## 📊 Текущий статус
 
 - **Фаза:** ✅ ЗАВЕРШЕНО - Все фазы 3.1-3.8 выполнены
-- **Прогресс:** 57/60 задач (95%)
-- **Следующее:** Финальная документация (v2.1.0)
+- **Прогресс:** 60/60 задач (100%)
+- **Следующее:** Обновление документации (v2.1.0)
 - **Дата завершения:** 2026-01-27
 
 **Выполнено:** ✅ Все фазы Stage 3 (система агентов)
@@ -292,12 +292,13 @@ lib/ai/agents/
 - [x] Проверить логи что модель выбирается правильно
 - [x] Проверить качество ответов (Gemini 3 Pro дает более глубокий reasoning)
 
-#### Задача 6.4: (Опционально) UI индикатор модели (30 мин)
-- [ ] Добавить индикатор текущей модели в UI чата:
-  - В `components/chat-header.tsx` или `components/multimodal-input.tsx`
-  - Небольшой badge: "Gemini 3 Pro" или "Gemini 2.5"
-  - Tooltip с объяснением выбора модели
-- [ ] Стилизация (Tailwind): text-xs, muted color
+#### Задача 6.4: (Опционально) UI индикатор модели (30 мин) ✅
+- [x] Добавить индикатор текущей модели в UI чата:
+  - В `components/chat-header.tsx` - badge с иконкой 🤖
+  - Показывает "Авто", "Gemini 3 Pro" или "Gemini 2.5 Flash"
+  - Tooltip объясняет режим (авто vs ручной выбор)
+- [x] Стилизация (Tailwind): text-xs, muted color, адаптивный дизайн
+- [x] Режим "auto" установлен по умолчанию для всех чатов
 
 ---
 
@@ -614,6 +615,38 @@ lib/ai/agents/
   - Одессит (😄): webSearch работает с русским языком ✅
 
 - 🎯 **Следующее:** Полное тестирование всех агентов под Юлией и Владимиром (Фаза 3.8)
+
+**2026-01-27 (Сессия 4 - Production Deployment и UI индикатор):**
+- ✅ **Production deployment исправлен**
+  - Удалены все редиректы на guest mode (page.tsx, chat/[id]/page.tsx)
+  - Переназначен production URL через vercel alias set
+  - Production теперь правильно редиректит на /login
+
+- ✅ **Рефакторинг конфигурации AI моделей (senior developer approach)**
+  - Исправлены ID моделей в lib/ai/models.ts (gemini-3-pro, gemini-2.5-flash вместо claude-*)
+  - Legacy IDs сохранены для backward compatibility (старые чаты в БД)
+  - Добавлена документация по структуре моделей в providers.ts
+  - Clear separation: Primary vs Legacy vs Internal model IDs
+
+- ✅ **Фаза 3.6: Task 6.4 - UI индикатор модели (100%)**
+  - Добавлен badge в chat-header.tsx с иконкой 🤖
+  - Показывает текущую активную модель (Авто, Gemini 3 Pro, Gemini 2.5 Flash)
+  - Tooltip объясняет режим: "Авто: {model} (оптимально для этого агента)" или "Выбрано вручную: {model}"
+  - Адаптивный дизайн: мобильный показывает "Авто", десктоп показывает полное название
+  - Режим "auto" добавлен в providers.ts (fix error "No such languageModel: auto")
+
+- ✅ **Режим "auto" по умолчанию для всех чатов**
+  - Упрощена логика initialModel в app/(chat)/chat/[id]/page.tsx
+  - Теперь: cookie || DEFAULT_CHAT_MODEL (всегда "auto" если пользователь не выбрал вручную)
+  - Удален вызов getModelForAgent() при инициализации (выбор модели происходит на сервере)
+  - Все новые чаты начинаются с режима "auto"
+
+- ✅ **Все изменения запушены на GitHub**
+  - 4 коммита: model indicator, model ID fix, refactor, auto mode default
+  - Vercel автоматически развернул production
+  - Stage 3 полностью завершен (60/60 задач)
+
+- 🎯 **Следующее:** Обновить документацию (CHANGELOG.md, docs/ai-capabilities.md, ROADMAP.md)
 
 ---
 

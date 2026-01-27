@@ -11,6 +11,150 @@
 - Этап 4: Персонализация (система персональных проектов, база знаний per user)
 - Экспорт артефактов в DOCX (опционально)
 
+---
+
+## [2.1.1] - 2026-01-27 - UI Model Indicator & Auto Mode Default
+
+**MINOR RELEASE**: Улучшения UX для системы выбора AI моделей.
+
+### Summary
+
+Добавлен UI индикатор текущей модели и режим "auto" по умолчанию для всех новых чатов. Проведен рефакторинг конфигурации моделей для улучшения поддерживаемости кода. Исправлено отображение guest mode на production.
+
+### Added
+
+#### 🤖 UI индикатор модели
+- **Файл**: [components/chat-header.tsx:69-85](components/chat-header.tsx#L69-L85)
+- **Функциональность**:
+  - Badge с иконкой 🤖 показывает текущую активную модель
+  - Отображает: "Авто", "Gemini 3 Pro" или "Gemini 2.5 Flash"
+  - Tooltip объясняет режим:
+    - Режим "auto": "Авто: {model} (оптимально для этого агента)"
+    - Ручной выбор: "Выбрано вручную: {model}"
+  - Адаптивный дизайн:
+    - Мобильный: показывает "Авто" или первое слово модели
+    - Десктоп: показывает полное название модели
+- **Логика выбора**:
+  - Если selectedModelId === "auto" → использует `getModelForAgent(agentId)`
+  - Иначе → использует выбранную пользователем модель
+- **Стилизация**: Tailwind CSS (bg-muted, text-xs, rounded-md)
+
+#### 🎯 Режим "auto" по умолчанию
+- **Файлы**: [app/(chat)/chat/[id]/page.tsx:41,92](app/(chat)/chat/[id]/page.tsx#L41)
+- **Изменения**:
+  - Упрощена логика initialModel: `cookie || DEFAULT_CHAT_MODEL`
+  - DEFAULT_CHAT_MODEL = "auto" (из [lib/ai/models.ts:1](lib/ai/models.ts#L1))
+  - Все новые чаты начинаются с режима "auto"
+  - Удален прямой вызов `getModelForAgent()` при инициализации
+  - Выбор модели происходит на сервере (route.ts) только при генерации ответа
+- **Преимущества**:
+  - Пользователь не думает о выборе модели
+  - Система автоматически выбирает оптимальную модель для агента
+  - Power users могут переключить вручную через селектор
+
+### Changed
+
+#### 🔧 Рефакторинг конфигурации AI моделей (Senior Developer Approach)
+- **Файлы**:
+  - [lib/ai/models.ts](lib/ai/models.ts) - обновлены ID моделей
+  - [lib/ai/providers.ts](lib/ai/providers.ts) - добавлена документация
+  - [lib/ai/entitlements.ts:17](lib/ai/entitlements.ts#L17) - обновлен список доступных моделей
+  - [app/(chat)/api/chat/schema.ts:29-38](app/(chat)/api/chat/schema.ts#L29-L38) - обновлена валидация
+
+- **Принцип backward compatibility**:
+  - Legacy IDs (`claude-sonnet-4`, `claude-haiku-3.5`) сохранены для старых чатов в БД
+  - Legacy IDs НЕ показываются в UI (не в entitlements)
+  - Legacy IDs работают через mapping на Google AI модели
+  - Документировано ПО ЧЕМ У legacy IDs остались в коде
+
+- **Структура model IDs**:
+  ```typescript
+  // Primary model IDs (используются во всём проекте)
+  "auto"                 - Автоматический выбор на основе агента
+  "gemini-3-pro"         - Gemini 3 Pro для профессиональных задач
+  "gemini-2.5-flash"     - Gemini 2.5 Flash для простых задач
+
+  // Legacy model IDs (backward compatibility для старых чатов в БД)
+  "claude-sonnet-4"      → google("gemini-2.5-pro")
+  "claude-haiku-3.5"     → google("gemini-2.5-flash")
+
+  // Internal use only (не показываются в UI)
+  "title-model"          → google("gemini-2.5-flash")
+  "artifact-model"       → google("gemini-2.5-pro")
+  ```
+
+- **Документация в коде**:
+  - Добавлены комментарии в providers.ts объясняющие структуру
+  - Каждая группа ID имеет пояснение назначения
+  - Clear separation: Primary vs Legacy vs Internal
+
+#### 📋 Обновлен список доступных моделей в UI
+- **Файл**: [lib/ai/models.ts:13-41](lib/ai/models.ts#L13-L41)
+- **Модели в UI**:
+  1. **Авто (рекомендуется)** - Автоматический выбор модели на основе агента
+     - Pricing: "Зависит от агента" / "$2-12 (3 Pro) / $0.075-0.30 (Flash)"
+  2. **Gemini 3 Pro** - Профессиональная модель с dynamic thinking
+     - Pricing: "$2" / "$12" за 1M токенов
+  3. **Gemini 2.5 Flash** - Быстрая модель для простых задач
+     - Pricing: "$0.075" / "$0.30" за 1M токенов
+- Старые claude-* модели удалены из UI (но работают для backward compatibility)
+
+### Fixed
+
+#### 🐛 Guest mode на production
+- **Проблема**: Production URL (https://negotiateai-chatbot.vercel.app/) показывал guest mode
+- **Причина**: Redirects на `/api/auth/guest` оставались в коде
+- **Файлы исправлены**:
+  - [app/(chat)/page.tsx:10](app/(chat)/page.tsx#L10) - redirect("/login")
+  - [app/(chat)/chat/[id]/page.tsx:24](app/(chat)/chat/[id]/page.tsx#L24) - redirect("/login")
+- **Решение**: Все redirects изменены с `/api/auth/guest` на `/login`
+- **Deployment**: Production URL переназначен через `vercel alias set`
+- **Результат**: Guest mode полностью удален из production ✅
+
+#### 🐛 Error "No such languageModel: auto"
+- **Проблема**: Runtime error при выборе режима "Авто" в UI
+- **Причина**: Model ID "auto" не был зарегистрирован в providers.ts
+- **Файл**: [lib/ai/providers.ts:31,48](lib/ai/providers.ts#L31)
+- **Решение**: Добавлен "auto" в оба провайдера (test + production):
+  - Test: `"auto": chatModel`
+  - Production: `"auto": google("gemini-2.5-flash")`
+- **Результат**: Режим "auto" работает корректно ✅
+
+### Technical Details
+
+**Commits (4 шт):**
+1. `21e5bb9` - feat: add model selection modes and UI indicator
+2. `066d28b` - fix: исправить ID моделей для соответствия агентам
+3. `b7035d9` - refactor: навести порядок в конфигурации AI моделей
+4. `330f588` - fix: режим "auto" по умолчанию для всех агентов
+
+**Изменено файлов**: 7
+- lib/ai/models.ts
+- lib/ai/providers.ts
+- lib/ai/entitlements.ts
+- app/(chat)/api/chat/schema.ts
+- app/(chat)/chat/[id]/page.tsx
+- components/chat-header.tsx
+- components/chat.tsx (передача selectedModelId в ChatHeader)
+
+**Добавлено строк**: ~150 строк кода
+
+### Breaking Changes
+
+**Нет breaking changes** - все изменения обратно совместимы:
+- Старые чаты с явным указанием модели продолжают работать
+- Legacy model IDs (claude-*) продолжают работать через mapping
+- API не изменился
+- Default behavior изменен на "auto", но пользователь может переключить
+
+### Related
+
+- Parent release: v2.1.0 (Stage 3: AI Agents System)
+- Roadmap: [TZ_STAGE_3_ROADMAP.md](TZ_STAGE_3_ROADMAP.md) - Task 6.4 завершен
+- Documentation: [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md) - следование SSOT принципам
+
+---
+
 ## [2.1.0] - 2026-01-27 - Stage 3: AI Agents System ✅
 
 **MAJOR RELEASE**: Полная система AI-агентов с персонализацией по ролям.

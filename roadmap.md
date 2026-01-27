@@ -1,6 +1,6 @@
 # Project Roadmap: NegotiateAI → Family AI Assistant
 
-**Версия:** 2.1.0
+**Версия:** 2.1.1
 **Последнее обновление:** 2026-01-27
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -27,8 +27,8 @@
 ## 📊 Текущий статус
 
 - **Этап:** Этап 3 (Агенты и персонализация) - ✅ ЗАВЕРШЁН
-- **Прогресс:** 57/60 задач Stage 3 (95%)
-- **Версия:** v2.1.0
+- **Прогресс:** 60/60 задач Stage 3 (100%)
+- **Версия:** v2.1.1 (с UI индикатором модели и режимом auto)
 - **Следующее:** Этап 4 (Персонализация: система проектов и база знаний)
 - **Дата завершения Stage 3:** 2026-01-27
 
@@ -194,7 +194,14 @@
    - 3 агента под Владимиром
    - Production build успешен
 
-**Файлы изменены:** 25 файлов (+3000 строк кода)
+8. ✅ UI улучшения (v2.1.1):
+   - UI индикатор модели в header чата (badge с иконкой 🤖)
+   - Режим "auto" по умолчанию для всех новых чатов
+   - Рефакторинг конфигурации моделей (senior developer approach)
+   - Исправлен guest mode на production
+   - Backward compatibility с legacy model IDs (claude-*)
+
+**Файлы изменены:** 25 файлов (+3000 строк кода) + 7 файлов UI улучшений (+150 строк)
 
 **Коммиты:**
 - 85724cf: fix: sign in button не реагирует на клики
@@ -204,9 +211,11 @@
 - fb0edc0: feat: remove guest mode, add user roles (engineer/marketer)
 
 **Документация:**
-- [CHANGELOG.md v2.1.0](CHANGELOG.md#210---2026-01-27---stage-3-ai-agents-system-)
-- [CHANGELOG.md v2.0.2](CHANGELOG.md#202---2026-01-27---stage-3-ux-improvements--bug-fixes)
+- [CHANGELOG.md v2.1.1](CHANGELOG.md#211---2026-01-27---ui-model-indicator--auto-mode-default) - UI улучшения
+- [CHANGELOG.md v2.1.0](CHANGELOG.md#210---2026-01-27---stage-3-ai-agents-system-) - система агентов
+- [CHANGELOG.md v2.0.2](CHANGELOG.md#202---2026-01-27---stage-3-ux-improvements--bug-fixes) - bug fixes
 - [DEV_COMMANDS.md](DEV_COMMANDS.md) - справочник команд
+- [docs/ai-capabilities.md](docs/ai-capabilities.md) - v2.1.1, описание агентов и моделей
 - [docs/troubleshooting.md](docs/troubleshooting.md) - обновлен с новыми решениями
 
 **Production Build:** ✅ Прошел успешно

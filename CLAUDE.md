@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Версия:** 2.0.0 | **Статус:** ✅ Deployed | **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
+**Версия:** 2.1.1 | **Статус:** ✅ Deployed | **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 ---
 
@@ -39,9 +39,10 @@
 - Tailwind CSS
 
 **AI:**
-- Google Gemini 2.5 Pro (@ai-sdk/google)
+- Google Gemini 3 Pro + Gemini 2.5 Flash (@ai-sdk/google)
 - AI SDK (Vercel AI SDK)
 - Streaming responses
+- 8 специализированных AI-агентов с автоматическим выбором модели
 
 **Backend:**
 - NextAuth 5.0-beta.25
@@ -58,8 +59,9 @@
 
 **AI/Chat:**
 - `app/(chat)/api/chat/route.ts` - Chat endpoint (streaming)
-- `lib/ai/providers.ts` - Конфигурация Gemini
-- `lib/ai/tools/` - AI-инструменты (search, web scraping)
+- `lib/ai/providers.ts` - Конфигурация Gemini (3 Pro + 2.5 Flash)
+- `lib/ai/agents/` - 8 AI-агентов (промпты, конфигурация)
+- `lib/ai/tools/` - AI-инструменты (search, web scraping, getCurrentDate)
 
 **Auth/DB:**
 - `app/(auth)/` - NextAuth 5.0 setup
@@ -81,11 +83,12 @@
 
 ## 🚀 Текущий этап
 
-**Этап:** Этап 1 (Очистка) - 🚧 В процессе
-**Прогресс:** 9/30 задач (30%)
-**Следующее:** Обновить CLAUDE.md (Фаза 1.3)
+**Этап:** Этап 3 (Агенты и персонализация) - ✅ ЗАВЕРШЁН
+**Прогресс:** 60/60 задач (100%)
+**Версия:** v2.1.1 (UI индикатор модели + режим auto по умолчанию)
+**Следующее:** Этап 4 (Персонализация: проекты и база знаний)
 
-**Детали:** См. [ROADMAP.md](ROADMAP.md)
+**Детали:** См. [ROADMAP.md](ROADMAP.md) и [TZ_STAGE_3_ROADMAP.md](TZ_STAGE_3_ROADMAP.md)
 
 **Архивная ветка:** `archive/mir-trade-v1.0.14` ✅
 
@@ -153,4 +156,4 @@ vercel --prod            # Deploy на production
 
 ---
 
-**Обновлено:** 2026-01-26
+**Обновлено:** 2026-01-27
