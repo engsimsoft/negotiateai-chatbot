@@ -45,6 +45,7 @@ export function Chat({
   isReadonly,
   autoResume,
   initialLastContext,
+  agentId,
 }: {
   id: string;
   initialMessages: ChatMessage[];
@@ -53,6 +54,7 @@ export function Chat({
   isReadonly: boolean;
   autoResume: boolean;
   initialLastContext?: AppUsage;
+  agentId?: string;
 }) {
   const { visibilityType } = useChatVisibility({
     chatId: id,
@@ -151,6 +153,7 @@ export function Chat({
               message: request.messages.at(-1),
               selectedChatModel: currentModelIdRef.current,
               selectedVisibilityType: visibilityType,
+              agentId: effectiveAgentId,
               ...request.body,
             },
           };
@@ -230,6 +233,8 @@ export function Chat({
 
   const searchParams = useSearchParams();
   const query = searchParams.get("query");
+  // Get agentId from search params if not provided as prop
+  const effectiveAgentId = agentId || searchParams.get("agentId") || undefined;
 
   const [hasAppendedQuery, setHasAppendedQuery] = useState(false);
 
@@ -267,6 +272,7 @@ export function Chat({
           chatId={id}
           isReadonly={isReadonly}
           selectedVisibilityType={initialVisibilityType}
+          agentId={effectiveAgentId}
         />
 
         <Messages

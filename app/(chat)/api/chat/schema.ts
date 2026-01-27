@@ -26,8 +26,14 @@ export const postRequestBodySchema = z.object({
     role: z.enum(["user"]),
     parts: z.array(partSchema),
   }),
-  selectedChatModel: z.enum(["claude-sonnet-4", "claude-haiku-3.5"]),
+  selectedChatModel: z.enum([
+    "claude-sonnet-4",      // Legacy ID, maps to gemini-2.5-pro
+    "claude-haiku-3.5",     // Legacy ID, maps to gemini-2.5-flash
+    "gemini-3-pro",         // Professional agents model
+    "gemini-2.5-flash",     // Casual agents model
+  ]),
   selectedVisibilityType: z.enum(["public", "private"]),
+  agentId: z.string().optional(), // Agent ID for agent-specific prompts
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

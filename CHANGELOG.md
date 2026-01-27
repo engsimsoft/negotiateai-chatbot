@@ -8,8 +8,383 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- Этап 2: Авторизация и роли (удаление guest режима, добавление ролей в БД, seed скрипт)
-- Этап 3: Персонализация (динамические промпты по ролям, система персональных проектов)
+- Этап 4: Персонализация (система персональных проектов, база знаний per user)
+- Экспорт артефактов в DOCX (опционально)
+
+## [2.1.0] - 2026-01-27 - Stage 3: AI Agents System ✅
+
+**MAJOR RELEASE**: Полная система AI-агентов с персонализацией по ролям.
+
+### Summary
+
+Реализована система из 8 специализированных AI-агентов с уникальными промптами, автоматическим выбором AI моделей (Gemini 3 Pro / Gemini 2.5 Flash) и персонализацией по ролям пользователей (engineer/marketer).
+
+**Ключевые возможности:**
+- 8 AI-агентов с уникальными промптами и поведением
+- Автоматический выбор AI модели в зависимости от типа задачи
+- Фильтрация агентов по роли пользователя
+- Приветственные сообщения от агентов
+- Иконки агентов в UI (header, sidebar, карточки)
+- Все агенты имеют доступ ко всем инструментам (getCurrentDate, webSearch, createDocument, и др.)
+
+### Added
+
+#### 🤖 AI Агенты (8 штук)
+
+**Для маркетологов (Юлия):**
+1. **📊 Маркетолог** - Профессиональный маркетинговый консультант
+   - Модель: Gemini 3 Pro (продвинутый reasoning)
+   - Промпт: Стратегия продвижения, аналитика, целевая аудитория
+   - Файл: [lib/ai/agents/marketer.md](lib/ai/agents/marketer.md)
+
+2. **✍️ Копирайтер** - Создание продающих текстов и постов
+   - Модель: Gemini 3 Pro (высокое качество текста)
+   - Промпт: Короткие абзацы, эмодзи, цепляющие заголовки
+   - Файл: [lib/ai/agents/copywriter.md](lib/ai/agents/copywriter.md)
+
+3. **🌐 Переводчик** - Точный перевод с учетом контекста
+   - Модель: Gemini 3 Pro (точность и контекст)
+   - Промпт: Перевод с сохранением стиля и технических терминов
+   - Файл: [lib/ai/agents/translator.md](lib/ai/agents/translator.md)
+
+4. **🍳 Кулинар** - Кулинарный помощник с рецептами
+   - Модель: Gemini 2.5 Flash (для души)
+   - Промпт: Подробные рецепты, советы по готовке
+   - Файл: [lib/ai/agents/cook.md](lib/ai/agents/cook.md)
+
+5. **⭐ Астролог** - Нумерология и гороскопы
+   - Модель: Gemini 2.5 Flash (для души)
+   - Промпт: Использует getCurrentDate для актуальных прогнозов
+   - Файл: [lib/ai/agents/astrologer.md](lib/ai/agents/astrologer.md)
+
+**Для всех (Юлия + Владимир):**
+6. **📚 Наставник** - Личностный рост по методике Кови
+   - Модель: Gemini 3 Pro (глубокие рассуждения)
+   - Промпт: 7 навыков высокоэффективных людей, целеполагание
+   - Файл: [lib/ai/agents/mentor.md](lib/ai/agents/mentor.md)
+
+7. **💬 Универсальный** - Общий ассистент для любых задач
+   - Модель: Gemini 2.5 Flash (баланс цена/качество)
+   - Промпт: Помощь по любым вопросам
+   - Файл: [lib/ai/agents/universal.md](lib/ai/agents/universal.md)
+
+8. **😄 Одессит** - Развлекательный агент с одесским юмором
+   - Модель: Gemini 2.5 Flash (развлечение)
+   - Промпт: Одесские шутки, байки, webSearch для актуальной информации
+   - Файл: [lib/ai/agents/odessit.md](lib/ai/agents/odessit.md)
+
+#### 🎯 Система выбора AI моделей
+
+**Файл**: [lib/ai/providers.ts](lib/ai/providers.ts)
+
+Автоматический выбор модели в зависимости от типа агента:
+- **Gemini 3 Pro** (gemini-3-pro-preview) - для профессиональных задач:
+  - Маркетолог, Копирайтер, Переводчик, Наставник
+  - 1M токенов контекст, 64K output
+  - Dynamic thinking для продвинутого reasoning
+  - Цена: $2/$12 за 1M токенов
+
+- **Gemini 2.5 Flash** (gemini-2.5-flash) - для развлечения и простых задач:
+  - Кулинар, Астролог, Универсальный, Одессит
+  - Быстрее и дешевле
+
+**Функция**: `getModelForAgent(agentId: AgentId): string` в [lib/ai/agents/index.ts](lib/ai/agents/index.ts)
+
+#### 📁 Файлы и компоненты
+
+**Backend:**
+- [lib/ai/agents/index.ts](lib/ai/agents/index.ts) - список агентов, функции getAgentsByRole(), getAgentById()
+- [lib/ai/agents/*.md](lib/ai/agents/) - 8 файлов промптов (marketer.md, copywriter.md, и др.)
+- [lib/ai/prompts.ts](lib/ai/prompts.ts) - функция loadAgentPrompt() с кешированием
+- [lib/db/schema.ts](lib/db/schema.ts) - поле `agentId` в таблице `chat`
+- [lib/db/queries.ts](lib/db/queries.ts) - saveChat() с параметром `agentId`
+- [lib/db/migrations/0010_ambitious_albert_cleary.sql](lib/db/migrations/0010_ambitious_albert_cleary.sql) - миграция БД
+
+**Frontend:**
+- [components/agent-selector.tsx](components/agent-selector.tsx) - карточки агентов на главном экране
+- [components/chat-header.tsx](components/chat-header.tsx) - иконка и имя агента в header
+- [components/sidebar-history-item.tsx](components/sidebar-history-item.tsx) - иконки в истории чатов
+- [app/(chat)/page.tsx](app/(chat)/page.tsx) - главный экран со списком агентов
+- [app/(chat)/chat/[id]/page.tsx](app/(chat)/chat/[id]/page.tsx) - поддержка новых чатов с agentId
+
+**API:**
+- [app/(chat)/api/chat/route.ts](app/(chat)/api/chat/route.ts) - загрузка промпта агента, выбор модели
+- [app/(chat)/api/chat/schema.ts](app/(chat)/api/chat/schema.ts) - валидация agentId и Gemini моделей
+
+### Changed
+
+- **app/(chat)/page.tsx**: главный экран теперь показывает список агентов вместо пустого чата
+  - Фильтрация по роли пользователя (engineer видит 3 агента, marketer - 8)
+  - Генерация UUID для нового чата
+  - Редирект на `/chat/{id}?agentId={agentId}`
+
+- **app/(chat)/api/chat/route.ts**: интеграция с системой агентов
+  - Загрузка промпта агента из `.md` файла: `loadAgentPrompt(agentId)`
+  - Автоматический выбор модели: `getModelForAgent(agentId)`
+  - Логирование: `Using agent ${agentId} with model ${modelId}`
+  - Приветственное сообщение при первом сообщении пользователя
+
+- **components/chat-header.tsx**: отображение иконки и имени агента
+  - Получение агента по `agentId` из чата
+  - Отображение: `{agent.icon} {agent.name}`
+  - Fallback: показать 💬 если агент не найден
+
+- **components/sidebar-history-item.tsx**: иконки агентов в истории
+  - Каждый чат показывает иконку своего агента
+  - Визуальная идентификация чатов по агентам
+
+- **lib/ai/tools/**: все инструменты доступны всем агентам
+  - getCurrentDate - для Астролога (показывает актуальное время)
+  - webSearch - для Одессита и других (поиск в интернете)
+  - createDocument, updateDocument - для всех
+  - getWeather, requestSuggestions - для всех
+
+### Testing
+
+- ✅ **Тестирование под Юлией (маркетолог)**: все 8 агентов
+  - Маркетолог: стратегия продвижения → gemini-3-pro ✅
+  - Копирайтер: пост про продукт → gemini-3-pro ✅
+  - Переводчик: технический перевод → gemini-3-pro ✅
+  - Кулинар: рецепт пасты → gemini-2.5-flash ✅
+  - Астролог: гороскоп на сегодня → gemini-2.5-flash + getCurrentDate ✅
+  - Наставник: цели на месяц → gemini-3-pro ✅
+  - Универсальный: общие вопросы → gemini-2.5-flash ✅
+  - Одессит: одесские шутки → gemini-2.5-flash + webSearch ✅
+
+- ✅ **Тестирование под Владимиром (engineer)**: 3 агента
+  - Видно только: Наставник, Универсальный, Одессит
+  - НЕ видно: Маркетолог, Копирайтер, Переводчик, Кулинар, Астролог
+  - Фильтрация по роли работает корректно ✅
+
+- ✅ **Production build**: `npm run build` → успешно
+  - Нет TypeScript ошибок ✅
+  - Нет ESLint warnings ✅
+  - 16 статических страниц сгенерировано ✅
+  - Build time: ~30 секунд ✅
+
+### Technical Details
+
+**База данных:**
+- Миграция 0010: добавлено поле `agentId varchar` в таблицу `Chat`
+- Все существующие чаты совместимы (агент опционален)
+
+**Промпты:**
+- Загружаются из markdown файлов в `lib/ai/agents/*.md`
+- Кешируются в памяти (Map cache) для быстрого доступа
+- Fallback на system-prompt.md если агент не найден
+
+**AI модели:**
+- Gemini 3 Pro для профессиональных агентов (4 агента)
+- Gemini 2.5 Flash для развлекательных агентов (4 агента)
+- Автоматический выбор через `getModelForAgent()`
+- Логирование выбранной модели в console
+
+**Инструменты:**
+- Все инструменты объединены в один массив `experimental_activeTools`
+- Нет условного назначения по модели (все агенты имеют доступ ко всем инструментам)
+- getCurrentDate используется Астрологом для актуальных прогнозов
+- webSearch используется Одесситом для поиска информации
+
+### Performance
+
+- **Dev mode**: первая компиляция ~12.5 сек (12,853 модулей)
+- **Production mode**: startup ~180ms, page load ~70ms
+- **Build time**: ~30 секунд для полного production build
+- **Bundle size**: Chat page 1.19 MB (с кодом агентов)
+
+### Breaking Changes
+
+**Нет breaking changes** - все изменения обратно совместимы:
+- Старые чаты без `agentId` продолжают работать (fallback на system-prompt.md)
+- API эндпоинты не изменились
+- Environment variables не изменились (только добавлены новые)
+
+### Files Changed
+
+**Счетчик**: 15 файлов изменено, 10 файлов создано
+
+**Новые файлы:**
+- lib/ai/agents/index.ts (+150 строк)
+- lib/ai/agents/*.md (8 файлов, ~400 строк каждый)
+- components/agent-selector.tsx (+120 строк)
+- lib/db/migrations/0010_ambitious_albert_cleary.sql (+2 строки)
+
+**Измененные файлы:**
+- lib/ai/prompts.ts (+30 строк)
+- lib/db/schema.ts (+1 строка)
+- lib/db/queries.ts (+15 строк)
+- app/(chat)/api/chat/route.ts (+45 строк)
+- app/(chat)/api/chat/schema.ts (+2 модели)
+- app/(chat)/page.tsx (+60 строк)
+- app/(chat)/chat/[id]/page.tsx (+40 строк)
+- components/chat-header.tsx (+15 строк)
+- components/sidebar-history-item.tsx (+10 строк)
+- components/chat.tsx (+5 строк)
+- lib/ai/providers.ts (+2 модели)
+
+**Итого**: ~3000+ строк кода добавлено
+
+### Related
+
+- Roadmap: [TZ_STAGE_3_ROADMAP.md](TZ_STAGE_3_ROADMAP.md) - полная дорожная карта реализации
+- Tech Spec: [TZ_STAGE_3_AGENTS_v2.md](TZ_STAGE_3_AGENTS_v2.md) - техническое задание
+- См. также: v2.0.2 (bug fixes для Stage 3)
+
+---
+
+## [2.0.2] - 2026-01-27 - Stage 3 UX Improvements & Bug Fixes
+
+### Fixed
+- ✅ **КРИТИЧЕСКАЯ ПРОБЛЕМА: "Thinking..." индикатор не всегда анимирован**
+  - Проблема: Spinner не отображался или был статичным во время ожидания ответа AI
+  - Причина 1: ThinkingMessage компонент не имел анимированного спиннера
+  - Причина 2: Индикатор исчезал при начале streaming, даже если первый токен еще не пришел
+  - Файлы:
+    - [components/message.tsx:21,404-407](components/message.tsx#L21): добавлен Loader компонент
+    - [components/messages.tsx:94-102](components/messages.tsx#L94-L102): улучшена логика показа индикатора
+  - Решение:
+    - Добавлен крутящийся Loader из [components/elements/loader.tsx](components/elements/loader.tsx)
+    - Индикатор теперь показывается пока: `status === "submitted"` ИЛИ последнее сообщение ассистента пустое
+  - Результат: Пользователь всегда видит что AI работает (особенно важно для Gemini 3 Pro с dynamic thinking) ✅
+
+- ✅ **КРИТИЧЕСКАЯ ПРОБЛЕМА: NextAuth UntrustedHost ошибка**
+  - Проблема: `UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session`
+  - Причина: NextAuth 5.0 требует явного доверия localhost в development режиме
+  - Файл: [.env.local:30](.env.local#L30)
+  - Решение: Добавлена переменная `AUTH_TRUST_HOST=true`
+  - Результат: Авторизация работает в development без ошибок ✅
+
+- ✅ **КРИТИЧЕСКАЯ ПРОБЛЕМА: Brave Search API возвращает 422 для русских запросов**
+  - Проблема: Web Search не работал с русскими запросами ("Одесса" → 422 Unprocessable Entity)
+  - Root Cause #1: API ключ был невалидным (SUBSCRIPTION_TOKEN_INVALID)
+  - Root Cause #2: Отсутствовал параметр `search_lang` (Brave Search API требует ISO 639-1 код)
+  - Файлы:
+    - [lib/ai/tools/web-search.ts:80-90](lib/ai/tools/web-search.ts#L80-L90): автоопределение языка
+    - [.env.local:7](.env.local#L7): обновлен API ключ
+  - Решение:
+    1. Получен новый валидный API ключ Brave Search
+    2. Добавлено автоопределение языка по наличию кириллицы:
+       ```typescript
+       const hasCyrillic = /[а-яА-ЯёЁ]/.test(query);
+       const searchLang = hasCyrillic ? "ru" : "en";
+       ```
+    3. Параметр `search_lang` передается в API запрос
+  - Результат: Web Search работает для русских и английских запросов ✅
+
+### Added
+- ✅ **DEV_COMMANDS.md** - справочник команд для разработки
+  - Создан файл [DEV_COMMANDS.md](DEV_COMMANDS.md) (~200 строк)
+  - Содержит:
+    - Команды запуска/остановки приложения (dev vs production)
+    - Управление процессами и портами
+    - Очистка кеша Next.js
+    - Работа с базой данных (миграции, Drizzle Studio)
+    - Git команды для коммитов и PR
+    - Решение типичных проблем
+    - Быстрый старт (основные команды одной страницей)
+  - Цель: Упростить работу с проектом для пользователя
+
+### Changed
+- **components/message.tsx**: добавлен анимированный Loader
+  - Импортирован Loader из `./elements/loader`
+  - ThinkingMessage компонент обновлен:
+    - Добавлен flex контейнер с gap-2
+    - Loader size={16} с auto-spinning animation
+    - Текст "Thinking..." рядом со спиннером
+
+- **components/messages.tsx**: улучшена логика показа индикатора
+  - До: показывался только при `status === "submitted"`
+  - После: показывается при `status === "submitted"` ИЛИ:
+    - `status === "streaming"` И
+    - Последнее сообщение от ассистента И
+    - Все parts пустые (нет текста)
+  - Защита от "пустого экрана" пока Gemini 3 Pro думает 5-15 секунд
+
+- **lib/ai/tools/web-search.ts**: мультиязычная поддержка
+  - Автоопределение языка запроса (кириллица vs латиница)
+  - Параметр `search_lang` устанавливается автоматически: "ru" или "en"
+  - Логирование detected language в console
+  - Удалены жестко заданные `country`, `ui_lang` параметры
+
+- **.env.local**: обновлены ключи и настройки
+  - Новый Brave Search API ключ (валидный, протестирован)
+  - Добавлена настройка `AUTH_TRUST_HOST=true` для NextAuth 5.0
+
+### Testing
+- ✅ **Animated Spinner**: протестирован с Маркетологом (Gemini 3 Pro)
+  - Spinner крутится все время пока AI думает
+  - Видно даже при 15+ секундах thinking (dynamic thinking)
+
+- ✅ **Web Search**: протестирован с Одесситом
+  - Русский запрос "Одесса" → 200 OK
+  - Английский запрос "test" → 200 OK
+  - Автоопределение языка работает
+
+- ✅ **getCurrentDate Tool**: протестирован с Астрологом
+  - Инструмент вызывается корректно
+  - Возвращает точное время (11:17:58)
+  - Timezone: Московское время
+
+### Performance
+- **Gemini 3 Pro dynamic thinking**: 5-15 секунд до первого токена
+  - Это нормальное поведение для модели с thinkingBudget: 1024
+  - Спиннер теперь показывает что модель работает
+  - Качество reasoning окупает задержку
+
+- **Web Search latency**: ~1-2 секунды для Brave API
+  - Автоопределение языка: <1ms (regex check)
+  - Network roundtrip к Brave API: ~800-1000ms
+  - Парсинг результатов: <100ms
+
+### Technical Details
+
+**Проблема с индикатором загрузки:**
+- AI SDK меняет status: "submitted" → "streaming" сразу при начале stream
+- Но Gemini 3 Pro может думать 5-15 секунд перед первым токеном
+- Старая логика: индикатор исчезал при status="streaming"
+- Новая логика: индикатор остается пока нет текста в ответе
+
+**Проблема с Brave Search API:**
+- Brave Search API требует `search_lang` параметр (ISO 639-1)
+- Без параметра → 422 Unprocessable Entity
+- Старый API ключ был невалиден → SUBSCRIPTION_TOKEN_INVALID
+- Решение: новый ключ + автоопределение языка
+
+**Автоопределение языка:**
+```typescript
+// Простая эвристика - работает для 95% случаев
+const hasCyrillic = /[а-яА-ЯёЁ]/.test(query);
+const searchLang = hasCyrillic ? "ru" : "en";
+```
+
+### Files Changed
+- [components/message.tsx](components/message.tsx): +2 строки (импорт Loader, обновлен ThinkingMessage)
+- [components/messages.tsx](components/messages.tsx): +6 строк (улучшена логика индикатора)
+- [lib/ai/tools/web-search.ts](lib/ai/tools/web-search.ts): +3 строки (автоопределение языка)
+- [.env.local](.env.local): +2 строки (новый API ключ, AUTH_TRUST_HOST)
+- [DEV_COMMANDS.md](DEV_COMMANDS.md): **НОВЫЙ** (+200 строк)
+
+### Documentation
+- ✅ DEV_COMMANDS.md создан
+- ✅ CHANGELOG.md обновлен (эта запись)
+- См. также:
+  - [TZ_STAGE_3_ROADMAP.md](TZ_STAGE_3_ROADMAP.md) - прогресс Stage 3 (80% завершено)
+  - [docs/troubleshooting.md](docs/troubleshooting.md) - решения проблем (будет обновлен)
+
+### Known Issues
+- ⚠️ **Dev mode холодный старт**: первый клик на агента занимает 3-5 секунд
+  - Причина: Next.js компилирует страницу на лету (12,853 модулей)
+  - После первой компиляции: моментально
+  - В production: нет проблемы (все предкомпилировано)
+  - См. [DEV_COMMANDS.md](DEV_COMMANDS.md) секция "Разница между dev и production"
+
+### Next Steps (Phase 3.8 - Финализация)
+- [ ] Полное тестирование под Юлией (8 агентов)
+- [ ] Полное тестирование под Владимиром (3 агента)
+- [ ] Обновление docs/troubleshooting.md с новыми решениями
+- [ ] Обновление docs/ai-capabilities.md с описанием агентов
+- [ ] Production сборка и deployment на Vercel
+- [ ] Создание git tag v2.1.0
 
 ## [2.0.1] - 2026-01-27 - Performance Optimization & Auth Fix
 

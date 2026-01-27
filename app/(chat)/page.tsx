@@ -1,52 +1,28 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Chat } from "@/components/chat";
-import { DataStreamHandler } from "@/components/data-stream-handler";
-import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
-import { generateUUID } from "@/lib/utils";
+import { AgentSelector } from "@/components/agent-selector";
+import { getAgentsByRole } from "@/lib/ai/agents";
 import { auth } from "../(auth)/auth";
 
 export default async function Page() {
   const session = await auth();
 
-  if (!session) {
+  if (!session || !session.user) {
     redirect("/api/auth/guest");
   }
 
-  const id = generateUUID();
+  // Get user role from session (default to engineer if not set)
+  const userRole = (session.user.role || "engineer") as "engineer" | "marketer";
 
-  const cookieStore = await cookies();
-  const modelIdFromCookie = cookieStore.get("chat-model");
+  // Get agents available for this user role
+  const availableAgents = getAgentsByRole(userRole);
 
-  if (!modelIdFromCookie) {
-    return (
-      <>
-        <Chat
-          autoResume={false}
-          id={id}
-          initialChatModel={DEFAULT_CHAT_MODEL}
-          initialMessages={[]}
-          initialVisibilityType="private"
-          isReadonly={false}
-          key={id}
-        />
-        <DataStreamHandler />
-      </>
-    );
-  }
+  // Get user name for greeting
+  const userName = session.user.email?.split('@')[0] || 'там';
 
   return (
-    <>
-      <Chat
-        autoResume={false}
-        id={id}
-        initialChatModel={modelIdFromCookie.value}
-        initialMessages={[]}
-        initialVisibilityType="private"
-        isReadonly={false}
-        key={id}
-      />
-      <DataStreamHandler />
-    </>
+    <AgentSelector
+      agents={availableAgents}
+      userName={userName}
+    />
   );
 }

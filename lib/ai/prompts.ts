@@ -2,9 +2,13 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import type { Geo } from "@vercel/functions";
 import type { ArtifactKind } from "@/components/artifact";
+import type { AgentId } from "./agents";
 
 // Cache for system prompt to avoid reading file on every request
 let cachedSystemPrompt: string | null = null;
+
+// Cache for agent prompts (Map: agentId -> prompt)
+const agentPromptsCache = new Map<string, string>();
 
 // Load system prompt from system-prompt.md
 async function loadSystemPrompt(): Promise<string> {
@@ -35,6 +39,36 @@ async function loadSystemPrompt(): Promise<string> {
     console.error("Failed to load system-prompt.md:", error);
     // Fallback to basic prompt if file not found
     return "You are NegotiateAI Assistant, a helpful AI assistant for negotiations on MIR.TRADE project.";
+  }
+}
+
+/**
+ * Load agent-specific system prompt from lib/ai/agents/{agentId}.md
+ * Prompts are cached to avoid reading files on every request
+ */
+export async function loadAgentPrompt(agentId: AgentId): Promise<string> {
+  // In development, skip cache to always get fresh content
+  const isDev = process.env.NODE_ENV === 'development';
+
+  // Check cache first (skip in dev mode)
+  if (agentPromptsCache.has(agentId) && !isDev) {
+    return agentPromptsCache.get(agentId)!;
+  }
+
+  try {
+    const agentPromptPath = join(process.cwd(), "lib", "ai", "agents", `${agentId}.md`);
+    const agentPrompt = await readFile(agentPromptPath, "utf-8");
+
+    // Only cache in production
+    if (!isDev) {
+      agentPromptsCache.set(agentId, agentPrompt);
+    }
+
+    return agentPrompt;
+  } catch (error) {
+    console.error(`Failed to load agent prompt for ${agentId}:`, error);
+    // Fallback to loading default system prompt
+    return loadSystemPrompt();
   }
 }
 

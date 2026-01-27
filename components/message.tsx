@@ -18,6 +18,7 @@ import {
   ToolInput,
   ToolOutput,
 } from "./elements/tool";
+import { Loader } from "./elements/loader";
 import { SparklesIcon } from "./icons";
 import { MessageActions } from "./message-actions";
 import { MessageEditor } from "./message-editor";
@@ -401,8 +402,9 @@ export const ThinkingMessage = () => {
         </div>
 
         <div className="flex w-full flex-col gap-2 md:gap-4">
-          <div className="p-0 text-muted-foreground text-sm">
-            Thinking...
+          <div className="flex items-center gap-2 p-0 text-muted-foreground text-sm">
+            <Loader size={16} />
+            <span>Thinking...</span>
           </div>
         </div>
       </div>

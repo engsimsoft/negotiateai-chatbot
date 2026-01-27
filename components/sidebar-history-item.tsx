@@ -2,6 +2,7 @@ import Link from "next/link";
 import { memo } from "react";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import type { Chat } from "@/lib/db/schema";
+import { getAgentById, type AgentId } from "@/lib/ai/agents";
 import {
   CheckCircleFillIcon,
   GlobeIcon,
@@ -42,10 +43,15 @@ const PureChatItem = ({
     initialVisibilityType: chat.visibility,
   });
 
+  // Get agent icon if agentId is available
+  const agent = chat.agentId ? getAgentById(chat.agentId as AgentId) : null;
+  const agentIcon = agent?.icon || "💬"; // Default fallback icon
+
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={isActive}>
         <Link href={`/chat/${chat.id}`} onClick={() => setOpenMobile(false)}>
+          <span className="mr-2">{agentIcon}</span>
           <span>{chat.title}</span>
         </Link>
       </SidebarMenuButton>

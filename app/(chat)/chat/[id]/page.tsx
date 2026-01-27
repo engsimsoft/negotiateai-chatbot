@@ -5,17 +5,18 @@ import { auth } from "@/app/(auth)/auth";
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
+import { getModelForAgent, getAgentById, type AgentId } from "@/lib/ai/agents";
 import { getChatById, getMessagesByChatId } from "@/lib/db/queries";
-import { convertToUIMessages } from "@/lib/utils";
+import { convertToUIMessages, generateUUID } from "@/lib/utils";
 
-export default async function Page(props: { params: Promise<{ id: string }> }) {
+export default async function Page(props: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ agentId?: string }>;
+}) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
   const { id } = params;
-  const chat = await getChatById({ id });
-
-  if (!chat) {
-    notFound();
-  }
+  const { agentId } = searchParams;
 
   const session = await auth();
 
@@ -23,6 +24,50 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
     redirect("/api/auth/guest");
   }
 
+  const chat = await getChatById({ id });
+
+  // New chat scenario: no chat in DB yet, but agentId provided
+  if (!chat) {
+    if (!agentId) {
+      // No chat and no agentId = invalid URL
+      return notFound();
+    }
+
+    // This is a new chat that will be created on first message
+    const cookieStore = await cookies();
+    const chatModelFromCookie = cookieStore.get("chat-model");
+
+    // Use agent-specific model or fall back to cookie/default
+    const initialModel = getModelForAgent(agentId as AgentId) ||
+                        chatModelFromCookie?.value ||
+                        DEFAULT_CHAT_MODEL;
+
+    // Get agent greeting message for new chats
+    const agent = getAgentById(agentId as AgentId);
+    const greetingMessages = agent?.greeting ? [{
+      id: generateUUID(),
+      role: "assistant" as const,
+      parts: [{ type: "text" as const, text: agent.greeting }],
+      createdAt: new Date(),
+    }] : [];
+
+    return (
+      <>
+        <Chat
+          autoResume={false}
+          id={id}
+          initialChatModel={initialModel}
+          initialMessages={greetingMessages}
+          initialVisibilityType="private"
+          isReadonly={false}
+          agentId={agentId}
+        />
+        <DataStreamHandler />
+      </>
+    );
+  }
+
+  // Existing chat scenario
   if (chat.visibility === "private") {
     if (!session.user) {
       return notFound();
@@ -42,33 +87,22 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
   const cookieStore = await cookies();
   const chatModelFromCookie = cookieStore.get("chat-model");
 
-  if (!chatModelFromCookie) {
-    return (
-      <>
-        <Chat
-          autoResume={true}
-          id={chat.id}
-          initialChatModel={DEFAULT_CHAT_MODEL}
-          initialLastContext={chat.lastContext ?? undefined}
-          initialMessages={uiMessages}
-          initialVisibilityType={chat.visibility}
-          isReadonly={session?.user?.id !== chat.userId}
-        />
-        <DataStreamHandler />
-      </>
-    );
-  }
+  // For existing chats, use agent-specific model if available
+  const initialModel = chat.agentId
+    ? (getModelForAgent(chat.agentId as AgentId) || chatModelFromCookie?.value || DEFAULT_CHAT_MODEL)
+    : (chatModelFromCookie?.value || DEFAULT_CHAT_MODEL);
 
   return (
     <>
       <Chat
         autoResume={true}
         id={chat.id}
-        initialChatModel={chatModelFromCookie.value}
+        initialChatModel={initialModel}
         initialLastContext={chat.lastContext ?? undefined}
         initialMessages={uiMessages}
         initialVisibilityType={chat.visibility}
         isReadonly={session?.user?.id !== chat.userId}
+        agentId={chat.agentId ?? undefined}
       />
       <DataStreamHandler />
     </>

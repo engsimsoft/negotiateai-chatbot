@@ -107,6 +107,34 @@ PORT=3001 npm run dev
 
 ---
 
+### Ошибка: "NextAuth UntrustedHost" (NextAuth 5.0)
+
+**Симптомы:**
+```
+Error: UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session
+```
+
+**Причина:** NextAuth 5.0 требует явного указания доверенных хостов в development режиме
+
+**Решение:**
+
+Добавь в `.env.local`:
+```env
+AUTH_TRUST_HOST=true
+```
+
+Перезапусти dev сервер:
+```bash
+# Ctrl+C для остановки
+npm run dev
+```
+
+**Важно:** Эта переменная нужна только для development. В production Vercel автоматически устанавливает правильные значения.
+
+**Связано:** См. CHANGELOG.md v2.0.2
+
+---
+
 ## API и интеграции
 
 ### Anthropic API: "401 Unauthorized"
@@ -184,7 +212,10 @@ const throttledCall = throttle(async () => {
 Error: 422 Unprocessable Entity - SUBSCRIPTION_TOKEN_INVALID
 ```
 
-**Причина:** Shell environment variable перекрывает .env.local
+**Причины:**
+1. Shell environment variable перекрывает .env.local
+2. Невалидный/просроченный API ключ
+3. Отсутствует параметр `search_lang` для русских запросов
 
 **Диагностика:**
 ```bash
@@ -198,9 +229,30 @@ echo $BRAVE_SEARCH_API_KEY
 
 # 3. Проверь переменную через Node
 node -e "console.log(process.env.BRAVE_SEARCH_API_KEY)"
+
+# 4. Тест API ключа напрямую
+curl -s "https://api.search.brave.com/res/v1/web/search?q=test&count=1&search_lang=en" \
+  -H "X-Subscription-Token: $BRAVE_SEARCH_API_KEY" \
+  -H "Accept: application/json" | jq
 ```
 
-**Решение:**
+**Решение 1: Обновить API ключ**
+
+1. Перейти на [brave.com/search/api](https://brave.com/search/api)
+2. Войти в аккаунт
+3. API Dashboard → API Keys
+4. Проверить статус ключа или создать новый
+5. Обновить `.env.local`:
+```env
+BRAVE_SEARCH_API_KEY=НОВЫЙ_КЛЮЧ
+```
+6. Перезапустить сервер:
+```bash
+lsof -ti:3000 | xargs kill -9
+npm run dev
+```
+
+**Решение 2: Environment variables приоритет**
 
 **Environment variables приоритет:**
 1. **Shell environment** (export BRAVE_SEARCH_API_KEY=...) ← **ВЫСШИЙ ПРИОРИТЕТ**
@@ -217,11 +269,36 @@ npm run dev
 ```
 3. Убедись что в shell configs (~/.zshrc, ~/.bashrc) нет export BRAVE_SEARCH_API_KEY
 
+**Решение 3: Добавить автоопределение языка**
+
+Для русских запросов обязателен параметр `search_lang=ru`:
+
+Файл: `lib/ai/tools/web-search.ts`
+```typescript
+// Auto-detect language from query (basic heuristic)
+const hasCyrillic = /[а-яА-ЯёЁ]/.test(query);
+const searchLang = hasCyrillic ? "ru" : "en";
+
+const url = new URL("https://api.search.brave.com/res/v1/web/search");
+url.searchParams.set("q", query);
+url.searchParams.set("count", count.toString());
+url.searchParams.set("search_lang", searchLang); // ISO 639-1 language code
+```
+
 **Проверка после исправления:**
 ```bash
-echo $BRAVE_SEARCH_API_KEY
-# Должен показать ПРАВИЛЬНЫЙ ключ из .env.local
+# Тест английского запроса
+curl -s "https://api.search.brave.com/res/v1/web/search?q=test&count=1&search_lang=en" \
+  -H "X-Subscription-Token: $BRAVE_SEARCH_API_KEY" | jq '.web.results[0].title'
+
+# Тест русского запроса
+curl -s "https://api.search.brave.com/res/v1/web/search?q=Одесса&count=1&search_lang=ru" \
+  -H "X-Subscription-Token: $BRAVE_SEARCH_API_KEY" | jq '.web.results[0].title'
+
+# Ожидаемый результат: HTTP 200 + JSON с результатами
 ```
+
+**Связано:** См. CHANGELOG.md v2.0.2
 
 ---
 
@@ -413,6 +490,77 @@ const response = await fetch(url, {
 ---
 
 ## Streaming и UI
+
+### Проблема: "Thinking..." spinner не анимирован или исчезает слишком рано
+
+**Симптомы:**
+- Spinner показывается, но не крутится (статичный текст "Thinking...")
+- Spinner исчезает до начала ответа AI (особенно при долгом thinking с Gemini 3 Pro: 5-15 сек)
+- Пользователь не видит что AI работает
+
+**Причины:**
+1. ThinkingMessage компонент не содержит анимированный loader
+2. Логика показа spinner недостаточна (исчезает при status="streaming" даже если текста еще нет)
+3. Gemini 3 Pro имеет большой thinkingBudget (до 15 секунд думания до первого токена)
+
+**Решение 1: Добавить анимированный Loader**
+
+Файл: [components/message.tsx](../components/message.tsx)
+
+```typescript
+import { Loader } from "./elements/loader";
+
+export const ThinkingMessage = () => {
+  return (
+    <motion.div className="group/message w-full" ...>
+      <div className="flex items-start justify-start gap-3">
+        <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
+          <SparklesIcon size={14} />
+        </div>
+
+        <div className="flex w-full flex-col gap-2 md:gap-4">
+          <div className="flex items-center gap-2 p-0 text-muted-foreground text-sm">
+            <Loader size={16} />  {/* ← Добавить анимированный loader */}
+            <span>Thinking...</span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+```
+
+**Решение 2: Улучшить логику показа spinner**
+
+Файл: [components/messages.tsx](../components/messages.tsx)
+
+```typescript
+<AnimatePresence mode="wait">
+  {(status === "submitted" ||
+    (status === "streaming" &&
+     messages.length > 0 &&
+     messages[messages.length - 1].role === "assistant" &&
+     // Показывать spinner пока не появился текст
+     messages[messages.length - 1].parts.every(p => p.type !== "text" || !p.text?.trim())
+    )
+  ) && <ThinkingMessage key="thinking" />}
+</AnimatePresence>
+```
+
+**Логика:**
+- Показывать spinner во время `status === "submitted"` (запрос отправлен)
+- Показывать spinner во время `status === "streaming"` **ПОКА** последнее сообщение assistant не содержит текста
+- Скрывать spinner когда появляется первый текстовый токен
+
+**Результат после исправления:**
+- ✅ Spinner анимирован (вращается)
+- ✅ Spinner показывается весь период thinking (даже 15 секунд с Gemini 3 Pro)
+- ✅ Spinner исчезает только когда текст начинает появляться
+- ✅ Улучшенный UX - пользователь видит что система работает
+
+**Связано:** См. CHANGELOG.md v2.0.2
+
+---
 
 ### Проблема: Streaming не работает
 

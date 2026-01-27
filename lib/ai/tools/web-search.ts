@@ -78,14 +78,16 @@ Returns a list of search results with titles, URLs, and descriptions.`,
     }
 
     try {
+      // Auto-detect language from query (basic heuristic)
+      const hasCyrillic = /[а-яА-ЯёЁ]/.test(query);
+      const searchLang = hasCyrillic ? "ru" : "en";
+
       const url = new URL("https://api.search.brave.com/res/v1/web/search");
       url.searchParams.set("q", query);
       url.searchParams.set("count", count.toString());
-      url.searchParams.set("country", "US"); // Country code
-      url.searchParams.set("search_lang", "en"); // Search language
-      url.searchParams.set("ui_lang", "en-US"); // UI language
+      url.searchParams.set("search_lang", searchLang); // ISO 639-1 language code
 
-      console.log('[webSearch] Fetching:', url.toString());
+      console.log('[webSearch] Fetching:', url.toString(), `(detected language: ${searchLang})`);
 
       const response = await fetch(url.toString(), {
         headers: {

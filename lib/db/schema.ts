@@ -36,6 +36,7 @@ export const chat = pgTable("Chat", {
   visibility: varchar("visibility", { enum: ["public", "private"] })
     .notNull()
     .default("private"),
+  agentId: varchar("agentId", { length: 64 }),
   lastContext: jsonb("lastContext").$type<AppUsage | null>(),
 });
 
