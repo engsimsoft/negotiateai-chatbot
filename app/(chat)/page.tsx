@@ -7,7 +7,7 @@ export default async function Page() {
   const session = await auth();
 
   if (!session || !session.user) {
-    redirect("/api/auth/guest");
+    redirect("/login");
   }
 
   // Get user role from session (default to engineer if not set)

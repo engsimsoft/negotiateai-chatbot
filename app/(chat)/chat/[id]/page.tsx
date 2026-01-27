@@ -21,7 +21,7 @@ export default async function Page(props: {
   const session = await auth();
 
   if (!session) {
-    redirect("/api/auth/guest");
+    redirect("/login");
   }
 
   const chat = await getChatById({ id });
