@@ -892,23 +892,16 @@ export default async function Layout({ children }) {
 - Сократи промпт (удали лишнее)
 - Важная информация в начале
 
-**Решение 2:** Используй caching (Anthropic prompt caching)
+**Решение 2:** Используй caching промптов в памяти
 ```typescript
-const response = await anthropic.messages.create({
-  model: 'claude-sonnet-4-5-20250929',
-  system: [
-    {
-      type: 'text',
-      text: systemPrompt,
-      cache_control: { type: 'ephemeral' } // Кэш на 5 минут
-    }
-  ],
-  messages: [...],
-});
+// В lib/ai/prompts.ts уже реализовано кеширование:
+// - Map cache для agent промптов
+// - Загрузка один раз в production
+// - Пропуск cache в development
 ```
 
-**Решение 3:** Parallel tool calls
-Claude может вызывать несколько tools параллельно - это быстрее.
+**Решение 3:** Параллельные вызовы tools
+Google Gemini может вызывать несколько tools параллельно - это быстрее.
 
 ---
 
@@ -936,12 +929,10 @@ console.log('API response:', response);
 ### Проверка API ключей
 
 ```bash
-# Anthropic API
-curl https://api.anthropic.com/v1/messages \
-  -H "x-api-key: $ANTHROPIC_API_KEY" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "content-type: application/json" \
-  -d '{"model":"claude-sonnet-4-5-20250929","messages":[{"role":"user","content":"Hi"}],"max_tokens":10}'
+# Google Gemini API
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GOOGLE_GENERATIVE_AI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contents":[{"parts":[{"text":"Hi"}]}]}'
 
 # Brave Search API
 curl "https://api.search.brave.com/res/v1/web/search?q=test" \
