@@ -28,6 +28,7 @@ export const myProvider = isTestEnvironment
       return customProvider({
         languageModels: {
           // Primary model IDs (используются во всём проекте)
+          "auto": chatModel,               // Default fallback (не используется напрямую, только UI)
           "gemini-3-pro": chatModel,       // Professional agents
           "gemini-2.5-flash": chatModel,   // Casual agents
 
@@ -44,6 +45,7 @@ export const myProvider = isTestEnvironment
   : customProvider({
       languageModels: {
         // Primary model IDs (используются во всём проекте)
+        "auto": google("gemini-2.5-flash"),                   // Default fallback (не используется напрямую, только UI)
         "gemini-3-pro": google("gemini-3-pro-preview"),       // Professional agents (Marketer, Copywriter, Translator, Mentor)
         "gemini-2.5-flash": google("gemini-2.5-flash"),       // Casual agents (Cook, Astrologer, Universal, Odessit)
 

@@ -5,7 +5,7 @@ import { auth } from "@/app/(auth)/auth";
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
-import { getModelForAgent, getAgentById, type AgentId } from "@/lib/ai/agents";
+import { getAgentById, type AgentId } from "@/lib/ai/agents";
 import { getChatById, getMessagesByChatId } from "@/lib/db/queries";
 import { convertToUIMessages, generateUUID } from "@/lib/utils";
 
@@ -37,10 +37,8 @@ export default async function Page(props: {
     const cookieStore = await cookies();
     const chatModelFromCookie = cookieStore.get("chat-model");
 
-    // Use agent-specific model or fall back to cookie/default
-    const initialModel = getModelForAgent(agentId as AgentId) ||
-                        chatModelFromCookie?.value ||
-                        DEFAULT_CHAT_MODEL;
+    // Use user's preference from cookie, or default to "auto" (agent-specific model)
+    const initialModel = chatModelFromCookie?.value || DEFAULT_CHAT_MODEL;
 
     // Get agent greeting message for new chats
     const agent = getAgentById(agentId as AgentId);
@@ -87,10 +85,9 @@ export default async function Page(props: {
   const cookieStore = await cookies();
   const chatModelFromCookie = cookieStore.get("chat-model");
 
-  // For existing chats, use agent-specific model if available
-  const initialModel = chat.agentId
-    ? (getModelForAgent(chat.agentId as AgentId) || chatModelFromCookie?.value || DEFAULT_CHAT_MODEL)
-    : (chatModelFromCookie?.value || DEFAULT_CHAT_MODEL);
+  // Use user's preference from cookie, or default to "auto" (agent-specific model)
+  // "auto" mode will automatically select the best model for each agent
+  const initialModel = chatModelFromCookie?.value || DEFAULT_CHAT_MODEL;
 
   return (
     <>
