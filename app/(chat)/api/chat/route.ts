@@ -362,8 +362,20 @@ export async function POST(request: Request) {
           // Tool results are needed only during response generation, not in history
           const filteredParts = currentMessage.parts.filter((part: any) => {
             const type = part.type;
-            // Keep only text and step markers, remove tool-call and tool results
-            return type === 'text' || type === 'step-start' || type === 'step-finish';
+
+            // Keep text and step markers
+            if (type === 'text' || type === 'step-start' || type === 'step-finish') {
+              return true;
+            }
+
+            // Keep artifact tool results (createDocument, updateDocument)
+            // These are small and needed to render artifact buttons after reload
+            if (type === 'tool-createDocument' || type === 'tool-updateDocument') {
+              return true;
+            }
+
+            // Filter out other tool calls and results (web search, etc.)
+            return false;
           });
 
           const tokenCount = estimateMessageTokens(filteredParts);

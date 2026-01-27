@@ -39,6 +39,17 @@ export type CustomUIDataTypes = {
     html?: string;
     isComplete?: boolean;
   };
+  pptxStatus: {
+    status: string;
+    message: string;
+    pptxUrl?: string;
+  };
+  pptxComplete: {
+    pptxUrl: string;
+    previewUrls: string[];
+    slideCount: number;
+    themeId: string;
+  };
   suggestion: Suggestion;
   appendMessage: string;
   id: string;

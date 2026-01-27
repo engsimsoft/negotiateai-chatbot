@@ -13,7 +13,8 @@ export type AgentId =
   | "astrologer"
   | "mentor"
   | "universal"
-  | "odessit";
+  | "odessit"
+  | "presentator";
 
 export type UserRole = "engineer" | "marketer";
 
@@ -102,6 +103,15 @@ export const AGENTS: Agent[] = [
     availableFor: "both",
     defaultModel: "gemini-2.5-flash",
     greeting: "О, кого я вижу! Ну шо, рассказывай, шо у тебя там?",
+  },
+  {
+    id: "presentator",
+    name: "Презентатор",
+    icon: "🎯",
+    description: "Создание презентаций: PPTX и веб-слайды",
+    availableFor: "both",
+    defaultModel: "gemini-3-pro",
+    greeting: "Привет! Давай создадим презентацию, которая запомнится. О чём будет твой спектакль?",
   },
 ];
 

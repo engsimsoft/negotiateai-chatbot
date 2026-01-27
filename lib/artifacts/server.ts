@@ -1,5 +1,6 @@
 import type { UIMessageStreamWriter } from "ai";
 import type { Session } from "next-auth";
+import { presentationPptxDocumentHandler } from "@/artifacts/presentation-pptx/server";
 import { presentationRevealDocumentHandler } from "@/artifacts/presentation-reveal/server";
 import { textDocumentHandler } from "@/artifacts/text/server";
 import type { ArtifactKind } from "@/components/artifact";
@@ -91,6 +92,7 @@ export function createDocumentHandler<T extends ArtifactKind>(config: {
 export const documentHandlersByArtifactKind: DocumentHandler[] = [
   textDocumentHandler,
   presentationRevealDocumentHandler,
+  presentationPptxDocumentHandler,
 ];
 
-export const artifactKinds = ["text", "presentation-reveal"] as const;
+export const artifactKinds = ["text", "presentation-reveal", "presentation-pptx"] as const;

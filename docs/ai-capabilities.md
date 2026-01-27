@@ -1,26 +1,28 @@
 # Возможности AI-агентов
 
-**Версия:** 2.1.1
-**Последнее обновление:** 2026-01-27
-**Статус:** ✅ Актуально для Этапа 3 (завершен + UI улучшения)
+**Версия:** 2.5.0
+**Последнее обновление:** 2026-01-28
+**Статус:** ✅ Актуально для Этапа 4 (Artifacts v2 - завершен)
 
 ---
 
 ## 📖 О документе
 
-Этот документ описывает все возможности и инструменты, доступные AI-агентам в приложении **Family AI Assistant**. В версии 2.1.1 реализована полная система из 8 специализированных агентов с автоматическим выбором AI моделей и UI индикатором активной модели.
+Этот документ описывает все возможности и инструменты, доступные AI-агентам в приложении **Family AI Assistant**. В версии 2.5.0 реализована полная система из 9 специализированных агентов с автоматическим выбором AI моделей, UI индикатором активной модели и системой артефактов v2 (текст, презентации).
 
 ---
 
 ## 🤖 Специализированные AI-агенты
 
-**Версия:** 2.1.1 (Этап 3 завершен + UI улучшения)
+**Версия:** 2.5.0 (Этап 4 завершен + 9 агентов)
 
 > **Контекст решения:** См. [ADR 004: Agent System Decision](decisions/004-agent-system.md) -
-> почему мы выбрали систему из 8 специализированных агентов с автоматическим выбором модели,
+> почему мы выбрали систему из 9 специализированных агентов с автоматическим выбором модели,
 > какие альтернативы рассматривали, и какие последствия это имеет для проекта.
 
-В приложении доступны 8 специализированных AI-агентов с уникальными промптами и поведением. Каждый агент автоматически использует оптимальную AI модель (Gemini 3 Pro или Gemini 2.5 Flash) в зависимости от типа задач. Пользователь может видеть активную модель в UI и при необходимости переключить режим вручную.
+В приложении доступны 9 специализированных AI-агентов с уникальными промптами и поведением. Каждый агент автоматически использует оптимальную AI модель (Gemini 3 Pro или Gemini 2.5 Flash) в зависимости от типа задач. Пользователь может видеть активную модель в UI и при необходимости переключить режим вручную.
+
+**Особенность v2.5.0:** Агент **Презентатор** имеет эксклюзивный доступ к инструментам создания презентаций (presentation-reveal, presentation-pptx). Другие агенты направляют пользователей к Презентатору для создания презентаций.
 
 ### 📊 Список агентов
 
@@ -34,15 +36,16 @@
 | **Наставник** | 📚 | Both | Gemini 3 Pro | Личностный рост по методике Стивена Кови: 7 навыков, целеполагание, развитие |
 | **Универсальный** | 💬 | Both | Gemini 2.5 Flash | Общий ассистент для любых задач: помощь по любым вопросам |
 | **Одессит** | 😄 | Both | Gemini 2.5 Flash | Развлекательный агент: одесский юмор, байки, webSearch для информации |
+| **Презентатор** | 🎯 | Both | Gemini 3 Pro | Создание презентаций: PPTX и веб-слайды (Reveal.js), эксклюзивный доступ к presentation tools |
 
 ### 🔑 Ключевые особенности
 
 **Персонализация по ролям:**
-- **Юлия (marketer)**: видит все 8 агентов
-- **Владимир (engineer)**: видит 3 агента (Наставник, Универсальный, Одессит)
+- **Юлия (marketer)**: видит все 9 агентов
+- **Владимир (engineer)**: видит 4 агента (Наставник, Универсальный, Одессит, Презентатор)
 
 **Автоматический выбор AI модели:**
-- **Gemini 3 Pro** - для профессиональных агентов (Маркетолог, Копирайтер, Переводчик, Наставник)
+- **Gemini 3 Pro** - для профессиональных агентов (Маркетолог, Копирайтер, Переводчик, Наставник, Презентатор)
   - Продвинутый reasoning с dynamic thinking
   - 1M токенов контекст, 64K output
   - Цена: $2/$12 за 1M токенов
@@ -96,6 +99,7 @@
 - [lib/ai/agents/mentor.md](../lib/ai/agents/mentor.md) - Наставник
 - [lib/ai/agents/universal.md](../lib/ai/agents/universal.md) - Универсальный
 - [lib/ai/agents/odessit.md](../lib/ai/agents/odessit.md) - Одессит
+- [lib/ai/agents/presentator.md](../lib/ai/agents/presentator.md) - Презентатор
 
 **Система загрузки:**
 - Функция `loadAgentPrompt(agentId)` в [lib/ai/prompts.ts](../lib/ai/prompts.ts)
@@ -118,7 +122,9 @@
 
 ### 🛠️ Инструменты агентов
 
-Все агенты имеют доступ ко всем инструментам:
+Все агенты имеют доступ к базовым инструментам (webSearch, getWeather, getCurrentDate, readDocument, createDocument для text).
+
+**Исключение:** Инструменты создания презентаций (`presentation-reveal`, `presentation-pptx`) доступны **только агенту Презентатор**. Другие агенты при запросе на презентацию направляют пользователя к Презентатору.
 
 ### 📡 Интернет и поиск
 
@@ -204,60 +210,74 @@
 
 ---
 
-### ✨ Артефакты (Artifacts)
+### ✨ Артефакты (Artifacts) — v2.5.0
 
 AI может создавать и обновлять интерактивные документы, которые отображаются справа от чата.
 
+> **Обновление v2.5.0:** Удалены code и sheet артефакты. Добавлены presentation-reveal и presentation-pptx.
+
 #### 1. Text Artifact (текстовые документы)
 - **Возможности:**
-  - Markdown форматирование (заголовки, списки, таблицы)
+  - Plain text с emoji (для соцсетей: VK, Telegram, Instagram)
   - Копирование в буфер обмена
-  - Предложения по улучшению текста (AI suggestions)
-  - Потоковое создание (streaming)
-- **Модель:** Google Gemini 2.5 Pro
+  - Скачивание как .txt файл
+  - Public Share (публичная ссылка)
 - **Файлы:**
   - [artifacts/text/server.ts](../artifacts/text/server.ts)
   - [artifacts/text/client.tsx](../artifacts/text/client.tsx)
 
 **Пример использования:**
 ```
-Напиши статью о TypeScript
-Создай документ с планом проекта
+Напиши пост для VK про наш новый продукт
+Создай текст для Telegram-канала
 ```
 
-#### 2. Code Artifact (код)
+#### 2. Presentation-Reveal (веб-презентации)
+- **Доступ:** Эксклюзивно для агента **Презентатор**
+- **Технология:** Reveal.js (iframe изоляция)
 - **Возможности:**
-  - Синтаксис: Python, JavaScript, HTML/CSS, и др.
-  - Интерактивный редактор с подсветкой синтаксиса
-  - Копирование кода
-  - Потоковое создание
-- **Модель:** Google Gemini 2.5 Pro
+  - 5 тем: corporate, modern, minimal, dark, creative
+  - Интерактивные переходы между слайдами
+  - Fullscreen режим
+  - Public Share (публичная ссылка)
+  - Copy HTML
 - **Файлы:**
-  - [artifacts/code/server.ts](../artifacts/code/server.ts)
-  - [artifacts/code/client.tsx](../artifacts/code/client.tsx)
+  - [artifacts/presentation-reveal/server.ts](../artifacts/presentation-reveal/server.ts)
+  - [artifacts/presentation-reveal/client.tsx](../artifacts/presentation-reveal/client.tsx)
+  - [lib/presentations/themes.ts](../lib/presentations/themes.ts) - темы Reveal.js
 
 **Пример использования:**
 ```
-Напиши функцию для сортировки массива на Python
-Создай HTML страницу с формой логина
+[Через агента Презентатор]
+Создай веб-презентацию про AI в современном стиле
 ```
 
-#### 3. Sheet Artifact (таблицы)
+#### 3. Presentation-PPTX (PowerPoint)
+- **Доступ:** Эксклюзивно для агента **Презентатор**
+- **Технология:** PptxGenJS + CloudConvert (preview)
 - **Возможности:**
-  - CSV данные
-  - Интерактивная таблица
-  - Экспорт: копирование как CSV
-  - Редактирование структуры
-- **Модель:** Google Gemini 2.5 Pro
+  - Настоящие PPTX файлы для PowerPoint/Keynote/Google Slides
+  - 5 тем: corporate, modern, minimal, dark, creative
+  - Галерея превью слайдов
+  - Скачивание PPTX файла
+  - Public Share (публичная ссылка)
 - **Файлы:**
-  - [artifacts/sheet/server.ts](../artifacts/sheet/server.ts)
-  - [artifacts/sheet/client.tsx](../artifacts/sheet/client.tsx)
+  - [artifacts/presentation-pptx/server.ts](../artifacts/presentation-pptx/server.ts)
+  - [artifacts/presentation-pptx/client.tsx](../artifacts/presentation-pptx/client.tsx)
+  - [lib/presentations/pptx-themes.ts](../lib/presentations/pptx-themes.ts) - темы PPTX
+  - [lib/services/pptx-preview.ts](../lib/services/pptx-preview.ts) - CloudConvert API
 
 **Пример использования:**
 ```
-Создай таблицу с бюджетом проекта
-Составь расписание встреч на неделю
+[Через агента Презентатор]
+Создай PPTX презентацию для инвестора про наш стартап
 ```
+
+#### Public Share (v2.3.0+)
+- Все артефакты поддерживают публичные ссылки
+- Ссылка: `/share/{token}` (без авторизации)
+- Только артефакт виден (без истории чата)
+- Можно отозвать ссылку (Unshare)
 
 **Важно:** Артефакты автоматически сохраняются в БД (таблица `documents`) и привязаны к пользователю.
 
@@ -319,7 +339,7 @@ AI может создавать и обновлять интерактивны�
 
 | Модель | ID | Назначение | Агенты | Характеристики |
 |--------|-----|------------|--------|----------------|
-| **Gemini 3 Pro** | `gemini-3-pro` | Профессиональные задачи | Маркетолог, Копирайтер, Переводчик, Наставник | 1M контекст, dynamic thinking, $2/$12 за 1M |
+| **Gemini 3 Pro** | `gemini-3-pro` | Профессиональные задачи | Маркетолог, Копирайтер, Переводчик, Наставник, Презентатор | 1M контекст, dynamic thinking, $2/$12 за 1M |
 | **Gemini 2.5 Flash** | `gemini-2.5-flash` | Развлечение, быстрые задачи | Кулинар, Астролог, Универсальный, Одессит | Быстрый, дешевый |
 | **Gemini 2.5 Pro** | `gemini-2.5-pro` | Артефакты (suggestions) | - | Используется для генерации suggestions |
 
@@ -411,10 +431,27 @@ function getModelForAgent(agentId: AgentId): string {
 
 **Документация:**
 - [CHANGELOG.md v2.1.0](../CHANGELOG.md#210---2026-01-27---stage-3-ai-agents-system-)
-- [TZ_STAGE_3_ROADMAP.md](../TZ_STAGE_3_ROADMAP.md) - полная дорожная карта
-- [TZ_STAGE_3_AGENTS_v2.md](../TZ_STAGE_3_AGENTS_v2.md) - техническое задание
+- [TZ_STAGE_3_ROADMAP.md](../_archive/TZ_STAGE_3_ROADMAP.md) - полная дорожная карта
+- [TZ_STAGE_3_AGENTS_v2.md](../_archive/TZ_STAGE_3_AGENTS_v2.md) - техническое задание
 
-### Этап 4: Система проектов (планируется)
+### ✅ Этап 4: Артефакты v2.0 - ЗАВЕРШЕН (2026-01-28)
+
+**Выполнено:**
+- [x] Удаление code и sheet артефактов (не использовались)
+- [x] Упрощение text артефакта (plain text + emoji для соцсетей)
+- [x] Public Share инфраструктура (публичные ссылки без авторизации)
+- [x] Presentation-Reveal (веб-презентации на Reveal.js)
+- [x] Presentation-PPTX (PowerPoint через PptxGenJS + CloudConvert)
+- [x] Агент "Презентатор" с эксклюзивным доступом к presentation tools
+- [x] 5 профессиональных тем для презентаций
+- [x] Production build успешен
+
+**Документация:**
+- [TZ_STAGE_ARTIFACTS_V2_ROADMAP.md](../TZ_STAGE_ARTIFACTS_V2_ROADMAP.md) - дорожная карта
+- [TZ_ARTIFACTS_SYSTEM_V2.md](../TZ_ARTIFACTS_SYSTEM_V2.md) - техническое задание
+- [ARTIFACTS_ARCHITECTURE.md](../ARTIFACTS_ARCHITECTURE.md) - архитектура артефактов
+
+### Этап 5: Система проектов (планируется)
 
 **Цель:** База знаний per-project, привязка чатов к проектам
 
@@ -426,12 +463,11 @@ function getModelForAgent(agentId: AgentId): string {
 - [ ] Загрузка файлов в проекты (привязка к `projectId`)
 - [ ] Фильтрация чатов по проектам
 
-### Будущие улучшения (после Этапа 4)
+### Будущие улучшения (после Этапа 5)
 
 **Экспорт артефактов:**
 - Экспорт в DOCX (библиотека `docx`)
 - Экспорт в PDF
-- Экспорт таблиц в XLSX
 
 **Расширение AI возможностей:**
 - Image generation (DALL-E 3 / Stable Diffusion)
@@ -451,14 +487,19 @@ function getModelForAgent(agentId: AgentId): string {
 
 **Документация:**
 - [README.md](../README.md) - Описание проекта
-- [ROADMAP.md](../ROADMAP.md) - План разработки (Этап 3 завершен)
-- [CHANGELOG.md](../CHANGELOG.md) - История изменений (v2.1.0)
+- [ROADMAP.md](../ROADMAP.md) - План разработки (Этап 4 завершен)
+- [CHANGELOG.md](../CHANGELOG.md) - История изменений (v2.5.0)
 - [docs/architecture.md](architecture.md) - Архитектура системы
 - [docs/troubleshooting.md](troubleshooting.md) - Решение проблем
 
 **Stage 3 (AI Агенты):**
-- [TZ_STAGE_3_ROADMAP.md](../TZ_STAGE_3_ROADMAP.md) - Дорожная карта реализации
-- [TZ_STAGE_3_AGENTS_v2.md](../TZ_STAGE_3_AGENTS_v2.md) - Техническое задание
+- [TZ_STAGE_3_ROADMAP.md](../_archive/TZ_STAGE_3_ROADMAP.md) - Дорожная карта реализации
+- [TZ_STAGE_3_AGENTS_v2.md](../_archive/TZ_STAGE_3_AGENTS_v2.md) - Техническое задание
+
+**Stage 4 (Артефакты v2):**
+- [TZ_STAGE_ARTIFACTS_V2_ROADMAP.md](../TZ_STAGE_ARTIFACTS_V2_ROADMAP.md) - Дорожная карта
+- [TZ_ARTIFACTS_SYSTEM_V2.md](../TZ_ARTIFACTS_SYSTEM_V2.md) - Техническое задание
+- [ARTIFACTS_ARCHITECTURE.md](../ARTIFACTS_ARCHITECTURE.md) - Архитектура артефактов
 
 **ADR:**
 - [docs/decisions/001-why-gemini.md](decisions/001-why-gemini.md) - Почему Gemini
@@ -467,5 +508,5 @@ function getModelForAgent(agentId: AgentId): string {
 
 ---
 
-**Документ обновлен:** 2026-01-27 (v2.1.0 - Stage 3 завершен)
+**Документ обновлен:** 2026-01-28 (v2.5.0 - Stage 4 Artifacts v2 завершен)
 **Автор:** Владимир (с помощью Claude Code)

@@ -57,6 +57,10 @@ export default function RootLayout({
             __html: THEME_COLOR_SCRIPT,
           }}
         />
+        <script
+          src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"
+          async
+        />
       </head>
       <body className="font-sans antialiased">
         <ThemeProvider

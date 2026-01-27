@@ -13,6 +13,7 @@ import {
 import useSWR, { useSWRConfig } from "swr";
 import { useDebounceCallback, useWindowSize } from "usehooks-ts";
 import { imageArtifact } from "@/artifacts/image/client";
+import { presentationPptxArtifact } from "@/artifacts/presentation-pptx/client";
 import { presentationRevealArtifact } from "@/artifacts/presentation-reveal/client";
 import { textArtifact } from "@/artifacts/text/client";
 import { useArtifact } from "@/hooks/use-artifact";
@@ -33,6 +34,7 @@ export const artifactDefinitions = [
   textArtifact,
   imageArtifact,
   presentationRevealArtifact,
+  presentationPptxArtifact,
 ];
 export type ArtifactKind = (typeof artifactDefinitions)[number]["kind"];
 
