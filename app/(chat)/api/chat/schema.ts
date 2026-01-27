@@ -27,11 +27,14 @@ export const postRequestBodySchema = z.object({
     parts: z.array(partSchema),
   }),
   selectedChatModel: z.enum([
-    "auto",                 // Auto-select model based on agent
-    "gemini-3-pro",         // Professional agents model
-    "gemini-2.5-flash",     // Casual agents model
-    "claude-sonnet-4",      // Legacy ID, maps to gemini-2.5-pro (for artifacts)
-    "claude-haiku-3.5",     // Legacy ID, maps to gemini-2.5-flash
+    // Primary model IDs (используются во всём проекте)
+    "auto",                 // Авто-выбор на основе агента (по умолчанию)
+    "gemini-3-pro",         // Gemini 3 Pro - профессиональные задачи
+    "gemini-2.5-flash",     // Gemini 2.5 Flash - простые задачи
+
+    // Legacy IDs (обратная совместимость для старых чатов в БД)
+    "claude-sonnet-4",      // → gemini-2.5-pro
+    "claude-haiku-3.5",     // → gemini-2.5-flash
   ]),
   selectedVisibilityType: z.enum(["public", "private"]),
   agentId: z.string().optional(), // Agent ID for agent-specific prompts
