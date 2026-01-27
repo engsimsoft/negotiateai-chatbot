@@ -117,25 +117,36 @@ function PureMessages({
 }
 
 export const Messages = memo(PureMessages, (prevProps, nextProps) => {
+  // If artifact is visible, skip re-render for both prev and next
   if (prevProps.isArtifactVisible && nextProps.isArtifactVisible) {
     return true;
   }
 
+  // Re-render if status changed
   if (prevProps.status !== nextProps.status) {
     return false;
   }
+
+  // Re-render if model changed
   if (prevProps.selectedModelId !== nextProps.selectedModelId) {
     return false;
   }
+
+  // Re-render if messages array length changed
   if (prevProps.messages.length !== nextProps.messages.length) {
     return false;
   }
+
+  // Re-render if messages content changed
   if (!equal(prevProps.messages, nextProps.messages)) {
     return false;
   }
+
+  // Re-render if votes changed
   if (!equal(prevProps.votes, nextProps.votes)) {
     return false;
   }
 
-  return false;
+  // Props are equal, skip re-render
+  return true;
 });

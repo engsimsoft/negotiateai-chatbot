@@ -8,11 +8,6 @@ import {
   streamText,
 } from "ai";
 import { unstable_cache as cache } from "next/cache";
-import { after } from "next/server";
-import {
-  createResumableStreamContext,
-  type ResumableStreamContext,
-} from "resumable-stream";
 import type { ModelCatalog } from "tokenlens/core";
 import { fetchModels } from "tokenlens/fetch";
 import { getUsage } from "tokenlens/helpers";
@@ -20,8 +15,9 @@ import { auth } from "@/app/(auth)/auth";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import type { ChatModel } from "@/lib/ai/models";
-import { type RequestHints, systemPrompt } from "@/lib/ai/prompts";
+import { type RequestHints, systemPrompt, loadAgentPrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
+import { getModelForAgent, getAgentById, type AgentId } from "@/lib/ai/agents";
 import { createDocument } from "@/lib/ai/tools/create-document";
 import { getCurrentDate } from "@/lib/ai/tools/get-current-date";
 import { getWeather } from "@/lib/ai/tools/get-weather";
@@ -49,8 +45,6 @@ import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
 export const maxDuration = 180; // 3 minutes - increased for complex document generation
 
-let globalStreamContext: ResumableStreamContext | null = null;
-
 const getTokenlensCatalog = cache(
   async (): Promise<ModelCatalog | undefined> => {
     try {
@@ -66,26 +60,6 @@ const getTokenlensCatalog = cache(
   ["tokenlens-catalog"],
   { revalidate: 24 * 60 * 60 } // 24 hours
 );
-
-export function getStreamContext() {
-  if (!globalStreamContext) {
-    try {
-      globalStreamContext = createResumableStreamContext({
-        waitUntil: after,
-      });
-    } catch (error: any) {
-      if (error.message.includes("REDIS_URL")) {
-        console.log(
-          " > Resumable streams are disabled due to missing REDIS_URL"
-        );
-      } else {
-        console.error(error);
-      }
-    }
-  }
-
-  return globalStreamContext;
-}
 
 export async function POST(request: Request) {
   let requestBody: PostRequestBody;
@@ -103,11 +77,13 @@ export async function POST(request: Request) {
       message,
       selectedChatModel,
       selectedVisibilityType,
+      agentId,
     }: {
       id: string;
       message: ChatMessage;
       selectedChatModel: ChatModel["id"];
       selectedVisibilityType: VisibilityType;
+      agentId?: string;
     } = requestBody;
 
     const session = await auth();
@@ -141,7 +117,30 @@ export async function POST(request: Request) {
         userId: session.user.id,
         title,
         visibility: selectedVisibilityType,
+        agentId,
       });
+
+      // Add greeting message from agent for new chats
+      if (agentId) {
+        const agent = getAgentById(agentId as AgentId);
+        if (agent?.greeting) {
+          await saveMessages({
+            messages: [
+              {
+                id: generateUUID(),
+                chatId: id,
+                role: "assistant",
+                parts: [{ type: "text", text: agent.greeting }],
+                attachments: [],
+                createdAt: new Date(),
+                tokenCount: estimateMessageTokens([
+                  { type: "text", text: agent.greeting },
+                ]),
+              },
+            ],
+          });
+        }
+      }
     }
 
     // Вычисляем токены нового user message
@@ -200,14 +199,32 @@ export async function POST(request: Request) {
 
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
-        // Load system prompt asynchronously
-        const systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
+        // Load system prompt: use agent prompt if agentId is provided, otherwise use default
+        let systemPromptText: string;
+        let modelToUse = selectedChatModel;
+
+        // Get agentId from chat if it exists (for existing chats)
+        const chatAgentId = chat?.agentId || agentId;
+
+        if (chatAgentId) {
+          try {
+            systemPromptText = await loadAgentPrompt(chatAgentId as AgentId);
+            // Use agent's default model if available
+            modelToUse = getModelForAgent(chatAgentId as AgentId) as ChatModel["id"];
+            console.log(`Using agent ${chatAgentId} with model ${modelToUse}`);
+          } catch (error) {
+            console.error(`Failed to load agent prompt for ${chatAgentId}, falling back to default:`, error);
+            systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
+          }
+        } else {
+          systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
+        }
 
         const startTime = Date.now();
         let firstTokenTime: number | null = null;
 
         const result = streamText({
-          model: myProvider.languageModel(selectedChatModel),
+          model: myProvider.languageModel(modelToUse),
           system: systemPromptText,
           messages: convertToModelMessages(uiMessages),
           // Gemini works best when creativity budget is not artificially limited
@@ -220,24 +237,15 @@ export async function POST(request: Request) {
             },
           },
           stopWhen: stepCountIs(5),
-          experimental_activeTools:
-            selectedChatModel === "claude-sonnet-4" || selectedChatModel === "claude-haiku-3.5"
-              ? [
-                  "getCurrentDate",
-                  "readDocument",
-                  "webSearch",
-                  "createDocument",
-                  "updateDocument",
-                  "requestSuggestions",
-                ]
-              : [
-                  "getWeather",
-                  "readDocument",
-                  "createDocument",
-                  "updateDocument",
-                  "requestSuggestions",
-                  "webSearch",
-                ],
+          experimental_activeTools: [
+            "getCurrentDate",
+            "getWeather",
+            "readDocument",
+            "webSearch",
+            "createDocument",
+            "updateDocument",
+            "requestSuggestions",
+          ],
           experimental_transform: smoothStream({ chunking: "word" }),
           tools: {
             getCurrentDate,
@@ -387,16 +395,6 @@ export async function POST(request: Request) {
         return "Oops, an error occurred!";
       },
     });
-
-    // const streamContext = getStreamContext();
-
-    // if (streamContext) {
-    //   return new Response(
-    //     await streamContext.resumableStream(streamId, () =>
-    //       stream.pipeThrough(new JsonToSseTransformStream())
-    //     )
-    //   );
-    // }
 
     return new Response(stream.pipeThrough(new JsonToSseTransformStream()));
   } catch (error) {

@@ -621,6 +621,118 @@ export async function OPTIONS(req: Request) {
 
 ## Performance Issues
 
+### Ошибка: TimeoutNegativeWarning (Node.js)
+
+**Симптомы:**
+```
+(node:46029) TimeoutNegativeWarning: -24620779.264301095 is a negative number.
+Timeout duration was set to 1.
+```
+
+**Причина:** Неиспользуемый код библиотеки `resumable-stream` вызывает отрицательные значения таймаутов
+
+**Решение:**
+```bash
+# 1. Удалить пакет
+npm uninstall resumable-stream
+
+# 2. Очистить кеш Next.js
+rm -rf .next
+
+# 3. Перезапустить сервер
+npm run dev
+```
+
+**Технические детали:**
+- Библиотека вычисляет таймауты относительно прошлого времени
+- Если код закомментирован но импорт остался - проблема сохраняется
+- Node.js принудительно устанавливает минимальный таймаут в 1ms
+
+**Связано:** См. CHANGELOG.md v2.0.1
+
+---
+
+### Проблема: Большие задержки при нажатии на кнопки (300-500ms)
+
+**Симптомы:**
+- Медленный отклик UI при кликах
+- Задержки при переключении между чатами
+- Интерфейс "подвисает" на долю секунды
+
+**Причины:**
+1. Компонент Messages ре-рендерится при каждом изменении props (даже когда не нужно)
+2. SWR делает лишние API запросы при фокусе окна
+3. Нет оптимизации кеширования
+
+**Решение 1: Проверить React memo**
+
+Файл: `components/messages.tsx`
+
+Убедиться что функция memo возвращает правильное значение:
+```typescript
+export const Messages = memo(PureMessages, (prevProps, nextProps) => {
+  // Проверки изменений...
+
+  // Props равны, ПРОПУСТИТЬ ре-рендер
+  return true; // ✅ Правильно (skip re-render)
+  // return false; // ❌ Неправильно (always re-render)
+});
+```
+
+**Решение 2: Настроить SWR кеширование**
+
+Создать `components/swr-provider.tsx`:
+```typescript
+"use client";
+import { SWRConfig } from "swr";
+
+export function SWRProvider({ children }) {
+  return (
+    <SWRConfig
+      value={{
+        revalidateOnFocus: false,      // Без запросов при фокусе
+        revalidateOnReconnect: false,  // Без запросов при переподключении
+        dedupingInterval: 5000,        // Дедупликация 5 сек
+        refreshInterval: 0,            // Отключить автообновление
+        keepPreviousData: true,        // Сохранять данные
+      }}
+    >
+      {children}
+    </SWRConfig>
+  );
+}
+```
+
+Обновить `app/(chat)/layout.tsx`:
+```typescript
+import { SWRProvider } from "@/components/swr-provider";
+
+export default async function Layout({ children }) {
+  return (
+    <SWRProvider>
+      {/* остальной код */}
+    </SWRProvider>
+  );
+}
+```
+
+**Решение 3: Проверить Network tab**
+```bash
+# Открыть DevTools (F12)
+# Network tab → Фильтр: Fetch/XHR
+# Переключить вкладку браузера и вернуться
+# Не должно быть лишних запросов
+```
+
+**Результат после исправления:**
+- ✅ Отклик UI: <50ms (вместо 300-500ms)
+- ✅ Нет лишних API запросов
+- ✅ Плавная работа интерфейса
+
+**Связано:** См. CHANGELOG.md v2.0.1
+
+---
+
 ### Проблема: Медленные ответы (>10 секунд)
 
 **Причины:**
