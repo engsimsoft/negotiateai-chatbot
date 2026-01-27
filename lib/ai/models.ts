@@ -16,21 +16,21 @@ export const chatModels: ChatModel[] = [
     name: "Авто (рекомендуется)",
     description: "Автоматический выбор модели на основе агента",
     pricing: {
-      input: "Gemini 3 Pro / 2.5 Flash",
-      output: "Зависит от агента",
+      input: "Зависит от агента",
+      output: "$2-12 (3 Pro) / $0.075-0.30 (Flash)",
     },
   },
   {
-    id: "claude-sonnet-4",
-    name: "Gemini 2.5 Pro",
-    description: "Единая модель для всех агентов (артефакты)",
+    id: "gemini-3-pro",
+    name: "Gemini 3 Pro",
+    description: "Профессиональная модель с dynamic thinking",
     pricing: {
-      input: "$1.25",
-      output: "$5",
+      input: "$2",
+      output: "$12",
     },
   },
   {
-    id: "claude-haiku-3.5",
+    id: "gemini-2.5-flash",
     name: "Gemini 2.5 Flash",
     description: "Быстрая модель для простых задач",
     pricing: {
