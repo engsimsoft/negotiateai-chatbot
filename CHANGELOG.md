@@ -11,9 +11,20 @@
 - Этап 2: Авторизация и роли (удаление guest режима, добавление ролей в БД, seed скрипт)
 - Этап 3: Персонализация (динамические промпты по ролям, система персональных проектов)
 
-## [2.0.1] - 2026-01-27 - Performance Optimization
+## [2.0.1] - 2026-01-27 - Performance Optimization & Auth Fix
 
 ### Fixed
+- ✅ **КРИТИЧЕСКАЯ ОШИБКА: Кнопка "Sign in" не реагирует на клики**
+  - Проблема: Кнопка входа не отправляет форму при нажатии
+  - Причина: Использовался `Form` из `next/form` (серверный компонент)
+  - `useFormStatus()` в SubmitButton не работает с серверными формами
+  - Файл: [components/auth-form.tsx](components/auth-form.tsx)
+  - Решение:
+    - Добавлена директива `"use client"`
+    - Заменён `<Form>` на обычный HTML `<form>`
+    - Удалён импорт `next/form`
+  - Результат: Форма входа работает корректно ✅
+
 - ✅ **КРИТИЧЕСКАЯ ОШИБКА: TimeoutNegativeWarning устранена**
   - Проблема: `TimeoutNegativeWarning: -24620779.264301095 is a negative number`
   - Причина: Неиспользуемый код библиотеки `resumable-stream`
@@ -97,6 +108,7 @@
 - Блокировали UI на время выполнения запросов
 
 ### Files Changed
+- [components/auth-form.tsx](components/auth-form.tsx): исправлена форма входа (добавлен "use client", form вместо Form)
 - [app/(chat)/api/chat/route.ts](app/(chat)/api/chat/route.ts): -27 строк (удален мёртвый код)
 - [app/(chat)/api/chat/[id]/stream/route.ts](app/(chat)/api/chat/[id]/stream/route.ts): -100 строк (упрощён)
 - [components/messages.tsx](components/messages.tsx): +6 строк (добавлены комментарии, исправлено возвращаемое значение)
