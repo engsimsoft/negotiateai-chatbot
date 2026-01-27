@@ -18,9 +18,9 @@
 
 ## Текущий статус
 
-- **Этап:** Этап 2 / 4 — Public Share инфраструктура ✅
-- **Прогресс:** 45/78 задач (58%)
-- **Следующее:** Этап 3, Фаза 3.1 — Исследование Reveal.js
+- **Этап:** Этап 3 / 4 — Presentation-Reveal
+- **Прогресс:** 60/78 задач (77%)
+- **Следующее:** Этап 3, Фаза 3.7 — Тестирование
 
 ---
 
@@ -221,119 +221,58 @@ lib/
 
 ---
 
-#### Фаза 3.1: Исследование Reveal.js (2-3 часа)
+#### Фаза 3.1: Исследование Reveal.js (2-3 часа) ✅
 
-- [ ] Изучить [Reveal.js документацию](https://revealjs.com/)
-- [ ] Изучить [демо](https://revealjs.com/demo/)
-- [ ] Выбрать способ подключения:
-  - CDN (проще, но зависимость)
-  - npm (сложнее, но контроль)
-  - Рекомендация: CDN для начала
-- [ ] Прототип: создать простую презентацию в Next.js iframe
+- [x] Изучить Reveal.js документацию
+- [x] Выбрать способ подключения: **CDN (jsdelivr)**
+- [x] Решение: iframe с srcDoc для изоляции
 
 ---
 
-#### Фаза 3.2: Система тем (3-4 часа)
+#### Фаза 3.2: Система тем (3-4 часа) ✅
 
-- [ ] Создать `lib/presentations/themes.ts`:
-  ```typescript
-  export const revealThemes = {
-    corporate: { /* синий, строгий */ },
-    modern: { /* градиенты, яркий */ },
-    minimal: { /* белый, чистый */ },
-    dark: { /* тёмный фон */ },
-    creative: { /* нестандартный */ }
-  }
-  ```
-- [ ] Для каждой темы:
-  - Цветовая палитра (primary, secondary, background, text)
-  - Шрифты (Google Fonts)
-  - CSS стили
-- [ ] Тип темы:
-  ```typescript
-  interface RevealTheme {
-    id: string;
-    name: string;
-    colors: { primary, secondary, background, text };
-    fonts: { heading, body };
-    css: string;
-  }
-  ```
+- [x] Создать `lib/presentations/themes.ts`
+- [x] 5 тем: corporate, modern, minimal, dark, creative
+- [x] Для каждой темы: colors, fonts, CSS
+- [x] Функции: getThemeById, getThemeCSS, generateRevealHTML
 
 ---
 
-#### Фаза 3.3: Server handler (3-4 часа)
+#### Фаза 3.3: Server handler (3-4 часа) ✅
 
-- [ ] Создать `artifacts/presentation-reveal/server.ts`:
-  ```typescript
-  export const revealDocumentHandler = createDocumentHandler<"presentation-reveal">({
-    kind: "presentation-reveal",
-    onCreateDocument: async ({ title, dataStream }) => {
-      // 1. Генерация структуры слайдов через AI
-      // 2. Применение темы
-      // 3. Сборка HTML с Reveal.js
-      // 4. Streaming
-    }
-  });
-  ```
-- [ ] Промпт для AI (генерация JSON структуры слайдов):
-  ```
-  Генерируй массив слайдов:
-  [
-    { type: "title", title: "...", subtitle: "..." },
-    { type: "content", title: "...", bullets: [...] },
-    { type: "image", title: "...", imageUrl: "..." },
-    ...
-  ]
-  ```
-- [ ] Шаблон Reveal.js HTML (с CDN)
-- [ ] Регистрация в `lib/artifacts/server.ts`
+- [x] Создать `artifacts/presentation-reveal/server.ts`
+- [x] AI генерирует JSON массив слайдов
+- [x] Типы слайдов: title, bullets, content, quote, end
+- [x] Автовыбор темы по заголовку
+- [x] Streaming data-presentationDelta
+- [x] Регистрация в `lib/artifacts/server.ts`
 
 ---
 
-#### Фаза 3.4: Client component (4-5 часов)
+#### Фаза 3.4: Client component (4-5 часов) ✅
 
-- [ ] Создать `artifacts/presentation-reveal/client.tsx`:
-  ```typescript
-  export const revealArtifact = new Artifact<"presentation-reveal", Metadata>({
-    kind: "presentation-reveal",
-    content: ({ content }) => {
-      return (
-        <iframe
-          srcDoc={content}
-          className="w-full h-full"
-          sandbox="allow-scripts"
-        />
-      );
-    }
-  });
-  ```
-- [ ] Обработка streaming (показ по мере генерации)
-- [ ] Инициализация Reveal.js в iframe
-- [ ] Навигация стрелками (keyboard events)
-- [ ] Плавные переходы между слайдами
+- [x] Создать `artifacts/presentation-reveal/client.tsx`
+- [x] iframe с srcDoc для рендеринга
+- [x] Обработка streaming
+- [x] Loading state во время генерации
 
 ---
 
-#### Фаза 3.5: Actions (2-3 часа)
+#### Фаза 3.5: Actions (2-3 часа) ✅
 
-- [ ] Кнопка "Fullscreen":
-  ```typescript
-  onClick: () => {
-    iframeRef.current?.requestFullscreen();
-  }
-  ```
-- [ ] Кнопка "Share" (использует Public Share из Этапа 2)
-- [ ] Опционально: "Download PDF" (через Reveal.js export)
+- [x] Кнопка "Fullscreen"
+- [x] Кнопка "Share" (Public Share)
+- [x] Кнопка "Copy HTML"
+- [x] Версионирование (Undo/Redo)
 
 ---
 
-#### Фаза 3.6: Интеграция с AI (2-3 часа)
+#### Фаза 3.6: Интеграция с AI (2-3 часа) ✅
 
-- [ ] Обновить `lib/ai/tools/create-document.ts`:
-  - Добавить `presentation-reveal` в enum `kind`
-- [ ] Обновить промпт AI чтобы он знал о новом типе
-- [ ] Тест: попросить AI создать презентацию
+- [x] Обновить schema.ts (kind enum)
+- [x] artifactKinds автоматически подхватывает новый тип
+- [x] Обновить system-prompt.md с инструкциями
+- [x] Обновить document-preview.tsx
 
 ---
 
@@ -609,7 +548,12 @@ lib/
   - Добавлен CheckIcon в icons.tsx
 - [X] Завершена Фаза 2.6 — Тестирование ✅
   - Все тесты пройдены (manual)
-- ⏸️ Следующее: Этап 3, Фаза 3.1 — Исследование Reveal.js
+- [X] Завершены Фазы 3.1-3.6 — Presentation-Reveal
+  - lib/presentations/themes.ts — 5 тем
+  - artifacts/presentation-reveal/server.ts — AI генерация слайдов
+  - artifacts/presentation-reveal/client.tsx — iframe рендеринг
+  - Обновлены: schema.ts, lib/types.ts, artifact.tsx, system-prompt.md
+- ⏸️ Следующее: Этап 3, Фаза 3.7 — Тестирование
 
 ---
 

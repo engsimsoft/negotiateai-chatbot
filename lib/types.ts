@@ -33,8 +33,12 @@ export type ChatTools = {
 export type CustomUIDataTypes = {
   textDelta: string;
   imageDelta: string;
-  sheetDelta: string;
-  codeDelta: string;
+  presentationDelta: {
+    jsonContent?: string;
+    themeId?: string;
+    html?: string;
+    isComplete?: boolean;
+  };
   suggestion: Suggestion;
   appendMessage: string;
   id: string;

@@ -13,6 +13,7 @@ import {
 import useSWR, { useSWRConfig } from "swr";
 import { useDebounceCallback, useWindowSize } from "usehooks-ts";
 import { imageArtifact } from "@/artifacts/image/client";
+import { presentationRevealArtifact } from "@/artifacts/presentation-reveal/client";
 import { textArtifact } from "@/artifacts/text/client";
 import { useArtifact } from "@/hooks/use-artifact";
 import { usePerformance } from "@/hooks/use-performance";
@@ -31,6 +32,7 @@ import type { VisibilityType } from "./visibility-selector";
 export const artifactDefinitions = [
   textArtifact,
   imageArtifact,
+  presentationRevealArtifact,
 ];
 export type ArtifactKind = (typeof artifactDefinitions)[number]["kind"];
 
