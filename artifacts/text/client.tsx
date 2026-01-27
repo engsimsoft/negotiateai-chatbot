@@ -7,6 +7,7 @@ import {
   CopyIcon,
   DownloadIcon,
   RedoIcon,
+  ShareIcon,
   UndoIcon,
 } from "@/components/icons";
 import { PlainTextEditor } from "@/components/plain-text-editor";
@@ -129,6 +130,13 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
         a.click();
         URL.revokeObjectURL(url);
         toast.success("Downloaded!");
+      },
+    },
+    {
+      icon: <ShareIcon size={18} />,
+      description: "Share document",
+      onClick: ({ openShareModal }) => {
+        openShareModal();
       },
     },
   ],

@@ -92,6 +92,9 @@ export function DocumentPreview({
           id: artifact.documentId,
           createdAt: new Date(),
           userId: "noop",
+          isPublic: false,
+          shareToken: null,
+          sharedAt: null,
         }
       : null;
 

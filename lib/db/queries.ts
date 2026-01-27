@@ -77,6 +77,7 @@ export async function saveChat({
   agentId?: string;
 }) {
   try {
+    console.log('[saveChat] Attempting to save chat:', { id, userId, title, visibility, agentId });
     return await db.insert(chat).values({
       id,
       createdAt: new Date(),
@@ -85,7 +86,8 @@ export async function saveChat({
       visibility,
       agentId,
     });
-  } catch (_error) {
+  } catch (error) {
+    console.error('[saveChat] Database error:', error);
     throw new ChatSDKError("bad_request:database", "Failed to save chat");
   }
 }
@@ -645,6 +647,176 @@ export async function getStreamIdsByChatId({ chatId }: { chatId: string }) {
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get stream ids by chat id"
+    );
+  }
+}
+
+// ============================================
+// Public Share Functions
+// ============================================
+
+/**
+ * Generate a unique share token (32 characters)
+ */
+function generateShareToken(): string {
+  return generateUUID().replace(/-/g, "");
+}
+
+/**
+ * Create a public share link for a document.
+ * Only the document owner can share it.
+ */
+export async function shareDocument({
+  documentId,
+  userId,
+}: {
+  documentId: string;
+  userId: string;
+}) {
+  try {
+    // Get the latest version of the document
+    const latestDoc = await getDocumentById({ id: documentId });
+
+    if (!latestDoc) {
+      throw new ChatSDKError("not_found:database", "Document not found");
+    }
+
+    // Verify ownership
+    if (latestDoc.userId !== userId) {
+      throw new ChatSDKError(
+        "forbidden:database",
+        "Only the document owner can share it"
+      );
+    }
+
+    // If already shared, return existing token
+    if (latestDoc.isPublic && latestDoc.shareToken) {
+      return {
+        shareToken: latestDoc.shareToken,
+        alreadyShared: true,
+      };
+    }
+
+    // Generate new share token
+    const shareToken = generateShareToken();
+
+    // Update the document with share info
+    await db
+      .update(document)
+      .set({
+        isPublic: true,
+        shareToken,
+        sharedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(document.id, documentId),
+          eq(document.createdAt, latestDoc.createdAt)
+        )
+      );
+
+    return {
+      shareToken,
+      alreadyShared: false,
+    };
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError("bad_request:database", "Failed to share document");
+  }
+}
+
+/**
+ * Revoke a public share link for a document.
+ * Only the document owner can unshare it.
+ */
+export async function unshareDocument({
+  documentId,
+  userId,
+}: {
+  documentId: string;
+  userId: string;
+}) {
+  try {
+    // Get the latest version of the document
+    const latestDoc = await getDocumentById({ id: documentId });
+
+    if (!latestDoc) {
+      throw new ChatSDKError("not_found:database", "Document not found");
+    }
+
+    // Verify ownership
+    if (latestDoc.userId !== userId) {
+      throw new ChatSDKError(
+        "forbidden:database",
+        "Only the document owner can unshare it"
+      );
+    }
+
+    // If not shared, nothing to do
+    if (!latestDoc.isPublic) {
+      return { wasShared: false };
+    }
+
+    // Remove share info
+    await db
+      .update(document)
+      .set({
+        isPublic: false,
+        shareToken: null,
+        sharedAt: null,
+      })
+      .where(
+        and(
+          eq(document.id, documentId),
+          eq(document.createdAt, latestDoc.createdAt)
+        )
+      );
+
+    return { wasShared: true };
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to unshare document"
+    );
+  }
+}
+
+/**
+ * Get a document by its public share token.
+ * No authentication required - this is for public access.
+ */
+export async function getPublicDocument({ token }: { token: string }) {
+  try {
+    // Find document by share token
+    const [sharedDoc] = await db
+      .select()
+      .from(document)
+      .where(and(eq(document.shareToken, token), eq(document.isPublic, true)))
+      .orderBy(desc(document.createdAt))
+      .limit(1);
+
+    if (!sharedDoc) {
+      return null;
+    }
+
+    // Return only public-safe fields (no userId for privacy)
+    return {
+      id: sharedDoc.id,
+      title: sharedDoc.title,
+      content: sharedDoc.content,
+      kind: sharedDoc.kind,
+      createdAt: sharedDoc.createdAt,
+      sharedAt: sharedDoc.sharedAt,
+    };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get public document"
     );
   }
 }

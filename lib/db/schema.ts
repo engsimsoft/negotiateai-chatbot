@@ -125,6 +125,10 @@ export const document = pgTable(
     userId: uuid("userId")
       .notNull()
       .references(() => user.id),
+    // Public share fields
+    isPublic: boolean("is_public").notNull().default(false),
+    shareToken: varchar("share_token", { length: 32 }).unique(),
+    sharedAt: timestamp("shared_at"),
   },
   (table) => {
     return {

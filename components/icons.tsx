@@ -912,6 +912,25 @@ export const CheckCircleFillIcon = ({ size = 16 }: { size?: number }) => {
   );
 };
 
+export const CheckIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    height={size}
+    strokeLinejoin="round"
+    style={{ color: "currentcolor" }}
+    viewBox="0 0 16 16"
+    width={size}
+  >
+    <path
+      d="M13.5 3L6 12L2.5 8.5"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+    />
+  </svg>
+);
+
 export const GlobeIcon = ({ size = 16 }: { size?: number }) => {
   return (
     <svg
