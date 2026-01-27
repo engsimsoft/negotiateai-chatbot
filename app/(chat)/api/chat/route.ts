@@ -209,9 +209,16 @@ export async function POST(request: Request) {
         if (chatAgentId) {
           try {
             systemPromptText = await loadAgentPrompt(chatAgentId as AgentId);
-            // Use agent's default model if available
-            modelToUse = getModelForAgent(chatAgentId as AgentId) as ChatModel["id"];
-            console.log(`Using agent ${chatAgentId} with model ${modelToUse}`);
+
+            // Model selection logic:
+            // - "auto" → use agent's default model (auto-selection based on task)
+            // - other → use user's explicit choice (override agent's default)
+            if (selectedChatModel === "auto") {
+              modelToUse = getModelForAgent(chatAgentId as AgentId) as ChatModel["id"];
+              console.log(`[Auto] Using agent ${chatAgentId} with model ${modelToUse}`);
+            } else {
+              console.log(`[Manual] Using agent ${chatAgentId} with user-selected model ${modelToUse}`);
+            }
           } catch (error) {
             console.error(`Failed to load agent prompt for ${chatAgentId}, falling back to default:`, error);
             systemPromptText = await systemPrompt({ selectedChatModel, requestHints });

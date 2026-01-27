@@ -273,6 +273,7 @@ export function Chat({
           isReadonly={isReadonly}
           selectedVisibilityType={initialVisibilityType}
           agentId={effectiveAgentId}
+          selectedModelId={currentModelId}
         />
 
         <Messages

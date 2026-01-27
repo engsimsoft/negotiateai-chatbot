@@ -8,18 +8,27 @@ import { Button } from "@/components/ui/button";
 import { PlusIcon } from "./icons";
 import { useSidebar } from "./ui/sidebar";
 import { VisibilitySelector, type VisibilityType } from "./visibility-selector";
-import { getAgentById, type AgentId } from "@/lib/ai/agents";
+import { getAgentById, getModelForAgent, type AgentId } from "@/lib/ai/agents";
+import { chatModels } from "@/lib/ai/models";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 function PureChatHeader({
   chatId,
   selectedVisibilityType,
   isReadonly,
   agentId,
+  selectedModelId,
 }: {
   chatId: string;
   selectedVisibilityType: VisibilityType;
   isReadonly: boolean;
   agentId?: string;
+  selectedModelId: string;
 }) {
   const router = useRouter();
   const { open } = useSidebar();
@@ -27,6 +36,22 @@ function PureChatHeader({
 
   // Get agent info if agentId is provided
   const agent = agentId ? getAgentById(agentId as AgentId) : null;
+
+  // Determine actual model being used
+  const actualModelId =
+    selectedModelId === "auto" && agentId
+      ? getModelForAgent(agentId as AgentId)
+      : selectedModelId;
+
+  // Get model display name
+  const modelInfo = chatModels.find((m) => m.id === actualModelId);
+  const modelDisplayName = modelInfo?.name || "Unknown";
+
+  // Tooltip text
+  const tooltipText =
+    selectedModelId === "auto"
+      ? `Авто: ${modelDisplayName} (оптимально для этого агента)`
+      : `Выбрано вручную: ${modelDisplayName}`;
 
   return (
     <header className="sticky top-0 flex items-center gap-2 bg-background px-2 py-1.5 md:px-2">
@@ -40,6 +65,24 @@ function PureChatHeader({
           <span className="hidden md:inline">{agent.name}</span>
         </div>
       )}
+
+      {/* Model indicator badge */}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+              <span className="hidden sm:inline">🤖</span>
+              <span className="hidden lg:inline">{modelDisplayName}</span>
+              <span className="lg:hidden">
+                {selectedModelId === "auto" ? "Авто" : modelDisplayName.split(" ")[0]}
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-xs">{tooltipText}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       {(!open || windowWidth < 768) && (
         <Button
@@ -71,6 +114,7 @@ export const ChatHeader = memo(PureChatHeader, (prevProps, nextProps) => {
     prevProps.chatId === nextProps.chatId &&
     prevProps.selectedVisibilityType === nextProps.selectedVisibilityType &&
     prevProps.isReadonly === nextProps.isReadonly &&
-    prevProps.agentId === nextProps.agentId
+    prevProps.agentId === nextProps.agentId &&
+    prevProps.selectedModelId === nextProps.selectedModelId
   );
 });
