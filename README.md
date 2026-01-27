@@ -58,6 +58,25 @@ npm run dev  # http://localhost:3000
 
 ---
 
+## 🔑 Тестовые пользователи
+
+После установки создай тестовых пользователей:
+
+```bash
+npm run db:seed
+```
+
+**Учетные данные для входа:**
+
+| Email | Пароль | Роль |
+|-------|--------|------|
+| `vladimir@family.local` | `change-me-vladimir` | engineer |
+| `julia@family.local` | `change-me-julia` | marketer |
+
+⚠️ **Важно:** Смени пароли после первого входа!
+
+---
+
 ## 🔧 Технологии
 
 - **Frontend:** Next.js 15.3 (App Router, RSC)

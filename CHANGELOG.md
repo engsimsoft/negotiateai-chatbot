@@ -13,6 +13,195 @@
 
 ---
 
+## [2.1.4] - 2026-01-27 - Documentation: User Credentials Added
+
+**PATCH RELEASE**: Добавлена документация о предустановленных пользователях для входа.
+
+### Summary
+
+Добавлена информация об учетных данных для тестовых пользователей в основную документацию ([README.md](README.md), [docs/setup.md](docs/setup.md)). Теперь после установки и запуска `npm run db:seed` пользователи знают, как войти в систему.
+
+### Added
+
+#### 📝 Раздел "Тестовые пользователи" в README.md
+- **Файл**: [README.md:60-76](README.md#L60-L76)
+- **Добавлено**:
+  - Новый раздел "🔑 Тестовые пользователи" после "Быстрый старт"
+  - Команда для создания пользователей: `npm run db:seed`
+  - Таблица с учетными данными (email, пароль, роль)
+  - Предупреждение о смене паролей после первого входа
+
+#### 📝 Шаг 5.3: Создание тестовых пользователей в setup.md
+- **Файл**: [docs/setup.md:156-177](docs/setup.md#L156-L177)
+- **Добавлено**:
+  - Новый раздел "5.3 Создание тестовых пользователей" после "5.2 Проверка БД"
+  - Команда для local БД: `npm run db:seed`
+  - Команда для production БД: `source .env.production && npm run db:seed`
+  - Таблица с учетными данными
+  - Примечание о том, что это семейный чат-бот для 2 пользователей (без открытой регистрации)
+
+### Changed
+
+#### 📝 Обновлен раздел "Следующие шаги" в setup.md
+- **Файл**: [docs/setup.md:306](docs/setup.md#L306)
+- **Изменения**:
+  - Было: "3. **Добавь пользователей** - создай seed скрипт или используй Drizzle Studio"
+  - Стало: "3. **Тестируй систему** - используй предустановленных пользователей (см. Шаг 5.3)"
+- **Результат**: Пользователи знают, что seed скрипт уже существует и его нужно просто запустить
+
+### Production Database
+
+#### ✅ Production БД полностью подготовлена
+- Все legacy данные MIR.TRADE удалены
+- Миграции применены (9 таблиц созданы)
+- 2 пользователя созданы через `npm run db:seed`:
+  - `vladimir@family.local` (engineer) - пароль: `change-me-vladimir`
+  - `julia@family.local` (marketer) - пароль: `change-me-julia`
+- БД готова к использованию
+
+### Deployment
+
+**Production URL**: https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
+
+**Готово к тестированию:**
+- ✅ Вход с предустановленными учетными данными
+- ✅ Система из 8 AI-агентов с role-based фильтрацией
+- ✅ UI индикатор модели (badge "Auto", "Gemini 3 Pro", etc.)
+- ✅ Автоматический выбор модели для каждого агента
+
+---
+
+## [2.1.3] - 2026-01-27 - Complete Removal of Legacy Claude IDs
+
+**PATCH RELEASE**: Полное удаление всех упоминаний legacy Claude model IDs из кодовой базы.
+
+### Summary
+
+Удалены все упоминания старых Claude model IDs (`claude-sonnet-4`, `claude-haiku-3.5`) из production кода. Проект теперь использует только Google Gemini модели без legacy маппингов. Обновлена документация с актуальными примерами для Google Gemini API.
+
+### Removed
+
+#### 🗑️ Legacy Claude model IDs полностью удалены
+- **Файл**: [lib/ai/providers.ts](lib/ai/providers.ts)
+- **Удалено**:
+  - Комментарий про "Legacy ID сохранены для обратной совместимости"
+  - `claude-sonnet-4` и `claude-haiku-3.5` из test mode (строки 36-37)
+  - `claude-sonnet-4` и `claude-haiku-3.5` из production mode (строки 53-54)
+  - Комментарии "Legacy model IDs (backward compatibility для старых чатов в БД)"
+  - Комментарии "Старые чаты, артефакты"
+- **Причина**: Старые чаты не используются, проект чистый
+
+#### 🗑️ Legacy IDs удалены из API schema
+- **Файл**: [app/(chat)/api/chat/schema.ts](app/(chat)/api/chat/schema.ts)
+- **Удалено**:
+  - `claude-sonnet-4` и `claude-haiku-3.5` из валидации Zod schema (строки 36-37)
+  - Комментарий "Legacy IDs (обратная совместимость для старых чатов в БД)"
+- **Результат**: API теперь принимает только `auto`, `gemini-3-pro`, `gemini-2.5-flash`
+
+### Changed
+
+#### 📝 Обновлена документация моделей
+- **Файл**: [docs/ai-capabilities.md:324](docs/ai-capabilities.md#L324)
+- **Изменения**:
+  - Строка про "Gemini 2.5 Pro | `claude-sonnet-4` | Артефакты (legacy) | - | Устаревший ID"
+  - Заменена на: "Gemini 2.5 Pro | `gemini-2.5-pro` | Артефакты (suggestions) | - | Используется для генерации suggestions"
+- **Результат**: Таблица моделей теперь показывает только актуальные Google Gemini IDs
+
+#### 📝 Обновлены примеры troubleshooting
+- **Файл**: [docs/troubleshooting.md:895-911,937-948](docs/troubleshooting.md#L895-L911)
+- **Удалено**:
+  - Пример с Anthropic prompt caching (`claude-sonnet-4-5-20250929`)
+  - Упоминание "Claude может вызывать несколько tools"
+  - cURL пример для Anthropic API
+- **Добавлено**:
+  - Описание caching промптов в памяти (Map cache)
+  - Упоминание "Google Gemini может вызывать несколько tools"
+  - cURL пример для Google Gemini API (`gemini-2.5-flash:generateContent`)
+
+### Documentation
+
+#### ✅ Проект полностью свободен от legacy кода
+- Все упоминания Anthropic/Claude удалены из production кода
+- Только Google Gemini модели: `gemini-3-pro`, `gemini-2.5-flash`, `gemini-2.5-pro`
+- Документация обновлена с актуальными примерами
+- API schema валидирует только актуальные model IDs
+
+### Files Changed
+- `lib/ai/providers.ts` - удалены legacy IDs (4 строки)
+- `app/(chat)/api/chat/schema.ts` - удалены legacy IDs из валидации (3 строки)
+- `docs/ai-capabilities.md` - обновлена таблица моделей (1 строка)
+- `docs/troubleshooting.md` - обновлены примеры на Gemini API (15+ строк)
+- `CHANGELOG.md` - этот changelog
+
+---
+
+## [2.1.2] - 2026-01-27 - Legacy Code Cleanup & ADR Documentation
+
+**PATCH RELEASE**: Очистка legacy кода от старого проекта (MIR.TRADE) и создание ADR для системы агентов.
+
+### Summary
+
+Проведена полная зачистка legacy кода и комментариев от проекта MIR.TRADE. Создан ADR 004 документирующий архитектурное решение о системе из 8 специализированных агентов. Обновлена документация в соответствии с принципами SSOT (Single Source of Truth).
+
+### Changed
+
+#### 🧹 Очистка legacy кода от MIR.TRADE
+- **Файл**: [lib/ai/prompts.ts:41,136](lib/ai/prompts.ts#L41)
+- **Изменения**:
+  - Fallback промпт изменен с "NegotiateAI Assistant for MIR.TRADE project" на "Family AI Assistant"
+  - Комментарий обновлен: "For NegotiateAI" → "For Family AI Assistant"
+- **Файл**: [system-prompt.md](system-prompt.md) - **ПОЛНОСТЬЮ ПЕРЕПИСАН**
+  - Старый промпт для MIR.TRADE (580 строк про проект Ольги Илюхиной) удален
+  - Создан новый минималистичный промпт для Family AI Assistant
+  - Фокус на универсальном помощнике для семьи (fallback для чатов без агента)
+  - Сохранены все инструкции по использованию инструментов (read_document, webSearch, artifacts)
+  - Размер: 227 строк (было 580) - оптимизирован для clarity
+
+### Added
+
+#### 📋 ADR 004: Agent System Decision
+- **Файл**: [docs/decisions/004-agent-system.md](docs/decisions/004-agent-system.md)
+- **Содержание**:
+  - **Контекст**: Почему нужна была персонализация, проблемы с единым промптом
+  - **Решение**: 8 специализированных агентов с автоматическим выбором модели
+  - **Причины**: Персонализация, оптимизация затрат, разделение ответственности
+  - **Последствия**: Плюсы (качество, экономия) и минусы (больше файлов, сложнее поддержка)
+  - **Альтернативы рассмотренные**:
+    1. Единый универсальный промпт (старый подход)
+    2. Dynamic prompts (генерация на лету)
+    3. Больше агентов (10+)
+    4. Меньше агентов (3-5)
+  - **Технические детали**: Промпты, выбор модели, персонализация, кеширование
+  - **Lessons learned**: Специализация лучше универсальности, автовыбор модели оптимизирует затраты
+  - **Будущие улучшения**: Привязка к проектам, AI reasoning, память агента, custom агенты
+
+#### 🔗 Обновлена документация
+- **Файл**: [docs/ai-capabilities.md:14-18](docs/ai-capabilities.md#L14-L18)
+- **Изменения**:
+  - Добавлена ссылка на ADR 004 в начале раздела "Специализированные AI-агенты"
+  - Формат: blockquote с пояснением контекста решения
+  - Соответствует принципу SSOT: ADR объясняет "почему", ai-capabilities описывает "что"
+
+### Documentation
+
+#### ✅ Соответствие DOCUMENTATION_GUIDE.md
+- ADR создан согласно шаблону из [DOCUMENTATION_GUIDE.md:346-374](DOCUMENTATION_GUIDE.md#L346-L374)
+- ai-capabilities.md не удален (это reference документация, не дублирование)
+- Разделение ответственности:
+  - **ADR 004** - "почему мы так решили" (design decision history)
+  - **ai-capabilities.md** - "что у нас есть сейчас" (current state reference)
+- Обновлен ROADMAP.md (задачи Этапа 3 завершены)
+
+### Files Changed
+- `lib/ai/prompts.ts` - 2 строки (очистка от MIR.TRADE)
+- `system-prompt.md` - полная перезапись (227 строк вместо 580)
+- `docs/decisions/004-agent-system.md` - новый файл (318 строк)
+- `docs/ai-capabilities.md` - добавлена ссылка на ADR 004
+- `CHANGELOG.md` - этот changelog
+- `ROADMAP.md` - отмечены выполненные задачи Этапа 3
+
+---
+
 ## [2.1.1] - 2026-01-27 - UI Model Indicator & Auto Mode Default
 
 **MINOR RELEASE**: Улучшения UX для системы выбора AI моделей.
