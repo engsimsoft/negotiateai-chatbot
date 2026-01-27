@@ -10,8 +10,30 @@ export const textDocumentHandler = createDocumentHandler<"text">({
 
     const { fullStream } = streamText({
       model: myProvider.languageModel("artifact-model"),
-      system:
-        "Write about the given topic. Markdown is supported. Use headings wherever appropriate.",
+      system: `Write about the given topic in PLAIN TEXT format.
+
+IMPORTANT RULES:
+- DO NOT use Markdown formatting (no #, **, *, -, etc.)
+- Use emoji for visual structure instead of bullets: ✅ 📌 🔹 💡 ⭐ 🎯
+- Use blank lines to separate sections
+- Use CAPS or emoji for section titles instead of ## headers
+- Text must copy-paste perfectly to VK, Telegram, Instagram
+- Keep formatting simple and clean
+
+Example format:
+🎯 ЗАГОЛОВОК
+
+Первый параграф текста здесь.
+
+📌 ВАЖНЫЕ ПУНКТЫ
+
+✅ Первый пункт
+✅ Второй пункт
+✅ Третий пункт
+
+💡 ИТОГ
+
+Заключительный текст.`,
       experimental_transform: smoothStream({ chunking: "word" }),
       prompt: title,
     });

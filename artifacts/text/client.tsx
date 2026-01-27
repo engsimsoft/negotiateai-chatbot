@@ -5,38 +5,19 @@ import { DocumentSkeleton } from "@/components/document-skeleton";
 import {
   ClockRewind,
   CopyIcon,
-  MessageIcon,
-  PenIcon,
+  DownloadIcon,
   RedoIcon,
   UndoIcon,
 } from "@/components/icons";
-import { Editor } from "@/components/text-editor";
-import type { Suggestion } from "@/lib/db/schema";
-import { getSuggestions } from "../actions";
+import { PlainTextEditor } from "@/components/plain-text-editor";
 
-type TextArtifactMetadata = {
-  suggestions: Suggestion[];
-};
+type TextArtifactMetadata = Record<string, never>;
 
 export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
   kind: "text",
-  description: "Useful for text content, like drafting essays and emails.",
-  initialize: async ({ documentId, setMetadata }) => {
-    const suggestions = await getSuggestions({ documentId });
-
-    setMetadata({
-      suggestions,
-    });
-  },
-  onStreamPart: ({ streamPart, setMetadata, setArtifact }) => {
-    if (streamPart.type === "data-suggestion") {
-      setMetadata((metadata) => {
-        return {
-          suggestions: [...metadata.suggestions, streamPart.data],
-        };
-      });
-    }
-
+  description: "Plain text for social media posts (VK, Telegram, Instagram).",
+  initialize: () => null,
+  onStreamPart: ({ streamPart, setArtifact }) => {
     if (streamPart.type === "data-textDelta") {
       setArtifact((draftArtifact) => {
         return {
@@ -62,7 +43,6 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
     onSaveContent,
     getDocumentContentById,
     isLoading,
-    metadata,
   }) => {
     if (isLoading) {
       return <DocumentSkeleton artifactKind="text" />;
@@ -76,19 +56,13 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
     }
 
     return (
-      <div className="flex flex-row px-4 py-8 md:p-20">
-        <Editor
+      <div className="flex flex-col w-full h-full px-4 py-8 md:px-12">
+        <PlainTextEditor
           content={content}
-          currentVersionIndex={currentVersionIndex}
           isCurrentVersion={isCurrentVersion}
           onSaveContent={onSaveContent}
           status={status}
-          suggestions={metadata ? metadata.suggestions : []}
         />
-
-        {metadata?.suggestions && metadata.suggestions.length > 0 ? (
-          <div className="h-dvh w-12 shrink-0 md:hidden" />
-        ) : null}
       </div>
     );
   },
@@ -143,37 +117,20 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
         toast.success("Copied to clipboard!");
       },
     },
-  ],
-  toolbar: [
     {
-      icon: <PenIcon />,
-      description: "Add final polish",
-      onClick: ({ sendMessage }) => {
-        sendMessage({
-          role: "user",
-          parts: [
-            {
-              type: "text",
-              text: "Please add final polish and check for grammar, add section titles for better structure, and ensure everything reads smoothly.",
-            },
-          ],
-        });
-      },
-    },
-    {
-      icon: <MessageIcon />,
-      description: "Request suggestions",
-      onClick: ({ sendMessage }) => {
-        sendMessage({
-          role: "user",
-          parts: [
-            {
-              type: "text",
-              text: "Please add suggestions you have that could improve the writing.",
-            },
-          ],
-        });
+      icon: <DownloadIcon size={18} />,
+      description: "Download as .txt",
+      onClick: ({ content }) => {
+        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "document.txt";
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Downloaded!");
       },
     },
   ],
+  toolbar: [],
 });
