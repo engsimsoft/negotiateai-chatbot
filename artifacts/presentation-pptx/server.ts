@@ -152,7 +152,7 @@ export const presentationPptxDocumentHandler =
 
       // Create PPTX file
       const pres = new pptxgen();
-      pres.author = "Family AI Assistant";
+      pres.author = "Simply";
       pres.title = title;
 
       generatePptxFromSlides(pres, slides, theme);
@@ -267,7 +267,7 @@ Generate the COMPLETE updated slides array (not just changes).`,
 
       // Create updated PPTX
       const pres = new pptxgen();
-      pres.author = "Family AI Assistant";
+      pres.author = "Simply";
       pres.title = document.title;
 
       generatePptxFromSlides(pres, slides, theme);

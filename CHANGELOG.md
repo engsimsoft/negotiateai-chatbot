@@ -1,6 +1,6 @@
 # Changelog
 
-Все заметные изменения в проекте NegotiateAI Assistant документируются здесь.
+Все заметные изменения в проекте **Simply** документируются здесь.
 
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 и проект следует [Semantic Versioning](https://semver.org/lang/ru/).
@@ -8,8 +8,49 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- Этап 4: Персонализация (система персональных проектов, база знаний per user)
-- Экспорт артефактов в DOCX (опционально)
+- Этап 0: Завершить ребрендинг (docs/, ADR, очистка)
+- Этап 1: Архитектура агентов (ТЗ-1) — миграция в БД, каталог
+- Этап 2+: Tool Activity UX, мультипровайдер, биллинг
+
+---
+
+## [2.2.0] - 2026-01-28 - Rebrand: Family AI Assistant → Simply
+
+**MINOR RELEASE**: Ребрендинг проекта в Simply — платформу AI-агентов для российского рынка.
+
+### Summary
+
+Проект переименован из Family AI Assistant в Simply. Обновлена вся основная документация. Подготовлен фундамент для ТЗ-1 (архитектура агентов).
+
+### Changed
+
+#### Ребрендинг документации
+- **README.md**: Полностью переписан для Simply (философия, возможности, roadmap)
+- **CLAUDE.md**: Обновлена навигация для Claude Code
+- **CHANGELOG.md**: Переименован проект в заголовке
+
+### Added
+
+#### Новые документы
+- **SIMPLY_PRODUCT_VISION.md**: Видение продукта Simply
+- **SIMPLY_ROADMAP.md**: План развития (Этап 0, Этап 1)
+- **SIMPLY_STATUS.md**: Текущее состояние проекта
+- **TZ_01_AGENTS_ARCHITECTURE.md**: Техническое задание на архитектуру агентов
+
+### Vision
+
+**Simply** — платформа AI-агентов для российского рынка:
+- Apple-подход: качество важнее количества
+- Персонализация готовых агентов (не создание с нуля)
+- Мультипровайдер: GPT, Claude, Gemini
+- Smart Routing: автовыбор модели
+- Оплата в рублях
+
+### Links
+
+- [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md)
+- [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md)
+- [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 ---
 

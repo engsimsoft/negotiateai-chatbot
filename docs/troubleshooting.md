@@ -1,6 +1,6 @@
 # Troubleshooting - Решение частых проблем
 
-Решения для типичных проблем при разработке и эксплуатации NegotiateAI Assistant.
+Решения для типичных проблем при разработке и эксплуатации Simply.
 
 ---
 
@@ -971,3 +971,7 @@ curl "https://api.search.brave.com/res/v1/web/search?q=test" \
 - [setup.md](setup.md) - Установка и настройка
 - [architecture.md](architecture.md) - Архитектура проекта
 - [deployment.md](deployment.md) - Деплой на Vercel
+
+---
+
+**Обновлено:** 2026-01-28 (Simply rebrand)

@@ -1,7 +1,7 @@
 {
-  "name": "family-ai-assistant",
-  "version": "2.0.0",
-  "description": "Personal family AI assistant with role-based personalization powered by Google Gemini 2.5 Pro",
+  "name": "simply",
+  "version": "2.2.0",
+  "description": "Simply — AI agents platform for Russian market",
   "private": true,
   "scripts": {
     "dev": "next dev",

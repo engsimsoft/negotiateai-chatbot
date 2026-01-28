@@ -1,35 +1,38 @@
-# Family AI Assistant
+# Simply
 
-Персональный семейный AI-ассистент с ролями и персонализацией на базе Google Gemini.
+Платформа AI-агентов для российского рынка. Шлюз к лучшим мировым AI-моделям с оплатой в рублях, без VPN.
 
 **Production:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
-**Версия:** 2.0.0
-**Статус:** ✅ Deployed
+**Версия:** 2.2.0
+**Статус:** 🚧 В разработке (ребрендинг Family AI → Simply)
 
 ---
 
-## 👥 О проекте
+## 🎯 О проекте
 
-Приватный AI-ассистент для двух пользователей с разными ролями и специализированными system prompts.
+**Simply** — платформа качественных AI-агентов для бизнес-пользователей в России.
 
-**Пользователи:**
+**Философия:** Apple-подход. Лучше 10 идеально работающих агентов, чем 100 посредственных.
 
-| Имя | Роль | Специализация ассистента |
-|-----|------|--------------------------|
-| Владимир | Инженер | Технический помощник (код, архитектура, debugging) |
-| Юлия | Маркетолог | Маркетинговый помощник (контент, стратегия, аналитика) |
+**Ключевые отличия:**
+- Проработанные агенты с проверенными промптами
+- Персонализация готовых агентов (не создание с нуля)
+- Умный выбор AI-модели для экономии без потери качества
+- Оплата в рублях
+
+**Подробнее:** [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md)
 
 ---
 
 ## ✨ Возможности
 
-- **Персонализация:** Разные system prompts для каждой роли
-- **Проекты:** Персональные проекты с базой знаний
-- **AI Tools:** Brave Search, web scraping, file analysis
+- **AI-агенты:** Каталог специализированных агентов (Маркетолог, Юрист, Аналитик)
+- **Мультипровайдер:** GPT, Claude, Gemini — через единый интерфейс
+- **Smart Routing:** Автоматический выбор оптимальной модели
+- **Инструменты:** Web search, анализ сайтов, документы, презентации
 - **Streaming:** Быстрые ответы через streaming API
-- **История:** Сохранение и управление диалогами
 
-**Подробнее:** [docs/ai-capabilities.md](docs/ai-capabilities.md) - полный список возможностей AI-агентов
+**Возможности AI:** [docs/ai-capabilities.md](docs/ai-capabilities.md)
 
 ---
 
@@ -50,41 +53,24 @@ npm run dev  # http://localhost:3000
 ```
 
 **Требуется в .env.local:**
-- `GOOGLE_GENERATIVE_AI_API_KEY` - https://aistudio.google.com/app/apikey
-- `BRAVE_SEARCH_API_KEY` - https://brave.com/search/api
-- `AUTH_SECRET` - `openssl rand -base64 32`
-- `POSTGRES_URL` - neon.tech или vercel.com/storage
-- `BLOB_READ_WRITE_TOKEN` - vercel.com/storage
-
----
-
-## 🔑 Тестовые пользователи
-
-После установки создай тестовых пользователей:
-
-```bash
-npm run db:seed
-```
-
-**Учетные данные для входа:**
-
-| Email | Пароль | Роль |
-|-------|--------|------|
-| `vladimir@family.local` | `change-me-vladimir` | engineer |
-| `julia@family.local` | `change-me-julia` | marketer |
-
-⚠️ **Важно:** Смени пароли после первого входа!
+- `GOOGLE_GENERATIVE_AI_API_KEY` — [aistudio.google.com](https://aistudio.google.com/app/apikey)
+- `BRAVE_SEARCH_API_KEY` — [brave.com/search/api](https://brave.com/search/api)
+- `AUTH_SECRET` — `openssl rand -base64 32`
+- `POSTGRES_URL` — [neon.tech](https://neon.tech)
+- `BLOB_READ_WRITE_TOKEN` — [vercel.com/storage](https://vercel.com/storage)
 
 ---
 
 ## 🔧 Технологии
 
-- **Frontend:** Next.js 15.3 (App Router, RSC)
-- **AI:** Google Gemini 2.5 Pro (@ai-sdk/google)
-- **Auth:** NextAuth 5.0-beta.25
-- **Database:** PostgreSQL (Neon) + Drizzle ORM
-- **Storage:** Vercel Blob Storage
-- **Deployment:** Vercel
+| Слой | Технология |
+|------|------------|
+| Frontend | Next.js 15.3 (App Router, RSC), TypeScript, Tailwind CSS |
+| AI | Vercel AI SDK (@ai-sdk/google, @ai-sdk/openai, @ai-sdk/anthropic) |
+| Auth | NextAuth 5.0-beta.25 |
+| Database | PostgreSQL (Neon) + Drizzle ORM |
+| Storage | Vercel Blob Storage |
+| Deploy | Vercel |
 
 ---
 
@@ -102,14 +88,30 @@ npm run db:studio    # Drizzle Studio (UI для БД)
 
 ## 📖 Документация
 
-- [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md) - Правила документации
-- [CLAUDE.md](CLAUDE.md) - Навигация для AI
-- [CHANGELOG.md](CHANGELOG.md) - История изменений
-- [ROADMAP.md](ROADMAP.md) - План разработки
-- [docs/ai-capabilities.md](docs/ai-capabilities.md) - Возможности AI-агентов
-- [docs/setup.md](docs/setup.md) - Детальная установка
-- [docs/architecture.md](docs/architecture.md) - Архитектура
-- [docs/decisions/](docs/decisions/) - Architecture Decision Records
+**Основные:**
+- [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md) — Видение продукта
+- [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md) — План разработки
+- [CHANGELOG.md](CHANGELOG.md) — История изменений
+- [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md) — Правила документации
+
+**Техническая:**
+- [docs/setup.md](docs/setup.md) — Детальная установка
+- [docs/architecture.md](docs/architecture.md) — Архитектура
+- [docs/ai-capabilities.md](docs/ai-capabilities.md) — Возможности AI
+- [docs/decisions/](docs/decisions/) — Architecture Decision Records
+
+**Для AI:**
+- [CLAUDE.md](CLAUDE.md) — Навигация для Claude Code
+
+---
+
+## 🛣️ Roadmap
+
+**Этап 0:** Документация и ребрендинг ← текущий
+**Этап 1:** Архитектура агентов (ТЗ-1)
+**Этап 2+:** Tool Activity UX, Мультипровайдер, Биллинг
+
+**Детали:** [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md)
 
 ---
 

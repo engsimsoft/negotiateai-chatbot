@@ -1,6 +1,6 @@
 # Деплой на Vercel
 
-Пошаговое руководство по развертыванию Family AI Assistant на платформе Vercel.
+Пошаговое руководство по развертыванию Simply на платформе Vercel.
 
 ## Почему Vercel?
 
@@ -583,3 +583,7 @@ vercel domains   # Управление доменами
 - [setup.md](setup.md) - Локальная установка
 - [architecture.md](architecture.md) - Архитектура проекта
 - [troubleshooting.md](troubleshooting.md) - Решение проблем
+
+---
+
+**Обновлено:** 2026-01-28 (Simply rebrand)

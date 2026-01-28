@@ -38,7 +38,7 @@ async function loadSystemPrompt(): Promise<string> {
   } catch (error) {
     console.error("Failed to load system-prompt.md:", error);
     // Fallback to basic prompt if file not found
-    return "You are Family AI Assistant, a helpful AI assistant.";
+    return "You are Simply, a helpful AI assistant.";
   }
 }
 
@@ -132,7 +132,7 @@ export const systemPrompt = async ({
   const customSystemPrompt = await loadSystemPrompt();
   const requestPrompt = getRequestPromptFromHints(requestHints);
 
-  // For Family AI Assistant, we use our custom system prompt
+  // For Simply, we use our custom system prompt
   // Artifacts functionality is not needed for our use case
   return `${customSystemPrompt}\n\n${requestPrompt}`;
 };
