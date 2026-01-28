@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { PlusIcon, TrashIcon } from "@/components/icons";
+import { SidebarAgents } from "@/components/sidebar-agents";
 import { SidebarHistory, getChatHistoryPaginationKey } from "@/components/sidebar-history";
 import { SidebarUserNav } from "@/components/sidebar-user-nav";
 import { Button } from "@/components/ui/button";
@@ -113,6 +114,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          <SidebarAgents user={user} />
           <SidebarHistory user={user} />
         </SidebarContent>
         <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>

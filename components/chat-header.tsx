@@ -1,11 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { memo } from "react";
+import { memo, useState } from "react";
+import { toast } from "sonner";
 import useSWR from "swr";
 import { useWindowSize } from "usehooks-ts";
 import { SidebarToggle } from "@/components/sidebar-toggle";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PlusIcon } from "./icons";
 import { useSidebar } from "./ui/sidebar";
 import { VisibilitySelector, type VisibilityType } from "./visibility-selector";
@@ -36,14 +43,43 @@ function PureChatHeader({
   const router = useRouter();
   const { open } = useSidebar();
   const { width: windowWidth } = useWindowSize();
+  const [isChangingAgent, setIsChangingAgent] = useState(false);
 
   // Fetch agent info from API
   const { data: agents } = useSWR<
-    Array<{ id: string; slug: string; name: string; icon: string; defaultModel: string }>
+    Array<{ id: string; slug: string; name: string; icon: string; defaultModel: string; type: string }>
   >("/api/agents", fetcher);
 
   // Find current agent
   const agent = agents?.find((a) => a.id === agentId);
+
+  // Filter catalog agents for switching (exclude system agents like helper)
+  const catalogAgents = agents?.filter((a) => a.type === "catalog") || [];
+
+  // Handle agent change
+  const handleAgentChange = async (newAgentId: string) => {
+    if (newAgentId === agentId || isChangingAgent) return;
+
+    setIsChangingAgent(true);
+    try {
+      const response = await fetch(`/api/chats/${chatId}/agent`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId: newAgentId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to change agent");
+      }
+
+      toast.success("Агент изменён");
+      router.refresh();
+    } catch {
+      toast.error("Не удалось сменить агента");
+    } finally {
+      setIsChangingAgent(false);
+    }
+  };
 
   // Determine actual model being used
   const actualModelId =
@@ -63,14 +99,41 @@ function PureChatHeader({
     <header className="sticky top-0 flex items-center gap-2 bg-background px-2 py-1.5 md:px-2">
       <SidebarToggle />
 
-      {agent && (
+      {agent && !isReadonly && catalogAgents.length > 0 ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="flex items-center gap-2 text-lg font-medium rounded-md px-2 py-1 hover:bg-muted transition-colors disabled:opacity-50"
+              disabled={isChangingAgent}
+            >
+              <span className="text-2xl" aria-hidden="true">
+                {agent.icon}
+              </span>
+              <span className="hidden md:inline">{agent.name}</span>
+              <span className="text-xs text-muted-foreground">▼</span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {catalogAgents.map((a) => (
+              <DropdownMenuItem
+                key={a.id}
+                onClick={() => handleAgentChange(a.id)}
+                className={a.id === agentId ? "bg-muted" : ""}
+              >
+                <span className="mr-2">{a.icon}</span>
+                {a.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : agent ? (
         <div className="flex items-center gap-2 text-lg font-medium">
           <span className="text-2xl" aria-hidden="true">
             {agent.icon}
           </span>
           <span className="hidden md:inline">{agent.name}</span>
         </div>
-      )}
+      ) : null}
 
       {/* Model indicator badge */}
       <TooltipProvider>
