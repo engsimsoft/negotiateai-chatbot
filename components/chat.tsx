@@ -20,13 +20,13 @@ import {
 import { useArtifactSelector } from "@/hooks/use-artifact";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
-import type { Vote } from "@/lib/db/schema";
+import type { Agent, Vote } from "@/lib/db/schema";
 import {
   ChatSDKError,
   categorizeClientError,
   clientErrorMessages,
 } from "@/lib/errors";
-import type { Attachment, ChatMessage } from "@/lib/types";
+import type { Attachment, ChatMessage, MessageMetadata } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
 import { Artifact } from "./artifact";
@@ -70,6 +70,9 @@ export function Chat({
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   const currentModelIdRef = useRef(currentModelId);
   const [retryState, setRetryState] = useState({ count: 0, maxRetries: 3 });
+  // ТЗ-2: Track the agent responding during streaming
+  const [streamingAgentId, setStreamingAgentId] = useState<string | null>(null);
+  const streamingAgentIdRef = useRef<string | null>(null);
   const [delayState, setDelayState] = useState<"normal" | "slow" | "timeout">(
     "normal"
   );
@@ -181,8 +184,42 @@ export function Chat({
       if (dataPart.type === "data-usage") {
         setUsage(dataPart.data);
       }
+      if (dataPart.type === "data-agentId") {
+        const id = dataPart.data as string | null;
+        setStreamingAgentId(id);
+        streamingAgentIdRef.current = id;
+      }
     },
     onFinish: () => {
+      // Patch the last assistant message's metadata with agentId so the icon
+      // persists after streaming ends (before the next DB reload).
+      const aid = streamingAgentIdRef.current;
+      if (aid) {
+        setMessages((prev) => {
+          for (let i = prev.length - 1; i >= 0; i--) {
+            const msg = prev[i];
+            if (msg.role === "assistant") {
+              const existingMeta = msg.metadata as MessageMetadata | undefined;
+              if (!existingMeta?.agentId) {
+                const updated = [...prev];
+                updated[i] = {
+                  ...msg,
+                  metadata: {
+                    createdAt: existingMeta?.createdAt ?? new Date().toISOString(),
+                    agentId: aid,
+                  },
+                };
+                return updated;
+              }
+              break;
+            }
+          }
+          return prev;
+        });
+        streamingAgentIdRef.current = null;
+        setStreamingAgentId(null);
+      }
+
       mutate(unstable_serialize(getChatHistoryPaginationKey));
       setRetryState({ count: 0, maxRetries: retryState.maxRetries });
       setDelayState("normal");
@@ -258,6 +295,20 @@ export function Chat({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
 
+  // ТЗ-2: Load agents for @-mention autocomplete
+  const { data: agents } = useSWR<Agent[]>("/api/agents", fetcher);
+
+  // ТЗ-2: Handle action button clicks (send payload as user message)
+  const handleActionButton = useCallback(
+    (payload: string) => {
+      sendMessage({
+        role: "user" as const,
+        parts: [{ type: "text", text: payload }],
+      });
+    },
+    [sendMessage]
+  );
+
   useAutoResume({
     autoResume,
     initialMessages,
@@ -277,20 +328,24 @@ export function Chat({
         />
 
         <Messages
+          agents={agents}
           chatId={id}
           isArtifactVisible={isArtifactVisible}
           isReadonly={isReadonly}
           messages={messages}
+          onActionButton={handleActionButton}
           regenerate={regenerate}
           selectedModelId={initialChatModel}
           setMessages={setMessages}
           status={status}
+          streamingAgentId={streamingAgentId}
           votes={votes}
         />
 
         <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
             {!isReadonly && (
               <MultimodalInput
+                agents={agents}
                 attachments={attachments}
                 chatId={id}
                 input={input}

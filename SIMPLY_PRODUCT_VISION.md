@@ -267,7 +267,7 @@ generateImage → "🎨 Генерирую изображение..."
 - 🔄 Мультипровайдер — не только Gemini
 
 ### Детали реализации
-См. **PROJECT_STATUS.md** в репозитории Family AI Assistant.
+См. **[SIMPLY_STATUS.md](SIMPLY_STATUS.md)** — текущее состояние проекта.
 
 ---
 
@@ -323,8 +323,8 @@ generateImage → "🎨 Генерирую изображение..."
 ## 📎 Связанные документы
 
 **Текущий проект:**
-- PROJECT_STATUS.md — полное состояние Family AI Assistant
-- docs/ai-capabilities.md — текущие возможности агентов
+- [SIMPLY_STATUS.md](SIMPLY_STATUS.md) — текущее состояние проекта
+- [docs/ai-capabilities.md](docs/ai-capabilities.md) — текущие возможности агентов
 
 **Конкуренты (изучены):**
 - ConsoleX.ai — 200+ моделей, маркетплейс агентов, MCP

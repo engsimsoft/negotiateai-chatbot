@@ -845,6 +845,33 @@ export async function getAgents(): Promise<Agent[]> {
 }
 
 /**
+ * Get agent by name or slug (case-insensitive).
+ * Used for resolving @-mentions in chat messages.
+ */
+export async function getAgentByName({
+  name,
+}: {
+  name: string;
+}): Promise<Agent | null> {
+  try {
+    const allAgents = await getAgents();
+    const lowerName = name.toLowerCase();
+    return (
+      allAgents.find(
+        (a) =>
+          a.name.toLowerCase() === lowerName ||
+          a.slug.toLowerCase() === lowerName
+      ) || null
+    );
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get agent by name"
+    );
+  }
+}
+
+/**
  * Get agent by slug
  */
 export async function getAgentBySlug({

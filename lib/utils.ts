@@ -100,13 +100,14 @@ export function sanitizeText(text: string) {
 export function convertToUIMessages(messages: DBMessage[]): ChatMessage[] {
   return messages.map((message) => {
     const parts = message.parts as UIMessagePart<CustomUIDataTypes, ChatTools>[];
-    
+
     return {
       id: message.id,
       role: message.role as 'user' | 'assistant' | 'system',
       parts: parts,
       metadata: {
         createdAt: formatISO(message.createdAt),
+        agentId: message.agentId ?? null,
       },
     };
   });

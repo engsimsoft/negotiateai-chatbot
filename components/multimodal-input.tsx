@@ -22,10 +22,16 @@ import { saveChatModelAsCookie } from "@/app/(chat)/actions";
 import { SelectItem } from "@/components/ui/select";
 import { chatModels } from "@/lib/ai/models";
 import { myProvider } from "@/lib/ai/providers";
+import type { Agent } from "@/lib/db/schema";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
+import { ChatHint } from "./chat-hint";
 import { Context } from "./elements/context";
+import {
+  extractMentionQuery,
+  MentionAutocomplete,
+} from "./mention-autocomplete";
 import {
   PromptInput,
   PromptInputModelSelect,
@@ -65,6 +71,7 @@ function PureMultimodalInput({
   selectedModelId,
   onModelChange,
   usage,
+  agents,
 }: {
   chatId: string;
   input: string;
@@ -83,6 +90,7 @@ function PureMultimodalInput({
   selectedModelId: string;
   onModelChange?: (modelId: string) => void;
   usage?: AppUsage;
+  agents?: Agent[];
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -126,9 +134,27 @@ function PureMultimodalInput({
     setLocalStorageInput(input);
   }, [input, setLocalStorageInput]);
 
+  // ТЗ-2: @-mention autocomplete state
+  const [mentionOpen, setMentionOpen] = useState(false);
+
   const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(event.target.value);
+    const val = event.target.value;
+    setInput(val);
+    // Show autocomplete when @ is detected
+    setMentionOpen(extractMentionQuery(val) !== null);
   };
+
+  const handleMentionSelect = useCallback(
+    (agent: Agent) => {
+      // Replace the @query with @AgentName
+      const lastAtIndex = input.lastIndexOf("@");
+      const before = input.slice(0, lastAtIndex);
+      setInput(`${before}@${agent.name} `);
+      setMentionOpen(false);
+      textareaRef.current?.focus();
+    },
+    [input, setInput]
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadQueue, setUploadQueue] = useState<string[]>([]);
@@ -247,6 +273,20 @@ function PureMultimodalInput({
             sendMessage={sendMessage}
           />
         )}
+
+      <ChatHint
+        hasUsedMentions={input.includes("@")}
+        messagesCount={messages.length}
+      />
+
+      {agents && agents.length > 0 && (
+        <MentionAutocomplete
+          agents={agents}
+          input={input}
+          onSelect={handleMentionSelect}
+          visible={mentionOpen}
+        />
+      )}
 
       <input
         className="-top-4 -left-4 pointer-events-none fixed size-0.5 opacity-0"
@@ -386,6 +426,9 @@ export const MultimodalInput = memo(
       return false;
     }
     if (prevProps.delayState !== nextProps.delayState) {
+      return false;
+    }
+    if (!equal(prevProps.agents, nextProps.agents)) {
       return false;
     }
 

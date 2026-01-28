@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 2.2.0 | **Статус:** 🚧 Ребрендинг
+**Проект:** Simply | **Версия:** 2.4.0 | **Статус:** ТЗ-2 завершён
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -54,13 +54,30 @@
 **AI/Chat:**
 - `app/(chat)/api/chat/route.ts` — Chat endpoint (streaming)
 - `lib/ai/providers.ts` — Конфигурация AI-моделей
-- `lib/ai/agents/` — AI-агенты (промпты, конфигурация)
 - `lib/ai/tools/` — Инструменты (search, web scraping)
+- `lib/db/seed-agents.ts` — Агенты и промпты (БД)
 
 **Auth/DB:**
 - `app/(auth)/` — NextAuth 5.0 setup
 - `lib/db/schema.ts` — Database schema (Drizzle)
 - `lib/db/queries.ts` — Database queries
+
+**Agents UI:**
+- `app/(chat)/agents/page.tsx` — Каталог агентов
+- `app/(chat)/agents/[slug]/page.tsx` — Страница агента
+- `components/sidebar-agents.tsx` — Секция агентов в sidebar
+
+**Agents API:**
+- `app/api/agents/route.ts` — GET список агентов
+- `app/api/agents/[slug]/route.ts` — GET агент по slug
+- `app/api/agents/by-name/[name]/route.ts` — GET агент по имени (ТЗ-2)
+- `app/api/chats/[id]/agent/route.ts` — PATCH смена агента
+
+**@-mentions & UI (ТЗ-2):**
+- `lib/agents/parse-mentions.ts` — Парсинг @-mentions
+- `components/mention-autocomplete.tsx` — Автокомплит @-mentions
+- `components/action-buttons.tsx` — Кнопки действий в сообщениях
+- `components/chat-hint.tsx` — Подсказки для новых пользователей
 
 **Config:**
 - `.env.local` — API keys (НЕ коммитить!)
@@ -71,15 +88,18 @@
 
 ## 🚀 Текущий этап
 
-**Этап:** 0 / 2 (Документация и ребрендинг)
+**Завершены:** Этап 0 (Документация), Этап 1 (ТЗ-1), Этап 2 (ТЗ-2)
+**Следующий:** Этап 3 — Персонализация агентов
 **Прогресс:** См. [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md)
 
-**Задачи Этапа 0:**
-- Переименовать Family AI → Simply
-- Обновить всю документацию
-- Подготовить к Этапу 1 (Архитектура агентов)
+**Выполнено в ТЗ-2:**
+- @-mentions: парсинг, UI автокомплит, резолвинг агента
+- Мультиагентный чат: иконка агента, `Message.agentId`
+- Помощник: полный промпт с `{AGENTS_LIST}`
+- Prompt-агент: улучшение запросов, кнопки действий
+- Подсказки для новых пользователей
 
-**Детали ТЗ-1:** [TZ_01_AGENTS_ARCHITECTURE.md](TZ_01_AGENTS_ARCHITECTURE.md)
+**Детали ТЗ-2:** [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md)
 
 ---
 
@@ -119,6 +139,7 @@ vercel --prod            # Deploy на Vercel
 
 **ТЗ:**
 - [TZ_01_AGENTS_ARCHITECTURE.md](TZ_01_AGENTS_ARCHITECTURE.md) — Этап 1
+- [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md) — Этап 2
 
 ---
 

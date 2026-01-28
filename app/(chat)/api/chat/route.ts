@@ -29,13 +29,16 @@ import {
   createStreamId,
   deleteChatById,
   getAgentById,
+  getAgents,
   getChatById,
   getMessageCountByUserId,
   getMessagesByChatId,
   saveChat,
   saveMessages,
+  updateChatAgent,
   updateChatLastContextById,
 } from "@/lib/db/queries";
+import { parseMention, buildAgentsList } from "@/lib/agents/parse-mentions";
 import { ChatSDKError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
@@ -136,6 +139,7 @@ export async function POST(request: Request) {
                 tokenCount: estimateMessageTokens([
                   { type: "text", text: agentData.greeting },
                 ]),
+                agentId: agentId,
               },
             ],
           });
@@ -188,6 +192,7 @@ export async function POST(request: Request) {
           attachments: [],
           createdAt: new Date(),
           tokenCount: estimateMessageTokens(message.parts),
+          agentId: null,
         },
       ],
     });
@@ -197,22 +202,61 @@ export async function POST(request: Request) {
 
     let finalMergedUsage: AppUsage | undefined;
 
+    // ТЗ-2: Parse @-mentions from user message to determine target agent
+    let mentionedAgentId: string | null = null;
+    const allAgents = await getAgents();
+
+    // Extract text from the latest user message parts
+    const userText = message.parts
+      .filter((p: any) => p.type === "text")
+      .map((p: any) => p.text)
+      .join(" ");
+
+    const { agent: mentionedAgent } = parseMention(userText, allAgents);
+    if (mentionedAgent) {
+      mentionedAgentId = mentionedAgent.id;
+      console.log(`[Mention] Detected @${mentionedAgent.name} (${mentionedAgent.slug})`);
+
+      // Update Chat.agentId to the mentioned agent
+      if (session.user?.id) {
+        try {
+          await updateChatAgent({
+            chatId: id,
+            agentId: mentionedAgent.id,
+            userId: session.user.id,
+          });
+        } catch (e) {
+          console.warn("Failed to update chat agent on mention:", e);
+        }
+      }
+    }
+
+    // Determine which agent to use: @-mention takes priority, then chat's agent
+    const resolvedAgentId = mentionedAgentId || chat?.agentId || agentId;
+
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         // Load system prompt: use agent prompt if agentId is provided, otherwise use default
         let systemPromptText: string;
         let modelToUse = selectedChatModel;
+        let activeAgentId: string | null = resolvedAgentId || null;
 
-        // Get agentId from chat if it exists (for existing chats)
-        const chatAgentId = chat?.agentId || agentId;
+        // ТЗ-2: Send agentId to client immediately so icon shows during streaming
+        dataStream.write({ type: "data-agentId", data: activeAgentId });
 
-        if (chatAgentId) {
+        if (resolvedAgentId) {
           try {
             // Load agent from database
-            const agentData = await getAgentById({ id: chatAgentId });
+            const agentData = await getAgentById({ id: resolvedAgentId });
 
             if (agentData) {
               systemPromptText = agentData.systemPrompt;
+
+              // ТЗ-2: Dynamic {AGENTS_LIST} substitution for Helper agent
+              if (agentData.slug === "helper" && systemPromptText.includes("{AGENTS_LIST}")) {
+                const agentsList = buildAgentsList(allAgents);
+                systemPromptText = systemPromptText.replace("{AGENTS_LIST}", agentsList);
+              }
 
               // Model selection logic:
               // - "auto" → use agent's default model (auto-selection based on task)
@@ -224,14 +268,17 @@ export async function POST(request: Request) {
                 console.log(`[Manual] Using agent ${agentData.slug} with user-selected model ${modelToUse}`);
               }
             } else {
-              console.warn(`Agent ${chatAgentId} not found in DB, falling back to default`);
+              console.warn(`Agent ${resolvedAgentId} not found in DB, falling back to default`);
+              activeAgentId = null;
               systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
             }
           } catch (error) {
-            console.error(`Failed to load agent for ${chatAgentId}, falling back to default:`, error);
+            console.error(`Failed to load agent for ${resolvedAgentId}, falling back to default:`, error);
+            activeAgentId = null;
             systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
           }
         } else {
+          activeAgentId = null;
           systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
         }
 
@@ -396,6 +443,8 @@ export async function POST(request: Request) {
             attachments: [],
             chatId: id,
             tokenCount,
+            // ТЗ-2: Tag assistant messages with the responding agent
+            agentId: currentMessage.role === "assistant" ? resolvedAgentId || null : null,
           };
         });
 

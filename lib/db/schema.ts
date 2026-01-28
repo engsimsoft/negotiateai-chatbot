@@ -160,6 +160,8 @@ export const message = pgTable("Message_v2", {
   attachments: json("attachments").notNull(),
   createdAt: timestamp("createdAt").notNull(),
   tokenCount: integer("tokenCount").default(0),
+  // ТЗ-2: Which agent sent this message (null for user messages)
+  agentId: uuid("agentId"),
 });
 
 export type DBMessage = InferSelectModel<typeof message>;

@@ -6,9 +6,9 @@
 
 ## 📊 Текущий статус
 
-- **Этап:** Этап 1 / 2 (завершён)
-- **Прогресс:** 54/54 задач (100%)
-- **Следующее:** Этап 2 (ТЗ-2) — Агент-Помощник и рекомендации
+- **Этап:** Этап 2 / 3 (завершён)
+- **Прогресс:** 98/99 задач (99%) — осталось: deploy ТЗ-1
+- **Следующее:** Этап 3 — Персонализация агентов
 
 ## 🚀 Этапы разработки
 
@@ -45,7 +45,7 @@
 
 **0.6 Финализация:**
 - [x] npm run build (проверка) (15 мин)
-- [ ] Проверить все ссылки в документации (30 мин)
+- [x] Проверить все ссылки в документации (30 мин)
 - [x] Коммит: "chore: rebrand Family AI Assistant → Simply" (15 мин)
 
 ---
@@ -118,6 +118,62 @@
 
 ---
 
+### Этап 2: Мультиагентный чат — ТЗ-2 (3-5 дней)
+
+**Цель:** @-mentions, полноценный Помощник, Prompt-агент, кнопки действий, подсказки.
+
+**Детали:** См. [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md) | [TZ_02_ROADMAP.md](TZ_02_ROADMAP.md)
+
+**2.1 База данных:**
+- [x] Миграция: `Message_v2.agentId` (uuid, nullable) (30 мин)
+- [x] Backfill: существующие сообщения → agentId из Chat.agentId (30 мин)
+- [x] Обновить `lib/db/schema.ts` — поле agentId (30 мин)
+
+**2.2 @-mentions — Парсинг и API:**
+- [x] Утилита `parseMention` в `lib/agents/parse-mentions.ts` (1 час)
+- [x] API: GET `/api/agents/by-name/:name` (1 час)
+- [x] Обновить POST `/api/chat` — @-mention → агент (1-2 часа)
+- [x] Сохранение `Message.agentId` + обновление `Chat.agentId` (1 час)
+
+**2.3 @-mentions — UI автокомплит:**
+- [x] Компонент `MentionAutocomplete` (1-2 часа)
+- [x] Фильтрация списка по мере ввода (30 мин)
+- [x] Вставка `@Имя` при Enter/клике (30 мин)
+- [x] Закрытие по Escape (15 мин)
+- [x] Интеграция в `multimodal-input.tsx` (1-2 часа)
+
+**2.4 Отображение в чате:**
+- [x] Иконка и имя агента на сообщениях (1-2 часа)
+- [x] Индикатор текущего агента в шапке (1 час)
+
+**2.5 Агент-Помощник:**
+- [x] Полный промпт с `{AGENTS_LIST}` (1 час)
+- [x] Динамическая подстановка в chat route (1-2 часа)
+- [x] Обновить capabilities (30 мин)
+
+**2.6 Prompt-агент:**
+- [x] Добавить в `seed-agents.ts` (30 мин)
+- [x] Промпт с техниками улучшения запросов (1 час)
+- [x] Capabilities и greeting (30 мин)
+
+**2.7 Кнопки действий:**
+- [x] Парсинг `[button:Label|payload]` (1 час)
+- [x] Рендеринг кнопок в `message.tsx` (1 час)
+- [x] Обработка клика → отправка как сообщение (1 час)
+
+**2.8 Подсказки:**
+- [x] Компонент `ChatHint` (1 час)
+- [x] Логика показа для новых пользователей (30 мин)
+- [x] Dismiss → localStorage (30 мин)
+- [x] Не показывать если уже использовал @-mentions (30 мин)
+
+**2.9 Финализация:**
+- [x] npm run build (15 мин)
+- [x] Обновить документацию (30 мин)
+- [x] Коммит (15 мин)
+
+---
+
 ## 📝 Текущая сессия
 
 **2026-01-28:**
@@ -155,6 +211,18 @@
 - [x] npm run build — успешно
 - ✅ ТЗ-1 завершён
 
+**ТЗ-2 (2026-01-28):**
+- [x] Миграция `Message_v2.agentId` + backfill
+- [x] Обновлён Помощник (полный промпт, capabilities, `{AGENTS_LIST}`)
+- [x] Добавлен Prompt-агент (slug: `prompt-agent`, 8 агентов в БД)
+- [x] Утилита парсинга @-mentions + API `/api/agents/by-name/[name]`
+- [x] Chat route: @-mention → агент, динамический промпт, agentId на сообщениях
+- [x] `MentionAutocomplete` — dropdown при вводе @, стрелки, Enter/Tab/Escape
+- [x] Иконка агента на сообщениях + кнопки действий `[button:Label|payload]`
+- [x] `ChatHint` — подсказка для новых пользователей (localStorage dismiss)
+- [x] npm run build — успешно
+- ✅ ТЗ-2 завершён
+
 ---
 
 ## 📁 Ключевые файлы
@@ -167,6 +235,8 @@
 **Видение и ТЗ:**
 - [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md) — видение продукта
 - [TZ_01_AGENTS_ARCHITECTURE.md](TZ_01_AGENTS_ARCHITECTURE.md) — полное ТЗ для Этапа 1
+- [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md) — полное ТЗ для Этапа 2
+- [TZ_02_ROADMAP.md](TZ_02_ROADMAP.md) — дорожная карта Этапа 2
 
 **БД:**
 - lib/db/schema.ts
@@ -175,12 +245,19 @@
 **API (новые):**
 - app/api/agents/route.ts
 - app/api/agents/[slug]/route.ts
+- app/api/agents/by-name/[name]/route.ts
 - app/api/chats/[id]/agent/route.ts
 
 **UI (новые):**
 - app/(chat)/agents/page.tsx
 - app/(chat)/agents/[slug]/page.tsx
 - components/sidebar-agents.tsx
+- components/mention-autocomplete.tsx
+- components/action-buttons.tsx
+- components/chat-hint.tsx
+
+**Парсинг:**
+- lib/agents/parse-mentions.ts
 
 **Удалены:**
 - ~~lib/ai/agents/index.ts~~
@@ -202,6 +279,17 @@
 - [x] /agents показывает каталог
 - [x] /agents/[slug] показывает детали агента
 - [x] Смена агента в чате работает
+- [x] Production build успешен
+
+### Этап 2 (ТЗ-2)
+- [x] `Message_v2.agentId` добавлен + миграция данных
+- [x] @-mentions парсинг работает (имя и slug)
+- [x] UI автокомплит при вводе @
+- [x] Сообщения показывают иконку и имя агента
+- [x] Помощник с полным промптом и `{AGENTS_LIST}`
+- [x] Prompt-агент добавлен (8 агентов в БД)
+- [x] Кнопки действий `[button:Label|payload]` работают
+- [x] Подсказки для новых пользователей
 - [x] Production build успешен
 
 ---
