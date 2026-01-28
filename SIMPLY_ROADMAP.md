@@ -6,9 +6,9 @@
 
 ## 📊 Текущий статус
 
-- **Этап:** Этап 0 / 2
-- **Прогресс:** 19/54 задач (35%)
-- **Следующее:** Этап 1 — Архитектура агентов (ТЗ-1)
+- **Этап:** Этап 1 / 2 (в процессе)
+- **Прогресс:** 35/54 задач (65%)
+- **Следующее:** 1.6 UI — Sidebar
 
 ## 🚀 Этапы разработки
 
@@ -57,32 +57,32 @@
 **Детали:** См. [TZ_01_AGENTS_ARCHITECTURE.md](TZ_01_AGENTS_ARCHITECTURE.md)
 
 **1.1 База данных — Миграции:**
-- [ ] Миграция: таблица `agents` (1 час)
-- [ ] Миграция: таблица `user_agents` (1 час)
-- [ ] Миграция: удалить `User.role` (30 мин)
-- [ ] Миграция: `Chat.agentId` varchar → uuid (1 час)
-- [ ] npm run db:migrate (15 мин)
+- [x] Миграция: таблица `agents` (1 час)
+- [x] Миграция: таблица `user_agents` (1 час)
+- [x] Миграция: удалить `User.role` (30 мин)
+- [x] Миграция: `Chat.agentId` varchar → uuid (1 час)
+- [x] npm run db:migrate (15 мин)
 
 **1.2 Схема и типы:**
-- [ ] Обновить lib/db/schema.ts (1 час)
-- [ ] Типы: Agent, UserAgent, AgentCapabilities (1 час)
+- [x] Обновить lib/db/schema.ts (1 час)
+- [x] Типы: Agent, UserAgent, AgentCapabilities (1 час)
 
 **1.3 Seed данные:**
-- [ ] Создать seed скрипт (lib/db/seed-agents.ts) (1-2 часа)
-- [ ] Перенести промпты из .md в seed (1 час)
-- [ ] Заполнить capabilities для агентов (2 часа)
-- [ ] Создать агента helper (заглушка) (30 мин)
-- [ ] Удалить: Кулинар, Астролог, Одессит (15 мин)
+- [x] Создать seed скрипт (lib/db/seed-agents.ts) (1-2 часа)
+- [x] Перенести промпты из .md в seed (1 час)
+- [x] Заполнить capabilities для агентов (2 часа)
+- [x] Создать агента helper (заглушка) (30 мин)
+- [x] Удалить: Кулинар, Астролог, Одессит (15 мин)
 
 **1.4 API endpoints:**
-- [ ] GET /api/agents (1 час)
-- [ ] GET /api/agents/:slug (1 час)
-- [ ] GET /api/user-agents (1 час)
-- [ ] PATCH /api/chats/:id/agent (1 час)
+- [x] GET /api/agents (1 час)
+- [x] GET /api/agents/:slug (1 час)
+- [x] GET /api/user-agents (1 час)
+- [x] PATCH /api/chats/:id/agent (1 час)
 
 **1.5 Загрузка промптов:**
-- [ ] Обновить chat route — агент из БД (2 часа)
-- [ ] Логика: agents vs user_agents (1 час)
+- [x] Обновить chat route — агент из БД (2 часа)
+- [x] Логика: agents vs user_agents (1 час)
 - [ ] Удалить lib/ai/agents/index.ts (30 мин)
 - [ ] Удалить lib/ai/agents/*.md (15 мин)
 
@@ -134,7 +134,18 @@
 - [x] Код: обновлены prompts.ts и presentation-pptx/server.ts
 - [x] npm run build — успешно
 - [x] Коммит: 96b080d "chore: rebrand Family AI Assistant → Simply (v2.2.0)"
-- ✅ Этап 0 завершён (кроме проверки ссылок)
+- ✅ Этап 0 завершён
+
+**ТЗ-1 (продолжение 2026-01-28):**
+- [x] Миграция: agents, user_agents, удалён User.role, Chat.agentId → uuid
+- [x] Schema: Agent, UserAgent, AgentCapabilities типы
+- [x] Seed: 7 агентов с промптами и capabilities
+- [x] API: /api/agents, /api/agents/[slug], /api/user-agents, /api/chats/[id]/agent
+- [x] Chat route загружает промпты из БД
+- [x] Компоненты обновлены (AgentSelector, ChatHeader, SidebarHistoryItem)
+- [x] npm run build — успешно
+- [x] Коммит: 5dcdb10 "feat: agent architecture — ТЗ-1"
+- ⏸️ Остановился на: 1.6 UI — Sidebar
 
 ---
 
@@ -176,13 +187,13 @@
 - [x] npm run build успешен
 
 ### Этап 1 (ТЗ-1)
-- [ ] Таблицы `agents` и `user_agents` созданы
-- [ ] 7 агентов в БД (6 каталожных + helper)
-- [ ] User.role удалён
+- [x] Таблицы `agents` и `user_agents` созданы
+- [x] 7 агентов в БД (6 каталожных + helper)
+- [x] User.role удалён
 - [ ] /agents показывает каталог
 - [ ] /agents/[slug] показывает детали агента
 - [ ] Смена агента в чате работает
-- [ ] Production build успешен
+- [x] Production build успешен
 
 ---
 
