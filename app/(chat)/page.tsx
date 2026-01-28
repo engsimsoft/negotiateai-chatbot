@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { AgentSelector } from "@/components/agent-selector";
-import { getAgentsByRole } from "@/lib/ai/agents";
+import { getAgents } from "@/lib/db/queries";
 import { auth } from "../(auth)/auth";
 
 export default async function Page() {
@@ -10,19 +10,22 @@ export default async function Page() {
     redirect("/login");
   }
 
-  // Get user role from session (default to engineer if not set)
-  const userRole = (session.user.role || "engineer") as "engineer" | "marketer";
+  // Get all active agents from database
+  const agents = await getAgents();
 
-  // Get agents available for this user role
-  const availableAgents = getAgentsByRole(userRole);
+  // Transform to format expected by AgentSelector
+  const availableAgents = agents
+    .filter((a) => a.type === "catalog") // Only show catalog agents, not system
+    .map((a) => ({
+      id: a.slug,
+      agentId: a.id,
+      name: a.name,
+      icon: a.icon,
+      description: a.description,
+    }));
 
   // Get user name for greeting
-  const userName = session.user.email?.split('@')[0] || 'там';
+  const userName = session.user.email?.split("@")[0] || "там";
 
-  return (
-    <AgentSelector
-      agents={availableAgents}
-      userName={userName}
-    />
-  );
+  return <AgentSelector agents={availableAgents} userName={userName} />;
 }

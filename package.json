@@ -17,6 +17,7 @@
     "db:check": "drizzle-kit check",
     "db:up": "drizzle-kit up",
     "db:seed": "tsx lib/db/seed.ts",
+    "db:seed-agents": "tsx lib/db/seed-agents.ts",
     "db:reset": "./scripts/reset-database.sh",
     "db:reset:production": "./scripts/reset-production-db.sh",
     "db:clean": "psql \"$DATABASE_URL\" -f scripts/clean-database.sql",

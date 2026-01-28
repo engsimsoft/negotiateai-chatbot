@@ -15,9 +15,8 @@ import { auth } from "@/app/(auth)/auth";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import type { ChatModel } from "@/lib/ai/models";
-import { type RequestHints, systemPrompt, loadAgentPrompt } from "@/lib/ai/prompts";
+import { type RequestHints, systemPrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
-import { getModelForAgent, getAgentById, type AgentId } from "@/lib/ai/agents";
 import { createDocument } from "@/lib/ai/tools/create-document";
 import { getCurrentDate } from "@/lib/ai/tools/get-current-date";
 import { getWeather } from "@/lib/ai/tools/get-weather";
@@ -29,6 +28,7 @@ import { isProductionEnvironment } from "@/lib/constants";
 import {
   createStreamId,
   deleteChatById,
+  getAgentById,
   getChatById,
   getMessageCountByUserId,
   getMessagesByChatId,
@@ -122,19 +122,19 @@ export async function POST(request: Request) {
 
       // Add greeting message from agent for new chats
       if (agentId) {
-        const agent = getAgentById(agentId as AgentId);
-        if (agent?.greeting) {
+        const agentData = await getAgentById({ id: agentId });
+        if (agentData?.greeting) {
           await saveMessages({
             messages: [
               {
                 id: generateUUID(),
                 chatId: id,
                 role: "assistant",
-                parts: [{ type: "text", text: agent.greeting }],
+                parts: [{ type: "text", text: agentData.greeting }],
                 attachments: [],
                 createdAt: new Date(),
                 tokenCount: estimateMessageTokens([
-                  { type: "text", text: agent.greeting },
+                  { type: "text", text: agentData.greeting },
                 ]),
               },
             ],
@@ -208,19 +208,27 @@ export async function POST(request: Request) {
 
         if (chatAgentId) {
           try {
-            systemPromptText = await loadAgentPrompt(chatAgentId as AgentId);
+            // Load agent from database
+            const agentData = await getAgentById({ id: chatAgentId });
 
-            // Model selection logic:
-            // - "auto" → use agent's default model (auto-selection based on task)
-            // - other → use user's explicit choice (override agent's default)
-            if (selectedChatModel === "auto") {
-              modelToUse = getModelForAgent(chatAgentId as AgentId) as ChatModel["id"];
-              console.log(`[Auto] Using agent ${chatAgentId} with model ${modelToUse}`);
+            if (agentData) {
+              systemPromptText = agentData.systemPrompt;
+
+              // Model selection logic:
+              // - "auto" → use agent's default model (auto-selection based on task)
+              // - other → use user's explicit choice (override agent's default)
+              if (selectedChatModel === "auto") {
+                modelToUse = agentData.defaultModel as ChatModel["id"];
+                console.log(`[Auto] Using agent ${agentData.slug} with model ${modelToUse}`);
+              } else {
+                console.log(`[Manual] Using agent ${agentData.slug} with user-selected model ${modelToUse}`);
+              }
             } else {
-              console.log(`[Manual] Using agent ${chatAgentId} with user-selected model ${modelToUse}`);
+              console.warn(`Agent ${chatAgentId} not found in DB, falling back to default`);
+              systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
             }
           } catch (error) {
-            console.error(`Failed to load agent prompt for ${chatAgentId}, falling back to default:`, error);
+            console.error(`Failed to load agent for ${chatAgentId}, falling back to default:`, error);
             systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
           }
         } else {

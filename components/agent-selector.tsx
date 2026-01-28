@@ -1,18 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { Agent, AgentId } from "@/lib/ai/agents";
 import { generateUUID } from "@/lib/utils";
 
+interface AgentForSelector {
+  id: string; // slug for URL
+  agentId: string; // uuid for DB
+  name: string;
+  icon: string;
+  description: string;
+}
+
 interface AgentSelectorProps {
-  agents: Agent[];
+  agents: AgentForSelector[];
   userName: string;
 }
 
 export function AgentSelector({ agents, userName }: AgentSelectorProps) {
   const router = useRouter();
 
-  const handleSelectAgent = (agentId: AgentId) => {
+  const handleSelectAgent = (agentId: string) => {
     const newChatId = generateUUID();
     router.push(`/chat/${newChatId}?agentId=${agentId}`);
   };
@@ -32,8 +39,8 @@ export function AgentSelector({ agents, userName }: AgentSelectorProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {agents.map((agent) => (
             <button
-              key={agent.id}
-              onClick={() => handleSelectAgent(agent.id)}
+              key={agent.agentId}
+              onClick={() => handleSelectAgent(agent.agentId)}
               className="group relative flex flex-col p-6 rounded-lg border bg-card hover:bg-accent hover:shadow-lg transition-all duration-200 text-left"
             >
               <div className="flex items-start gap-4 mb-3">

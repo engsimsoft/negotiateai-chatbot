@@ -2,13 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { memo } from "react";
+import useSWR from "swr";
 import { useWindowSize } from "usehooks-ts";
 import { SidebarToggle } from "@/components/sidebar-toggle";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "./icons";
 import { useSidebar } from "./ui/sidebar";
 import { VisibilitySelector, type VisibilityType } from "./visibility-selector";
-import { getAgentById, getModelForAgent, type AgentId } from "@/lib/ai/agents";
 import { chatModels } from "@/lib/ai/models";
 import {
   Tooltip,
@@ -16,6 +16,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+// Fetcher for SWR
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 function PureChatHeader({
   chatId,
@@ -34,14 +37,17 @@ function PureChatHeader({
   const { open } = useSidebar();
   const { width: windowWidth } = useWindowSize();
 
-  // Get agent info if agentId is provided
-  const agent = agentId ? getAgentById(agentId as AgentId) : null;
+  // Fetch agent info from API
+  const { data: agents } = useSWR<
+    Array<{ id: string; slug: string; name: string; icon: string; defaultModel: string }>
+  >("/api/agents", fetcher);
+
+  // Find current agent
+  const agent = agents?.find((a) => a.id === agentId);
 
   // Determine actual model being used
   const actualModelId =
-    selectedModelId === "auto" && agentId
-      ? getModelForAgent(agentId as AgentId)
-      : selectedModelId;
+    selectedModelId === "auto" && agent ? agent.defaultModel : selectedModelId;
 
   // Get model display name
   const modelInfo = chatModels.find((m) => m.id === actualModelId);

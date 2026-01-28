@@ -20,6 +20,8 @@ import { ChatSDKError } from "../errors";
 import type { AppUsage } from "../usage";
 import { estimateMessageTokens, generateUUID } from "../utils";
 import {
+  type Agent,
+  agent,
   type Chat,
   chat,
   type DBMessage,
@@ -30,6 +32,8 @@ import {
   suggestion,
   type User,
   user,
+  type UserAgent,
+  userAgent,
   vote,
 } from "./schema";
 import { generateHashedPassword } from "./utils";
@@ -817,6 +821,149 @@ export async function getPublicDocument({ token }: { token: string }) {
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get public document"
+    );
+  }
+}
+
+// ============================================
+// Agent Functions (ТЗ-1)
+// ============================================
+
+/**
+ * Get all active catalog agents ordered by sortOrder
+ */
+export async function getAgents(): Promise<Agent[]> {
+  try {
+    return await db
+      .select()
+      .from(agent)
+      .where(eq(agent.isActive, true))
+      .orderBy(asc(agent.sortOrder));
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to get agents");
+  }
+}
+
+/**
+ * Get agent by slug
+ */
+export async function getAgentBySlug({
+  slug,
+}: {
+  slug: string;
+}): Promise<Agent | null> {
+  try {
+    const [selectedAgent] = await db
+      .select()
+      .from(agent)
+      .where(and(eq(agent.slug, slug), eq(agent.isActive, true)));
+    return selectedAgent || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get agent by slug"
+    );
+  }
+}
+
+/**
+ * Get agent by ID
+ */
+export async function getAgentById({
+  id,
+}: {
+  id: string;
+}): Promise<Agent | null> {
+  try {
+    const [selectedAgent] = await db
+      .select()
+      .from(agent)
+      .where(eq(agent.id, id));
+    return selectedAgent || null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to get agent by id");
+  }
+}
+
+/**
+ * Get user's personal agents
+ */
+export async function getUserAgents({
+  userId,
+}: {
+  userId: string;
+}): Promise<UserAgent[]> {
+  try {
+    return await db
+      .select()
+      .from(userAgent)
+      .where(and(eq(userAgent.userId, userId), eq(userAgent.isActive, true)));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get user agents"
+    );
+  }
+}
+
+/**
+ * Get user agent by ID
+ */
+export async function getUserAgentById({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}): Promise<UserAgent | null> {
+  try {
+    const [selectedUserAgent] = await db
+      .select()
+      .from(userAgent)
+      .where(and(eq(userAgent.id, id), eq(userAgent.userId, userId)));
+    return selectedUserAgent || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get user agent by id"
+    );
+  }
+}
+
+/**
+ * Update chat agent
+ */
+export async function updateChatAgent({
+  chatId,
+  agentId,
+  userId,
+}: {
+  chatId: string;
+  agentId: string;
+  userId: string;
+}) {
+  try {
+    // Verify chat ownership
+    const [existingChat] = await db
+      .select()
+      .from(chat)
+      .where(and(eq(chat.id, chatId), eq(chat.userId, userId)));
+
+    if (!existingChat) {
+      throw new ChatSDKError("not_found:database", "Chat not found");
+    }
+
+    return await db
+      .update(chat)
+      .set({ agentId })
+      .where(eq(chat.id, chatId));
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update chat agent"
     );
   }
 }

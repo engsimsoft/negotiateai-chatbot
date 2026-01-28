@@ -2,29 +2,122 @@ import type { InferSelectModel } from "drizzle-orm";
 import {
   boolean,
   foreignKey,
+  index,
   integer,
   json,
   jsonb,
+  pgEnum,
   pgTable,
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
 import type { AppUsage } from "../usage";
 
+// ============================================================================
+// Enums
+// ============================================================================
+
+export const agentTypeEnum = pgEnum("agent_type", ["system", "catalog"]);
+
+// ============================================================================
+// Types for JSONB columns
+// ============================================================================
+
+export type AgentCapabilities = {
+  superpowers: string[];
+  exampleTasks: string[];
+  limitations: string[];
+};
+
+export type AgentCustomizations = {
+  communicationStyle?: "formal" | "friendly" | "brief";
+  userAddress?: "ты" | "вы" | string;
+  specialization?: string;
+  userContext?: string;
+  systemPromptOverride?: string | null;
+};
+
+// ============================================================================
+// User
+// ============================================================================
+
 export const user = pgTable("User", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   email: varchar("email", { length: 64 }).notNull(),
   password: varchar("password", { length: 64 }),
-  role: varchar("role", { enum: ["engineer", "marketer"] })
-    .notNull()
-    .default("engineer"),
+  // NOTE: role field removed in v2.3.0 (ТЗ-1 migration)
 });
 
 export type User = InferSelectModel<typeof user>;
-export type UserRole = "engineer" | "marketer";
+
+// ============================================================================
+// Agents (каталог)
+// ============================================================================
+
+export const agent = pgTable(
+  "Agent",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    slug: varchar("slug", { length: 64 }).notNull(),
+    type: agentTypeEnum("type").notNull().default("catalog"),
+    name: varchar("name", { length: 100 }).notNull(),
+    icon: varchar("icon", { length: 10 }).notNull(),
+    description: text("description").notNull(),
+    systemPrompt: text("system_prompt").notNull(),
+    greeting: text("greeting").notNull(),
+    defaultModel: varchar("default_model", { length: 50 }).notNull(),
+    toolAccess: jsonb("tool_access").$type<string[] | null>(),
+    capabilities: jsonb("capabilities").$type<AgentCapabilities>().notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    slugIdx: uniqueIndex("agent_slug_idx").on(table.slug),
+    typeIdx: index("agent_type_idx").on(table.type),
+    isActiveIdx: index("agent_is_active_idx").on(table.isActive),
+  })
+);
+
+export type Agent = InferSelectModel<typeof agent>;
+
+// ============================================================================
+// User Agents (персональные копии)
+// ============================================================================
+
+export const userAgent = pgTable(
+  "UserAgent",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => user.id),
+    sourceAgentId: uuid("source_agent_id")
+      .notNull()
+      .references(() => agent.id),
+    name: varchar("name", { length: 100 }).notNull(),
+    customizations: jsonb("customizations").$type<AgentCustomizations | null>(),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index("user_agent_user_id_idx").on(table.userId),
+    sourceAgentIdIdx: index("user_agent_source_agent_id_idx").on(table.sourceAgentId),
+    userNameIdx: uniqueIndex("user_agent_user_name_idx").on(table.userId, table.name),
+  })
+);
+
+export type UserAgent = InferSelectModel<typeof userAgent>;
+
+// ============================================================================
+// Chat
+// ============================================================================
 
 export const chat = pgTable("Chat", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
@@ -36,7 +129,8 @@ export const chat = pgTable("Chat", {
   visibility: varchar("visibility", { enum: ["public", "private"] })
     .notNull()
     .default("private"),
-  agentId: varchar("agentId", { length: 64 }),
+  // agentId can reference either Agent.id or UserAgent.id (no strict FK)
+  agentId: uuid("agentId"),
   lastContext: jsonb("lastContext").$type<AppUsage | null>(),
 });
 

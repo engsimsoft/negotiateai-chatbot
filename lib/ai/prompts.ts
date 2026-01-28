@@ -2,18 +2,14 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import type { Geo } from "@vercel/functions";
 import type { ArtifactKind } from "@/components/artifact";
-import type { AgentId } from "./agents";
 
 // Cache for system prompt to avoid reading file on every request
 let cachedSystemPrompt: string | null = null;
 
-// Cache for agent prompts (Map: agentId -> prompt)
-const agentPromptsCache = new Map<string, string>();
-
 // Load system prompt from system-prompt.md
 async function loadSystemPrompt(): Promise<string> {
   // In development, skip cache to always get fresh content
-  const isDev = process.env.NODE_ENV === 'development';
+  const isDev = process.env.NODE_ENV === "development";
 
   if (cachedSystemPrompt && !isDev) {
     return cachedSystemPrompt;
@@ -25,9 +21,13 @@ async function loadSystemPrompt(): Promise<string> {
 
     // Replace placeholder with instruction to read index.md via tool
     const placeholder = "[ИНДЕКСНЫЙ ФАЙЛ index.md ВСТАВЛЯЕТСЯ СЮДА]";
-    const indexInstruction = "**ВАЖНО:** Для просмотра полного индекса базы знаний используй инструмент read_document('knowledge/index.md')";
+    const indexInstruction =
+      "**ВАЖНО:** Для просмотра полного индекса базы знаний используй инструмент read_document('knowledge/index.md')";
 
-    const processedPrompt = systemPromptTemplate.replace(placeholder, indexInstruction);
+    const processedPrompt = systemPromptTemplate.replace(
+      placeholder,
+      indexInstruction
+    );
 
     // Only cache in production
     if (!isDev) {
@@ -42,35 +42,8 @@ async function loadSystemPrompt(): Promise<string> {
   }
 }
 
-/**
- * Load agent-specific system prompt from lib/ai/agents/{agentId}.md
- * Prompts are cached to avoid reading files on every request
- */
-export async function loadAgentPrompt(agentId: AgentId): Promise<string> {
-  // In development, skip cache to always get fresh content
-  const isDev = process.env.NODE_ENV === 'development';
-
-  // Check cache first (skip in dev mode)
-  if (agentPromptsCache.has(agentId) && !isDev) {
-    return agentPromptsCache.get(agentId)!;
-  }
-
-  try {
-    const agentPromptPath = join(process.cwd(), "lib", "ai", "agents", `${agentId}.md`);
-    const agentPrompt = await readFile(agentPromptPath, "utf-8");
-
-    // Only cache in production
-    if (!isDev) {
-      agentPromptsCache.set(agentId, agentPrompt);
-    }
-
-    return agentPrompt;
-  } catch (error) {
-    console.error(`Failed to load agent prompt for ${agentId}:`, error);
-    // Fallback to loading default system prompt
-    return loadSystemPrompt();
-  }
-}
+// NOTE: Agent prompts are now loaded from database (ТЗ-1)
+// See: lib/db/queries.ts -> getAgentById()
 
 export const artifactsPrompt = `
 Artifacts is a special user interface mode that helps users with writing, editing, and other content creation tasks. When artifact is open, it is on the right side of the screen, while the conversation is on the left side. When creating or updating documents, changes are reflected in real-time on the artifacts and visible to the user.

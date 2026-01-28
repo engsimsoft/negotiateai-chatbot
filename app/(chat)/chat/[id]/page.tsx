@@ -5,8 +5,7 @@ import { auth } from "@/app/(auth)/auth";
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
-import { getAgentById, type AgentId } from "@/lib/ai/agents";
-import { getChatById, getMessagesByChatId } from "@/lib/db/queries";
+import { getAgentById, getChatById, getMessagesByChatId } from "@/lib/db/queries";
 import { convertToUIMessages, generateUUID } from "@/lib/utils";
 
 export default async function Page(props: {
@@ -41,13 +40,17 @@ export default async function Page(props: {
     const initialModel = chatModelFromCookie?.value || DEFAULT_CHAT_MODEL;
 
     // Get agent greeting message for new chats
-    const agent = getAgentById(agentId as AgentId);
-    const greetingMessages = agent?.greeting ? [{
-      id: generateUUID(),
-      role: "assistant" as const,
-      parts: [{ type: "text" as const, text: agent.greeting }],
-      createdAt: new Date(),
-    }] : [];
+    const agent = await getAgentById({ id: agentId });
+    const greetingMessages = agent?.greeting
+      ? [
+          {
+            id: generateUUID(),
+            role: "assistant" as const,
+            parts: [{ type: "text" as const, text: agent.greeting }],
+            createdAt: new Date(),
+          },
+        ]
+      : [];
 
     return (
       <>
