@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { SidebarToggle } from "@/components/sidebar-toggle";
 import { Button } from "@/components/ui/button";
 import { getAgentBySlug } from "@/lib/db/queries";
 import type { AgentCapabilities } from "@/lib/db/schema";
 import { auth } from "../../../(auth)/auth";
+import { AgentsHeader } from "../agents-header";
 import { StartChatButton } from "./start-chat-button";
 
 interface AgentPageProps {
@@ -49,16 +48,10 @@ export default async function AgentPage({ params }: AgentPageProps) {
 
   return (
     <div className="flex h-dvh flex-col bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4">
-        <SidebarToggle />
-        <Link
-          href="/agents"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          ← Назад к каталогу
-        </Link>
-      </header>
+      <AgentsHeader
+        title=""
+        backLink={{ href: "/agents", label: "← Назад к каталогу" }}
+      />
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto p-6">

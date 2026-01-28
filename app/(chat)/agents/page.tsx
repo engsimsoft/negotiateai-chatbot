@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { SidebarToggle } from "@/components/sidebar-toggle";
 import { getAgents } from "@/lib/db/queries";
 import { auth } from "../../(auth)/auth";
+import { AgentsHeader } from "./agents-header";
 
 export default async function AgentsPage() {
   const session = await auth();
@@ -18,11 +18,7 @@ export default async function AgentsPage() {
 
   return (
     <div className="flex h-dvh flex-col bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4">
-        <SidebarToggle />
-        <h1 className="text-lg font-semibold">AI Агенты</h1>
-      </header>
+      <AgentsHeader title="AI Агенты" />
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto p-6">
