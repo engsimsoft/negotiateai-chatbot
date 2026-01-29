@@ -6,9 +6,9 @@
 
 ## 📊 Текущий статус
 
-- **Этап:** Этап 3B (завершён)
-- **Прогресс:** ТЗ-3B полностью выполнен
-- **Следующее:** Этап 4+ — Мультипровайдер, биллинг
+- **Этап:** Этап 4 (завершён)
+- **Прогресс:** ТЗ-4 полностью выполнен
+- **Следующее:** Этап 5+ — Мультипровайдер, биллинг
 
 ## 🚀 Этапы разработки
 
@@ -281,7 +281,60 @@
 
 ---
 
+### Этап 4: Упрощение UX — ТЗ-4 (1 день)
+
+**Цель:** Убрать избыточную сложность, исправить логику @-mentions. Философия: "iPhone, не Android".
+
+**Детали:** См. [TZ_04_UX_SIMPLIFICATION.md](TZ_04_UX_SIMPLIFICATION.md) | [TZ_04_ROADMAP.md](TZ_04_ROADMAP.md)
+
+**4.1 Удаление персонализации из UI:**
+- [x] Убрать кнопку "В мои агенты" со страницы агента
+- [x] Убрать секцию "Мои агенты" из sidebar
+- [x] Сохранить backend API для будущего
+
+**4.2 @-mentions — гостевой вызов:**
+- [x] Убрать вызов `updateChatAgent()` при @-mention
+- [x] @-mention НЕ меняет Chat.agentId — одноразовый "гостевой" вызов
+- [x] Message.agentId сохраняется для ответа гостевого агента
+
+**4.3 Визуализация гостевых сообщений:**
+- [x] Определение гостя: `Message.agentId !== Chat.agentId`
+- [x] Стилизация: отступ слева, фоновый цвет, метка "↩️ гость"
+
+**4.4 Подсказка и иконка:**
+- [x] Новый текст подсказки про гостевые вызовы
+- [x] Ключ localStorage: `simply-hint-guest-agent-seen`
+- [x] Иконка 💡 рядом с полем ввода для повторного показа
+
+**4.5 Suggested actions из БД:**
+- [x] Использовать `agent.capabilities.exampleTasks`
+- [x] Разные suggestions для каждого агента
+- [x] Дефолтные suggestions когда агент не выбран
+
+**4.6 Greeting:**
+- [x] Убрать создание greeting message в page.tsx
+- [x] Greeting как UI компонент (заголовок + suggested actions)
+
+**4.7 Финализация:**
+- [x] npm run build — успешен
+- [x] Мануальное тестирование — все 4 сценария пройдены
+- [x] Обновить документацию
+- [x] Коммит: 7abb1d3, 95101fd
+
+---
+
 ## 📝 Текущая сессия
+
+**2026-01-29 — ТЗ-4:**
+- [x] Убрана кнопка "В мои агенты" и секция "Мои агенты" из UI
+- [x] @-mentions теперь гостевой вызов (не меняет Chat.agentId)
+- [x] Гостевые сообщения визуально выделены (отступ + фон + метка)
+- [x] Подсказка обновлена + иконка 💡 для повторного показа
+- [x] Suggested actions берутся из agent.capabilities.exampleTasks
+- [x] Greeting как UI (не сообщение в БД)
+- [x] npm run build — успешно
+- [x] Мануальное тестирование — все сценарии пройдены
+- ✅ ТЗ-4 завершён
 
 **2026-01-29 — ТЗ-3B:**
 - [x] Обновлён тип AgentCustomizations (brief → expert)
@@ -350,6 +403,7 @@
 - [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md) — полное ТЗ для Этапа 2
 - [TZ_03A_USER_PROFILE.md](TZ_03A_USER_PROFILE.md) — полное ТЗ для Этапа 3A
 - [TZ_03B_AGENT_PERSONALIZATION.md](TZ_03B_AGENT_PERSONALIZATION.md) — полное ТЗ для Этапа 3B
+- [TZ_04_UX_SIMPLIFICATION.md](TZ_04_UX_SIMPLIFICATION.md) — полное ТЗ для Этапа 4
 
 **БД:**
 - lib/db/schema.ts
@@ -393,6 +447,14 @@
 **API (ТЗ-3B):**
 - app/(chat)/api/user-agents/route.ts (POST)
 - app/(chat)/api/user-agents/[id]/route.ts (PATCH, DELETE)
+
+**UI (ТЗ-4):**
+- components/message.tsx (гостевые сообщения)
+- components/messages.tsx (chatAgentId prop)
+- components/chat.tsx (передача chatAgentId, agentId)
+- components/suggested-actions.tsx (из БД)
+- components/chat-hint.tsx (новый текст)
+- components/multimodal-input.tsx (иконка 💡)
 
 **Парсинг:**
 - lib/agents/parse-mentions.ts
@@ -444,6 +506,16 @@
 - [x] Кнопка "В мои агенты" на странице агента
 - [x] Секция "Мои агенты" в sidebar с меню действий
 - [x] Применение customizations в chat route
+- [x] Production build успешен
+
+### Этап 4 (ТЗ-4)
+- [x] Персонализация убрана из UI (backend сохранён)
+- [x] @-mentions — гостевой вызов (не меняет Chat.agentId)
+- [x] Гостевые сообщения визуально выделены
+- [x] Suggested actions из agent.capabilities.exampleTasks
+- [x] Greeting как UI компонент (не сообщение)
+- [x] Иконка 💡 для показа подсказки
+- [x] Мануальное тестирование пройдено
 - [x] Production build успешен
 
 ---
