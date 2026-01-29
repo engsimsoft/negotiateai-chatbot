@@ -33,12 +33,10 @@ export type AgentCapabilities = {
   limitations: string[];
 };
 
+// ТЗ-3B: Agent customizations for personalized agents
 export type AgentCustomizations = {
-  communicationStyle?: "formal" | "friendly" | "brief";
-  userAddress?: "ты" | "вы" | string;
+  communicationStyle?: "formal" | "friendly" | "expert";
   specialization?: string;
-  userContext?: string;
-  systemPromptOverride?: string | null;
 };
 
 // ============================================================================

@@ -8,7 +8,52 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- Этап 3B+: Персонализация агентов, Tool Activity UX, мультипровайдер, биллинг
+- Этап 4+: Tool Activity UX, мультипровайдер, биллинг
+
+---
+
+## [2.6.0] - 2026-01-29 - ТЗ-3B: Персонализация агентов
+
+**MINOR RELEASE**: Диалоговая персонализация агентов — пользователь создаёт персональную копию через скриптованный диалог.
+
+### Summary
+
+Реализована персонализация агентов из каталога. Пользователь может добавить агента "в свои" через 4-шаговый диалог: выбор имени, стиля общения, специализации и подтверждение. Персональные агенты отображаются в sidebar с возможностью редактирования и удаления. Настройки применяются в system prompt при общении.
+
+### Added
+
+#### Диалог персонализации
+- Компонент `PersonalizationDialog` (`components/personalization-dialog.tsx`)
+- 4 шага: имя → стиль общения → специализация → подтверждение
+- Режим редактирования для изменения существующих настроек
+- Прогресс-индикатор (шаг X из 4)
+
+#### API CRUD
+- POST `/api/user-agents` — создание персонального агента
+- PATCH `/api/user-agents/[id]` — обновление настроек
+- DELETE `/api/user-agents/[id]` — soft delete (isActive = false)
+- Queries: `createUserAgent`, `updateUserAgent`, `deleteUserAgent`, `getUserAgentsWithSource`
+
+#### UI
+- Кнопка "В мои агенты" на странице `/agents/[slug]` (`AddToMyAgentsButton`)
+- Секция "Мои агенты" в sidebar с реальными данными
+- Меню (⋯) на каждом агенте: Редактировать / Удалить
+- Компонент `DeleteAgentDialog` для подтверждения удаления
+
+### Changed
+
+#### Типы
+- `AgentCustomizations`: заменён `brief` на `expert` в стилях
+- Убраны неиспользуемые поля (userAddress, userContext, systemPromptOverride)
+
+#### Применение настроек
+- Функция `buildAgentCustomizations` в `lib/ai/prompts.ts`
+- Chat route: fallback на userAgent если agentId не найден в каталоге
+- Комбинирование: userContext + agentCustomizations + baseAgent.systemPrompt
+
+### Links
+- [TZ_03B_AGENT_PERSONALIZATION.md](TZ_03B_AGENT_PERSONALIZATION.md) — полное ТЗ
+- [TZ_03B_ROADMAP.md](TZ_03B_ROADMAP.md) — дорожная карта
 
 ---
 

@@ -6,9 +6,9 @@
 
 ## 📊 Текущий статус
 
-- **Этап:** Этап 3A (завершён)
-- **Прогресс:** ТЗ-3A полностью выполнен
-- **Следующее:** Этап 3B+ — Персонализация агентов, мультипровайдер, биллинг
+- **Этап:** Этап 3B (завершён)
+- **Прогресс:** ТЗ-3B полностью выполнен
+- **Следующее:** Этап 4+ — Мультипровайдер, биллинг
 
 ## 🚀 Этапы разработки
 
@@ -229,11 +229,74 @@
 **3A.10 Финализация:**
 - [x] npm run build — успешен
 - [x] Обновить документацию
-- [ ] Коммит
+- [x] Коммит: 649cb1a "feat: user profile and settings — ТЗ-3A complete"
+
+---
+
+### Этап 3B: Персонализация агентов — ТЗ-3B (2-3 дня)
+
+**Цель:** Диалоговая персонализация агентов — пользователь создаёт персональную копию через скриптованный диалог.
+
+**Детали:** См. [TZ_03B_AGENT_PERSONALIZATION.md](TZ_03B_AGENT_PERSONALIZATION.md) | [TZ_03B_ROADMAP.md](TZ_03B_ROADMAP.md)
+
+**3B.1 Типы и схема БД:**
+- [x] Обновить `AgentCustomizations` (brief → expert)
+- [x] Убрать неиспользуемые поля из типа
+
+**3B.2 API endpoints:**
+- [x] POST /api/user-agents — создание персонального агента
+- [x] PATCH /api/user-agents/[id] — обновление
+- [x] DELETE /api/user-agents/[id] — удаление (soft delete)
+- [x] Queries: createUserAgent, updateUserAgent, deleteUserAgent, getUserAgentsWithSource
+
+**3B.3 Диалог персонализации:**
+- [x] Компонент `PersonalizationDialog` (4 шага)
+- [x] Шаг 1: Имя агента
+- [x] Шаг 2: Стиль общения (Дружелюбный/Деловой/Экспертный)
+- [x] Шаг 3: Специализация (опционально)
+- [x] Шаг 4: Подтверждение
+- [x] Режим редактирования
+
+**3B.4 UI — Кнопка "В мои агенты":**
+- [x] `AddToMyAgentsButton` на странице /agents/[slug]
+- [x] Проверка "Уже добавлен"
+
+**3B.5 UI — Sidebar:**
+- [x] Секция "Мои агенты" с реальными данными
+- [x] Меню (⋯) → Редактировать / Удалить
+- [x] Иконка базового агента + имя персональной копии
+
+**3B.6 Применение настроек:**
+- [x] `buildAgentCustomizations` в lib/ai/prompts.ts
+- [x] Chat route: fallback на userAgent
+- [x] Применение customizations к system prompt
+
+**3B.7 Удаление:**
+- [x] Компонент `DeleteAgentDialog` с подтверждением
+
+**3B.8 Финализация:**
+- [x] npm run build — успешен
+- [x] Обновить документацию
+- [x] Коммит: fdf0cc2
 
 ---
 
 ## 📝 Текущая сессия
+
+**2026-01-29 — ТЗ-3B:**
+- [x] Обновлён тип AgentCustomizations (brief → expert)
+- [x] API: POST /api/user-agents (создание)
+- [x] API: PATCH /api/user-agents/[id] (обновление)
+- [x] API: DELETE /api/user-agents/[id] (soft delete)
+- [x] Queries: createUserAgent, updateUserAgent, deleteUserAgent, getUserAgentsWithSource
+- [x] PersonalizationDialog — 4 шага + режим редактирования
+- [x] AddToMyAgentsButton — кнопка на странице агента
+- [x] DeleteAgentDialog — подтверждение удаления
+- [x] Sidebar: секция "Мои агенты" с меню действий
+- [x] buildAgentCustomizations — применение стиля и специализации
+- [x] Chat route: fallback на userAgent, применение customizations
+- [x] npm run build — успешно
+- ✅ ТЗ-3B завершён
 
 **2026-01-29 — ТЗ-3A:**
 - [x] Миграция: 5 новых полей User (displayName, pronouns, occupation, bio, theme)
@@ -286,6 +349,7 @@
 - [TZ_01_AGENTS_ARCHITECTURE.md](TZ_01_AGENTS_ARCHITECTURE.md) — полное ТЗ для Этапа 1
 - [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md) — полное ТЗ для Этапа 2
 - [TZ_03A_USER_PROFILE.md](TZ_03A_USER_PROFILE.md) — полное ТЗ для Этапа 3A
+- [TZ_03B_AGENT_PERSONALIZATION.md](TZ_03B_AGENT_PERSONALIZATION.md) — полное ТЗ для Этапа 3B
 
 **БД:**
 - lib/db/schema.ts
@@ -318,8 +382,17 @@
 - components/ui/radio-group.tsx
 - hooks/use-theme-sync.ts
 
-**AI (ТЗ-3A):**
-- lib/ai/prompts.ts (buildUserContext)
+**AI (ТЗ-3A, ТЗ-3B):**
+- lib/ai/prompts.ts (buildUserContext, buildAgentCustomizations)
+
+**UI (ТЗ-3B):**
+- components/personalization-dialog.tsx
+- components/delete-agent-dialog.tsx
+- app/(chat)/agents/[slug]/add-to-my-agents-button.tsx
+
+**API (ТЗ-3B):**
+- app/(chat)/api/user-agents/route.ts (POST)
+- app/(chat)/api/user-agents/[id]/route.ts (PATCH, DELETE)
 
 **Парсинг:**
 - lib/agents/parse-mentions.ts
@@ -362,6 +435,15 @@
 - [x] Динамическое приветствие на главной
 - [x] User context инъекция в system prompts всех агентов
 - [x] Синхронизация темы БД ↔ next-themes
+- [x] Production build успешен
+
+### Этап 3B (ТЗ-3B)
+- [x] Тип AgentCustomizations обновлён (brief → expert)
+- [x] API CRUD для персональных агентов (POST, PATCH, DELETE)
+- [x] Диалог персонализации (4 шага + режим редактирования)
+- [x] Кнопка "В мои агенты" на странице агента
+- [x] Секция "Мои агенты" в sidebar с меню действий
+- [x] Применение customizations в chat route
 - [x] Production build успешен
 
 ---

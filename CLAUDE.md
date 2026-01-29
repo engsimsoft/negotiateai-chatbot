@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 2.5.0 | **Статус:** ТЗ-3A завершён
+**Проект:** Simply | **Версия:** 2.6.0 | **Статус:** ТЗ-3B завершён
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -88,6 +88,14 @@
 - `hooks/use-theme-sync.ts` — Синхронизация темы
 - `lib/ai/prompts.ts` — buildUserContext
 
+**Agent Personalization (ТЗ-3B):**
+- `app/(chat)/api/user-agents/route.ts` — API персональных агентов (GET/POST)
+- `app/(chat)/api/user-agents/[id]/route.ts` — PATCH/DELETE персонального агента
+- `app/(chat)/agents/[slug]/add-to-my-agents-button.tsx` — Кнопка "В мои агенты"
+- `components/personalization-dialog.tsx` — Диалог персонализации (4 шага)
+- `components/delete-agent-dialog.tsx` — Подтверждение удаления
+- `lib/ai/prompts.ts` — buildAgentCustomizations
+
 **Config:**
 - `.env.local` — API keys (НЕ коммитить!)
 - `next.config.ts` — Next.js config
@@ -97,19 +105,19 @@
 
 ## 🚀 Текущий этап
 
-**Завершены:** Этап 0 (Документация), Этап 1 (ТЗ-1), Этап 2 (ТЗ-2), Этап 3A (ТЗ-3A)
-**Следующий:** Этап 3B+ — Персонализация агентов, мультипровайдер, биллинг
+**Завершены:** Этап 0 (Документация), Этап 1 (ТЗ-1), Этап 2 (ТЗ-2), Этап 3A (ТЗ-3A), Этап 3B (ТЗ-3B)
+**Следующий:** Этап 4+ — Мультипровайдер, биллинг
 **Прогресс:** См. [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md)
 
-**Выполнено в ТЗ-3A:**
-- Профиль пользователя: 5 полей в БД, API GET/PATCH
-- Страница настроек /settings: 3 секции (Профиль, Аккаунт, Внешний вид)
-- Меню пользователя: аватар, имя, план, настройки, тема, помощь, выход
-- Онбординг: 3-шаговый диалог для новых пользователей
-- User context injection в system prompts всех агентов
-- Синхронизация темы БД ↔ next-themes
+**Выполнено в ТЗ-3B:**
+- Диалог персонализации агентов (4 шага + режим редактирования)
+- Кнопка "В мои агенты" на странице агента
+- Секция "Мои агенты" в sidebar с меню действий
+- API CRUD для персональных агентов (POST, PATCH, DELETE)
+- Применение customizations (стиль, специализация) в chat route
+- Удаление персональных агентов с подтверждением
 
-**Детали ТЗ-3A:** [TZ_03A_USER_PROFILE.md](TZ_03A_USER_PROFILE.md)
+**Детали ТЗ-3B:** [TZ_03B_AGENT_PERSONALIZATION.md](TZ_03B_AGENT_PERSONALIZATION.md)
 
 ---
 
@@ -151,6 +159,7 @@ vercel --prod            # Deploy на Vercel
 - [TZ_01_AGENTS_ARCHITECTURE.md](TZ_01_AGENTS_ARCHITECTURE.md) — Этап 1
 - [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md) — Этап 2
 - [TZ_03A_USER_PROFILE.md](TZ_03A_USER_PROFILE.md) — Этап 3A
+- [TZ_03B_AGENT_PERSONALIZATION.md](TZ_03B_AGENT_PERSONALIZATION.md) — Этап 3B
 
 ---
 

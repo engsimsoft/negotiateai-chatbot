@@ -146,3 +146,34 @@ export function buildUserContext(user: {
 
   return parts.join("\n");
 }
+
+// ТЗ-3B: Build agent customizations block for personalized agents
+export function buildAgentCustomizations(customizations: {
+  communicationStyle?: "formal" | "friendly" | "expert";
+  specialization?: string;
+} | null): string {
+  if (!customizations) {
+    return "";
+  }
+
+  const parts: string[] = ["# Персонализация агента", ""];
+
+  if (customizations.communicationStyle) {
+    const styleDescriptions: Record<string, string> = {
+      friendly: "Дружелюбный — общайся как с коллегой, неформально, но профессионально",
+      formal: "Деловой — чётко и по делу, без лишних слов, структурированно",
+      expert: "Экспертный — подробно и профессионально, с глубоким анализом и деталями",
+    };
+    const description = styleDescriptions[customizations.communicationStyle];
+    parts.push(`- Стиль общения: ${description}`);
+  }
+
+  if (customizations.specialization) {
+    parts.push(`- Специализация: ${customizations.specialization}`);
+    parts.push(`  Учитывай эту специализацию при ответах.`);
+  }
+
+  parts.push("", "");
+
+  return parts.join("\n");
+}

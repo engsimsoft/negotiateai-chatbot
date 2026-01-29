@@ -19,6 +19,7 @@ import {
   type RequestHints,
   systemPrompt,
   buildUserContext,
+  buildAgentCustomizations,
 } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
@@ -37,6 +38,7 @@ import {
   getChatById,
   getMessageCountByUserId,
   getMessagesByChatId,
+  getUserAgentById,
   getUserById,
   saveChat,
   saveMessages,
@@ -253,9 +255,12 @@ export async function POST(request: Request) {
         // ТЗ-2: Send agentId to client immediately so icon shows during streaming
         dataStream.write({ type: "data-agentId", data: activeAgentId });
 
+        // ТЗ-3B: Track agent customizations for personalized agents
+        let agentCustomizations: string = "";
+
         if (resolvedAgentId) {
           try {
-            // Load agent from database
+            // Load agent from database (catalog agent)
             const agentData = await getAgentById({ id: resolvedAgentId });
 
             if (agentData) {
@@ -277,9 +282,39 @@ export async function POST(request: Request) {
                 console.log(`[Manual] Using agent ${agentData.slug} with user-selected model ${modelToUse}`);
               }
             } else {
-              console.warn(`Agent ${resolvedAgentId} not found in DB, falling back to default`);
-              activeAgentId = null;
-              systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
+              // ТЗ-3B: Try loading as user agent (personalized agent)
+              const userAgentData = await getUserAgentById({
+                id: resolvedAgentId,
+                userId: session.user.id,
+              });
+
+              if (userAgentData) {
+                // Load source agent
+                const sourceAgent = await getAgentById({ id: userAgentData.sourceAgentId });
+                if (sourceAgent) {
+                  systemPromptText = sourceAgent.systemPrompt;
+
+                  // Apply customizations
+                  if (userAgentData.customizations) {
+                    agentCustomizations = buildAgentCustomizations(userAgentData.customizations);
+                  }
+
+                  if (selectedChatModel === "auto") {
+                    modelToUse = sourceAgent.defaultModel as ChatModel["id"];
+                    console.log(`[Auto] Using user agent ${userAgentData.name} (source: ${sourceAgent.slug}) with model ${modelToUse}`);
+                  } else {
+                    console.log(`[Manual] Using user agent ${userAgentData.name} with user-selected model ${modelToUse}`);
+                  }
+                } else {
+                  console.warn(`Source agent ${userAgentData.sourceAgentId} not found`);
+                  activeAgentId = null;
+                  systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
+                }
+              } else {
+                console.warn(`Agent ${resolvedAgentId} not found in DB, falling back to default`);
+                activeAgentId = null;
+                systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
+              }
             }
           } catch (error) {
             console.error(`Failed to load agent for ${resolvedAgentId}, falling back to default:`, error);
@@ -292,8 +327,9 @@ export async function POST(request: Request) {
         }
 
         // ТЗ-3A: Prepend user context to system prompt
-        if (userContext) {
-          systemPromptText = userContext + systemPromptText;
+        // ТЗ-3B: Also prepend agent customizations (after user context, before agent prompt)
+        if (userContext || agentCustomizations) {
+          systemPromptText = userContext + agentCustomizations + systemPromptText;
         }
 
         const startTime = Date.now();

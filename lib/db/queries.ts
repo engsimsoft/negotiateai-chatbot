@@ -22,6 +22,7 @@ import { estimateMessageTokens, generateUUID } from "../utils";
 import {
   type Agent,
   agent,
+  type AgentCustomizations,
   type Chat,
   chat,
   type DBMessage,
@@ -982,6 +983,42 @@ export async function getUserAgents({
 }
 
 /**
+ * ТЗ-3B: Get user's personal agents with source agent data
+ */
+export async function getUserAgentsWithSource({
+  userId,
+}: {
+  userId: string;
+}): Promise<
+  (UserAgent & { sourceAgent: { icon: string; name: string; slug: string } })[]
+> {
+  try {
+    const results = await db
+      .select({
+        userAgent: userAgent,
+        sourceAgent: {
+          icon: agent.icon,
+          name: agent.name,
+          slug: agent.slug,
+        },
+      })
+      .from(userAgent)
+      .innerJoin(agent, eq(userAgent.sourceAgentId, agent.id))
+      .where(and(eq(userAgent.userId, userId), eq(userAgent.isActive, true)));
+
+    return results.map((r) => ({
+      ...r.userAgent,
+      sourceAgent: r.sourceAgent,
+    }));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get user agents with source"
+    );
+  }
+}
+
+/**
  * Get user agent by ID
  */
 export async function getUserAgentById({
@@ -1001,6 +1038,98 @@ export async function getUserAgentById({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get user agent by id"
+    );
+  }
+}
+
+/**
+ * ТЗ-3B: Create a personal agent
+ */
+export async function createUserAgent({
+  userId,
+  sourceAgentId,
+  name,
+  customizations,
+}: {
+  userId: string;
+  sourceAgentId: string;
+  name: string;
+  customizations: AgentCustomizations | null;
+}): Promise<UserAgent> {
+  try {
+    const [newUserAgent] = await db
+      .insert(userAgent)
+      .values({
+        userId,
+        sourceAgentId,
+        name,
+        customizations,
+        isActive: true,
+      })
+      .returning();
+    return newUserAgent;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create user agent"
+    );
+  }
+}
+
+/**
+ * ТЗ-3B: Update a personal agent
+ */
+export async function updateUserAgent({
+  id,
+  userId,
+  name,
+  customizations,
+}: {
+  id: string;
+  userId: string;
+  name?: string;
+  customizations?: AgentCustomizations | null;
+}): Promise<UserAgent | null> {
+  try {
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    if (name !== undefined) updateData.name = name;
+    if (customizations !== undefined) updateData.customizations = customizations;
+
+    const [updated] = await db
+      .update(userAgent)
+      .set(updateData)
+      .where(and(eq(userAgent.id, id), eq(userAgent.userId, userId)))
+      .returning();
+    return updated || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update user agent"
+    );
+  }
+}
+
+/**
+ * ТЗ-3B: Delete a personal agent (soft delete)
+ */
+export async function deleteUserAgent({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}): Promise<boolean> {
+  try {
+    const [deleted] = await db
+      .update(userAgent)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(eq(userAgent.id, id), eq(userAgent.userId, userId)))
+      .returning();
+    return !!deleted;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete user agent"
     );
   }
 }
