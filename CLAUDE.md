@@ -144,36 +144,38 @@ vercel --prod            # Deploy на Vercel
 
 **Основная:**
 - [README.md](README.md) — О проекте
-- [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md) — Видение
-- [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md) — План и прогресс
+- [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md) — Видение продукта
+- [SIMPLY_STATUS.md](SIMPLY_STATUS.md) — Текущее состояние проекта
 - [CHANGELOG.md](CHANGELOG.md) — История изменений
 
-**Техническая:**
-- [docs/ai-capabilities.md](docs/ai-capabilities.md) — Возможности AI
+**Техническая (AI):**
+- [docs/ai-agents.md](docs/ai-agents.md) — AI-агенты, модели, промпты
+- [docs/ai-artifacts.md](docs/ai-artifacts.md) — Артефакты (схема БД, API)
+- [docs/ai-tools.md](docs/ai-tools.md) — Инструменты (search, vision)
+
+**Техническая (инфраструктура):**
 - [docs/setup.md](docs/setup.md) — Установка
 - [docs/architecture.md](docs/architecture.md) — Архитектура
 - [docs/deployment.md](docs/deployment.md) — Deployment
 - [docs/decisions/](docs/decisions/) — ADR
 
-**ТЗ:**
-- [TZ_01_AGENTS_ARCHITECTURE.md](TZ_01_AGENTS_ARCHITECTURE.md) — Этап 1
-- [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md) — Этап 2
-- [TZ_03A_USER_PROFILE.md](TZ_03A_USER_PROFILE.md) — Этап 3A
-- [TZ_03B_AGENT_PERSONALIZATION.md](TZ_03B_AGENT_PERSONALIZATION.md) — Этап 3B
-- [TZ_04_UX_SIMPLIFICATION.md](TZ_04_UX_SIMPLIFICATION.md) — Этап 4
+**Архив (не читать для новых задач):**
+- [_archive/](_archive/) — завершённые ТЗ (история планирования)
+
+> **Правило:** Папка `_archive/` содержит завершённые ТЗ. Вся актуальная информация уже в docs/. Не трать токены на изучение архива.
 
 ---
 
 ## 💡 Workflow
 
-**При работе с задачами:**
-1. Открыть [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md)
-2. Найти текущую задачу
-3. Выполнить задачу
-4. Отметить [x] в ROADMAP
-5. Обновить прогресс и секцию "Текущая сессия"
+**При работе с новыми задачами:**
+1. Читай [SIMPLY_STATUS.md](SIMPLY_STATUS.md) — текущее состояние
+2. Читай [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md) — куда идём
+3. Читай docs/ — техническая документация
+4. Выполняй задачу
+5. Обновляй SIMPLY_STATUS.md и CHANGELOG.md
 
-**Правило:** По одной задаче за раз.
+**Правило:** Не читай `_archive/` — там только история.
 
 ---
 

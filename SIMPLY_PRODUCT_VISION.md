@@ -324,7 +324,7 @@ generateImage → "🎨 Генерирую изображение..."
 
 **Текущий проект:**
 - [SIMPLY_STATUS.md](SIMPLY_STATUS.md) — текущее состояние проекта
-- [docs/ai-capabilities.md](docs/ai-capabilities.md) — текущие возможности агентов
+- [docs/ai-agents.md](docs/ai-agents.md) — AI-агенты
 
 **Конкуренты (изучены):**
 - ConsoleX.ai — 200+ моделей, маркетплейс агентов, MCP

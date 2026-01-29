@@ -32,7 +32,7 @@
 - **Инструменты:** Web search, анализ сайтов, документы, презентации
 - **Streaming:** Быстрые ответы через streaming API
 
-**Возможности AI:** [docs/ai-capabilities.md](docs/ai-capabilities.md)
+**Возможности AI:** [docs/ai-agents.md](docs/ai-agents.md) | [docs/ai-artifacts.md](docs/ai-artifacts.md) | [docs/ai-tools.md](docs/ai-tools.md)
 
 ---
 
@@ -90,14 +90,16 @@ npm run db:studio    # Drizzle Studio (UI для БД)
 
 **Основные:**
 - [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md) — Видение продукта
-- [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md) — План разработки
+- [SIMPLY_STATUS.md](SIMPLY_STATUS.md) — Текущее состояние
 - [CHANGELOG.md](CHANGELOG.md) — История изменений
 - [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md) — Правила документации
 
 **Техническая:**
 - [docs/setup.md](docs/setup.md) — Детальная установка
 - [docs/architecture.md](docs/architecture.md) — Архитектура
-- [docs/ai-capabilities.md](docs/ai-capabilities.md) — Возможности AI
+- [docs/ai-agents.md](docs/ai-agents.md) — AI-агенты
+- [docs/ai-artifacts.md](docs/ai-artifacts.md) — Артефакты
+- [docs/ai-tools.md](docs/ai-tools.md) — Инструменты
 - [docs/decisions/](docs/decisions/) — Architecture Decision Records
 
 **Для AI:**

@@ -202,7 +202,7 @@
 - [lib/ai/agents/index.ts](../../lib/ai/agents/index.ts) - список агентов и конфигурация
 - [lib/ai/prompts.ts](../../lib/ai/prompts.ts) - загрузка промптов с кешированием
 - [lib/ai/agents/*.md](../../lib/ai/agents/) - 8 файлов промптов агентов
-- [docs/ai-capabilities.md](../ai-capabilities.md) - полное описание возможностей
+- [docs/ai-agents.md](../ai-agents.md) - полное описание агентов
 
 ### Коммиты:
 - `feat: implement 8 specialized agents with auto model selection` (Этап 3.1-3.4)

@@ -249,7 +249,9 @@ lib/ai/agents/
 
 - [setup.md](setup.md) — Установка
 - [deployment.md](deployment.md) — Деплой
-- [ai-capabilities.md](ai-capabilities.md) — AI возможности
+- [ai-agents.md](ai-agents.md) — AI-агенты
+- [ai-artifacts.md](ai-artifacts.md) — Артефакты
+- [ai-tools.md](ai-tools.md) — Инструменты
 - [ADR](decisions/) — Архитектурные решения
 - [TZ_01_AGENTS_ARCHITECTURE.md](../TZ_01_AGENTS_ARCHITECTURE.md) — ТЗ-1
 

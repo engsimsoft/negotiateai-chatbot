@@ -251,7 +251,7 @@
 - Мультипровайдер (GPT, Claude)
 - Smart Routing, Биллинг
 
-**Полный roadmap:** [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md)
+**Видение продукта:** [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md)
 
 ---
 
@@ -273,12 +273,13 @@
 
 **Основная:**
 - [README.md](README.md) — О проекте
-- [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md) — Видение
-- [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md) — План развития
+- [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md) — Видение продукта
 - [CHANGELOG.md](CHANGELOG.md) — История изменений
 
 **Техническая:**
-- [docs/ai-capabilities.md](docs/ai-capabilities.md) — AI возможности
+- [docs/ai-agents.md](docs/ai-agents.md) — AI-агенты
+- [docs/ai-artifacts.md](docs/ai-artifacts.md) — Артефакты
+- [docs/ai-tools.md](docs/ai-tools.md) — Инструменты
 - [docs/architecture.md](docs/architecture.md) — Архитектура
 - [docs/setup.md](docs/setup.md) — Установка
 - [docs/decisions/](docs/decisions/) — ADR
