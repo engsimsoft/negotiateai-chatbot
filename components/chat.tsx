@@ -330,6 +330,7 @@ export function Chat({
         <Messages
           agents={agents}
           chatId={id}
+          chatAgentId={effectiveAgentId}
           isArtifactVisible={isArtifactVisible}
           isReadonly={isReadonly}
           messages={messages}
@@ -346,6 +347,7 @@ export function Chat({
             {!isReadonly && (
               <MultimodalInput
                 agents={agents}
+                agentId={effectiveAgentId}
                 attachments={attachments}
                 chatId={id}
                 input={input}

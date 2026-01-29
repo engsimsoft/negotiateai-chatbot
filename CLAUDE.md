@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 2.6.0 | **Статус:** ТЗ-3B завершён
+**Проект:** Simply | **Версия:** 2.7.0 | **Статус:** ТЗ-4 завершён
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -105,19 +105,19 @@
 
 ## 🚀 Текущий этап
 
-**Завершены:** Этап 0 (Документация), Этап 1 (ТЗ-1), Этап 2 (ТЗ-2), Этап 3A (ТЗ-3A), Этап 3B (ТЗ-3B)
-**Следующий:** Этап 4+ — Мультипровайдер, биллинг
+**Завершены:** Этап 0 (Документация), Этап 1 (ТЗ-1), Этап 2 (ТЗ-2), Этап 3A (ТЗ-3A), Этап 3B (ТЗ-3B), Этап 4 (ТЗ-4)
+**Следующий:** Этап 5+ — Мультипровайдер, биллинг
 **Прогресс:** См. [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md)
 
-**Выполнено в ТЗ-3B:**
-- Диалог персонализации агентов (4 шага + режим редактирования)
-- Кнопка "В мои агенты" на странице агента
-- Секция "Мои агенты" в sidebar с меню действий
-- API CRUD для персональных агентов (POST, PATCH, DELETE)
-- Применение customizations (стиль, специализация) в chat route
-- Удаление персональных агентов с подтверждением
+**Выполнено в ТЗ-4:**
+- Убрана персонализация агентов из UI (backend сохранён)
+- @-mentions теперь "гостевой вызов" — не меняет Chat.agentId
+- Гостевые сообщения визуально выделены (отступ + фон + метка)
+- Подсказка обновлена + иконка 💡 для повторного показа
+- Suggested actions берутся из agent.capabilities.exampleTasks
+- Убрано создание greeting как сообщения
 
-**Детали ТЗ-3B:** [TZ_03B_AGENT_PERSONALIZATION.md](TZ_03B_AGENT_PERSONALIZATION.md)
+**Детали ТЗ-4:** [TZ_04_UX_SIMPLIFICATION.md](TZ_04_UX_SIMPLIFICATION.md)
 
 ---
 
@@ -160,6 +160,7 @@ vercel --prod            # Deploy на Vercel
 - [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md) — Этап 2
 - [TZ_03A_USER_PROFILE.md](TZ_03A_USER_PROFILE.md) — Этап 3A
 - [TZ_03B_AGENT_PERSONALIZATION.md](TZ_03B_AGENT_PERSONALIZATION.md) — Этап 3B
+- [TZ_04_UX_SIMPLIFICATION.md](TZ_04_UX_SIMPLIFICATION.md) — Этап 4
 
 ---
 

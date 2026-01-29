@@ -72,6 +72,7 @@ function PureMultimodalInput({
   onModelChange,
   usage,
   agents,
+  agentId,
 }: {
   chatId: string;
   input: string;
@@ -91,6 +92,7 @@ function PureMultimodalInput({
   onModelChange?: (modelId: string) => void;
   usage?: AppUsage;
   agents?: Agent[];
+  agentId?: string;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -136,6 +138,9 @@ function PureMultimodalInput({
 
   // ТЗ-2: @-mention autocomplete state
   const [mentionOpen, setMentionOpen] = useState(false);
+
+  // ТЗ-4: Force show hint state (for 💡 button)
+  const [forceShowHint, setForceShowHint] = useState(false);
 
   const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = event.target.value;
@@ -271,12 +276,15 @@ function PureMultimodalInput({
             chatId={chatId}
             selectedVisibilityType={selectedVisibilityType}
             sendMessage={sendMessage}
+            agent={agentId ? agents?.find((a) => a.id === agentId) : undefined}
           />
         )}
 
       <ChatHint
         hasUsedMentions={input.includes("@")}
         messagesCount={messages.length}
+        forceShow={forceShowHint}
+        onDismiss={() => setForceShowHint(false)}
       />
 
       {agents && agents.length > 0 && (
@@ -369,6 +377,18 @@ function PureMultimodalInput({
               onModelChange={onModelChange}
               selectedModelId={selectedModelId}
             />
+            {/* ТЗ-4: Hint button to show @-mentions tip */}
+            <Button
+              className="aspect-square h-8 rounded-lg p-1 transition-colors hover:bg-accent"
+              onClick={(event) => {
+                event.preventDefault();
+                setForceShowHint(true);
+              }}
+              title="Подсказка про @-mentions"
+              variant="ghost"
+            >
+              <span className="text-sm">💡</span>
+            </Button>
           </PromptInputTools>
 
           {retryState && retryState.count > 0 && (

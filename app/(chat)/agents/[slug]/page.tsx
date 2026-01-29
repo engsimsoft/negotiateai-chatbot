@@ -3,7 +3,6 @@ import { getAgentBySlug } from "@/lib/db/queries";
 import type { AgentCapabilities } from "@/lib/db/schema";
 import { auth } from "../../../(auth)/auth";
 import { AgentsHeader } from "../agents-header";
-import { AddToMyAgentsButton } from "./add-to-my-agents-button";
 import { StartChatButton } from "./start-chat-button";
 
 interface AgentPageProps {
@@ -70,9 +69,6 @@ export default async function AgentPage({ params }: AgentPageProps) {
 
             <div className="flex gap-3">
               <StartChatButton agentId={agent.id} />
-              <AddToMyAgentsButton
-                agent={{ id: agent.id, name: agent.name, icon: agent.icon }}
-              />
             </div>
           </div>
 

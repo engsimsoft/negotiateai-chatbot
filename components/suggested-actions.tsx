@@ -3,27 +3,32 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { motion } from "framer-motion";
 import { memo } from "react";
+import type { Agent, AgentCapabilities } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { Suggestion } from "./elements/suggestion";
 import type { VisibilityType } from "./visibility-selector";
+
+// ТЗ-4: Default suggestions when no agent is selected
+const defaultSuggestions = [
+  "Объясни простыми словами...",
+  "Помоги составить план...",
+  "Проанализируй информацию...",
+  "Посоветуй как лучше...",
+];
 
 type SuggestedActionsProps = {
   chatId: string;
   sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
   selectedVisibilityType: VisibilityType;
+  agent?: Agent;
 };
 
-function PureSuggestedActions({ chatId, sendMessage }: SuggestedActionsProps) {
-  const suggestedActions = [
-    "Объясни разницу между AGORA и Saleor простыми словами",
-    "Как настроить парсинг тендеров?",
-    "Что находится в папке knowledge? Покажи все документы",
-    "Как будет работать админка платформы?",
-    "Нужен ли отдельный сервер для проекта?",
-    "Что такое AI-разработка и как она экономит деньги?",
-    "Какие технические риски у проекта?",
-    "Составь техническое задание для программистов",
-  ];
+function PureSuggestedActions({ chatId, sendMessage, agent }: SuggestedActionsProps) {
+  // ТЗ-4: Get suggestions from agent's exampleTasks or use defaults
+  const capabilities = agent?.capabilities as AgentCapabilities | undefined;
+  const suggestedActions = capabilities?.exampleTasks?.length
+    ? capabilities.exampleTasks.slice(0, 4) // Limit to 4 suggestions
+    : defaultSuggestions;
 
   return (
     <div
@@ -64,6 +69,9 @@ export const SuggestedActions = memo(
       return false;
     }
     if (prevProps.selectedVisibilityType !== nextProps.selectedVisibilityType) {
+      return false;
+    }
+    if (prevProps.agent?.id !== nextProps.agent?.id) {
       return false;
     }
 

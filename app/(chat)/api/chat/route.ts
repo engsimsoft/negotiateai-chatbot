@@ -42,7 +42,6 @@ import {
   getUserById,
   saveChat,
   saveMessages,
-  updateChatAgent,
   updateChatLastContextById,
 } from "@/lib/db/queries";
 import { parseMention, buildAgentsList } from "@/lib/agents/parse-mentions";
@@ -133,29 +132,7 @@ export async function POST(request: Request) {
         visibility: selectedVisibilityType,
         agentId,
       });
-
-      // Add greeting message from agent for new chats
-      if (agentId) {
-        const agentData = await getAgentById({ id: agentId });
-        if (agentData?.greeting) {
-          await saveMessages({
-            messages: [
-              {
-                id: generateUUID(),
-                chatId: id,
-                role: "assistant",
-                parts: [{ type: "text", text: agentData.greeting }],
-                attachments: [],
-                createdAt: new Date(),
-                tokenCount: estimateMessageTokens([
-                  { type: "text", text: agentData.greeting },
-                ]),
-                agentId: agentId,
-              },
-            ],
-          });
-        }
-      }
+      // ТЗ-4: Greeting НЕ добавляется как сообщение — используем UI с заголовком + suggested actions
     }
 
     // Вычисляем токены нового user message
@@ -226,23 +203,13 @@ export async function POST(request: Request) {
     const { agent: mentionedAgent } = parseMention(userText, allAgents);
     if (mentionedAgent) {
       mentionedAgentId = mentionedAgent.id;
-      console.log(`[Mention] Detected @${mentionedAgent.name} (${mentionedAgent.slug})`);
-
-      // Update Chat.agentId to the mentioned agent
-      if (session.user?.id) {
-        try {
-          await updateChatAgent({
-            chatId: id,
-            agentId: mentionedAgent.id,
-            userId: session.user.id,
-          });
-        } catch (e) {
-          console.warn("Failed to update chat agent on mention:", e);
-        }
-      }
+      console.log(`[Mention] Guest agent call: @${mentionedAgent.name} (${mentionedAgent.slug})`);
+      // ТЗ-4: НЕ обновляем Chat.agentId — это одноразовый "гостевой" вызов
     }
 
-    // Determine which agent to use: @-mention takes priority, then chat's agent
+    // Determine which agent responds:
+    // - If @-mention detected: use mentioned agent (guest call)
+    // - Otherwise: use chat's default agent
     const resolvedAgentId = mentionedAgentId || chat?.agentId || agentId;
 
     const stream = createUIMessageStream({

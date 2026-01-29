@@ -13,6 +13,7 @@ import { PreviewMessage, ThinkingMessage } from "./message";
 
 type MessagesProps = {
   chatId: string;
+  chatAgentId?: string;
   status: UseChatHelpers<ChatMessage>["status"];
   votes: Vote[] | undefined;
   messages: ChatMessage[];
@@ -28,6 +29,7 @@ type MessagesProps = {
 
 function PureMessages({
   chatId,
+  chatAgentId,
   status,
   votes,
   messages,
@@ -82,6 +84,7 @@ function PureMessages({
               <PreviewMessage
                 agents={agents}
                 chatId={chatId}
+                chatAgentId={chatAgentId}
                 isLoading={isStreamingMessage}
                 isReadonly={isReadonly}
                 key={message.id}

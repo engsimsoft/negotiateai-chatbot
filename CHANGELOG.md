@@ -12,6 +12,69 @@
 
 ---
 
+## [2.7.0] - 2026-01-29 - ТЗ-4: Упрощение UX и исправление @-mentions
+
+**MINOR RELEASE**: Упрощение интерфейса для пользователей 40+ без технического бэкграунда. Философия: "iPhone, не Android".
+
+### Summary
+
+Убрана избыточная сложность UI. Исправлена логика @-mentions — теперь это "гостевой вызов" агента без переключения чата. Гостевые сообщения визуально выделяются. Suggested actions теперь берутся из БД. Приветствие — UI компонент, не сообщение в БД.
+
+### Changed
+
+#### @-mentions — одноразовый вызов
+- @-mention НЕ меняет `Chat.agentId` — агент отвечает один раз как "гость"
+- Следующее сообщение без @ идёт основному агенту чата
+- Убран вызов `updateChatAgent()` при @-mention в `app/(chat)/api/chat/route.ts`
+
+#### Визуализация гостевых сообщений
+- Гостевые ответы визуально отличаются: отступ слева, фоновый цвет, метка "↩️ гость"
+- Определение гостя: `Message.agentId !== Chat.agentId`
+- Изменён `components/message.tsx` с новыми стилями
+
+#### Suggested actions из БД
+- Используются `agent.capabilities.exampleTasks` вместо хардкода
+- Разные suggestions для каждого агента
+- Дефолтные suggestions когда агент не выбран
+- Очищен `components/suggested-actions.tsx`
+
+#### Подсказка про @-mentions
+- Новый текст: "Напишите @Помощник чтобы позвать другого агента прямо в этот чат"
+- Ключ localStorage: `simply-hint-guest-agent-seen`
+- Иконка 💡 рядом с полем ввода для повторного показа подсказки
+
+#### Приветствие
+- Greeting НЕ добавляется как сообщение в БД
+- Пустой чат показывает заголовок + suggested actions
+- Убрано создание `greetingMessages` в chat route
+
+### Removed (из UI, сохранено в backend)
+
+#### Персонализация агентов
+- Кнопка "В мои агенты" убрана со страницы агента
+- Секция "Мои агенты" убрана из sidebar
+- Backend API и таблица `user_agents` сохранены для будущего
+
+#### Хардкод
+- Удалены упоминания AGORA/Saleor/тендеров из UI компонентов
+
+### Files Modified
+- `app/(chat)/api/chat/route.ts` — логика @-mentions, убран greeting
+- `app/(chat)/agents/[slug]/page.tsx` — убрана кнопка персонализации
+- `components/sidebar-agents.tsx` — убрана секция "Мои агенты"
+- `components/message.tsx` — стилизация гостевых сообщений
+- `components/messages.tsx` — передача chatAgentId
+- `components/chat.tsx` — передача chatAgentId и agentId
+- `components/suggested-actions.tsx` — данные из БД
+- `components/chat-hint.tsx` — новый текст
+- `components/multimodal-input.tsx` — иконка 💡, передача agentId
+
+### Links
+- [TZ_04_UX_SIMPLIFICATION.md](TZ_04_UX_SIMPLIFICATION.md) — полное ТЗ
+- [TZ_04_ROADMAP.md](TZ_04_ROADMAP.md) — дорожная карта
+
+---
+
 ## [2.6.0] - 2026-01-29 - ТЗ-3B: Персонализация агентов
 
 **MINOR RELEASE**: Диалоговая персонализация агентов — пользователь создаёт персональную копию через скриптованный диалог.
