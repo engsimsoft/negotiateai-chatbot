@@ -1,6 +1,6 @@
 # Инструменты AI-агентов
 
-**Версия:** 2.7.0
+**Версия:** 2.9.0
 **Последнее обновление:** 2026-01-29
 **Статус:** 8 инструментов
 
@@ -24,9 +24,12 @@
 | `getWeather` | Погода по городу | Все агенты |
 | `getCurrentDate` | Текущая дата | Все агенты |
 | `readDocument` | Чтение из knowledge/ | Все агенты |
-| `createDocument` | Создание артефактов | Все агенты (презентации — только Презентатор) |
+| `createDocument` | Создание артефактов (text, markdown, excel, presentations) | Все агенты (презентации — только Презентатор) |
 | `updateDocument` | Обновление артефактов | Все агенты |
 | `requestSuggestions` | Предложения по улучшению | Все агенты |
+| `parseExcel` | Анализ загруженных Excel-файлов | Все агенты |
+
+> **Примечание:** Excel создаётся через `createDocument(kind: "excel")`, редактируется через `updateDocument`. Отдельный `parseExcel` используется только для анализа **загруженных** пользователем файлов.
 
 ---
 
@@ -231,6 +234,79 @@ requestSuggestions({
 
 ---
 
+## Excel (через артефакты)
+
+Excel-документы создаются и редактируются через систему артефактов.
+
+### Создание Excel
+
+Используйте `createDocument` с `kind: "excel"`.
+
+**Возможности:**
+- Множественные листы
+- Типы данных: текст, число, валюта (₽), процент, дата
+- Формулы: SUM, AVERAGE, IF, VLOOKUP и др.
+- 5 цветовых тем
+- Графики: столбчатые, линейные, круговые, и др.
+- Русская локализация
+
+**10 шаблонов:**
+- Семейный бюджет
+- Бюджет проекта
+- Учёт доходов/расходов ИП
+- Контент-план
+- Медиаплан
+- Счёт/Инвойс
+- Учёт клиентов
+- График отпусков
+- Сравнительная таблица
+- Трекер задач
+
+**Файл:** [artifacts/excel/server.ts](../artifacts/excel/server.ts)
+
+### Редактирование Excel
+
+Используйте `updateDocument` для редактирования созданных Excel-документов.
+
+**Операции:**
+- Добавление колонок и строк
+- Изменение значений ячеек
+- Добавление формул
+- Добавление графиков
+- Изменение стилей и тем
+
+### Parse Excel
+
+Анализ загруженных пользователем Excel-файлов (.xlsx, .xls).
+
+**Возможности:**
+- Чтение структуры файла
+- Определение типов колонок
+- Preview первых 10 строк
+- Извлечение формул
+- Генерация саммари
+
+**Параметры:**
+
+```typescript
+parseExcel({
+  fileUrl: string,        // URL файла (Vercel Blob)
+})
+```
+
+**Файл:** [lib/ai/tools/excel/parse-excel.ts](../lib/ai/tools/excel/parse-excel.ts)
+
+### Пример использования
+
+```
+Сделай таблицу расходов за месяц: продукты 15000, транспорт 5000, ЖКХ 8000
+Создай медиаплан для VK с бюджетом 100000₽
+Добавь в таблицу колонку с НДС 20%
+[Загрузить .xlsx] — Какой итог по всем месяцам?
+```
+
+---
+
 ## Vision / Multimodal
 
 ### Image OCR
@@ -267,10 +343,12 @@ requestSuggestions({
 **Поддерживаемые форматы:**
 - Изображения: JPG, PNG
 - Документы: PDF, DOCX, TXT, MD
+- Таблицы: XLSX, XLS
 
 **Обработка:**
 - DOCX → конвертация в TXT (mammoth)
 - TXT/MD → UTF-8 текст
+- XLSX/XLS → конвертация в CSV текст (xlsx library)
 - PDF/Images → без конвертации (multimodal)
 
 **Хранилище:** Vercel Blob Storage
@@ -299,9 +377,10 @@ const tools = {
   getWeather: getWeather(),
   getCurrentDate: getCurrentDate(),
   readDocument: readDocument(),
-  createDocument: createDocument({ session, dataStream }),
-  updateDocument: updateDocument({ session, dataStream }),
+  createDocument: createDocument({ session, dataStream }),  // создаёт text, markdown, excel, presentations
+  updateDocument: updateDocument({ session, dataStream }),  // редактирует артефакты
   requestSuggestions: requestSuggestions({ session }),
+  parseExcel,                                               // анализ загруженных файлов
 };
 ```
 
@@ -373,4 +452,14 @@ const tools = {
 
 ---
 
-**Обновлено:** 2026-01-29
+## Excel зависимости
+
+| Пакет | Версия | Назначение |
+|-------|--------|------------|
+| `exceljs` | ^4.4.0 | Генерация .xlsx файлов |
+| `xlsx` | ^0.18.5 | Парсинг загруженных файлов |
+| `recharts` | ^2.15.0 | Рендеринг графиков в UI |
+
+---
+
+**Обновлено:** 2026-01-29 (v2.9.0 — Excel Tools)

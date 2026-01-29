@@ -8,7 +8,184 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- Этап 4+: Tool Activity UX, мультипровайдер, биллинг
+- Этап 7+: Tool Activity UX, мультипровайдер, биллинг
+
+---
+
+## [2.9.0] - 2026-01-29 - ТЗ-6: Excel Tool
+
+**MINOR RELEASE**: Полноценная поддержка Excel — создание, анализ и редактирование таблиц с формулами, графиками и профессиональными стилями.
+
+### Summary
+
+Добавлен новый тип документа Excel с поддержкой множественных листов, формул (SUM, AVERAGE, IF, VLOOKUP), графиков (столбчатые, линейные, круговые и др.) и 5 цветовых тем. Реализовано 10 профессиональных шаблонов. Поддержка загрузки и анализа .xlsx/.xls файлов. Экспорт в XLSX и PDF.
+
+### Added
+
+#### Excel документы
+- Новый тип документа `excel` в схеме БД
+- Server handler `artifacts/excel/server.ts` со стримингом через `data-excelDelta`
+- Client component `artifacts/excel/client.tsx` с таблицами и графиками
+
+#### Excel через артефакты
+- `createDocument(kind: "excel")` — создание таблиц с формулами, графиками и стилями
+- `updateDocument` — редактирование созданных Excel-документов
+- `parseExcel` — анализ загруженных .xlsx/.xls файлов
+
+#### 10 шаблонов
+- Семейный бюджет
+- Бюджет проекта
+- Учёт доходов/расходов ИП
+- Контент-план
+- Медиаплан
+- Счёт/Инвойс
+- Учёт клиентов
+- График отпусков
+- Сравнительная таблица
+- Трекер задач
+
+#### 5 цветовых тем
+- corporate-blue (по умолчанию)
+- forest-green
+- warm-orange
+- professional-gray
+- modern-teal
+
+#### Графики (recharts)
+- Столбчатые (column, bar)
+- Линейные (line, area)
+- Круговые (pie, doughnut)
+
+#### Загрузка файлов
+- Поддержка .xlsx и .xls в upload API
+- Конвертация в CSV для анализа AI
+
+#### Экспорт
+- Скачивание .xlsx (оригинальный файл)
+- Экспорт в PDF (html2pdf.js)
+- Копирование как CSV
+
+### Changed
+
+#### Интеграция с агентами
+- Маркетолог: createExcel, parseExcel для медиапланов и бюджетов
+- Копирайтер: createExcel для контент-планов
+- Универсальный: все Excel tools
+
+#### Chat Route
+- Добавлены createExcel, parseExcel, editExcel в tools и experimental_activeTools
+
+### Technical
+
+#### Dependencies
+- `exceljs` ^4.4.0 — генерация .xlsx файлов
+- `xlsx` ^0.18.5 — парсинг загруженных файлов
+- `recharts` ^2.15.0 — рендеринг графиков
+- `react-is` — peer dependency для recharts
+
+#### Files Added
+- `lib/ai/tools/excel/types.ts` — TypeScript типы
+- `lib/ai/tools/excel/styles.ts` — темы и форматирование
+- `lib/ai/tools/excel/utils.ts` — утилиты
+- `lib/ai/tools/excel/create-excel.ts` — createExcel tool
+- `lib/ai/tools/excel/parse-excel.ts` — parseExcel tool
+- `lib/ai/tools/excel/edit-excel.ts` — editExcel tool
+- `lib/ai/tools/excel/templates/index.ts` — 10 шаблонов
+- `lib/ai/tools/excel/index.ts` — экспорт
+- `artifacts/excel/server.ts` — document handler
+- `artifacts/excel/client.tsx` — UI компонент
+
+#### Files Modified
+- `lib/db/schema.ts` — добавлен "excel" в enum kind
+- `lib/types.ts` — добавлен `excelDelta` в CustomUIDataTypes
+- `lib/ai/tools/create-document.ts` — описание excel типа
+- `lib/artifacts/server.ts` — регистрация excel handler
+- `components/artifact.tsx` — регистрация excelArtifact
+- `app/(chat)/api/chat/route.ts` — интеграция Excel tools
+- `app/(chat)/api/files/upload/route.ts` — поддержка xlsx/xls
+- `components/multimodal-input.tsx` — accept для xlsx/xls
+- `components/preview-attachment.tsx` — иконка 📊 для Excel
+- `lib/db/seed-agents.ts` — system prompts с Excel
+
+---
+
+## [2.8.0] - 2026-01-29 - ТЗ-5: Markdown документы и улучшения UI
+
+**MINOR RELEASE**: Новый тип документа Markdown с рендерингом, экспортом в PDF, и компактным превью в стиле Anthropic.
+
+### Summary
+
+Добавлен тип документа Markdown с полноценным рендерингом (заголовки, списки, таблицы, код). Реализованы режимы просмотра и редактирования с переключением. Добавлен экспорт в PDF и .md. Превью документов в чате переработано — теперь компактные карточки с информацией о формате.
+
+### Added
+
+#### Markdown документы
+- Новый тип документа `markdown` в схеме БД
+- Server handler `artifacts/markdown/server.ts` со стримингом через `data-markdownDelta`
+- Client component `artifacts/markdown/client.tsx` с react-markdown + remark-gfm
+- Режим просмотра: рендеринг markdown в красивый HTML с prose-стилями
+- Режим редактирования: textarea с исходным markdown кодом
+- Переключение режимов кнопками ✏️/👁️
+
+#### Экспорт документов
+- Скачивание как PDF (html2pdf.js) с сохранением форматирования
+- Скачивание как .md файл
+- Новая иконка `FileTextIcon` для markdown
+
+#### Компактное превью (Anthropic-стиль)
+- Карточка ~56px вместо ~314px
+- Иконка документа + название + формат
+- Форматы: "Документ · MD", "Текст · TXT", "Презентация · PPTX/HTML", "Изображение"
+- Hover-эффект при наведении
+
+#### Публичные ссылки для Markdown
+- Поддержка markdown в `app/share/[token]/shared-document-view.tsx`
+- Скачивание PDF и .md на публичной странице
+
+### Changed
+
+#### Система actions артефактов
+- Новое свойство `isHidden` для условного скрытия кнопок
+- Исправлен memo в `artifact-actions.tsx` — теперь реагирует на изменение metadata
+
+#### Инициализация документов
+- useEffect для загрузки контента теперь зависит от `artifact.isVisible`
+- Исправлена проблема с повторным открытием документов
+
+#### Терминология
+- "Артефакт" → "Документ в холсте" в интерфейсе
+
+### Technical
+
+#### Dependencies
+- `react-markdown` — рендеринг markdown
+- `remark-gfm` — GitHub Flavored Markdown (таблицы, чеклисты)
+- `html2pdf.js` — генерация PDF на клиенте
+- `@tailwindcss/typography` — prose-стили для markdown
+
+#### Files Added
+- `artifacts/markdown/server.ts`
+- `artifacts/markdown/client.tsx`
+- `components/chat-hints-panel.tsx`
+
+#### Files Modified
+- `lib/db/schema.ts` — добавлен "markdown" в enum kind
+- `lib/types.ts` — добавлен `markdownDelta` в CustomUIDataTypes
+- `lib/ai/tools/create-document.ts` — описание типов документов
+- `lib/artifacts/server.ts` — регистрация markdown handler
+- `components/artifact.tsx` — регистрация markdown + fix инициализации
+- `components/artifact-actions.tsx` — isHidden + metadata в memo
+- `components/create-artifact.tsx` — тип isHidden в ArtifactAction
+- `components/document-preview.tsx` — компактный Anthropic-стиль
+- `components/icons.tsx` — FileTextIcon
+- `app/share/[token]/shared-document-view.tsx` — поддержка markdown
+
+### Performance
+- Размер бандла `/chat/[id]` уменьшился с 735kB до 665kB (убраны неиспользуемые компоненты из превью)
+
+### Links
+- [_archive/TZ_05_MARKDOWN_ARTIFACTS.md](_archive/TZ_05_MARKDOWN_ARTIFACTS.md) — полное ТЗ
+- [_archive/TZ_05_ROADMAP.md](_archive/TZ_05_ROADMAP.md) — дорожная карта
 
 ---
 

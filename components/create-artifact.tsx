@@ -7,6 +7,7 @@ import type { UIArtifact } from "./artifact";
 
 export type ArtifactActionContext<M = any> = {
   content: string;
+  title: string;
   documentId: string;
   handleVersionChange: (type: "next" | "prev" | "toggle" | "latest") => void;
   currentVersionIndex: number;
@@ -23,6 +24,7 @@ type ArtifactAction<M = any> = {
   description: string;
   onClick: (context: ArtifactActionContext<M>) => Promise<void> | void;
   isDisabled?: (context: ArtifactActionContext<M>) => boolean;
+  isHidden?: (context: ArtifactActionContext<M>) => boolean;
 };
 
 export type ArtifactToolbarContext = {

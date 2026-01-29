@@ -18,14 +18,16 @@ const FileSchema = z.object({
           "image/png",
           "application/pdf",
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // DOCX
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // XLSX
+          "application/vnd.ms-excel", // XLS
           "text/plain",
           "text/markdown",
           "text/x-markdown", // Alternative MD MIME type
-          "application/octet-stream", // Generic binary (browsers may use this for .md)
+          "application/octet-stream", // Generic binary (browsers may use this for .md or .xlsx)
         ].includes(file.type),
       {
         message:
-          "File type should be JPEG, PNG, PDF, DOCX, TXT, or MD",
+          "File type should be JPEG, PNG, PDF, DOCX, XLSX, XLS, TXT, or MD",
       }
     ),
 });
@@ -34,6 +36,12 @@ const FileSchema = z.object({
 const getMammoth = async () => {
   const mammoth = await import("mammoth");
   return mammoth.default || mammoth;
+};
+
+// Dynamic import for xlsx (Excel parser)
+const getXLSX = async () => {
+  const xlsx = await import("xlsx");
+  return xlsx;
 };
 
 export async function POST(request: Request) {
@@ -71,9 +79,16 @@ export async function POST(request: Request) {
     const fileType = file.type;
 
     // Get file extension for better type detection
-    const fileExt = originalFilename.toLowerCase().match(/\.(docx|txt|md)$/)?.[1];
+    const fileExt = originalFilename.toLowerCase().match(/\.(docx|txt|md|xlsx|xls)$/)?.[1];
 
     try {
+      // Check if it's an Excel file
+      const isExcelFile =
+        fileType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        fileType === "application/vnd.ms-excel" ||
+        fileExt === "xlsx" ||
+        fileExt === "xls";
+
       // Process document files (DOCX, TXT, MD) and extract text
       // These will be uploaded as text/plain to work with Claude multimodal API
       const isDocumentFile =
@@ -85,6 +100,38 @@ export async function POST(request: Request) {
         fileExt === "docx" ||
         fileExt === "txt" ||
         fileExt === "md";
+
+      // Process Excel files (XLSX, XLS) and extract as CSV text
+      if (isExcelFile) {
+        const xlsx = await getXLSX();
+        const workbook = xlsx.read(Buffer.from(fileBuffer), { type: "buffer" });
+
+        // Convert all sheets to text format
+        let extractedText = "";
+        workbook.SheetNames.forEach((sheetName, index) => {
+          const worksheet = workbook.Sheets[sheetName];
+          const csv = xlsx.utils.sheet_to_csv(worksheet);
+          if (index > 0) extractedText += "\n\n";
+          extractedText += `=== Лист: ${sheetName} ===\n${csv}`;
+        });
+
+        // Upload extracted text as .txt file
+        const textFilename = originalFilename.replace(/\.(xlsx|xls)$/i, ".txt");
+        const textBuffer = Buffer.from(extractedText, "utf-8");
+
+        const data = await put(textFilename, textBuffer, {
+          access: "public",
+          contentType: "text/plain",
+        });
+
+        return NextResponse.json({
+          ...data,
+          originalFilename,
+          originalContentType: fileType,
+          processed: true,
+          fileType: "excel",
+        });
+      }
 
       if (isDocumentFile) {
         let extractedText: string;

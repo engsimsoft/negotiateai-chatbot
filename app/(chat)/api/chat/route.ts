@@ -23,6 +23,7 @@ import {
 } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
+import { parseExcel } from "@/lib/ai/tools/excel";
 import { getCurrentDate } from "@/lib/ai/tools/get-current-date";
 import { getWeather } from "@/lib/ai/tools/get-weather";
 import { readDocument } from "@/lib/ai/tools/read-document";
@@ -324,6 +325,7 @@ export async function POST(request: Request) {
             "createDocument",
             "updateDocument",
             "requestSuggestions",
+            "parseExcel",
           ],
           experimental_transform: smoothStream({ chunking: "word" }),
           tools: {
@@ -337,6 +339,7 @@ export async function POST(request: Request) {
               dataStream,
             }),
             webSearch,
+            parseExcel,
           },
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,

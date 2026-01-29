@@ -12,7 +12,9 @@ import {
 } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { useDebounceCallback, useWindowSize } from "usehooks-ts";
+import { excelArtifact } from "@/artifacts/excel/client";
 import { imageArtifact } from "@/artifacts/image/client";
+import { markdownArtifact } from "@/artifacts/markdown/client";
 import { presentationPptxArtifact } from "@/artifacts/presentation-pptx/client";
 import { presentationRevealArtifact } from "@/artifacts/presentation-reveal/client";
 import { textArtifact } from "@/artifacts/text/client";
@@ -35,6 +37,8 @@ export const artifactDefinitions = [
   imageArtifact,
   presentationRevealArtifact,
   presentationPptxArtifact,
+  markdownArtifact,
+  excelArtifact,
 ];
 export type ArtifactKind = (typeof artifactDefinitions)[number]["kind"];
 
@@ -109,7 +113,9 @@ function PureArtifact({
   const { open: isSidebarOpen } = useSidebar();
 
   useEffect(() => {
-    if (documents && documents.length > 0) {
+    // Load content when documents are available AND artifact is visible
+    // This ensures content is loaded when reopening a closed document
+    if (documents && documents.length > 0 && artifact.isVisible) {
       const mostRecentDocument = documents.at(-1);
 
       if (mostRecentDocument) {
@@ -121,7 +127,7 @@ function PureArtifact({
         }));
       }
     }
-  }, [documents, setArtifact]);
+  }, [documents, setArtifact, artifact.isVisible]);
 
   useEffect(() => {
     mutateDocuments();
@@ -256,13 +262,14 @@ function PureArtifact({
   }
 
   useEffect(() => {
-    if (artifact.documentId !== "init" && artifactDefinition.initialize) {
+    // Initialize metadata when artifact becomes visible or documentId changes
+    if (artifact.documentId !== "init" && artifact.isVisible && artifactDefinition.initialize) {
       artifactDefinition.initialize({
         documentId: artifact.documentId,
         setMetadata,
       });
     }
-  }, [artifact.documentId, artifactDefinition, setMetadata]);
+  }, [artifact.documentId, artifact.isVisible, artifactDefinition, setMetadata]);
 
   return (
     <AnimatePresence>

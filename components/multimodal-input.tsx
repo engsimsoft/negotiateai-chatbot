@@ -26,7 +26,7 @@ import type { Agent } from "@/lib/db/schema";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
-import { ChatHint } from "./chat-hint";
+import { ChatHintsPanel } from "./chat-hints-panel";
 import { Context } from "./elements/context";
 import {
   extractMentionQuery,
@@ -267,6 +267,64 @@ function PureMultimodalInput({
     [setAttachments, uploadFile]
   );
 
+  // Handle paste from clipboard (Ctrl+V / Cmd+V)
+  const handlePaste = useCallback(
+    async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      const imageFiles: File[] = [];
+
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) {
+            // Generate a readable filename with timestamp
+            const timestamp = new Date().toISOString().slice(11, 19).replace(/:/g, "-");
+            const extension = file.type.split("/")[1] || "png";
+            const namedFile = new File(
+              [file],
+              `screenshot-${timestamp}.${extension}`,
+              { type: file.type }
+            );
+            imageFiles.push(namedFile);
+          }
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        // Prevent default only if we have images to handle
+        event.preventDefault();
+
+        setUploadQueue((current) => [
+          ...current,
+          ...imageFiles.map((f) => f.name),
+        ]);
+
+        try {
+          const uploadPromises = imageFiles.map((file) => uploadFile(file));
+          const uploadedAttachments = await Promise.all(uploadPromises);
+          const successfullyUploadedAttachments = uploadedAttachments.filter(
+            (attachment) => attachment !== undefined
+          );
+
+          setAttachments((currentAttachments) => [
+            ...currentAttachments,
+            ...successfullyUploadedAttachments,
+          ]);
+        } catch (error) {
+          console.error("Error uploading pasted images!", error);
+          toast.error("Failed to upload pasted image");
+        } finally {
+          setUploadQueue((current) =>
+            current.filter((name) => !imageFiles.some((f) => f.name === name))
+          );
+        }
+      }
+    },
+    [uploadFile, setAttachments]
+  );
+
   return (
     <div className={cn("relative flex w-full flex-col gap-4", className)}>
       {messages.length === 0 &&
@@ -280,7 +338,7 @@ function PureMultimodalInput({
           />
         )}
 
-      <ChatHint
+      <ChatHintsPanel
         hasUsedMentions={input.includes("@")}
         messagesCount={messages.length}
         forceShow={forceShowHint}
@@ -303,7 +361,7 @@ function PureMultimodalInput({
         ref={fileInputRef}
         tabIndex={-1}
         type="file"
-        accept="image/jpeg,image/png,application/pdf,.docx,.txt,.md"
+        accept="image/jpeg,image/png,application/pdf,.docx,.xlsx,.xls,.txt,.md"
       />
 
       <PromptInput
@@ -359,6 +417,7 @@ function PureMultimodalInput({
             maxHeight={200}
             minHeight={44}
             onChange={handleInput}
+            onPaste={handlePaste}
             placeholder="Send a message..."
             ref={textareaRef}
             rows={1}
@@ -377,14 +436,14 @@ function PureMultimodalInput({
               onModelChange={onModelChange}
               selectedModelId={selectedModelId}
             />
-            {/* ТЗ-4: Hint button to show @-mentions tip */}
+            {/* ТЗ-5: Hints panel button */}
             <Button
               className="aspect-square h-8 rounded-lg p-1 transition-colors hover:bg-accent"
               onClick={(event) => {
                 event.preventDefault();
                 setForceShowHint(true);
               }}
-              title="Подсказка про @-mentions"
+              title="Подсказки"
               variant="ghost"
             >
               <span className="text-sm">💡</span>

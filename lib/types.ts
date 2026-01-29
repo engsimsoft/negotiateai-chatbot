@@ -34,6 +34,7 @@ export type ChatTools = {
 export type CustomUIDataTypes = {
   textDelta: string;
   imageDelta: string;
+  markdownDelta: string;
   presentationDelta: {
     jsonContent?: string;
     themeId?: string;
@@ -50,6 +51,11 @@ export type CustomUIDataTypes = {
     previewUrls: string[];
     slideCount: number;
     themeId: string;
+  };
+  excelDelta: {
+    excelData?: string; // JSON stringified ExcelData
+    fileUrl?: string;
+    isComplete?: boolean;
   };
   suggestion: Suggestion;
   appendMessage: string;

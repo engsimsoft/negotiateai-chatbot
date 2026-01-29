@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 2.7.0 | **Статус:** ТЗ-4 завершён
+**Проект:** Simply | **Версия:** 2.9.0 | **Статус:** ТЗ-6 завершён
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -54,7 +54,8 @@
 **AI/Chat:**
 - `app/(chat)/api/chat/route.ts` — Chat endpoint (streaming)
 - `lib/ai/providers.ts` — Конфигурация AI-моделей
-- `lib/ai/tools/` — Инструменты (search, web scraping)
+- `lib/ai/tools/` — Инструменты (search, excel, web scraping)
+- `lib/ai/tools/excel/` — Excel tools (create, parse, edit)
 - `lib/db/seed-agents.ts` — Агенты и промпты (БД)
 
 **Auth/DB:**
@@ -105,19 +106,27 @@
 
 ## 🚀 Текущий этап
 
-**Завершены:** Этап 0 (Документация), Этап 1 (ТЗ-1), Этап 2 (ТЗ-2), Этап 3A (ТЗ-3A), Этап 3B (ТЗ-3B), Этап 4 (ТЗ-4)
-**Следующий:** Этап 5+ — Мультипровайдер, биллинг
-**Прогресс:** См. [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md)
+**Завершены:** Этап 0-6 (ТЗ-1 → ТЗ-6)
+**Следующий:** Этап 7+ — Мультипровайдер, биллинг
+**Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
-**Выполнено в ТЗ-4:**
-- Убрана персонализация агентов из UI (backend сохранён)
-- @-mentions теперь "гостевой вызов" — не меняет Chat.agentId
-- Гостевые сообщения визуально выделены (отступ + фон + метка)
-- Подсказка обновлена + иконка 💡 для повторного показа
-- Suggested actions берутся из agent.capabilities.exampleTasks
-- Убрано создание greeting как сообщения
+**Выполнено в ТЗ-6:**
+- Новый тип документа: Excel с формулами, графиками и стилями
+- Excel через артефакты: createDocument + updateDocument + parseExcel
+- 10 профессиональных шаблонов (бюджеты, медиапланы, инвойсы и др.)
+- 5 цветовых тем
+- Загрузка и анализ .xlsx/.xls файлов
+- Экспорт: .xlsx, .pdf, Copy CSV
+- Интеграция с агентами (Маркетолог, Копирайтер, Универсальный)
 
-**Детали ТЗ-4:** [TZ_04_UX_SIMPLIFICATION.md](TZ_04_UX_SIMPLIFICATION.md)
+**Документы в холсте (5 типов):**
+- `text` — plain text для соцсетей
+- `markdown` — форматированные документы
+- `excel` — таблицы с формулами и графиками (NEW)
+- `presentation-reveal` — веб-презентации
+- `presentation-pptx` — PowerPoint
+
+**Детали:** [docs/ai-artifacts.md](docs/ai-artifacts.md)
 
 ---
 
@@ -150,7 +159,7 @@ vercel --prod            # Deploy на Vercel
 
 **Техническая (AI):**
 - [docs/ai-agents.md](docs/ai-agents.md) — AI-агенты, модели, промпты
-- [docs/ai-artifacts.md](docs/ai-artifacts.md) — Артефакты (схема БД, API)
+- [docs/ai-artifacts.md](docs/ai-artifacts.md) — Документы в холсте (text, markdown, presentations)
 - [docs/ai-tools.md](docs/ai-tools.md) — Инструменты (search, vision)
 
 **Техническая (инфраструктура):**

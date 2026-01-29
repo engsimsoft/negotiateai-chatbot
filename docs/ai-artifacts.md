@@ -1,8 +1,8 @@
-# Система артефактов
+# Система артефактов (документы в холсте)
 
-**Версия:** 2.7.0
+**Версия:** 2.9.0
 **Последнее обновление:** 2026-01-29
-**Статус:** 3 типа артефактов (text, presentation-reveal, presentation-pptx)
+**Статус:** 5 типов документов (text, markdown, excel, presentation-reveal, presentation-pptx)
 
 ---
 
@@ -16,13 +16,15 @@
 
 ---
 
-## Типы артефактов
+## Типы документов
 
-| Тип | Описание | Доступ | Экспорт |
-|-----|----------|--------|---------|
-| `text` | Plain text для соцсетей | Все агенты | .txt, Copy |
-| `presentation-reveal` | Веб-презентации Reveal.js | Только Презентатор | Copy HTML, Fullscreen |
-| `presentation-pptx` | PowerPoint файлы | Только Презентатор | .pptx |
+| Тип | Описание | Доступ | Экспорт | Формат в UI |
+|-----|----------|--------|---------|-------------|
+| `text` | Plain text для соцсетей | Все агенты | .txt, Copy | Текст · TXT |
+| `markdown` | Форматированные документы | Все агенты | .pdf, .md, Copy | Документ · MD |
+| `excel` | Excel-таблицы с формулами | Все агенты | .xlsx, .pdf, Copy CSV | Таблица · XLSX |
+| `presentation-reveal` | Веб-презентации Reveal.js | Только Презентатор | Copy HTML, Fullscreen | Презентация · HTML |
+| `presentation-pptx` | PowerPoint файлы | Только Презентатор | .pptx | Презентация · PPTX |
 
 ---
 
@@ -51,7 +53,138 @@ Plain text с emoji для соцсетей (VK, Telegram, Instagram).
 
 ---
 
-## 2. Presentation-Reveal
+## 2. Markdown Artifact (NEW в v2.8.0)
+
+Форматированные документы с поддержкой заголовков, списков, таблиц и кода.
+
+### Возможности
+- **Рендеринг:** react-markdown + remark-gfm (GitHub Flavored Markdown)
+- **Режим просмотра:** красивый рендеринг с prose-стилями
+- **Режим редактирования:** textarea с исходным markdown кодом
+- **Переключение режимов:** кнопки ✏️ (редактировать) / 👁️ (просмотр)
+- **Скачивание:** PDF (html2pdf.js), .md файл
+- **Копирование:** в буфер обмена
+- **Public Share:** публичная ссылка
+
+### Поддерживаемое форматирование
+| Элемент | Markdown | Результат |
+|---------|----------|-----------|
+| Заголовки | `# H1`, `## H2`, `### H3` | Иерархия заголовков |
+| Жирный | `**текст**` | **текст** |
+| Курсив | `*текст*` | *текст* |
+| Код inline | `` `код` `` | `код` |
+| Списки | `- item` / `1. item` | Маркированные/нумерованные |
+| Таблицы | GFM синтаксис | Таблицы с заголовком |
+| Цитаты | `> цитата` | Блочные цитаты |
+| Блоки кода | ` ``` ` | Подсветка синтаксиса |
+
+### Хранение контента
+Строка markdown в поле `content` таблицы `Document`.
+
+### DataStream события
+| Событие | Данные | Описание |
+|---------|--------|----------|
+| `data-markdownDelta` | `string` | Часть markdown текста |
+
+### Файлы
+- [artifacts/markdown/server.ts](../artifacts/markdown/server.ts) — генерация
+- [artifacts/markdown/client.tsx](../artifacts/markdown/client.tsx) — UI
+
+### Зависимости
+```json
+{
+  "react-markdown": "^9.x",
+  "remark-gfm": "^4.x",
+  "html2pdf.js": "^0.10.x"
+}
+```
+
+### Пример использования
+```
+Напиши маркетинговый план для нового продукта
+Создай инструкцию по установке в формате Markdown
+Составь отчёт по результатам исследования
+```
+
+---
+
+## 3. Excel Artifact (NEW в v2.9.0)
+
+Профессиональные таблицы Excel с формулами, графиками и стилями.
+
+### Возможности
+- **Множественные листы:** поддержка нескольких листов в одном документе
+- **Типы данных:** текст, число, валюта (₽), процент, дата
+- **Формулы:** SUM, AVERAGE, IF, VLOOKUP и другие
+- **5 цветовых тем:** corporate-blue, forest-green, warm-orange, professional-gray, modern-teal
+- **Графики:** столбчатые, линейные, круговые, area, doughnut
+- **Профессиональные стили:** замороженные заголовки, чередование строк, стилизация итоговых строк
+- **Русская локализация:** "15 000 ₽", даты DD.MM.YYYY
+
+### Экспорт
+- **XLSX:** скачивание оригинального Excel-файла
+- **PDF:** экспорт таблицы в PDF (html2pdf.js)
+- **CSV:** копирование в буфер обмена
+
+### 10 шаблонов
+1. Семейный бюджет
+2. Бюджет проекта
+3. Учёт доходов/расходов ИП
+4. Контент-план
+5. Медиаплан
+6. Счёт/Инвойс
+7. Учёт клиентов
+8. График отпусков
+9. Сравнительная таблица
+10. Трекер задач
+
+### Хранение контента
+JSON в поле `content`:
+```typescript
+{
+  filename: string,       // Имя файла
+  fileUrl?: string,       // URL в Vercel Blob
+  sheets: [{
+    name: string,         // Имя листа
+    columns: [...],       // Колонки с типами
+    data: [...],          // Данные
+    rows?: [...],         // Структурированные строки
+    charts?: [...],       // Графики
+    styles?: {...}        // Стили
+  }]
+}
+```
+
+### DataStream события
+| Событие | Данные | Описание |
+|---------|--------|----------|
+| `data-excelDelta` | `object` | `{ excelData, fileUrl, isComplete }` |
+
+### Файлы
+- [artifacts/excel/server.ts](../artifacts/excel/server.ts) — генерация
+- [artifacts/excel/client.tsx](../artifacts/excel/client.tsx) — UI
+- [lib/ai/tools/excel/](../lib/ai/tools/excel/) — Excel tools
+
+### Зависимости
+```json
+{
+  "exceljs": "^4.4.0",
+  "xlsx": "^0.18.5",
+  "recharts": "^2.15.0",
+  "html2pdf.js": "^0.10.x"
+}
+```
+
+### Пример использования
+```
+Сделай таблицу расходов за месяц: продукты 15000, транспорт 5000
+Создай медиаплан с бюджетом 100000₽ и расчётом ROI
+Сделай счёт для клиента ООО "Рога и Копыта" с НДС 20%
+```
+
+---
+
+## 4. Presentation-Reveal
 
 Интерактивные веб-презентации на Reveal.js.
 
@@ -88,7 +221,7 @@ JSON в поле `content`:
 
 ---
 
-## 3. Presentation-PPTX
+## 5. Presentation-PPTX
 
 Настоящие PowerPoint файлы для PowerPoint/Keynote/Google Slides.
 
@@ -141,7 +274,7 @@ CREATE TABLE "Document" (
   createdAt TIMESTAMP NOT NULL,
   title TEXT NOT NULL,
   content TEXT,                    -- Контент (строка или JSON)
-  kind VARCHAR NOT NULL DEFAULT 'text',  -- 'text' | 'presentation-reveal' | 'presentation-pptx'
+  kind VARCHAR NOT NULL DEFAULT 'text',  -- 'text' | 'markdown' | 'excel' | 'presentation-reveal' | 'presentation-pptx'
   userId UUID NOT NULL REFERENCES "User"(id),
 
   -- Public Share
@@ -186,13 +319,13 @@ CREATE TABLE "Suggestion" (
 
 ### createDocument
 
-Создаёт новый артефакт.
+Создаёт новый документ в холсте.
 
 ```typescript
 // lib/ai/tools/create-document.ts
 createDocument({
   title: string,
-  kind: "text" | "presentation-reveal" | "presentation-pptx"
+  kind: "text" | "markdown" | "excel" | "presentation-reveal" | "presentation-pptx"
 })
 ```
 
@@ -254,10 +387,20 @@ updateDocument({
 |---------|--------|----------|
 | `data-textDelta` | `string` | Часть текста |
 
+**Markdown:**
+| Событие | Данные | Описание |
+|---------|--------|----------|
+| `data-markdownDelta` | `string` | Часть markdown текста |
+
 **Presentation-Reveal:**
 | Событие | Данные | Описание |
 |---------|--------|----------|
 | `data-presentationDelta` | `string` | JSON delta слайдов |
+
+**Excel:**
+| Событие | Данные | Описание |
+|---------|--------|----------|
+| `data-excelDelta` | `object` | `{ excelData, fileUrl, isComplete }` |
 
 **Presentation-PPTX:**
 | Событие | Данные | Описание |
@@ -278,10 +421,13 @@ updateDocument({
 
 ### PostgreSQL (таблица Document)
 - `text` контент — строка
+- `markdown` контент — строка markdown
+- `excel` контент — JSON с ExcelData
 - `presentation-reveal` контент — JSON с HTML
 - `presentation-pptx` контент — JSON с URLs
 
 ### Vercel Blob Storage
+- XLSX файлы → `excel/{id}.xlsx`
 - PPTX файлы → `presentations/pptx/{id}.pptx`
 - PNG превью → `presentations/preview/{id}-{slideIndex}.png`
 
@@ -307,8 +453,10 @@ GET /share/{token}
 ```
 
 - Без авторизации
-- Только артефакт (без истории чата)
-- Поддерживается только `text` (пока)
+- Только документ (без истории чата)
+- Поддерживается: `text`, `markdown`
+- Не поддерживается: `excel`, `presentation-reveal`, `presentation-pptx`
+- Для markdown: скачивание PDF и .md на публичной странице
 
 ### Отзыв ссылки
 
@@ -328,11 +476,13 @@ GET /share/{token}
 | Компонент | Файл | Описание |
 |-----------|------|----------|
 | Artifact | [components/artifact.tsx](../components/artifact.tsx) | Главный контейнер с версионированием |
+| DocumentPreview | [components/document-preview.tsx](../components/document-preview.tsx) | Компактное превью в чате (Anthropic-стиль) |
 | TextEditor | [artifacts/text/client.tsx](../artifacts/text/client.tsx) | Редактор текста |
+| MarkdownViewer/Editor | [artifacts/markdown/client.tsx](../artifacts/markdown/client.tsx) | Просмотр/редактирование markdown |
 | RevealViewer | [artifacts/presentation-reveal/client.tsx](../artifacts/presentation-reveal/client.tsx) | Iframe с Reveal.js |
 | PptxViewer | [artifacts/presentation-pptx/client.tsx](../artifacts/presentation-pptx/client.tsx) | Галерея превью |
 | DataStreamHandler | [components/data-stream-handler.tsx](../components/data-stream-handler.tsx) | Обработка streaming |
-| ArtifactActions | [components/artifact-actions.tsx](../components/artifact-actions.tsx) | Кнопки (Copy, Download, Share) |
+| ArtifactActions | [components/artifact-actions.tsx](../components/artifact-actions.tsx) | Кнопки (Copy, Download, Share, Edit/View) |
 
 ---
 
@@ -340,9 +490,9 @@ GET /share/{token}
 
 | Ограничение | Статус |
 |-------------|--------|
-| Экспорт в PDF | Нет (только Print из браузера) |
+| Экспорт в PDF | ✅ Да для markdown (html2pdf.js) |
 | Генерация изображений | Нет |
-| Public Share для презентаций | Только text пока |
+| Public Share для презентаций | Только text и markdown |
 
 ---
 
@@ -393,8 +543,17 @@ GET /share/{token}
    export const artifactDefinitions = [..., newTypeArtifact];
    ```
 
-6. **Обновить документацию** (этот файл!)
+6. **Добавить тип в CustomUIDataTypes** (если нужен streaming):
+   ```typescript
+   // lib/types.ts
+   export type CustomUIDataTypes = {
+     ...
+     newTypeDelta: string,
+   };
+   ```
+
+7. **Обновить документацию** (этот файл!)
 
 ---
 
-**Обновлено:** 2026-01-29
+**Обновлено:** 2026-01-29 (v2.9.0 — добавлен Excel)

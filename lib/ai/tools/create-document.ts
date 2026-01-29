@@ -16,8 +16,17 @@ type CreateDocumentProps = {
 
 export const createDocument = ({ session, dataStream }: CreateDocumentProps) =>
   tool({
-    description:
-      "Create a document for a writing or content creation activities. This tool will call other functions that will generate the contents of the document based on the title and kind.",
+    description: `Create a document in the canvas for writing or content creation.
+
+Document types (kind parameter):
+- "markdown" - for structured documents with formatting (plans, reports, instructions, articles). Supports headers, lists, tables, code blocks. Use this for most documents.
+- "text" - for short plain text without formatting (social media posts, messages). No markdown.
+- "presentation-reveal" - for web presentations
+- "presentation-pptx" - for PowerPoint presentations
+- "excel" - for spreadsheets, tables, budgets, invoices, media plans. Supports formulas, charts, and professional styling.
+
+Default to "markdown" for most document requests unless the user specifically asks for a social media post, plain text, or spreadsheet/table.
+Use "excel" when user asks for: budget, table, spreadsheet, invoice, content plan, media plan, or any financial/data table.`,
     inputSchema: z.object({
       title: z.string(),
       kind: z.enum(artifactKinds),

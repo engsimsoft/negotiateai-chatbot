@@ -1,8 +1,8 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 2.7.0
+**Версия:** 2.9.0
 **Дата:** 2026-01-29
-**Статус:** ТЗ-4 завершён (Упрощение UX)
+**Статус:** ТЗ-6 завершён (Excel Tool)
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** Полная информация о состоянии проекта для разработки ТЗ и архитектурных решений.
@@ -51,11 +51,14 @@
 - ✅ Weather (Open-Meteo)
 - ✅ Get Current Date
 
-### Артефакты
+### Артефакты (документы в холсте)
 - ✅ Text Artifact (plain text + emoji)
+- ✅ Markdown Artifact (форматированные документы) — NEW в ТЗ-5
+- ✅ Excel Artifact (таблицы, формулы, графики) — NEW в ТЗ-6
 - ✅ Presentation-Reveal (веб-презентации)
 - ✅ Presentation-PPTX (PowerPoint)
 - ✅ Public Share (публичные ссылки)
+- ✅ PDF Export (для Markdown и Excel) — NEW в ТЗ-5/ТЗ-6
 
 ---
 
@@ -152,11 +155,14 @@
 - Get Current Date
 - Get Weather (Open-Meteo)
 - Read Document
-- Create/Update Document (text)
+- Create Document (text, markdown, excel, presentations)
+- Update Document (редактирование артефактов)
+- Request Suggestions
+- Parse Excel (анализ загруженных файлов) — NEW в ТЗ-6
 
 **Эксклюзивные (Презентатор):**
-- Presentation-Reveal
-- Presentation-PPTX
+- Presentation-Reveal (через createDocument)
+- Presentation-PPTX (через createDocument)
 
 **Планируемые:**
 - Website Analyzer (fetch, screenshot, SEO)
@@ -243,9 +249,40 @@
 - Suggested actions берутся из agent.capabilities.exampleTasks
 - Убрано создание greeting как сообщения
 
-**Детали:** [TZ_04_UX_SIMPLIFICATION.md](TZ_04_UX_SIMPLIFICATION.md) | [TZ_04_ROADMAP.md](TZ_04_ROADMAP.md)
+**Детали:** [_archive/TZ_04_UX_SIMPLIFICATION.md](_archive/TZ_04_UX_SIMPLIFICATION.md)
 
-### Этап 5+: Будущее ← СЛЕДУЮЩИЙ
+### Этап 5: Markdown документы (ТЗ-5) — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- Новый тип документа: Markdown с рендерингом (react-markdown + remark-gfm)
+- Режимы View/Edit с переключением кнопкой
+- Скачивание: PDF (html2pdf.js) и .md файлы
+- Публичные ссылки для Markdown документов
+- Компактное превью документов в чате (Anthropic-стиль)
+- Информация о формате документа (MD, TXT, PPTX, HTML)
+- Панель подсказок с accordion-секциями
+- Терминология: "артефакт" → "документ в холсте"
+
+**Детали:** [_archive/TZ_05_MARKDOWN_ARTIFACTS.md](_archive/TZ_05_MARKDOWN_ARTIFACTS.md)
+
+### Этап 6: Excel Tool (ТЗ-6) — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- Новый тип документа: Excel (таблицы, формулы, графики)
+- Excel через артефакты: createDocument(kind: "excel") + updateDocument
+- parseExcel для анализа загруженных файлов
+- 10 профессиональных шаблонов (бюджеты, медиапланы, инвойсы и др.)
+- 5 цветовых тем (corporate-blue, forest-green, warm-orange, professional-gray, modern-teal)
+- Поддержка формул: SUM, AVERAGE, IF, VLOOKUP и др.
+- Графики: столбчатые, линейные, круговые, area, doughnut
+- Русская локализация (₽, даты DD.MM.YYYY, числа с пробелами)
+- Загрузка и анализ .xlsx/.xls файлов
+- Экспорт: .xlsx, .pdf, Copy CSV
+- Интеграция с агентами (Маркетолог, Копирайтер, Универсальный)
+
+**Детали:** [_archive/TZ_EXCEL_TOOL.md](_archive/TZ_EXCEL_TOOL.md) | [_archive/TZ_06_ROADMAP.md](_archive/TZ_06_ROADMAP.md)
+
+### Этап 7+: Будущее ← СЛЕДУЮЩИЙ
 
 - Tool Activity UX
 - Мультипровайдер (GPT, Claude)
@@ -259,12 +296,15 @@
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 2.7.0 |
-| Статус | ТЗ-4 завершён |
+| Версия | 2.9.0 |
+| Статус | ТЗ-6 завершён |
 | AI-агентов | 8 (в БД) |
 | AI моделей | 2 (Gemini 3 Pro, 2.5 Flash) |
-| Артефактов | 3 |
+| AI-инструментов | 8 |
+| Типов документов | 5 (text, markdown, excel, presentation-reveal, presentation-pptx) |
 | Тем презентаций | 5 |
+| Тем Excel | 5 |
+| Шаблонов Excel | 10 |
 | Production build | ✅ Успешен |
 
 ---
@@ -284,15 +324,15 @@
 - [docs/setup.md](docs/setup.md) — Установка
 - [docs/decisions/](docs/decisions/) — ADR
 
-**ТЗ:**
-- [TZ_01_AGENTS_ARCHITECTURE.md](TZ_01_AGENTS_ARCHITECTURE.md) — Этап 1
-- [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md) — Этап 2
-- [TZ_02_ROADMAP.md](TZ_02_ROADMAP.md) — Дорожная карта Этапа 2
-- [TZ_03A_USER_PROFILE.md](TZ_03A_USER_PROFILE.md) — Этап 3A
-- [TZ_03B_AGENT_PERSONALIZATION.md](TZ_03B_AGENT_PERSONALIZATION.md) — Этап 3B
-- [TZ_03B_ROADMAP.md](TZ_03B_ROADMAP.md) — Дорожная карта Этапа 3B
-- [TZ_04_UX_SIMPLIFICATION.md](TZ_04_UX_SIMPLIFICATION.md) — Этап 4
-- [TZ_04_ROADMAP.md](TZ_04_ROADMAP.md) — Дорожная карта Этапа 4
+**ТЗ (архив):**
+- [_archive/TZ_01_AGENTS_ARCHITECTURE.md](_archive/TZ_01_AGENTS_ARCHITECTURE.md) — Этап 1
+- [_archive/TZ_02_MULTIAGENT_CHAT.md](_archive/TZ_02_MULTIAGENT_CHAT.md) — Этап 2
+- [_archive/TZ_03A_USER_PROFILE.md](_archive/TZ_03A_USER_PROFILE.md) — Этап 3A
+- [_archive/TZ_03B_AGENT_PERSONALIZATION.md](_archive/TZ_03B_AGENT_PERSONALIZATION.md) — Этап 3B
+- [_archive/TZ_04_UX_SIMPLIFICATION.md](_archive/TZ_04_UX_SIMPLIFICATION.md) — Этап 4
+- [_archive/TZ_05_MARKDOWN_ARTIFACTS.md](_archive/TZ_05_MARKDOWN_ARTIFACTS.md) — Этап 5
+- [_archive/TZ_EXCEL_TOOL.md](_archive/TZ_EXCEL_TOOL.md) — Этап 6
+- [_archive/TZ_06_ROADMAP.md](_archive/TZ_06_ROADMAP.md) — Этап 6 Roadmap
 
 ---
 
