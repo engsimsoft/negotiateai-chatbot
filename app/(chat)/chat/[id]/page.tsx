@@ -5,8 +5,8 @@ import { auth } from "@/app/(auth)/auth";
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
-import { getAgentById, getChatById, getMessagesByChatId } from "@/lib/db/queries";
-import { convertToUIMessages, generateUUID } from "@/lib/utils";
+import { getChatById, getMessagesByChatId } from "@/lib/db/queries";
+import { convertToUIMessages } from "@/lib/utils";
 
 export default async function Page(props: {
   params: Promise<{ id: string }>;
@@ -39,26 +39,14 @@ export default async function Page(props: {
     // Use user's preference from cookie, or default to "auto" (agent-specific model)
     const initialModel = chatModelFromCookie?.value || DEFAULT_CHAT_MODEL;
 
-    // Get agent greeting message for new chats
-    const agent = await getAgentById({ id: agentId });
-    const greetingMessages = agent?.greeting
-      ? [
-          {
-            id: generateUUID(),
-            role: "assistant" as const,
-            parts: [{ type: "text" as const, text: agent.greeting }],
-            createdAt: new Date(),
-          },
-        ]
-      : [];
-
+    // ТЗ-4: Greeting НЕ добавляется как сообщение — используем UI компонент Greeting + SuggestedActions
     return (
       <>
         <Chat
           autoResume={false}
           id={id}
           initialChatModel={initialModel}
-          initialMessages={greetingMessages}
+          initialMessages={[]}
           initialVisibilityType="private"
           isReadonly={false}
           agentId={agentId}
