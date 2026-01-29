@@ -49,7 +49,12 @@ export const user = pgTable("User", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   email: varchar("email", { length: 64 }).notNull(),
   password: varchar("password", { length: 64 }),
-  // NOTE: role field removed in v2.3.0 (ТЗ-1 migration)
+  // ТЗ-3A: User profile fields
+  displayName: varchar("display_name", { length: 100 }),
+  pronouns: varchar("pronouns", { length: 10 }), // "ты" | "вы"
+  occupation: varchar("occupation", { length: 100 }),
+  bio: text("bio"),
+  theme: varchar("theme", { length: 20 }), // "light" | "dark" | "system"
 });
 
 export type User = InferSelectModel<typeof user>;

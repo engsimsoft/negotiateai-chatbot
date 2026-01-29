@@ -118,3 +118,31 @@ export const updateDocumentPrompt = (
 
 ${currentContent}`;
 };
+
+// ТЗ-3A: Build user context block for system prompts
+export function buildUserContext(user: {
+  displayName: string | null;
+  pronouns: string | null;
+  occupation: string | null;
+  bio: string | null;
+}): string {
+  if (!user.displayName && !user.occupation && !user.bio) {
+    return "";
+  }
+
+  const parts: string[] = ["# Информация о пользователе", ""];
+
+  if (user.displayName) {
+    parts.push(`- Имя: ${user.displayName}`);
+  }
+  parts.push(`- Обращение: на "${user.pronouns || "вы"}"`);
+  if (user.occupation) {
+    parts.push(`- Сфера деятельности: ${user.occupation}`);
+  }
+  if (user.bio) {
+    parts.push(`- Контекст: ${user.bio}`);
+  }
+  parts.push("", "");
+
+  return parts.join("\n");
+}

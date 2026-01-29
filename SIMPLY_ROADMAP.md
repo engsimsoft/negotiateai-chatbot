@@ -6,9 +6,9 @@
 
 ## 📊 Текущий статус
 
-- **Этап:** Этап 2 / 3 (завершён)
-- **Прогресс:** 98/99 задач (99%) — осталось: deploy ТЗ-1
-- **Следующее:** Этап 3 — Персонализация агентов
+- **Этап:** Этап 3A (завершён)
+- **Прогресс:** ТЗ-3A полностью выполнен
+- **Следующее:** Этап 3B+ — Персонализация агентов, мультипровайдер, биллинг
 
 ## 🚀 Этапы разработки
 
@@ -174,44 +174,81 @@
 
 ---
 
+### Этап 3A: Профиль пользователя — ТЗ-3A (2-3 дня)
+
+**Цель:** Страница настроек, меню пользователя, онбординг, персонализация агентов через user context.
+
+**Детали:** См. [TZ_03A_USER_PROFILE.md](TZ_03A_USER_PROFILE.md)
+
+**3A.1 База данных:**
+- [x] Миграция: 5 новых полей в таблице User (displayName, pronouns, occupation, bio, theme)
+- [x] npm run db:migrate
+
+**3A.2 API:**
+- [x] GET /api/user/profile — получить профиль
+- [x] PATCH /api/user/profile — обновить профиль
+
+**3A.3 UI — Страница настроек /settings:**
+- [x] app/(chat)/settings/page.tsx (серверная обёртка)
+- [x] app/(chat)/settings/settings-page.tsx (клиентский компонент)
+- [x] Секция "Профиль": имя, обращение (ты/вы), сфера деятельности, о себе
+- [x] Секция "Аккаунт": email (readonly), заглушки для будущих функций
+- [x] Секция "Внешний вид": выбор темы (светлая/тёмная/системная)
+- [x] components/ui/radio-group.tsx (Radix UI)
+
+**3A.4 UI — Меню пользователя:**
+- [x] Редизайн sidebar-user-nav.tsx
+- [x] Аватар с первой буквой имени
+- [x] Имя вместо email (фоллбэк: username из email)
+- [x] Метка "Бесплатный" под именем
+- [x] Пункты: Настройки, Тема, Помощь (заглушка), Выйти
+- [x] Русификация всех текстов
+
+**3A.5 Динамическое приветствие:**
+- [x] Обновить greeting.tsx — динамическое имя через SWR
+- [x] Удалить старые артефакты ("Ольга", текст про Gemini)
+
+**3A.6 Интеграция с агентами:**
+- [x] buildUserContext в lib/ai/prompts.ts
+- [x] Инъекция user context в chat route (все агенты)
+
+**3A.7 Синхронизация темы:**
+- [x] hooks/use-theme-sync.ts — синхронизация БД ↔ next-themes
+- [x] Подключение в AppSidebar
+
+**3A.8 Онбординг:**
+- [x] components/onboarding-dialog.tsx — 3-шаговый модальный диалог
+- [x] Шаг 1: Имя
+- [x] Шаг 2: Обращение (ты/вы)
+- [x] Шаг 3: Сфера деятельности (опционально)
+- [x] Интеграция в agent-selector.tsx
+
+**3A.9 Очистка артефактов:**
+- [x] system-prompt.md: "Family AI Assistant" → "Simply"
+
+**3A.10 Финализация:**
+- [x] npm run build — успешен
+- [x] Обновить документацию
+- [ ] Коммит
+
+---
+
 ## 📝 Текущая сессия
 
-**2026-01-28:**
-- [x] Создать SIMPLY_ROADMAP.md
-- [x] Переработать README.md (Family AI → Simply, 118 строк)
-- [x] Переработать CLAUDE.md (навигация для AI, 139 строк)
-- [x] Создать SIMPLY_STATUS.md (текущее состояние проекта)
-- [x] Обновить CHANGELOG.md (v2.2.0 — ребрендинг)
-- [x] Обновить docs/architecture.md
-- [x] Обновить docs/ (setup, deployment, troubleshooting, ai-capabilities)
-- [x] ADR: создан 005-simply-rebrand.md, обновлены 002 и 004
-- [x] Очистка: удалены ROADMAP.md, PROJECT_STATUS.md, _archive/
-- [x] Обновлены DOCUMENTATION_GUIDE.md и package.json
-- [x] Код: обновлены prompts.ts и presentation-pptx/server.ts
+**2026-01-29 — ТЗ-3A:**
+- [x] Миграция: 5 новых полей User (displayName, pronouns, occupation, bio, theme)
+- [x] API: GET/PATCH /api/user/profile
+- [x] Страница настроек /settings с 3 секциями
+- [x] Редизайн меню пользователя (sidebar-user-nav.tsx)
+- [x] Онбординг для новых пользователей (onboarding-dialog.tsx)
+- [x] Динамическое приветствие (greeting.tsx)
+- [x] User context injection в system prompts агентов
+- [x] Синхронизация темы БД ↔ next-themes
+- [x] Очистка артефактов (Family AI → Simply)
 - [x] npm run build — успешно
-- [x] Коммит: 96b080d "chore: rebrand Family AI Assistant → Simply (v2.2.0)"
-- ✅ Этап 0 завершён
+- ✅ ТЗ-3A завершён
 
-**ТЗ-1 (продолжение 2026-01-28):**
-- [x] Миграция: agents, user_agents, удалён User.role, Chat.agentId → uuid
-- [x] Schema: Agent, UserAgent, AgentCapabilities типы
-- [x] Seed: 7 агентов с промптами и capabilities
-- [x] API: /api/agents, /api/agents/[slug], /api/user-agents, /api/chats/[id]/agent
-- [x] Chat route загружает промпты из БД
-- [x] Компоненты обновлены (AgentSelector, ChatHeader, SidebarHistoryItem)
-- [x] npm run build — успешно
-- [x] Коммит: 5dcdb10 "feat: agent architecture — ТЗ-1"
-
-**ТЗ-1 UI (2026-01-28):**
-- [x] Удалены старые файлы lib/ai/agents/
-- [x] Sidebar: Агент-Помощник, ссылка Каталог, секция Мои агенты
-- [x] Страница /agents — каталог агентов с grid карточек
-- [x] Страница /agents/[slug] — детали агента с суперсилами
-- [x] ChatHeader: dropdown для смены агента в чате
-- [x] npm run build — успешно
-- ✅ ТЗ-1 завершён
-
-**ТЗ-2 (2026-01-28):**
+**2026-01-28 — ТЗ-2:**
 - [x] Миграция `Message_v2.agentId` + backfill
 - [x] Обновлён Помощник (полный промпт, capabilities, `{AGENTS_LIST}`)
 - [x] Добавлен Prompt-агент (slug: `prompt-agent`, 8 агентов в БД)
@@ -222,6 +259,18 @@
 - [x] `ChatHint` — подсказка для новых пользователей (localStorage dismiss)
 - [x] npm run build — успешно
 - ✅ ТЗ-2 завершён
+
+**2026-01-28 — ТЗ-1:**
+- [x] Миграция: agents, user_agents, удалён User.role, Chat.agentId → uuid
+- [x] Seed: 7 агентов с промптами и capabilities
+- [x] API: /api/agents, /api/agents/[slug], /api/user-agents, /api/chats/[id]/agent
+- [x] UI: Каталог /agents, страница /agents/[slug], смена агента в чате
+- ✅ ТЗ-1 завершён
+
+**2026-01-28 — Этап 0:**
+- [x] Ребрендинг Family AI Assistant → Simply
+- [x] Документация: README, CLAUDE.md, SIMPLY_STATUS.md, docs/
+- ✅ Этап 0 завершён
 
 ---
 
@@ -236,19 +285,23 @@
 - [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md) — видение продукта
 - [TZ_01_AGENTS_ARCHITECTURE.md](TZ_01_AGENTS_ARCHITECTURE.md) — полное ТЗ для Этапа 1
 - [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md) — полное ТЗ для Этапа 2
-- [TZ_02_ROADMAP.md](TZ_02_ROADMAP.md) — дорожная карта Этапа 2
+- [TZ_03A_USER_PROFILE.md](TZ_03A_USER_PROFILE.md) — полное ТЗ для Этапа 3A
 
 **БД:**
 - lib/db/schema.ts
-- lib/db/seed-agents.ts (новый)
+- lib/db/queries.ts (getUserById, updateUserProfile)
+- lib/db/seed-agents.ts
 
-**API (новые):**
+**API (ТЗ-1, ТЗ-2):**
 - app/api/agents/route.ts
 - app/api/agents/[slug]/route.ts
 - app/api/agents/by-name/[name]/route.ts
 - app/api/chats/[id]/agent/route.ts
 
-**UI (новые):**
+**API (ТЗ-3A):**
+- app/(chat)/api/user/profile/route.ts
+
+**UI (ТЗ-1, ТЗ-2):**
 - app/(chat)/agents/page.tsx
 - app/(chat)/agents/[slug]/page.tsx
 - components/sidebar-agents.tsx
@@ -256,12 +309,20 @@
 - components/action-buttons.tsx
 - components/chat-hint.tsx
 
+**UI (ТЗ-3A):**
+- app/(chat)/settings/page.tsx
+- app/(chat)/settings/settings-page.tsx
+- components/sidebar-user-nav.tsx (редизайн)
+- components/greeting.tsx (динамическое)
+- components/onboarding-dialog.tsx
+- components/ui/radio-group.tsx
+- hooks/use-theme-sync.ts
+
+**AI (ТЗ-3A):**
+- lib/ai/prompts.ts (buildUserContext)
+
 **Парсинг:**
 - lib/agents/parse-mentions.ts
-
-**Удалены:**
-- ~~lib/ai/agents/index.ts~~
-- ~~lib/ai/agents/*.md~~
 
 ---
 
@@ -292,7 +353,19 @@
 - [x] Подсказки для новых пользователей
 - [x] Production build успешен
 
+### Этап 3A (ТЗ-3A)
+- [x] 5 новых полей в таблице User (displayName, pronouns, occupation, bio, theme)
+- [x] API GET/PATCH /api/user/profile работает
+- [x] Страница /settings с 3 секциями (Профиль, Аккаунт, Внешний вид)
+- [x] Меню пользователя: аватар, имя, план, настройки, тема, помощь, выход
+- [x] Онбординг для новых пользователей (3 шага)
+- [x] Динамическое приветствие на главной
+- [x] User context инъекция в system prompts всех агентов
+- [x] Синхронизация темы БД ↔ next-themes
+- [x] Production build успешен
+
 ---
 
 **Создано:** 2026-01-28
+**Обновлено:** 2026-01-29
 **Источники:** SIMPLY_PRODUCT_VISION.md, TZ_01_AGENTS_ARCHITECTURE.md

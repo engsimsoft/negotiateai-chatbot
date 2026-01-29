@@ -15,7 +15,11 @@ import { auth } from "@/app/(auth)/auth";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import type { ChatModel } from "@/lib/ai/models";
-import { type RequestHints, systemPrompt } from "@/lib/ai/prompts";
+import {
+  type RequestHints,
+  systemPrompt,
+  buildUserContext,
+} from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
 import { getCurrentDate } from "@/lib/ai/tools/get-current-date";
@@ -33,6 +37,7 @@ import {
   getChatById,
   getMessageCountByUserId,
   getMessagesByChatId,
+  getUserById,
   saveChat,
   saveMessages,
   updateChatAgent,
@@ -94,6 +99,10 @@ export async function POST(request: Request) {
     if (!session?.user) {
       return new ChatSDKError("unauthorized:chat").toResponse();
     }
+
+    // ТЗ-3A: Load user profile for system prompt context
+    const userProfile = await getUserById(session.user.id);
+    const userContext = userProfile ? buildUserContext(userProfile) : "";
 
     const messageCount = await getMessageCountByUserId({
       id: session.user.id,
@@ -280,6 +289,11 @@ export async function POST(request: Request) {
         } else {
           activeAgentId = null;
           systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
+        }
+
+        // ТЗ-3A: Prepend user context to system prompt
+        if (userContext) {
+          systemPromptText = userContext + systemPromptText;
         }
 
         const startTime = Date.now();

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { AgentSelector } from "@/components/agent-selector";
-import { getAgents } from "@/lib/db/queries";
+import { getAgents, getUserById } from "@/lib/db/queries";
 import { auth } from "../(auth)/auth";
 
 export default async function Page() {
@@ -24,8 +24,21 @@ export default async function Page() {
       description: a.description,
     }));
 
-  // Get user name for greeting
-  const userName = session.user.email?.split("@")[0] || "там";
+  // Get user profile for greeting
+  const userProfile = await getUserById(session.user.id);
+  const userName =
+    userProfile?.displayName ||
+    session.user.email?.split("@")[0] ||
+    "там";
 
-  return <AgentSelector agents={availableAgents} userName={userName} />;
+  // Check if user needs onboarding (no displayName set)
+  const needsOnboarding = !userProfile?.displayName;
+
+  return (
+    <AgentSelector
+      agents={availableAgents}
+      userName={userName}
+      needsOnboarding={needsOnboarding}
+    />
+  );
 }

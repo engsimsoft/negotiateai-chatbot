@@ -67,6 +67,54 @@ export async function createUser(email: string, password: string) {
   }
 }
 
+export async function getUserById(id: string): Promise<User | null> {
+  try {
+    const [result] = await db.select().from(user).where(eq(user.id, id));
+    return result || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get user by id"
+    );
+  }
+}
+
+export async function updateUserProfile({
+  id,
+  displayName,
+  pronouns,
+  occupation,
+  bio,
+  theme,
+}: {
+  id: string;
+  displayName?: string | null;
+  pronouns?: string | null;
+  occupation?: string | null;
+  bio?: string | null;
+  theme?: string | null;
+}) {
+  try {
+    const updateData: Record<string, string | null> = {};
+    if (displayName !== undefined) updateData.displayName = displayName;
+    if (pronouns !== undefined) updateData.pronouns = pronouns;
+    if (occupation !== undefined) updateData.occupation = occupation;
+    if (bio !== undefined) updateData.bio = bio;
+    if (theme !== undefined) updateData.theme = theme;
+
+    return await db
+      .update(user)
+      .set(updateData)
+      .where(eq(user.id, id))
+      .returning();
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update user profile"
+    );
+  }
+}
+
 export async function saveChat({
   id,
   userId,

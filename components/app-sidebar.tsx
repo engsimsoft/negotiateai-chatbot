@@ -20,6 +20,7 @@ import {
   SidebarMenu,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useThemeSync } from "@/hooks/use-theme-sync";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import {
   AlertDialog,
@@ -37,6 +38,9 @@ export function AppSidebar({ user }: { user: User | undefined }) {
   const { setOpenMobile } = useSidebar();
   const { mutate } = useSWRConfig();
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
+
+  // ТЗ-3A: Sync theme preference from DB
+  useThemeSync();
 
   const handleDeleteAll = () => {
     const deletePromise = fetch("/api/history", {

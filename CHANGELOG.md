@@ -8,7 +8,70 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- Этап 3+: Персонализация агентов, Tool Activity UX, мультипровайдер, биллинг
+- Этап 3B+: Персонализация агентов, Tool Activity UX, мультипровайдер, биллинг
+
+---
+
+## [2.5.0] - 2026-01-29 - ТЗ-3A: Профиль пользователя и настройки
+
+**MINOR RELEASE**: Профиль пользователя, страница настроек, онбординг, персонализация агентов.
+
+### Summary
+
+Реализован профиль пользователя с 5 полями (displayName, pronouns, occupation, bio, theme). Создана страница настроек /settings с 3 секциями. Полностью переработано меню пользователя в sidebar. Добавлен онбординг для новых пользователей. Агенты теперь получают контекст пользователя в system prompt и могут персонализировать ответы.
+
+### Added
+
+#### Профиль пользователя (БД)
+- 5 новых полей в таблице User: `displayName`, `pronouns`, `occupation`, `bio`, `theme`
+- Миграция `0014_marvelous_blacklash.sql`
+- Функции `getUserById` и `updateUserProfile` в `lib/db/queries.ts`
+
+#### API
+- GET `/api/user/profile` — получение профиля
+- PATCH `/api/user/profile` — обновление профиля
+
+#### Страница настроек /settings
+- Серверная обёртка `app/(chat)/settings/page.tsx`
+- Клиентский компонент `app/(chat)/settings/settings-page.tsx`
+- **Секция "Профиль"**: имя, обращение (ты/вы), сфера деятельности, о себе
+- **Секция "Аккаунт"**: email (readonly), заглушки для будущих функций
+- **Секция "Внешний вид"**: выбор темы (светлая/тёмная/системная)
+- Компонент `components/ui/radio-group.tsx` (Radix UI)
+
+#### Меню пользователя
+- Редизайн `sidebar-user-nav.tsx`
+- Аватар с первой буквой имени
+- Отображение displayName (фоллбэк: username из email)
+- Метка "Бесплатный" под именем
+- Пункты: Настройки, Тема, Помощь (заглушка), Выйти
+- Русификация всех текстов
+
+#### Онбординг
+- Компонент `components/onboarding-dialog.tsx`
+- 3-шаговый модальный диалог (имя → обращение → сфера)
+- Интеграция в `agent-selector.tsx`
+
+#### Синхронизация темы
+- Hook `hooks/use-theme-sync.ts` — БД ↔ next-themes
+- Подключение в `components/app-sidebar.tsx`
+
+### Changed
+
+#### Интеграция с агентами
+- Функция `buildUserContext` в `lib/ai/prompts.ts`
+- Инъекция user context в `app/(chat)/api/chat/route.ts`
+- Все агенты получают информацию о пользователе (имя, обращение, сфера, контекст)
+
+#### Динамическое приветствие
+- Обновлён `components/greeting.tsx` — SWR вместо хардкода
+- Удалены старые артефакты ("Ольга", текст про Gemini)
+
+#### Очистка
+- `system-prompt.md`: "Family AI Assistant" → "Simply"
+
+### Links
+- [TZ_03A_USER_PROFILE.md](TZ_03A_USER_PROFILE.md) — полное ТЗ
 
 ---
 

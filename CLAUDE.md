@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 2.4.0 | **Статус:** ТЗ-2 завершён
+**Проект:** Simply | **Версия:** 2.5.0 | **Статус:** ТЗ-3A завершён
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -79,6 +79,15 @@
 - `components/action-buttons.tsx` — Кнопки действий в сообщениях
 - `components/chat-hint.tsx` — Подсказки для новых пользователей
 
+**User Profile (ТЗ-3A):**
+- `app/(chat)/api/user/profile/route.ts` — API профиля (GET/PATCH)
+- `app/(chat)/settings/page.tsx` — Страница настроек
+- `app/(chat)/settings/settings-page.tsx` — UI настроек
+- `components/sidebar-user-nav.tsx` — Меню пользователя
+- `components/onboarding-dialog.tsx` — Онбординг
+- `hooks/use-theme-sync.ts` — Синхронизация темы
+- `lib/ai/prompts.ts` — buildUserContext
+
 **Config:**
 - `.env.local` — API keys (НЕ коммитить!)
 - `next.config.ts` — Next.js config
@@ -88,18 +97,19 @@
 
 ## 🚀 Текущий этап
 
-**Завершены:** Этап 0 (Документация), Этап 1 (ТЗ-1), Этап 2 (ТЗ-2)
-**Следующий:** Этап 3 — Персонализация агентов
+**Завершены:** Этап 0 (Документация), Этап 1 (ТЗ-1), Этап 2 (ТЗ-2), Этап 3A (ТЗ-3A)
+**Следующий:** Этап 3B+ — Персонализация агентов, мультипровайдер, биллинг
 **Прогресс:** См. [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md)
 
-**Выполнено в ТЗ-2:**
-- @-mentions: парсинг, UI автокомплит, резолвинг агента
-- Мультиагентный чат: иконка агента, `Message.agentId`
-- Помощник: полный промпт с `{AGENTS_LIST}`
-- Prompt-агент: улучшение запросов, кнопки действий
-- Подсказки для новых пользователей
+**Выполнено в ТЗ-3A:**
+- Профиль пользователя: 5 полей в БД, API GET/PATCH
+- Страница настроек /settings: 3 секции (Профиль, Аккаунт, Внешний вид)
+- Меню пользователя: аватар, имя, план, настройки, тема, помощь, выход
+- Онбординг: 3-шаговый диалог для новых пользователей
+- User context injection в system prompts всех агентов
+- Синхронизация темы БД ↔ next-themes
 
-**Детали ТЗ-2:** [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md)
+**Детали ТЗ-3A:** [TZ_03A_USER_PROFILE.md](TZ_03A_USER_PROFILE.md)
 
 ---
 
@@ -140,6 +150,7 @@ vercel --prod            # Deploy на Vercel
 **ТЗ:**
 - [TZ_01_AGENTS_ARCHITECTURE.md](TZ_01_AGENTS_ARCHITECTURE.md) — Этап 1
 - [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md) — Этап 2
+- [TZ_03A_USER_PROFILE.md](TZ_03A_USER_PROFILE.md) — Этап 3A
 
 ---
 
@@ -156,4 +167,4 @@ vercel --prod            # Deploy на Vercel
 
 ---
 
-**Обновлено:** 2026-01-28
+**Обновлено:** 2026-01-29
