@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 2.9.0 | **Статус:** ТЗ-6 завершён
+**Проект:** Simply | **Версия:** 2.11.0 | **Статус:** Artifact Loading UX завершён
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -106,18 +106,18 @@
 
 ## 🚀 Текущий этап
 
-**Завершены:** Этап 0-6 (ТЗ-1 → ТЗ-6)
+**Завершены:** Этап 0-6 + Performance Audit
 **Следующий:** Этап 7+ — Мультипровайдер, биллинг
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
-**Выполнено в ТЗ-6:**
-- Новый тип документа: Excel с формулами, графиками и стилями
-- Excel через артефакты: createDocument + updateDocument + parseExcel
-- 10 профессиональных шаблонов (бюджеты, медиапланы, инвойсы и др.)
-- 5 цветовых тем
-- Загрузка и анализ .xlsx/.xls файлов
-- Экспорт: .xlsx, .pdf, Copy CSV
-- Интеграция с агентами (Маркетолог, Копирайтер, Универсальный)
+**Выполнено в Performance Audit:**
+- Исправлен memo() в PreviewMessage и Artifact (лишние ре-рендеры)
+- Title generation в фоновом режиме (-2-3 сек TTFT)
+- DB запросы параллелизированы (Promise.all)
+- Кэширование каталога агентов (5 мин)
+- LIMIT в getMessagesByChatId (макс. 200)
+- Исключён lastContext из sidebar history
+- Excel генерация оптимизирована (array.join)
 
 **Документы в холсте (5 типов):**
 - `text` — plain text для соцсетей
@@ -188,4 +188,4 @@ vercel --prod            # Deploy на Vercel
 
 ---
 
-**Обновлено:** 2026-01-29
+**Обновлено:** 2026-01-30

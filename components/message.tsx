@@ -2,7 +2,7 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { motion } from "framer-motion";
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import type { Agent, Vote } from "@/lib/db/schema";
 import type { ChatMessage, MessageMetadata } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
@@ -99,6 +99,27 @@ const PurePreviewMessage = ({
     chatAgentId !== undefined &&
     resolvedAgentId !== chatAgentId;
 
+  // Deduplicate document tool parts by result.id to prevent duplicate cards
+  // (AI sometimes calls createDocument twice for the same document)
+  const deduplicatedParts = useMemo(() => {
+    if (!message.parts) return [];
+
+    const seenDocumentIds = new Set<string>();
+    return message.parts.filter((part) => {
+      // Only deduplicate tool-createDocument and tool-updateDocument
+      if (part.type === "tool-createDocument" || part.type === "tool-updateDocument") {
+        const output = part.output as { id?: string } | undefined;
+        if (output?.id) {
+          if (seenDocumentIds.has(output.id)) {
+            return false; // Skip duplicate
+          }
+          seenDocumentIds.add(output.id);
+        }
+      }
+      return true;
+    });
+  }, [message.parts]);
+
   return (
     <motion.div
       animate={{ opacity: 1 }}
@@ -177,7 +198,7 @@ const PurePreviewMessage = ({
             </div>
           )}
 
-          {message.parts?.map((part, index) => {
+          {deduplicatedParts.map((part, index) => {
             const { type } = part;
             const key = `message-${message.id}-part-${index}`;
 
@@ -441,7 +462,7 @@ export const PreviewMessage = memo(
       return false;
     }
 
-    return false;
+    return true;
   }
 );
 

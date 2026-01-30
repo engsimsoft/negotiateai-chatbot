@@ -1,12 +1,14 @@
 "use client";
 
 import { memo } from "react";
+import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 import { Artifact } from "@/components/create-artifact";
 import { DiffView } from "@/components/diffview";
 import { DocumentSkeleton } from "@/components/document-skeleton";
+import { SparklesIcon } from "@/components/icons";
 import {
   ClockRewind,
   CopyIcon,
@@ -30,7 +32,7 @@ const MarkdownViewer = memo(function MarkdownViewer({
   content: string;
 }) {
   return (
-    <div className="prose prose-slate dark:prose-invert max-w-none prose-headings:font-semibold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-base prose-li:text-base prose-code:text-sm prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-muted prose-pre:p-4 prose-table:text-sm prose-th:bg-muted/50 prose-th:p-2 prose-td:p-2 prose-blockquote:border-l-primary prose-blockquote:bg-muted/30 prose-blockquote:py-1">
+    <div className="prose prose-slate dark:prose-invert max-w-none prose-headings:font-semibold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-base prose-li:text-base prose-code:text-sm prose-code:bg-muted prose-code:text-foreground prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-zinc-100 prose-pre:text-zinc-800 dark:prose-pre:bg-zinc-800 dark:prose-pre:text-zinc-100 prose-pre:p-4 prose-pre:overflow-x-auto prose-table:text-sm prose-th:bg-muted/50 prose-th:p-2 prose-td:p-2 prose-blockquote:border-l-primary prose-blockquote:bg-muted/30 prose-blockquote:py-1">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   );
@@ -152,12 +154,8 @@ export const markdownArtifact = new Artifact<"markdown", MarkdownArtifactMetadat
         return {
           ...draftArtifact,
           content: draftArtifact.content + streamPart.data,
-          isVisible:
-            draftArtifact.status === "streaming" &&
-            draftArtifact.content.length > 400 &&
-            draftArtifact.content.length < 450
-              ? true
-              : draftArtifact.isVisible,
+          // Open artifact immediately when streaming starts (shows Code Rain first)
+          isVisible: true,
           status: "streaming",
         };
       });
@@ -185,9 +183,15 @@ export const markdownArtifact = new Artifact<"markdown", MarkdownArtifactMetadat
     }
 
     const isEditMode = metadata?.isEditMode ?? false;
+    const isStreaming = status === "streaming";
+
+    // Show Code Rain animation while content is being generated (first ~200 chars)
+    if (isStreaming && (!content || content.length < 200)) {
+      return <DocumentSkeleton artifactKind="markdown" />;
+    }
 
     return (
-      <div className="flex flex-col w-full h-full px-4 py-8 md:px-12">
+      <div className="relative flex flex-col w-full h-full px-4 py-8 md:px-12">
         {isEditMode ? (
           <MarkdownEditor
             content={content}
@@ -196,6 +200,45 @@ export const markdownArtifact = new Artifact<"markdown", MarkdownArtifactMetadat
           />
         ) : (
           <MarkdownViewer content={content} />
+        )}
+
+        {/* Streaming indicator */}
+        {isStreaming && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="sticky bottom-4 left-0 right-0 flex justify-center pointer-events-none"
+          >
+            <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 backdrop-blur-sm rounded-full border border-primary/20 shadow-lg">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              >
+                <SparklesIcon size={16} />
+              </motion.div>
+              <span className="text-sm font-medium text-primary">
+                Генерация документа...
+              </span>
+              <div className="flex gap-1">
+                {[0, 1, 2].map((i) => (
+                  <motion.div
+                    key={i}
+                    animate={{
+                      scale: [1, 1.3, 1],
+                      opacity: [0.5, 1, 0.5],
+                    }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      delay: i * 0.2,
+                    }}
+                    className="size-1.5 rounded-full bg-primary"
+                  />
+                ))}
+              </div>
+            </div>
+          </motion.div>
         )}
       </div>
     );

@@ -77,14 +77,7 @@ export const presentationPptxArtifact = new Artifact<
     }, [handlePrevSlide, handleNextSlide]);
 
     if (isLoading || status === "streaming") {
-      return (
-        <div className="flex flex-col items-center justify-center h-full w-full p-8">
-          <DocumentSkeleton artifactKind="text" />
-          <p className="text-sm text-muted-foreground mt-4">
-            Создание презентации...
-          </p>
-        </div>
-      );
+      return <DocumentSkeleton artifactKind="presentation-pptx" />;
     }
 
     const pptxUrl = metadata?.pptxUrl ?? "";

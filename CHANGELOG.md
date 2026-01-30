@@ -12,6 +12,123 @@
 
 ---
 
+## [2.11.0] - 2026-01-30 - Artifact Loading UX
+
+**MINOR RELEASE**: Улучшен UX загрузки артефактов — красивая анимация Code Rain, индикаторы стриминга, исправлены дубли документов.
+
+### Summary
+
+Добавлена визуально привлекательная анимация загрузки артефактов в стиле Claude Desktop. Падающие символы (Code Rain) контекстно подобраны для каждого типа документа. Статусные сообщения показывают прогресс генерации. Исправлен баг с дублированием карточек документов.
+
+### Added
+
+#### Code Rain анимация
+- **DocumentSkeleton** — полностью переписан с CSS-анимацией падающих символов
+- **Контекстные символы** для каждого типа артефакта:
+  - Excel: `=`, `SUM`, `$`, `%`, `A1`, `IF`, `∑`, `ИТОГО`
+  - Markdown: `#`, `##`, `**`, `_`, `>`, `-`, `` ` ``, `---`
+  - Text: `А`, `Б`, `В`, `...`, `→`, `•`, `«`, `»`
+  - Presentations: `→`, `•`, `1.`, `◆`, `▸`, `Слайд`
+- **Статусные сообщения** с плавной ротацией:
+  - "Думаю..." → "Анализирую запрос..." → "Генерирую таблицу..." и т.д.
+- **Пульсирующие точки** — индикатор прогресса
+
+#### Streaming индикатор
+- **Плавающий индикатор** внизу документа во время стриминга
+- Крутящаяся иконка ✨ + текст "Генерация документа..." + пульсирующие точки
+- Применён к Markdown и Text артефактам
+
+### Fixed
+
+#### Дублирование документов
+- **Дедупликация** tool-call результатов в message.tsx по `result.id`
+- AI иногда вызывает `createDocument` дважды — теперь дубли отфильтровываются
+
+#### Markdown code blocks
+- **Контрастные стили** для блоков кода (серый текст на сером фоне → контрастный)
+- Light mode: `bg-zinc-100 text-zinc-800`
+- Dark mode: `bg-zinc-800 text-zinc-100`
+
+### Changed
+
+#### Логика открытия артефактов
+- Артефакт открывается **сразу** при начале стриминга (было: после 400 символов)
+- Code Rain показывается пока контент < 200 символов
+- Плавный переход: Code Rain → Контент + индикатор → Готовый документ
+
+### Technical
+
+#### CSS анимации (globals.css)
+- `@keyframes code-rain-fall` — падение символов сверху вниз
+- `@keyframes shimmer-glow` — пульсация иконки
+- `.code-rain-column` — класс для колонок символов
+- `.artifact-shimmer-glow` — класс для пульсации
+
+#### Files Modified
+- `components/document-skeleton.tsx` — полностью переписан
+- `app/globals.css` — добавлены keyframes анимаций
+- `components/message.tsx` — дедупликация tool results
+- `artifacts/markdown/client.tsx` — streaming индикатор, стили code blocks
+- `artifacts/text/client.tsx` — streaming индикатор
+- `artifacts/presentation-reveal/client.tsx` — правильный artifactKind
+- `artifacts/presentation-pptx/client.tsx` — правильный artifactKind
+
+---
+
+## [2.10.0] - 2026-01-30 - Performance Audit
+
+**MINOR RELEASE**: Аудит производительности — исправлены критические проблемы с ре-рендерами, оптимизированы DB запросы, улучшено время до первого токена (TTFT).
+
+### Summary
+
+Выполнен полный аудит производительности. Исправлены 11 из 12 найденных проблем. Ключевые улучшения: исправлен сломанный `memo()` в PreviewMessage и Artifact, генерация заголовка чата перенесена в фоновый режим (-2-3 сек TTFT), DB запросы параллелизированы, добавлено кэширование каталога агентов.
+
+### Fixed
+
+#### Критические исправления
+- **PreviewMessage memo()** — функция сравнения возвращала `false` всегда, отключая оптимизацию. Исправлено на `true` ([message.tsx:444](components/message.tsx#L444))
+- **Artifact memo()** — сравнивался массив с числом. Исправлено сравнение длин ([artifact.tsx:532](components/artifact.tsx#L532))
+
+### Changed
+
+#### Оптимизация TTFT (Time to First Token)
+- **Title generation** — перенесён в фоновый режим (non-blocking). Чат создаётся с временным заголовком "Новый чат", реальный генерируется асинхронно ([route.ts:125](app/(chat)/api/chat/route.ts#L125))
+- **DB queries** — getUserById, getMessageCountByUserId, getChatById теперь выполняются параллельно через `Promise.all` ([route.ts:106](app/(chat)/api/chat/route.ts#L106))
+- **Agent resolve** — getAgentById и getUserAgentById загружаются параллельно ([route.ts:233](app/(chat)/api/chat/route.ts#L233))
+
+#### Оптимизация масштабируемости
+- **getMessagesByChatId** — добавлен параметр `maxMessages` с LIMIT на уровне SQL (по умолчанию 200) ([queries.ts:305](lib/db/queries.ts#L305))
+- **getChatsByUserId** — исключён `lastContext` (JSONB) из SELECT для уменьшения payload sidebar history ([queries.ts:213](lib/db/queries.ts#L213))
+- **Document API** — добавлен параметр `?latest=true` для загрузки только последней версии документа ([document/route.ts](app/(chat)/api/document/route.ts))
+
+#### Кэширование
+- **Каталог агентов** — добавлен 5-минутный кэш через `unstable_cache` для `getAgents()` ([route.ts:78](app/(chat)/api/chat/route.ts#L78))
+
+#### Мелкие оптимизации
+- **Excel generation** — заменён `jsonContent += delta.text` на `chunks.push()` + `join("")` для уменьшения GC pressure ([excel/server.ts](artifacts/excel/server.ts))
+- **usePerformance** — sessionStorage запись только для slow renders (>50ms) вместо каждого рендера ([use-performance.ts](hooks/use-performance.ts))
+
+### Added
+
+- `updateChatTitle()` — новая функция в queries.ts для фоновой генерации заголовка
+
+### Not Implemented
+
+- **#5 Виртуализация сообщений** — требует установки `@tanstack/react-virtual` и рефакторинга. Отложено на следующий релиз.
+
+### Technical
+
+#### Files Modified
+- `components/message.tsx` — memo fix
+- `components/artifact.tsx` — memo fix
+- `app/(chat)/api/chat/route.ts` — parallelization, caching, background title
+- `app/(chat)/api/document/route.ts` — ?latest=true parameter
+- `lib/db/queries.ts` — updateChatTitle, LIMIT, exclude lastContext
+- `artifacts/excel/server.ts` — array.join optimization
+- `hooks/use-performance.ts` — conditional sessionStorage
+
+---
+
 ## [2.9.0] - 2026-01-29 - ТЗ-6: Excel Tool
 
 **MINOR RELEASE**: Полноценная поддержка Excel — создание, анализ и редактирование таблиц с формулами, графиками и профессиональными стилями.

@@ -93,14 +93,7 @@ export const presentationRevealArtifact = new Artifact<
     }, [htmlContent]);
 
     if (isLoading || status === "streaming") {
-      return (
-        <div className="flex flex-col items-center justify-center h-full w-full p-8">
-          <DocumentSkeleton artifactKind="text" />
-          <p className="text-sm text-muted-foreground mt-4">
-            Generating presentation...
-          </p>
-        </div>
-      );
+      return <DocumentSkeleton artifactKind="presentation-reveal" />;
     }
 
     if (!htmlContent) {
