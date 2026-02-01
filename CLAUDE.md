@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 2.11.0 | **Статус:** Artifact Loading UX завершён
+**Проект:** Simply | **Версия:** 2.12.0 | **Статус:** Voice Input MVP завершён
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -9,8 +9,8 @@
 ## 📖 Начни здесь
 
 1. **[README.md](README.md)** — О проекте Simply
-2. **[SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md)** — Видение продукта
-3. **[SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md)** — План разработки и прогресс
+2. **[SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md)** — Видение продукта (roadmap, инструменты, концепции)
+3. **[SIMPLY_STATUS.md](SIMPLY_STATUS.md)** — Текущее состояние проекта
 4. **[DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md)** — Правила документации
 
 **Главный принцип:** SSOT (Single Source of Truth)
@@ -19,16 +19,18 @@
 
 ## 🎯 О проекте
 
-**Simply** — платформа AI-агентов для российского рынка.
+**Simply** — платформа AI-агентов для российского рынка. Шлюз к лучшим мировым AI-моделям с оплатой в рублях.
 
-**Философия:** Apple-подход. Качество важнее количества.
+**Философия:**
+- **Apple-подход** — качество важнее количества
+- **Best-in-Class API** — не изобретаем велосипеды, интегрируем лучшие решения (Perplexity, Plus AI, Ideogram)
 
 **Ключевые особенности:**
-- Каталог проработанных AI-агентов
-- Персонализация готовых агентов (не создание с нуля)
-- Мультипровайдер: GPT, Claude, Gemini
+- Каталог проработанных AI-агентов (8 агентов)
+- Три уровня персонализации: Профиль + RAG + Chat Memory
+- Мультипровайдер: GPT, Claude, Gemini (планируется)
 - Smart Routing — автовыбор модели
-- Оплата в рублях
+- Оплата в рублях (ЮKassa, Тинькофф, СБП)
 
 ---
 
@@ -39,6 +41,7 @@
 **AI:**
 - Vercel AI SDK (@ai-sdk/google, @ai-sdk/openai, @ai-sdk/anthropic)
 - Текущий: Google Gemini (3 Pro + 2.5 Flash)
+- Voice Input: AssemblyAI Universal-Streaming (Speech-to-Text)
 - План: мультипровайдер
 
 **Backend:** NextAuth 5.0-beta.25, PostgreSQL (Neon), Drizzle ORM
@@ -57,6 +60,12 @@
 - `lib/ai/tools/` — Инструменты (search, excel, web scraping)
 - `lib/ai/tools/excel/` — Excel tools (create, parse, edit)
 - `lib/db/seed-agents.ts` — Агенты и промпты (БД)
+
+**Voice Input (ТЗ-VOICE-01):**
+- `app/(chat)/api/assemblyai/token/route.ts` — Token API для AssemblyAI
+- `lib/audio/` — Аудио утилиты (types, utils, constants)
+- `hooks/use-voice-recorder.ts` — Хук записи и стриминга
+- `components/voice-button.tsx` — Кнопка микрофона
 
 **Auth/DB:**
 - `app/(auth)/` — NextAuth 5.0 setup
@@ -106,27 +115,27 @@
 
 ## 🚀 Текущий этап
 
-**Завершены:** Этап 0-6 + Performance Audit
-**Следующий:** Этап 7+ — Мультипровайдер, биллинг
+**Завершены:** Этапы 0-6, Performance Audit, Artifact Loading UX
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
-**Выполнено в Performance Audit:**
-- Исправлен memo() в PreviewMessage и Artifact (лишние ре-рендеры)
-- Title generation в фоновом режиме (-2-3 сек TTFT)
-- DB запросы параллелизированы (Promise.all)
-- Кэширование каталога агентов (5 мин)
-- LIMIT в getMessagesByChatId (макс. 200)
-- Исключён lastContext из sidebar history
-- Excel генерация оптимизирована (array.join)
+**Следующие этапы (по приоритету):**
+| Этап | Описание | Приоритет |
+|------|----------|-----------|
+| 7 | Tool Activity UX | Высокий |
+| 8 | Инструменты Фаза 1 (Perplexity, Plus AI, Ideogram) | Высокий |
+| 9 | RAG (База знаний) | Средний |
+| 10 | Chat Memory | Средний |
+| 11 | Мультипровайдер (GPT, Claude) | Средний |
+| 12 | Биллинг (Pay-as-you-go) | Средний |
 
 **Документы в холсте (5 типов):**
 - `text` — plain text для соцсетей
 - `markdown` — форматированные документы
-- `excel` — таблицы с формулами и графиками (NEW)
+- `excel` — таблицы с формулами и графиками
 - `presentation-reveal` — веб-презентации
 - `presentation-pptx` — PowerPoint
 
-**Детали:** [docs/ai-artifacts.md](docs/ai-artifacts.md)
+**Детали:** [docs/ai-artifacts.md](docs/ai-artifacts.md) | [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md)
 
 ---
 
@@ -176,6 +185,8 @@ vercel --prod            # Deploy на Vercel
 ---
 
 ## 💡 Workflow
+
+**Моя роль:** Получаю ТЗ → Пишу код → Документирую изменения в STATUS/CHANGELOG
 
 **При работе с новыми задачами:**
 1. Читай [SIMPLY_STATUS.md](SIMPLY_STATUS.md) — текущее состояние

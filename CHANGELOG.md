@@ -12,6 +12,41 @@
 
 ---
 
+## [2.12.0] - 2026-02-01 - Voice Input MVP
+
+**MINOR RELEASE**: Добавлен голосовой ввод сообщений через AssemblyAI.
+
+### Summary
+
+Пользователи теперь могут вводить сообщения голосом. Нажмите кнопку микрофона, говорите — текст появится в поле ввода. Поддерживается автоматическая остановка по паузе, русский и английский языки.
+
+### Added
+
+#### Voice Input
+- **Кнопка микрофона** в поле ввода (между скрепкой и выбором модели)
+- **useVoiceRecorder** хук — запись и streaming аудио в AssemblyAI
+- **VoiceButton** компонент — состояния idle/recording/processing
+- **Token API endpoint** — `/api/assemblyai/token` для безопасной авторизации
+- **Пульсация** при записи — визуальная индикация активного микрофона
+- **Автостоп** по end_of_turn от AssemblyAI (умное определение конца речи)
+
+#### Audio Utilities
+- `lib/audio/types.ts` — TypeScript типы (VoiceState, TranscriptResult)
+- `lib/audio/utils.ts` — PCM конвертация, ресемплинг аудио
+- `lib/audio/constants.ts` — константы (SAMPLE_RATE, сообщения об ошибках)
+
+### Technical Details
+- **Технология:** AssemblyAI Universal-Streaming (multilingual)
+- **Latency:** ~300ms
+- **Формат:** PCM 16-bit, 16kHz
+- **Безопасность:** API ключ не попадает в браузер
+
+### Documentation
+- Обновлён `.env.example` с документацией ASSEMBLYAI_API_KEY
+- Добавлен раздел Voice Input в CLAUDE.md
+
+---
+
 ## [2.11.0] - 2026-01-30 - Artifact Loading UX
 
 **MINOR RELEASE**: Улучшен UX загрузки артефактов — красивая анимация Code Rain, индикаторы стриминга, исправлены дубли документов.
@@ -49,6 +84,10 @@
 - Light mode: `bg-zinc-100 text-zinc-800`
 - Dark mode: `bg-zinc-800 text-zinc-100`
 
+#### Excel artifact crash
+- **TypeError: Cannot read properties of undefined (reading '0')** — добавлена проверка `excelData.sheets` перед рендерингом
+- Показывается Code Rain анимация пока данные не готовы
+
 ### Changed
 
 #### Логика открытия артефактов
@@ -70,6 +109,7 @@
 - `components/message.tsx` — дедупликация tool results
 - `artifacts/markdown/client.tsx` — streaming индикатор, стили code blocks
 - `artifacts/text/client.tsx` — streaming индикатор
+- `artifacts/excel/client.tsx` — проверка sheets перед рендерингом
 - `artifacts/presentation-reveal/client.tsx` — правильный artifactKind
 - `artifacts/presentation-pptx/client.tsx` — правильный artifactKind
 

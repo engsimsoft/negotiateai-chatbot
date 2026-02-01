@@ -49,6 +49,8 @@ import {
   StopIcon,
 } from "./icons";
 import { PreviewAttachment } from "./preview-attachment";
+import { VoiceButton } from "./voice-button";
+import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { SuggestedActions } from "./suggested-actions";
 import { Button } from "./ui/button";
 import type { VisibilityType } from "./visibility-selector";
@@ -141,6 +143,21 @@ function PureMultimodalInput({
 
   // ТЗ-4: Force show hint state (for 💡 button)
   const [forceShowHint, setForceShowHint] = useState(false);
+
+  // Voice input hook
+  const {
+    state: voiceState,
+    isAvailable: voiceAvailable,
+    startRecording,
+    stopRecording,
+  } = useVoiceRecorder({
+    onTranscript: (text) => {
+      setInput((prev) => (prev ? `${prev} ${text}` : text));
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
 
   const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = event.target.value;
@@ -432,6 +449,14 @@ function PureMultimodalInput({
               selectedModelId={selectedModelId}
               status={status}
             />
+            {voiceAvailable && (
+              <VoiceButton
+                state={voiceState}
+                onStart={startRecording}
+                onStop={stopRecording}
+                disabled={status !== "ready"}
+              />
+            )}
             <ModelSelectorCompact
               onModelChange={onModelChange}
               selectedModelId={selectedModelId}
