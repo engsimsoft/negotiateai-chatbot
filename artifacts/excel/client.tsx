@@ -392,11 +392,11 @@ export const excelArtifact = new Artifact<"excel", ExcelArtifactMetadata>({
       }
     }, [content, metadata?.excelData]);
 
-    if (status === "streaming" && !excelData) {
+    if (status === "streaming" && (!excelData || !excelData.sheets?.length)) {
       return <DocumentSkeleton artifactKind="excel" />;
     }
 
-    if (!excelData) {
+    if (!excelData || !excelData.sheets || excelData.sheets.length === 0) {
       return (
         <div className="flex items-center justify-center h-full text-muted-foreground">
           Нет данных для отображения

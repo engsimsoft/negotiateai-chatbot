@@ -1,8 +1,8 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 2.11.0
-**Дата:** 2026-01-30
-**Статус:** Artifact Loading UX завершён
+**Версия:** 2.13.0
+**Дата:** 2026-02-01
+**Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** Полная информация о состоянии проекта для разработки ТЗ и архитектурных решений.
@@ -17,17 +17,19 @@
 
 ### Философия
 
-**Apple-подход:** Лучше 10 идеально работающих агентов, чем 100 посредственных.
+- **Apple-подход:** Лучше 10 идеально работающих агентов, чем 100 посредственных
+- **Best-in-Class API:** Не изобретаем велосипеды — интегрируем лучшие решения (Perplexity, Plus AI, Ideogram)
 
 ### Ключевые особенности
 
-| Особенность | Описание |
-|-------------|----------|
-| **Каталог агентов** | Проработанные агенты с проверенными промптами |
-| **Персонализация** | Профиль пользователя + адаптация агентов |
-| **Мультипровайдер** | GPT, Claude, Gemini через единый интерфейс |
-| **Smart Routing** | Автовыбор модели для экономии без потери качества |
-| **Оплата в рублях** | ЮKassa, Тинькофф, СБП |
+| Особенность | Описание | Статус |
+|-------------|----------|--------|
+| **Каталог агентов** | 8 проработанных агентов с проверенными промптами | ✅ |
+| **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG/Memory 📋 |
+| **Best-in-Class инструменты** | Perplexity, Plus AI, Ideogram, AssemblyAI | 📋 Фаза 1 |
+| **Мультипровайдер** | GPT, Claude, Gemini через единый интерфейс | 📋 |
+| **Smart Routing** | Автовыбор модели для экономии без потери качества | 📋 |
+| **Оплата в рублях** | ЮKassa, Тинькофф, СБП | 📋 |
 
 **Подробнее:** [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md)
 
@@ -305,15 +307,64 @@
 - Исправлен баг с дублированием карточек документов (дедупликация по result.id)
 - Исправлены стили code blocks в Markdown (контрастный текст)
 - Артефакт открывается сразу при начале стриминга (было: после 400 символов)
+- Исправлен баг Excel: `excelData.sheets undefined` — добавлена проверка перед рендерингом
 
-### Этап 7+: Будущее ← СЛЕДУЮЩИЙ
+**Файлы изменены:**
+- `components/document-skeleton.tsx` — Code Rain анимация
+- `app/globals.css` — CSS keyframes
+- `components/message.tsx` — дедупликация tool results
+- `artifacts/markdown/client.tsx` — streaming индикатор, стили code blocks
+- `artifacts/text/client.tsx` — streaming индикатор
+- `artifacts/excel/client.tsx` — проверка sheets
+- `artifacts/presentation-reveal/client.tsx` — artifactKind
+- `artifacts/presentation-pptx/client.tsx` — artifactKind
 
-- Tool Activity UX
-- Мультипровайдер (GPT, Claude)
-- Smart Routing, Биллинг
-- Виртуализация списка сообщений
+### ТЗ-VOICE-02: Voice Input (Deepgram) — ✅ ЗАВЕРШЁН
 
-**Видение продукта:** [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md)
+**Причина миграции:** AssemblyAI Streaming не поддерживает русский язык.
+**Решение:** Deepgram Nova-3 (поддерживает русский в real-time streaming).
+
+**Выполнено:**
+- ✅ Token endpoint `/api/deepgram/token` (POST + GET)
+- ✅ WebSocket подключение к Deepgram Nova-3
+- ✅ Параметры: `language=ru`, `smart_format`, `punctuate`, `interim_results`
+- ✅ Захват аудио через Web Audio API (PCM 16-bit, 16kHz)
+- ✅ Кнопка микрофона с визуальными состояниями
+- ✅ Interim транскрипты (текст появляется во время речи)
+- ✅ Финальные транскрипты в поле ввода
+- ✅ Ручной стоп (без автостопа по паузе — можно думать, мычать)
+- ✅ Лимит 3 минуты (защита от забытой записи)
+
+**Философия:** Apple-подход — качество важнее экономии. Пользователь контролирует запись.
+
+**Файлы:**
+- `app/(chat)/api/deepgram/token/route.ts` — Token API
+- `lib/audio/constants.ts` — DEEPGRAM_PARAMS, MAX_RECORDING_DURATION
+- `lib/audio/types.ts` — DeepgramMessage
+- `hooks/use-voice-recorder.ts` — React хук (Deepgram WebSocket)
+- `components/voice-button.tsx` — UI компонент
+
+**Переменные окружения:**
+- `DEEPGRAM_API_KEY` — добавить в `.env.local` и Vercel
+
+**Детали:** [TZ_VOICE_01_MIGRATION_TO_DEEPGRAM.md](TZ_VOICE_01_MIGRATION_TO_DEEPGRAM.md)
+
+### Следующие этапы ← ROADMAP
+
+| Этап | Описание | Приоритет |
+|------|----------|-----------|
+| **7** | Tool Activity UX (индикация работы инструментов) | 🔴 Высокий |
+| **8** | Инструменты Фаза 1 (Perplexity, Plus AI, Ideogram) | 🔴 Высокий |
+| **9** | RAG (База знаний пользователя) | 🟡 Средний |
+| **10** | Chat Memory (автоизвлечение фактов) | 🟡 Средний |
+| **11** | Мультипровайдер (GPT, Claude) | 🟡 Средний |
+| **12** | Биллинг (Pay-as-you-go, рубли) | 🟡 Средний |
+| **13** | Инструменты Фаза 2 (видео, TTS quality) | 🟢 Низкий |
+| **14** | Инструменты Фаза 3 + Morning Briefing | 🟢 Низкий |
+
+**Философия инструментов:** Best-in-Class API — интегрируем лучшие готовые решения, не изобретаем велосипеды.
+
+**Подробности:** [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md)
 
 ---
 
@@ -321,8 +372,9 @@
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 2.11.0 |
-| Статус | Artifact Loading UX завершён |
+| Версия | 2.13.0 |
+| Статус | Active development |
+| Voice Input | Deepgram Nova-3 (русский) |
 | AI-агентов | 8 (в БД) |
 | AI моделей | 2 (Gemini 3 Pro, 2.5 Flash) |
 | AI-инструментов | 8 |
@@ -358,7 +410,9 @@
 - [_archive/TZ_05_MARKDOWN_ARTIFACTS.md](_archive/TZ_05_MARKDOWN_ARTIFACTS.md) — Этап 5
 - [_archive/TZ_EXCEL_TOOL.md](_archive/TZ_EXCEL_TOOL.md) — Этап 6
 - [_archive/TZ_06_ROADMAP.md](_archive/TZ_06_ROADMAP.md) — Этап 6 Roadmap
+- [_archive/TZ_VOICE_01_VOICE_INPUT_MVP.md](_archive/TZ_VOICE_01_VOICE_INPUT_MVP.md) — Voice Input AssemblyAI (отменён)
+- [TZ_VOICE_01_MIGRATION_TO_DEEPGRAM.md](TZ_VOICE_01_MIGRATION_TO_DEEPGRAM.md) — Voice Input Deepgram (завершён)
 
 ---
 
-**Обновлено:** 2026-01-30
+**Обновлено:** 2026-02-01

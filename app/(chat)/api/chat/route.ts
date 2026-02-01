@@ -44,6 +44,7 @@ import {
   saveChat,
   saveMessages,
   updateChatLastContextById,
+  updateChatTitle,
 } from "@/lib/db/queries";
 import { parseMention, buildAgentsList } from "@/lib/agents/parse-mentions";
 import { ChatSDKError } from "@/lib/errors";
@@ -69,6 +70,15 @@ const getTokenlensCatalog = cache(
   },
   ["tokenlens-catalog"],
   { revalidate: 24 * 60 * 60 } // 24 hours
+);
+
+// Performance: Cache agents catalog (rarely changes)
+const getCachedAgents = cache(
+  async () => {
+    return await getAgents();
+  },
+  ["agents-catalog"],
+  { revalidate: 5 * 60 } // 5 minutes
 );
 
 export async function POST(request: Request) {
@@ -102,37 +112,38 @@ export async function POST(request: Request) {
       return new ChatSDKError("unauthorized:chat").toResponse();
     }
 
-    // ТЗ-3A: Load user profile for system prompt context
-    const userProfile = await getUserById(session.user.id);
-    const userContext = userProfile ? buildUserContext(userProfile) : "";
+    // Performance: Parallelize independent DB queries
+    const [userProfile, messageCount, chat] = await Promise.all([
+      getUserById(session.user.id),
+      getMessageCountByUserId({ id: session.user.id, differenceInHours: 24 }),
+      getChatById({ id }),
+    ]);
 
-    const messageCount = await getMessageCountByUserId({
-      id: session.user.id,
-      differenceInHours: 24,
-    });
+    // ТЗ-3A: Build user context for system prompt
+    const userContext = userProfile ? buildUserContext(userProfile) : "";
 
     if (messageCount > userEntitlements.maxMessagesPerDay) {
       return new ChatSDKError("rate_limit:chat").toResponse();
     }
-
-    const chat = await getChatById({ id });
 
     if (chat) {
       if (chat.userId !== session.user.id) {
         return new ChatSDKError("forbidden:chat").toResponse();
       }
     } else {
-      const title = await generateTitleFromUserMessage({
-        message,
-      });
-
+      // Performance: Save chat with temporary title, generate real title in background
       await saveChat({
         id,
         userId: session.user.id,
-        title,
+        title: "Новый чат",
         visibility: selectedVisibilityType,
         agentId,
       });
+
+      // Generate title in background (non-blocking)
+      generateTitleFromUserMessage({ message })
+        .then((title) => updateChatTitle({ chatId: id, title }))
+        .catch((err) => console.warn("Background title generation failed:", err));
       // ТЗ-4: Greeting НЕ добавляется как сообщение — используем UI с заголовком + suggested actions
     }
 
@@ -193,7 +204,7 @@ export async function POST(request: Request) {
 
     // ТЗ-2: Parse @-mentions from user message to determine target agent
     let mentionedAgentId: string | null = null;
-    const allAgents = await getAgents();
+    const allAgents = await getCachedAgents();
 
     // Extract text from the latest user message parts
     const userText = message.parts
@@ -228,10 +239,14 @@ export async function POST(request: Request) {
 
         if (resolvedAgentId) {
           try {
-            // Load agent from database (catalog agent)
-            const agentData = await getAgentById({ id: resolvedAgentId });
+            // Performance: Load catalog agent and user agent in parallel
+            const [agentData, userAgentData] = await Promise.all([
+              getAgentById({ id: resolvedAgentId }),
+              getUserAgentById({ id: resolvedAgentId, userId: session.user.id }),
+            ]);
 
             if (agentData) {
+              // Found in catalog
               systemPromptText = agentData.systemPrompt;
 
               // ТЗ-2: Dynamic {AGENTS_LIST} substitution for Helper agent
@@ -240,49 +255,37 @@ export async function POST(request: Request) {
                 systemPromptText = systemPromptText.replace("{AGENTS_LIST}", agentsList);
               }
 
-              // Model selection logic:
-              // - "auto" → use agent's default model (auto-selection based on task)
-              // - other → use user's explicit choice (override agent's default)
               if (selectedChatModel === "auto") {
                 modelToUse = agentData.defaultModel as ChatModel["id"];
                 console.log(`[Auto] Using agent ${agentData.slug} with model ${modelToUse}`);
               } else {
                 console.log(`[Manual] Using agent ${agentData.slug} with user-selected model ${modelToUse}`);
               }
-            } else {
-              // ТЗ-3B: Try loading as user agent (personalized agent)
-              const userAgentData = await getUserAgentById({
-                id: resolvedAgentId,
-                userId: session.user.id,
-              });
+            } else if (userAgentData) {
+              // ТЗ-3B: User agent (personalized)
+              const sourceAgent = await getAgentById({ id: userAgentData.sourceAgentId });
+              if (sourceAgent) {
+                systemPromptText = sourceAgent.systemPrompt;
 
-              if (userAgentData) {
-                // Load source agent
-                const sourceAgent = await getAgentById({ id: userAgentData.sourceAgentId });
-                if (sourceAgent) {
-                  systemPromptText = sourceAgent.systemPrompt;
+                if (userAgentData.customizations) {
+                  agentCustomizations = buildAgentCustomizations(userAgentData.customizations);
+                }
 
-                  // Apply customizations
-                  if (userAgentData.customizations) {
-                    agentCustomizations = buildAgentCustomizations(userAgentData.customizations);
-                  }
-
-                  if (selectedChatModel === "auto") {
-                    modelToUse = sourceAgent.defaultModel as ChatModel["id"];
-                    console.log(`[Auto] Using user agent ${userAgentData.name} (source: ${sourceAgent.slug}) with model ${modelToUse}`);
-                  } else {
-                    console.log(`[Manual] Using user agent ${userAgentData.name} with user-selected model ${modelToUse}`);
-                  }
+                if (selectedChatModel === "auto") {
+                  modelToUse = sourceAgent.defaultModel as ChatModel["id"];
+                  console.log(`[Auto] Using user agent ${userAgentData.name} (source: ${sourceAgent.slug}) with model ${modelToUse}`);
                 } else {
-                  console.warn(`Source agent ${userAgentData.sourceAgentId} not found`);
-                  activeAgentId = null;
-                  systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
+                  console.log(`[Manual] Using user agent ${userAgentData.name} with user-selected model ${modelToUse}`);
                 }
               } else {
-                console.warn(`Agent ${resolvedAgentId} not found in DB, falling back to default`);
+                console.warn(`Source agent ${userAgentData.sourceAgentId} not found`);
                 activeAgentId = null;
                 systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
               }
+            } else {
+              console.warn(`Agent ${resolvedAgentId} not found in DB, falling back to default`);
+              activeAgentId = null;
+              systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
             }
           } catch (error) {
             console.error(`Failed to load agent for ${resolvedAgentId}, falling back to default:`, error);

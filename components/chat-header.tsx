@@ -23,6 +23,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  PromptAgentTrigger,
+  PromptAgentDrawer,
+  BenTrigger,
+  BenDrawer,
+} from "@/components/modal-assistants";
 
 // Fetcher for SWR
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -44,6 +50,10 @@ function PureChatHeader({
   const { open } = useSidebar();
   const { width: windowWidth } = useWindowSize();
   const [isChangingAgent, setIsChangingAgent] = useState(false);
+
+  // Modal assistants state (Phase 3)
+  const [promptAgentOpen, setPromptAgentOpen] = useState(false);
+  const [benOpen, setBenOpen] = useState(false);
 
   // Fetch agent info from API
   const { data: agents } = useSWR<
@@ -167,6 +177,12 @@ function PureChatHeader({
         </Button>
       )}
 
+      {/* Modal assistant triggers (Phase 3) */}
+      <div className="flex items-center gap-1">
+        <PromptAgentTrigger onClick={() => setPromptAgentOpen(true)} />
+        <BenTrigger onClick={() => setBenOpen(true)} />
+      </div>
+
       {!isReadonly && (
         <VisibilitySelector
           chatId={chatId}
@@ -174,6 +190,16 @@ function PureChatHeader({
           selectedVisibilityType={selectedVisibilityType}
         />
       )}
+
+      {/* Modal assistant drawers */}
+      <PromptAgentDrawer
+        open={promptAgentOpen}
+        onOpenChange={setPromptAgentOpen}
+      />
+      <BenDrawer
+        open={benOpen}
+        onOpenChange={setBenOpen}
+      />
     </header>
   );
 }

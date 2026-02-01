@@ -4,31 +4,37 @@
 export type VoiceState = "idle" | "recording" | "processing" | "error";
 
 /**
- * AssemblyAI transcript response
+ * Deepgram WebSocket message types
  */
-export interface TranscriptResult {
-  /** Raw transcript text */
-  transcript: string;
-  /** Formatted transcript with punctuation */
-  utterance?: string;
-  /** Whether this is the end of a turn (speech segment) */
-  end_of_turn: boolean;
-  /** Whether the turn is formatted */
-  turn_is_formatted: boolean;
-}
-
-/**
- * AssemblyAI WebSocket message types
- */
-export interface AssemblyAIMessage {
-  message_type: "SessionBegins" | "PartialTranscript" | "FinalTranscript" | "SessionTerminated" | "Error";
-  session_id?: string;
-  expires_at?: string;
-  transcript?: string;
-  utterance?: string;
-  end_of_turn?: boolean;
-  turn_is_formatted?: boolean;
-  error?: string;
+export interface DeepgramMessage {
+  type: "Results" | "Metadata" | "UtteranceEnd" | "SpeechStarted" | "Error";
+  /** Channel index */
+  channel_index?: [number, number];
+  /** Audio duration */
+  duration?: number;
+  /** Start time */
+  start?: number;
+  /** Whether this is a final result (not interim) */
+  is_final?: boolean;
+  /** Whether the speech utterance has ended */
+  speech_final?: boolean;
+  /** Channel data with alternatives */
+  channel?: {
+    alternatives: Array<{
+      transcript: string;
+      confidence: number;
+      words?: Array<{
+        word: string;
+        start: number;
+        end: number;
+        confidence: number;
+      }>;
+    }>;
+  };
+  /** Error code (Error message) */
+  err_code?: string;
+  /** Error message (Error message) */
+  err_msg?: string;
 }
 
 /**

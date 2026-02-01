@@ -52,20 +52,22 @@ export function usePerformance(componentName: string) {
       }
     }
 
-    // Store metrics in sessionStorage for analysis
-    try {
-      const existingMetrics = sessionStorage.getItem("performance-metrics");
-      const metricsArray = existingMetrics ? JSON.parse(existingMetrics) : [];
-      metricsArray.push(metrics);
+    // Performance: Only store metrics for slow renders (>50ms) to reduce overhead
+    if (renderDuration > 50) {
+      try {
+        const existingMetrics = sessionStorage.getItem("performance-metrics");
+        const metricsArray = existingMetrics ? JSON.parse(existingMetrics) : [];
+        metricsArray.push(metrics);
 
-      // Keep only last 100 measurements
-      if (metricsArray.length > 100) {
-        metricsArray.shift();
+        // Keep only last 50 slow measurements
+        if (metricsArray.length > 50) {
+          metricsArray.shift();
+        }
+
+        sessionStorage.setItem("performance-metrics", JSON.stringify(metricsArray));
+      } catch (error) {
+        // Ignore storage errors
       }
-
-      sessionStorage.setItem("performance-metrics", JSON.stringify(metricsArray));
-    } catch (error) {
-      // Ignore storage errors
     }
   });
 

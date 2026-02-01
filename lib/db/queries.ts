@@ -10,6 +10,7 @@ import {
   gte,
   inArray,
   lt,
+  sql,
   type SQL,
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -209,9 +210,18 @@ export async function getChatsByUserId({
   try {
     const extendedLimit = limit + 1;
 
+    // Performance: Exclude lastContext (heavy JSONB) from history listing
     const query = (whereCondition?: SQL<any>) =>
       db
-        .select()
+        .select({
+          id: chat.id,
+          createdAt: chat.createdAt,
+          title: chat.title,
+          userId: chat.userId,
+          visibility: chat.visibility,
+          agentId: chat.agentId,
+          lastContext: sql<null>`NULL`.as("lastContext"),
+        })
         .from(chat)
         .where(
           whereCondition
@@ -296,18 +306,21 @@ export async function getMessagesByChatId({
   id,
   maxTokens = 140000,
   minMessages = 20,
+  maxMessages = 200, // Hard limit to prevent loading thousands of messages
 }: {
   id: string;
   maxTokens?: number;
   minMessages?: number;
+  maxMessages?: number;
 }) {
   try {
-    // Загружаем все сообщения от новых к старым
+    // Performance: Load only last N messages from DB (not all)
     const allMessages = await db
       .select()
       .from(message)
       .where(eq(message.chatId, id))
-      .orderBy(desc(message.createdAt));
+      .orderBy(desc(message.createdAt))
+      .limit(maxMessages);
 
     if (allMessages.length === 0) {
       return [];
@@ -611,6 +624,21 @@ export async function updateChatVisiblityById({
       "bad_request:database",
       "Failed to update chat visibility by id"
     );
+  }
+}
+
+export async function updateChatTitle({
+  chatId,
+  title,
+}: {
+  chatId: string;
+  title: string;
+}) {
+  try {
+    return await db.update(chat).set({ title }).where(eq(chat.id, chatId));
+  } catch (_error) {
+    console.warn("Failed to update chat title:", _error);
+    // Don't throw - title update is non-critical
   }
 }
 

@@ -12,9 +12,12 @@
 
 ## Текущий статус
 
-- **Этап:** ТЗ-NEW-01 — К разработке
-- **Прогресс:** 0/65 задач (0%)
-- **Предыдущий:** Voice Input MVP (завершён)
+- **Этап:** ТЗ-NEW-01 — В разработке
+- **Прогресс:** 17/77 задач (22%)
+- **Завершено:**
+  - ✅ Фаза 1: Инфраструктура промптов (tag: `tz-new-01/phase-1-prompts`)
+  - ✅ Фаза 2: Anthropic SDK (tag: `tz-new-01/phase-2-anthropic`)
+- **Следующая:** Фаза 3: Модальные помощники
 
 ---
 
@@ -101,19 +104,19 @@ git push --tags
 
 **Цель:** Создать файловую систему промптов с builder API. Не ломает текущее.
 
-- [ ] **1.1** Создать структуру папок `lib/prompts/`
-- [ ] **1.2** Создать `lib/prompts/types.ts` — типы PromptConfig, BuildContext, BuiltPrompt
-- [ ] **1.3** Создать `lib/prompts/template.ts` — простой template engine (regex replace)
-- [ ] **1.4** Создать `lib/prompts/core/base.ts` — базовые правила
-- [ ] **1.5** Создать `lib/prompts/core/formatting.ts` — форматирование
-- [ ] **1.6** Создать `lib/prompts/core/safety.ts` — безопасность
-- [ ] **1.7** Создать `lib/prompts/core/russian-market.ts` — специфика РФ
-- [ ] **1.8** Создать `lib/prompts/chat/config.ts` — конфиг и промпт чата
-- [ ] **1.9** Создать `lib/prompts/ben/config.ts` — конфиг и промпты Бена
-- [ ] **1.10** Создать `lib/prompts/assistants/prompt-agent/config.ts` — конфиг Prompt-агента
-- [ ] **1.11** Создать `lib/prompts/contexts/` — user-profile.ts, chat-memory.ts
-- [ ] **1.12** Создать `lib/prompts/builder.ts` — логика сборки промптов
-- [ ] **1.13** Создать `lib/prompts/index.ts` — экспорт buildPrompt()
+- [x] **1.1** Создать структуру папок `lib/prompts/`
+- [x] **1.2** Создать `lib/prompts/types.ts` — типы PromptConfig, BuildContext, BuiltPrompt
+- [x] **1.3** Создать `lib/prompts/template.ts` — простой template engine (regex replace)
+- [x] **1.4** Создать `lib/prompts/core/base.ts` — базовые правила
+- [x] **1.5** Создать `lib/prompts/core/formatting.ts` — форматирование
+- [x] **1.6** Создать `lib/prompts/core/safety.ts` — безопасность
+- [x] **1.7** Создать `lib/prompts/core/russian-market.ts` — специфика РФ
+- [x] **1.8** Создать `lib/prompts/chat/config.ts` — конфиг и промпт чата
+- [x] **1.9** Создать `lib/prompts/ben/config.ts` — конфиг и промпты Бена
+- [x] **1.10** Создать `lib/prompts/assistants/prompt-agent/config.ts` — конфиг Prompt-агента
+- [x] **1.11** Создать `lib/prompts/contexts/` — user-profile.ts, chat-memory.ts
+- [x] **1.12** Создать `lib/prompts/builder.ts` — логика сборки промптов
+- [x] **1.13** Создать `lib/prompts/index.ts` — экспорт buildPrompt()
 
 **Верификация Фазы 1:**
 ```typescript
@@ -155,10 +158,10 @@ lib/prompts/
 
 **Цель:** Установить и настроить Anthropic для будущих проектов.
 
-- [ ] **2.1** Установить `@ai-sdk/anthropic`
-- [ ] **2.2** Добавить `ANTHROPIC_API_KEY` в `.env.local` и `.env.example`
-- [ ] **2.3** Обновить `lib/ai/providers.ts` — добавить модели Claude
-- [ ] **2.4** Создать тестовый endpoint `app/(chat)/api/test-anthropic/route.ts`
+- [x] **2.1** Установить `@ai-sdk/openai` для OpenRouter (вместо @ai-sdk/anthropic)
+- [x] **2.2** Добавить `OPENROUTER_API_KEY` в `.env.local`
+- [x] **2.3** Обновить `lib/ai/providers.ts` — добавить модели Claude через OpenRouter
+- [x] **2.4** Создать тестовый endpoint `app/(chat)/api/test-anthropic/route.ts`
 
 **Верификация Фазы 2:**
 ```bash
@@ -426,13 +429,27 @@ npm run dev    # Приложение работает
 
 ---
 
-### Фаза 9: Финализация (3 задачи)
+### Фаза 9: Финализация (6 задач)
 
 **Цель:** Документация и завершение.
 
-- [ ] **9.1** Обновить `SIMPLY_STATUS.md` — добавить завершённый этап
-- [ ] **9.2** Обновить `CHANGELOG.md` — версия 3.0.0
-- [ ] **9.3** Переместить ТЗ и дорожную карту в `_archive/`
+#### Документация (SSOT):
+- [ ] **9.1** Переписать `docs/ai-agents.md`:
+  - Удалить все ссылки на старых агентов
+  - Описать модальных помощников (Бен, Prompt-агент)
+  - Обновить ссылки на `lib/prompts/`
+  - Удалить схему БД Agent/UserAgent
+- [ ] **9.2** Обновить `CLAUDE.md`:
+  - Удалить ссылки на `lib/db/seed-agents.ts`
+  - Удалить секции Agents UI/API
+  - Добавить секцию Modal Assistants
+  - Обновить структуру кода
+- [ ] **9.3** Проверить все docs/ на актуальность ссылок
+
+#### Финализация:
+- [ ] **9.4** Обновить `SIMPLY_STATUS.md` — добавить завершённый этап
+- [ ] **9.5** Обновить `CHANGELOG.md` — версия 3.0.0
+- [ ] **9.6** Переместить ТЗ и дорожную карту в `_archive/`
 
 **Коммит:**
 ```
@@ -543,8 +560,8 @@ package.json                              # +@ai-sdk/anthropic
 | 6. Миграция БД | 4 | SQL + применение |
 | 7. Интеграция | 6 | Связывание всего |
 | 8. Тестирование | 7 | Мануальные сценарии |
-| 9. Финализация | 3 | Документация |
-| **Итого** | **74** | |
+| 9. Финализация | 6 | Документация + SSOT |
+| **Итого** | **77** | |
 
 ---
 

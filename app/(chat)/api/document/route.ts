@@ -2,6 +2,7 @@ import { auth } from "@/app/(auth)/auth";
 import type { ArtifactKind } from "@/components/artifact";
 import {
   deleteDocumentsByIdAfterTimestamp,
+  getDocumentById,
   getDocumentsById,
   saveDocument,
 } from "@/lib/db/queries";
@@ -10,6 +11,7 @@ import { ChatSDKError } from "@/lib/errors";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
+  const latest = searchParams.get("latest") === "true";
 
   if (!id) {
     return new ChatSDKError(
@@ -24,6 +26,23 @@ export async function GET(request: Request) {
     return new ChatSDKError("unauthorized:document").toResponse();
   }
 
+  // Performance: If only latest version is needed, use optimized query
+  if (latest) {
+    const document = await getDocumentById({ id });
+
+    if (!document) {
+      return new ChatSDKError("not_found:document").toResponse();
+    }
+
+    if (document.userId !== session.user.id) {
+      return new ChatSDKError("forbidden:document").toResponse();
+    }
+
+    // Return as array for client compatibility
+    return Response.json([document], { status: 200 });
+  }
+
+  // Default: return all versions (for history/undo)
   const documents = await getDocumentsById({ id });
 
   const [document] = documents;

@@ -176,12 +176,14 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
         prompt: title,
       });
 
-      let jsonContent = "";
+      // Performance: Use array.join instead of string concatenation
+      const chunks: string[] = [];
       for await (const delta of fullStream) {
         if (delta.type === "text-delta") {
-          jsonContent += delta.text;
+          chunks.push(delta.text);
         }
       }
+      const jsonContent = chunks.join("");
 
       // Parse JSON response
       try {
@@ -264,12 +266,14 @@ ${JSON.stringify(excelData, null, 2)}
       prompt: description,
     });
 
-    let jsonContent = "";
+    // Performance: Use array.join instead of string concatenation
+    const chunks: string[] = [];
     for await (const delta of fullStream) {
       if (delta.type === "text-delta") {
-        jsonContent += delta.text;
+        chunks.push(delta.text);
       }
     }
+    const jsonContent = chunks.join("");
 
     // Parse updated JSON
     try {

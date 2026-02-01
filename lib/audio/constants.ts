@@ -1,21 +1,35 @@
 /**
- * Audio constants for AssemblyAI streaming
+ * Audio constants for Deepgram streaming
  */
 
-/** Sample rate required by AssemblyAI (16kHz) */
+/** Sample rate required by Deepgram (16kHz) */
 export const SAMPLE_RATE = 16000;
 
 /** Buffer size for audio processing (256 samples = 16ms at 16kHz) */
 export const BUFFER_SIZE = 256;
 
-/** AssemblyAI WebSocket endpoint */
-export const ASSEMBLYAI_WS_URL = "wss://api.assemblyai.com/v2/realtime/ws";
+/** Maximum recording duration in milliseconds (3 minutes) */
+export const MAX_RECORDING_DURATION = 3 * 60 * 1000;
 
-/** Speech model for multilingual support */
-export const SPEECH_MODEL = "universal";
+/** Deepgram WebSocket endpoint */
+export const DEEPGRAM_WS_URL = "wss://api.deepgram.com/v1/listen";
 
 /** Token endpoint */
-export const TOKEN_ENDPOINT = "/api/assemblyai/token";
+export const TOKEN_ENDPOINT = "/api/deepgram/token";
+
+/** Deepgram connection parameters for Russian language */
+export const DEEPGRAM_PARAMS: Record<string, string> = {
+  model: "nova-3",
+  language: "ru",
+  smart_format: "true",
+  punctuate: "true",
+  interim_results: "true",
+  // Без автостопа — запись до ручного нажатия кнопки
+  // endpointing и utterance_end_ms убраны намеренно
+  encoding: "linear16",
+  sample_rate: "16000",
+  channels: "1",
+};
 
 /** Error messages in Russian */
 export const VOICE_ERROR_MESSAGES: Record<string, string> = {

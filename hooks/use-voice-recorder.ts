@@ -6,12 +6,13 @@ import {
   type VoiceError,
   type VoiceRecorderOptions,
   type VoiceRecorderReturn,
-  type AssemblyAIMessage,
+  type DeepgramMessage,
   SAMPLE_RATE,
-  ASSEMBLYAI_WS_URL,
+  DEEPGRAM_WS_URL,
+  DEEPGRAM_PARAMS,
   TOKEN_ENDPOINT,
+  MAX_RECORDING_DURATION,
   floatTo16BitPCM,
-  int16ToBase64,
   resampleAudio,
   createVoiceError,
   checkBrowserSupport,
@@ -35,6 +36,7 @@ export function useVoiceRecorder(
   const streamRef = useRef<MediaStream | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const maxDurationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check availability on mount
   useEffect(() => {
@@ -79,6 +81,12 @@ export function useVoiceRecorder(
 
   // Cleanup function
   const cleanup = useCallback(() => {
+    // Clear max duration timer
+    if (maxDurationTimerRef.current) {
+      clearTimeout(maxDurationTimerRef.current);
+      maxDurationTimerRef.current = null;
+    }
+
     // Close WebSocket
     if (wsRef.current) {
       wsRef.current.close();
@@ -134,13 +142,14 @@ export function useVoiceRecorder(
     try {
       updateState("processing");
 
-      // Get token from server
+      // Get API key from server
       const tokenResponse = await fetch(TOKEN_ENDPOINT, { method: "POST" });
       if (!tokenResponse.ok) {
         handleError(createVoiceError("api_error"));
         return;
       }
-      const { token } = await tokenResponse.json();
+      const tokenData = await tokenResponse.json();
+      const { apiKey } = tokenData;
 
       // Request microphone access
       let stream: MediaStream;
@@ -177,13 +186,20 @@ export function useVoiceRecorder(
       const audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
       audioContextRef.current = audioContext;
 
-      // Create WebSocket connection
-      const wsUrl = `${ASSEMBLYAI_WS_URL}?sample_rate=${SAMPLE_RATE}&token=${token}`;
-      const ws = new WebSocket(wsUrl);
+      // Create WebSocket connection to Deepgram
+      const wsParams = new URLSearchParams(DEEPGRAM_PARAMS);
+      const wsUrl = `${DEEPGRAM_WS_URL}?${wsParams.toString()}`;
+      // Deepgram auth via WebSocket subprotocol
+      const ws = new WebSocket(wsUrl, ["token", apiKey]);
       wsRef.current = ws;
 
       ws.onopen = () => {
         updateState("recording");
+
+        // Start max duration timer (auto-stop after 3 minutes)
+        maxDurationTimerRef.current = setTimeout(() => {
+          stopRecording();
+        }, MAX_RECORDING_DURATION);
 
         // Set up audio processing
         const source = audioContext.createMediaStreamSource(stream);
@@ -204,12 +220,11 @@ export function useVoiceRecorder(
             SAMPLE_RATE
           );
 
-          // Convert to 16-bit PCM and base64
+          // Convert to 16-bit PCM
           const pcm = floatTo16BitPCM(resampled);
-          const base64 = int16ToBase64(pcm);
 
-          // Send to AssemblyAI
-          ws.send(JSON.stringify({ audio_data: base64 }));
+          // Send raw binary data (ArrayBuffer)
+          ws.send(pcm.buffer);
         };
 
         source.connect(processor);
@@ -218,34 +233,28 @@ export function useVoiceRecorder(
 
       ws.onmessage = (event) => {
         try {
-          const message: AssemblyAIMessage = JSON.parse(event.data);
+          const message: DeepgramMessage = JSON.parse(event.data);
 
-          if (message.message_type === "FinalTranscript" && message.transcript) {
-            const text = message.transcript.trim();
-            if (text) {
-              setTranscript((prev) => {
-                const newTranscript = prev ? `${prev} ${text}` : text;
-                onTranscript?.(newTranscript);
-                return newTranscript;
-              });
+          if (message.type === "Results") {
+            const transcriptText =
+              message.channel?.alternatives?.[0]?.transcript || "";
+
+            if (message.is_final && transcriptText) {
+              // Final result - add to transcript
+              onTranscript?.(transcriptText);
+              setTranscript((prev) =>
+                prev ? `${prev} ${transcriptText}` : transcriptText
+              );
               setInterimTranscript("");
+            } else if (transcriptText) {
+              // Interim result - show while speaking
+              setInterimTranscript(transcriptText);
+              onInterimTranscript?.(transcriptText);
             }
-
-            // Auto-stop on end of turn
-            if (message.end_of_turn) {
-              stopRecording();
-            }
-          } else if (
-            message.message_type === "PartialTranscript" &&
-            message.transcript
-          ) {
-            const text = message.transcript.trim();
-            setInterimTranscript(text);
-            onInterimTranscript?.(text);
-          } else if (message.message_type === "Error") {
-            handleError(
-              createVoiceError("api_error", new Error(message.error || "Unknown error"))
-            );
+            // Без автостопа — запись продолжается до ручного нажатия кнопки
+            // Пользователь может думать, делать паузы, мычать
+          } else if (message.type === "Error") {
+            handleError(createVoiceError("api_error"));
             cleanup();
           }
         } catch {
