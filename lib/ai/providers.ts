@@ -6,14 +6,17 @@ import { isTestEnvironment } from "../constants";
 /**
  * AI Provider Configuration
  *
+ * Источник правды: docs/ai-providers.md
+ *
  * Supported providers:
  * 1. Google Gemini (primary)
  *    - gemini-3-pro — профессиональные задачи, dynamic thinking
  *    - gemini-2.5-flash — простые задачи, быстрый ответ
  *
- * 2. Anthropic Claude via OpenRouter
- *    - claude-sonnet-4 — быстрый и умный
- *    - claude-opus-4 — максимальное качество
+ * 2. Anthropic Claude 4.5 via OpenRouter
+ *    - claude-sonnet-4.5 — баланс скорости и качества, 1M контекст
+ *    - claude-opus-4.5 — максимальное качество, reasoning
+ *    - claude-haiku-4.5 — быстрый и дешёвый
  */
 
 // Initialize Google provider
@@ -62,20 +65,33 @@ export const myProvider = isTestEnvironment
     });
 
 /**
- * OpenRouter models (Claude via OpenRouter)
+ * OpenRouter models (Claude 4.5 via OpenRouter)
  *
  * Use directly with streamText/generateText:
  * ```ts
- * import { claudeSonnet, claudeOpus } from '@/lib/ai/providers';
+ * import { claudeSonnet, claudeOpus, claudeHaiku } from '@/lib/ai/providers';
  * const result = await streamText({ model: claudeSonnet, prompt: '...' });
  * ```
+ *
+ * Pricing (per 1M tokens):
+ * - Haiku:  $1 input / $5 output  (fastest, cheapest)
+ * - Sonnet: $3 input / $15 output (balanced)
+ * - Opus:   $5 input / $25 output (best quality)
  */
-export const claudeSonnet = openRouter("anthropic/claude-sonnet-4");
-export const claudeOpus = openRouter("anthropic/claude-opus-4");
+export const claudeHaiku = openRouter("anthropic/claude-haiku-4.5");
+export const claudeSonnet = openRouter("anthropic/claude-sonnet-4.5");
+export const claudeOpus = openRouter("anthropic/claude-opus-4.5");
 
 /**
  * Get Claude model by name
  */
-export function getClaudeModel(name: "sonnet" | "opus") {
-  return name === "opus" ? claudeOpus : claudeSonnet;
+export function getClaudeModel(name: "haiku" | "sonnet" | "opus") {
+  switch (name) {
+    case "haiku":
+      return claudeHaiku;
+    case "opus":
+      return claudeOpus;
+    default:
+      return claudeSonnet;
+  }
 }

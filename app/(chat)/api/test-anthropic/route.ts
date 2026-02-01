@@ -27,7 +27,7 @@ export async function GET() {
 
     return Response.json({
       success: true,
-      model: "claude-sonnet-4 (via OpenRouter)",
+      model: "claude-sonnet-4.5 (via OpenRouter)",
       response: result.text,
     });
   } catch (error) {

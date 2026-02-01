@@ -2,7 +2,7 @@
 
 **Версия:** 1.0.0
 **Последнее обновление:** 2026-02-02
-**Статус:** 2 провайдера, 5 моделей
+**Статус:** 2 провайдера, 6 моделей
 
 ---
 
@@ -56,14 +56,15 @@
 | **Gemini 2.5 Flash** | `gemini-2.5-flash` | `gemini-2.5-flash` | $0.075/1M | $0.30/1M | 200K токенов | Быстрый, дешёвый |
 | **Gemini 2.5 Pro** | `artifact-model` | `gemini-2.5-pro` | $1.25/1M | $5.00/1M | 1M токенов | Для suggestions |
 
-### Anthropic Claude (через OpenRouter)
+### Anthropic Claude 4.5 (через OpenRouter)
 
-| Модель | ID в проекте | OpenRouter ID | Input | Output | Контекст | Особенности |
-|--------|--------------|---------------|-------|--------|----------|-------------|
-| **Claude Sonnet 4** | `claude-sonnet-4` | `anthropic/claude-sonnet-4` | $3.00/1M | $15.00/1M | 200K токенов | Быстрый и умный |
-| **Claude Opus 4** | `claude-opus-4` | `anthropic/claude-opus-4` | $15.00/1M | $75.00/1M | 200K токенов | Максимальное качество |
+| Модель | Экспорт | OpenRouter ID | Input | Output | Контекст | Особенности |
+|--------|---------|---------------|-------|--------|----------|-------------|
+| **Claude Haiku 4.5** | `claudeHaiku` | `anthropic/claude-haiku-4.5` | $1.00/1M | $5.00/1M | 200K | Самый быстрый и дешёвый |
+| **Claude Sonnet 4.5** | `claudeSonnet` | `anthropic/claude-sonnet-4.5` | $3.00/1M | $15.00/1M | 1M | Баланс скорости и качества |
+| **Claude Opus 4.5** | `claudeOpus` | `anthropic/claude-opus-4.5` | $5.00/1M | $25.00/1M | 200K | Reasoning, сложные задачи |
 
-> **Примечание:** Цены OpenRouter могут включать наценку ~5-10% к оригинальным ценам Anthropic.
+> **Ссылки:** [Haiku](https://openrouter.ai/anthropic/claude-haiku-4.5) | [Sonnet](https://openrouter.ai/anthropic/claude-sonnet-4.5) | [Opus](https://openrouter.ai/anthropic/claude-opus-4.5)
 
 ---
 
@@ -89,7 +90,7 @@ const model = myProvider.languageModel('gemini-3-pro');
 ### Claude модели (прямой экспорт)
 
 ```typescript
-import { claudeSonnet, claudeOpus, getClaudeModel } from '@/lib/ai/providers';
+import { claudeHaiku, claudeSonnet, claudeOpus, getClaudeModel } from '@/lib/ai/providers';
 
 // Прямое использование
 const result = await generateText({
@@ -98,7 +99,7 @@ const result = await generateText({
 });
 
 // Или через функцию
-const model = getClaudeModel('opus');
+const model = getClaudeModel('haiku');  // 'haiku' | 'sonnet' | 'opus'
 ```
 
 ---
@@ -191,8 +192,9 @@ const summary = getUsage({ modelId, usage, providers });
 |--------|---------------------|----------------------|
 | Gemini 3 Pro | $0.014 | $0.044 |
 | Gemini 2.5 Flash | $0.000375 | $0.00135 |
-| Claude Sonnet 4 | $0.018 | $0.060 |
-| Claude Opus 4 | $0.090 | $0.300 |
+| Claude Haiku 4.5 | $0.006 | $0.020 |
+| Claude Sonnet 4.5 | $0.018 | $0.060 |
+| Claude Opus 4.5 | $0.030 | $0.100 |
 
 ---
 
@@ -204,8 +206,9 @@ const summary = getUsage({ modelId, usage, providers });
 |--------|---------------------|---------|
 | Сложный анализ | Gemini 3 Pro | Dynamic thinking |
 | Быстрые ответы | Gemini 2.5 Flash | Скорость + цена |
-| Креативный текст | Claude Sonnet 4 | Качество генерации |
-| Критически важные задачи | Claude Opus 4 | Максимальное качество |
+| Простые задачи (Claude) | Claude Haiku 4.5 | Дешёвый, быстрый |
+| Креативный текст | Claude Sonnet 4.5 | Качество + 1M контекст |
+| Критически важные задачи | Claude Opus 4.5 | Reasoning, сложные задачи |
 
 ### Автовыбор в проекте
 
@@ -219,6 +222,7 @@ const summary = getUsage({ modelId, usage, providers });
 
 | Дата | Версия | Изменения |
 |------|--------|-----------|
+| 2026-02-02 | 1.1.0 | Обновлены модели Claude на 4.5 (Haiku, Sonnet, Opus) |
 | 2026-02-02 | 1.0.0 | Создание документа, добавлены Google и OpenRouter |
 
 ---
