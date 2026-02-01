@@ -29,10 +29,6 @@ import { cn } from "@/lib/utils";
 import { ChatHintsPanel } from "./chat-hints-panel";
 import { Context } from "./elements/context";
 import {
-  extractMentionQuery,
-  MentionAutocomplete,
-} from "./mention-autocomplete";
-import {
   PromptInput,
   PromptInputModelSelect,
   PromptInputModelSelectContent,
@@ -138,9 +134,6 @@ function PureMultimodalInput({
     setLocalStorageInput(input);
   }, [input, setLocalStorageInput]);
 
-  // ТЗ-2: @-mention autocomplete state
-  const [mentionOpen, setMentionOpen] = useState(false);
-
   // ТЗ-4: Force show hint state (for 💡 button)
   const [forceShowHint, setForceShowHint] = useState(false);
 
@@ -160,23 +153,8 @@ function PureMultimodalInput({
   });
 
   const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = event.target.value;
-    setInput(val);
-    // Show autocomplete when @ is detected
-    setMentionOpen(extractMentionQuery(val) !== null);
+    setInput(event.target.value);
   };
-
-  const handleMentionSelect = useCallback(
-    (agent: Agent) => {
-      // Replace the @query with @AgentName
-      const lastAtIndex = input.lastIndexOf("@");
-      const before = input.slice(0, lastAtIndex);
-      setInput(`${before}@${agent.name} `);
-      setMentionOpen(false);
-      textareaRef.current?.focus();
-    },
-    [input, setInput]
-  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadQueue, setUploadQueue] = useState<string[]>([]);
@@ -356,20 +334,10 @@ function PureMultimodalInput({
         )}
 
       <ChatHintsPanel
-        hasUsedMentions={input.includes("@")}
         messagesCount={messages.length}
         forceShow={forceShowHint}
         onDismiss={() => setForceShowHint(false)}
       />
-
-      {agents && agents.length > 0 && (
-        <MentionAutocomplete
-          agents={agents}
-          input={input}
-          onSelect={handleMentionSelect}
-          visible={mentionOpen}
-        />
-      )}
 
       <input
         className="-top-4 -left-4 pointer-events-none fixed size-0.5 opacity-0"

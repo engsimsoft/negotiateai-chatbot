@@ -92,13 +92,6 @@ const PurePreviewMessage = ({
   })();
   const resolvedAgent = resolvedAgentId ? agents?.find((a) => a.id === resolvedAgentId) : undefined;
 
-  // ТЗ-4: Determine if this is a guest agent message
-  // Guest = assistant message where agentId differs from chat's default agent
-  const isGuestAgent = message.role === "assistant" &&
-    resolvedAgentId !== null &&
-    chatAgentId !== undefined &&
-    resolvedAgentId !== chatAgentId;
-
   // Deduplicate document tool parts by result.id to prevent duplicate cards
   // (AI sometimes calls createDocument twice for the same document)
   const deduplicatedParts = useMemo(() => {
@@ -123,12 +116,8 @@ const PurePreviewMessage = ({
   return (
     <motion.div
       animate={{ opacity: 1 }}
-      className={cn("group/message w-full", {
-        // ТЗ-4: Guest agent styling - indent and subtle background
-        "ml-4 pl-3 border-l-2 border-muted-foreground/30 bg-muted/30 rounded-r-lg py-2": isGuestAgent,
-      })}
+      className="group/message w-full"
       data-role={message.role}
-      data-guest={isGuestAgent ? "true" : undefined}
       data-testid={`message-${message.role}`}
       initial={{ opacity: 0 }}
     >
@@ -152,12 +141,6 @@ const PurePreviewMessage = ({
               {agent && (
                 <span className="max-w-[4rem] truncate text-center text-[10px] text-muted-foreground leading-tight">
                   {agent.name}
-                </span>
-              )}
-              {/* ТЗ-4: Guest agent label */}
-              {isGuestAgent && (
-                <span className="text-[9px] text-muted-foreground/70 whitespace-nowrap">
-                  ↩️ гость
                 </span>
               )}
             </div>

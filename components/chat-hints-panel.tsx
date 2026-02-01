@@ -7,13 +7,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
 
 // localStorage keys
 const HINTS_DISMISSED_KEY = "simply-hints-dismissed";
 const HINTS_COLLAPSED_KEY = "simply-hints-collapsed";
 
-type HintSectionId = "mentions" | "documents" | "files";
+type HintSectionId = "documents" | "files";
 
 interface HintSection {
   id: HintSectionId;
@@ -22,23 +21,9 @@ interface HintSection {
 }
 
 const sections: HintSection[] = [
-  { id: "mentions", icon: "👥", title: "Вызвать другого агента" },
   { id: "documents", icon: "📄", title: "Создание документов в холсте" },
   { id: "files", icon: "📎", title: "Работа с файлами" },
 ];
-
-function MentionsHint() {
-  return (
-    <div className="space-y-2 text-sm text-muted-foreground">
-      <p>
-        Напишите <strong className="text-foreground">@Помощник</strong> или{" "}
-        <strong className="text-foreground">@Маркетолог</strong> чтобы позвать
-        другого агента прямо в этот чат.
-      </p>
-      <p>Он ответит и вы продолжите с текущим агентом.</p>
-    </div>
-  );
-}
 
 function DocumentsHint() {
   return (
@@ -102,21 +87,18 @@ function FilesHint() {
 }
 
 const sectionContent: Record<HintSectionId, React.ReactNode> = {
-  mentions: <MentionsHint />,
   documents: <DocumentsHint />,
   files: <FilesHint />,
 };
 
 interface ChatHintsPanelProps {
   messagesCount: number;
-  hasUsedMentions: boolean;
   forceShow?: boolean;
   onDismiss?: () => void;
 }
 
 function PureChatHintsPanel({
   messagesCount,
-  hasUsedMentions,
   forceShow,
   onDismiss,
 }: ChatHintsPanelProps) {
@@ -163,9 +145,8 @@ function PureChatHintsPanel({
     });
   }, []);
 
-  // Show if: forced, or (not dismissed AND not used mentions AND empty chat)
-  const shouldShow =
-    forceShow || (!dismissed && !hasUsedMentions && messagesCount === 0);
+  // Show if: forced, or (not dismissed AND empty chat)
+  const shouldShow = forceShow || (!dismissed && messagesCount === 0);
 
   if (!shouldShow) {
     return null;
