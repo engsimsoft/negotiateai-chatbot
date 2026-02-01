@@ -53,18 +53,10 @@ export async function POST(_request: NextRequest) {
   }
 }
 
-// GET endpoint to check if voice input is available
+// GET endpoint to check if voice input is available (public - no auth required)
+// This only checks if API key is configured, doesn't expose any secrets
 export async function GET(_request: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return new ChatSDKError("unauthorized:api").toResponse();
-    }
-
-    return Response.json({
-      available: !!ASSEMBLYAI_API_KEY,
-    });
-  } catch (error) {
-    return new ChatSDKError("bad_request:api").toResponse();
-  }
+  return Response.json({
+    available: !!ASSEMBLYAI_API_KEY,
+  });
 }
