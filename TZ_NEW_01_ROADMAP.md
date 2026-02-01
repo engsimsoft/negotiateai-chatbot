@@ -13,13 +13,14 @@
 ## Текущий статус
 
 - **Этап:** ТЗ-NEW-01 — В разработке
-- **Прогресс:** 39/77 задач (51%)
+- **Прогресс:** 54/77 задач (70%)
 - **Завершено:**
   - ✅ Фаза 1: Инфраструктура промптов (tag: `tz-new-01/phase-1-prompts`)
   - ✅ Фаза 2: Anthropic SDK (tag: `tz-new-01/phase-2-anthropic`)
   - ✅ Фаза 3: Модальные помощники (tag: `tz-new-01/phase-3-modals`)
   - ✅ Фаза 4: Чистка UI (tag: `tz-new-01/phase-4-ui-clean`)
-- **Следующая:** Фаза 5: Чистка кода
+  - ✅ Фаза 5: Чистка кода (tag: `tz-new-01/phase-5-code-clean`)
+- **Следующая:** Фаза 6: Миграция БД
 
 ---
 
@@ -268,46 +269,46 @@ app/(chat)/api/assistant/
 
 ---
 
-### Фаза 5: Чистка кода (15 задач)
+### Фаза 5: Чистка кода (15 задач) ✅
 
 **Цель:** Удалить весь код связанный с агентами.
 
 #### API routes:
-- [ ] **5.1** Удалить `app/(chat)/api/agents/` — весь каталог
-- [ ] **5.2** Удалить `app/(chat)/api/user-agents/` — весь каталог
-- [ ] **5.3** Удалить `app/(chat)/api/chats/[id]/agent/route.ts` (если есть)
+- [x] **5.1** Удалить `app/(chat)/api/agents/` — весь каталог
+- [x] **5.2** Удалить `app/(chat)/api/user-agents/` — весь каталог
+- [x] **5.3** Удалить `app/(chat)/api/chats/[id]/agent/route.ts` (если есть)
 
 #### Компоненты:
-- [ ] **5.4** Удалить `components/agent-selector.tsx`
-- [ ] **5.5** Удалить `components/delete-agent-dialog.tsx`
-- [ ] **5.6** Удалить `components/sidebar-agents.tsx`
-- [ ] **5.7** Удалить `components/mention-autocomplete.tsx`
-- [ ] **5.8** Удалить `components/personalization-dialog.tsx`
+- [x] **5.4** Удалить `components/agent-selector.tsx`
+- [x] **5.5** Удалить `components/delete-agent-dialog.tsx`
+- [x] **5.6** Удалить `components/sidebar-agents.tsx`
+- [x] **5.7** Удалить `components/mention-autocomplete.tsx`
+- [x] **5.8** Удалить `components/personalization-dialog.tsx`
 
 #### Библиотеки:
-- [ ] **5.9** Удалить `lib/agents/` — весь каталог (parse-mentions.ts)
-- [ ] **5.10** Удалить `lib/db/seed-agents.ts`
+- [x] **5.9** Удалить `lib/agents/` — весь каталог (parse-mentions.ts)
+- [x] **5.10** Удалить `lib/db/seed-agents.ts`
 
 #### Queries:
-- [ ] **5.11** Удалить из `lib/db/queries.ts`:
+- [x] **5.11** Удалить из `lib/db/queries.ts`:
   - getAgents, getAgentBySlug, getAgentByName, getAgentById
   - getUserAgents, getUserAgentsWithSource, getUserAgentById
   - createUserAgent, updateUserAgent, deleteUserAgent
   - updateChatAgent
 
 #### Schema:
-- [ ] **5.12** Удалить из `lib/db/schema.ts`:
+- [x] **5.12** Удалить из `lib/db/schema.ts`:
   - Таблица `agent`
   - Таблица `userAgent`
   - Relations для agent/userAgent
 
-- [ ] **5.13** Удалить поле `agentId` из таблицы `chat`
-- [ ] **5.14** Удалить поле `agentId` из таблицы `message` (messages_v2)
-- [ ] **5.15** Добавить поле `hasSeenBenIntro` в таблицу `user`
+- [x] **5.13** Удалить поле `agentId` из Drizzle schema (таблица `chat`)
+- [x] **5.14** Удалить поле `agentId` из Drizzle schema (таблица `message`)
+- [ ] **5.15** Добавить поле `hasSeenBenIntro` в таблицу `user` — перенесено в Фазу 6
 
 **Верификация Фазы 5:**
 ```bash
-npm run build  # Должен пройти без ошибок TypeScript
+npm run build  # ✅ Пройден без ошибок TypeScript
 ```
 
 ---

@@ -3,8 +3,8 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { motion } from "framer-motion";
 import { memo, useMemo, useState } from "react";
-import type { Agent, Vote } from "@/lib/db/schema";
-import type { ChatMessage, MessageMetadata } from "@/lib/types";
+import type { Vote } from "@/lib/db/schema";
+import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
 import { ActionButtons, parseActionButtons } from "./action-buttons";
 import { useDataStream } from "./data-stream-provider";
@@ -49,7 +49,6 @@ function unwrapToolResult<T>(output: any): T {
 
 const PurePreviewMessage = ({
   chatId,
-  chatAgentId,
   message,
   vote,
   isLoading,
@@ -57,12 +56,9 @@ const PurePreviewMessage = ({
   regenerate,
   isReadonly,
   requiresScrollPadding,
-  agents,
   onActionButton,
-  streamingAgentId,
 }: {
   chatId: string;
-  chatAgentId?: string;
   message: ChatMessage;
   vote: Vote | undefined;
   isLoading: boolean;
@@ -70,9 +66,7 @@ const PurePreviewMessage = ({
   regenerate: UseChatHelpers<ChatMessage>["regenerate"];
   isReadonly: boolean;
   requiresScrollPadding: boolean;
-  agents?: Agent[];
   onActionButton?: (payload: string) => void;
-  streamingAgentId?: string | null;
 }) => {
   const [mode, setMode] = useState<"view" | "edit">("view");
 
@@ -81,16 +75,6 @@ const PurePreviewMessage = ({
   );
 
   useDataStream();
-
-  // ТЗ-2: Resolve agent — from metadata (DB/patched) or streaming prop
-  const resolvedAgentId = (() => {
-    const meta = message.metadata as MessageMetadata | undefined;
-    if (meta?.agentId) return meta.agentId;
-    // During streaming, use the prop passed from chat.tsx
-    if (streamingAgentId && message.role === "assistant") return streamingAgentId;
-    return null;
-  })();
-  const resolvedAgent = resolvedAgentId ? agents?.find((a) => a.id === resolvedAgentId) : undefined;
 
   // Deduplicate document tool parts by result.id to prevent duplicate cards
   // (AI sometimes calls createDocument twice for the same document)
@@ -127,25 +111,13 @@ const PurePreviewMessage = ({
           "justify-start": message.role === "assistant",
         })}
       >
-        {message.role === "assistant" && (() => {
-          const agent = resolvedAgent;
-          return (
-            <div className="-mt-1 flex shrink-0 flex-col items-center gap-0.5">
-              <div className="flex size-8 items-center justify-center rounded-full bg-background ring-1 ring-border" title={agent ? agent.name : undefined}>
-                {agent ? (
-                  <span className="text-sm leading-none">{agent.icon}</span>
-                ) : (
-                  <SparklesIcon size={14} />
-                )}
-              </div>
-              {agent && (
-                <span className="max-w-[4rem] truncate text-center text-[10px] text-muted-foreground leading-tight">
-                  {agent.name}
-                </span>
-              )}
+        {message.role === "assistant" && (
+          <div className="-mt-1 flex shrink-0 flex-col items-center gap-0.5">
+            <div className="flex size-8 items-center justify-center rounded-full bg-background ring-1 ring-border">
+              <SparklesIcon size={14} />
             </div>
-          );
-        })()}
+          </div>
+        )}
 
         <div
           className={cn("flex flex-col", {

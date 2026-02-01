@@ -1,7 +1,11 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { AgentSelector } from "@/components/agent-selector";
-import { getAgents, getUserById } from "@/lib/db/queries";
-import { auth } from "../(auth)/auth";
+
+import { auth } from "@/app/(auth)/auth";
+import { Chat } from "@/components/chat";
+import { DataStreamHandler } from "@/components/data-stream-handler";
+import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
+import { generateUUID } from "@/lib/utils";
 
 export default async function Page() {
   const session = await auth();
@@ -10,35 +14,24 @@ export default async function Page() {
     redirect("/login");
   }
 
-  // Get all active agents from database
-  const agents = await getAgents();
+  // Generate new chat ID
+  const id = generateUUID();
 
-  // Transform to format expected by AgentSelector
-  const availableAgents = agents
-    .filter((a) => a.type === "catalog") // Only show catalog agents, not system
-    .map((a) => ({
-      id: a.slug,
-      agentId: a.id,
-      name: a.name,
-      icon: a.icon,
-      description: a.description,
-    }));
-
-  // Get user profile for greeting
-  const userProfile = await getUserById(session.user.id);
-  const userName =
-    userProfile?.displayName ||
-    session.user.email?.split("@")[0] ||
-    "там";
-
-  // Check if user needs onboarding (no displayName set)
-  const needsOnboarding = !userProfile?.displayName;
+  const cookieStore = await cookies();
+  const chatModelFromCookie = cookieStore.get("chat-model");
+  const initialModel = chatModelFromCookie?.value || DEFAULT_CHAT_MODEL;
 
   return (
-    <AgentSelector
-      agents={availableAgents}
-      userName={userName}
-      needsOnboarding={needsOnboarding}
-    />
+    <>
+      <Chat
+        autoResume={false}
+        id={id}
+        initialChatModel={initialModel}
+        initialMessages={[]}
+        initialVisibilityType="private"
+        isReadonly={false}
+      />
+      <DataStreamHandler />
+    </>
   );
 }

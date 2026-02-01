@@ -32,7 +32,6 @@ export const postRequestBodySchema = z.object({
     "gemini-2.5-flash",     // Gemini 2.5 Flash - простые задачи
   ]),
   selectedVisibilityType: z.enum(["public", "private"]),
-  agentId: z.string().optional(), // Agent ID for agent-specific prompts
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

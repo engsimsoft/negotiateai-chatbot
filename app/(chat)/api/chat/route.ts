@@ -19,7 +19,6 @@ import {
   type RequestHints,
   systemPrompt,
   buildUserContext,
-  buildAgentCustomizations,
 } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
@@ -34,19 +33,15 @@ import { isProductionEnvironment } from "@/lib/constants";
 import {
   createStreamId,
   deleteChatById,
-  getAgentById,
-  getAgents,
   getChatById,
   getMessageCountByUserId,
   getMessagesByChatId,
-  getUserAgentById,
   getUserById,
   saveChat,
   saveMessages,
   updateChatLastContextById,
   updateChatTitle,
 } from "@/lib/db/queries";
-import { parseMention, buildAgentsList } from "@/lib/agents/parse-mentions";
 import { ChatSDKError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
@@ -72,15 +67,6 @@ const getTokenlensCatalog = cache(
   { revalidate: 24 * 60 * 60 } // 24 hours
 );
 
-// Performance: Cache agents catalog (rarely changes)
-const getCachedAgents = cache(
-  async () => {
-    return await getAgents();
-  },
-  ["agents-catalog"],
-  { revalidate: 5 * 60 } // 5 minutes
-);
-
 export async function POST(request: Request) {
   let requestBody: PostRequestBody;
 
@@ -97,13 +83,11 @@ export async function POST(request: Request) {
       message,
       selectedChatModel,
       selectedVisibilityType,
-      agentId,
     }: {
       id: string;
       message: ChatMessage;
       selectedChatModel: ChatModel["id"];
       selectedVisibilityType: VisibilityType;
-      agentId?: string;
     } = requestBody;
 
     const session = await auth();
@@ -137,7 +121,6 @@ export async function POST(request: Request) {
         userId: session.user.id,
         title: "Новый чат",
         visibility: selectedVisibilityType,
-        agentId,
       });
 
       // Generate title in background (non-blocking)
@@ -192,7 +175,6 @@ export async function POST(request: Request) {
           attachments: [],
           createdAt: new Date(),
           tokenCount: estimateMessageTokens(message.parts),
-          agentId: null,
         },
       ],
     });
@@ -202,106 +184,14 @@ export async function POST(request: Request) {
 
     let finalMergedUsage: AppUsage | undefined;
 
-    // ТЗ-2: Parse @-mentions from user message to determine target agent
-    let mentionedAgentId: string | null = null;
-    const allAgents = await getCachedAgents();
-
-    // Extract text from the latest user message parts
-    const userText = message.parts
-      .filter((p: any) => p.type === "text")
-      .map((p: any) => p.text)
-      .join(" ");
-
-    const { agent: mentionedAgent } = parseMention(userText, allAgents);
-    if (mentionedAgent) {
-      mentionedAgentId = mentionedAgent.id;
-      console.log(`[Mention] Guest agent call: @${mentionedAgent.name} (${mentionedAgent.slug})`);
-      // ТЗ-4: НЕ обновляем Chat.agentId — это одноразовый "гостевой" вызов
-    }
-
-    // Determine which agent responds:
-    // - If @-mention detected: use mentioned agent (guest call)
-    // - Otherwise: use chat's default agent
-    const resolvedAgentId = mentionedAgentId || chat?.agentId || agentId;
-
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
-        // Load system prompt: use agent prompt if agentId is provided, otherwise use default
-        let systemPromptText: string;
-        let modelToUse = selectedChatModel;
-        let activeAgentId: string | null = resolvedAgentId || null;
+        // Build system prompt with user context
+        const basePrompt = await systemPrompt({ selectedChatModel, requestHints });
+        const systemPromptText = userContext ? userContext + basePrompt : basePrompt;
 
-        // ТЗ-2: Send agentId to client immediately so icon shows during streaming
-        dataStream.write({ type: "data-agentId", data: activeAgentId });
-
-        // ТЗ-3B: Track agent customizations for personalized agents
-        let agentCustomizations: string = "";
-
-        if (resolvedAgentId) {
-          try {
-            // Performance: Load catalog agent and user agent in parallel
-            const [agentData, userAgentData] = await Promise.all([
-              getAgentById({ id: resolvedAgentId }),
-              getUserAgentById({ id: resolvedAgentId, userId: session.user.id }),
-            ]);
-
-            if (agentData) {
-              // Found in catalog
-              systemPromptText = agentData.systemPrompt;
-
-              // ТЗ-2: Dynamic {AGENTS_LIST} substitution for Helper agent
-              if (agentData.slug === "helper" && systemPromptText.includes("{AGENTS_LIST}")) {
-                const agentsList = buildAgentsList(allAgents);
-                systemPromptText = systemPromptText.replace("{AGENTS_LIST}", agentsList);
-              }
-
-              if (selectedChatModel === "auto") {
-                modelToUse = agentData.defaultModel as ChatModel["id"];
-                console.log(`[Auto] Using agent ${agentData.slug} with model ${modelToUse}`);
-              } else {
-                console.log(`[Manual] Using agent ${agentData.slug} with user-selected model ${modelToUse}`);
-              }
-            } else if (userAgentData) {
-              // ТЗ-3B: User agent (personalized)
-              const sourceAgent = await getAgentById({ id: userAgentData.sourceAgentId });
-              if (sourceAgent) {
-                systemPromptText = sourceAgent.systemPrompt;
-
-                if (userAgentData.customizations) {
-                  agentCustomizations = buildAgentCustomizations(userAgentData.customizations);
-                }
-
-                if (selectedChatModel === "auto") {
-                  modelToUse = sourceAgent.defaultModel as ChatModel["id"];
-                  console.log(`[Auto] Using user agent ${userAgentData.name} (source: ${sourceAgent.slug}) with model ${modelToUse}`);
-                } else {
-                  console.log(`[Manual] Using user agent ${userAgentData.name} with user-selected model ${modelToUse}`);
-                }
-              } else {
-                console.warn(`Source agent ${userAgentData.sourceAgentId} not found`);
-                activeAgentId = null;
-                systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
-              }
-            } else {
-              console.warn(`Agent ${resolvedAgentId} not found in DB, falling back to default`);
-              activeAgentId = null;
-              systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
-            }
-          } catch (error) {
-            console.error(`Failed to load agent for ${resolvedAgentId}, falling back to default:`, error);
-            activeAgentId = null;
-            systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
-          }
-        } else {
-          activeAgentId = null;
-          systemPromptText = await systemPrompt({ selectedChatModel, requestHints });
-        }
-
-        // ТЗ-3A: Prepend user context to system prompt
-        // ТЗ-3B: Also prepend agent customizations (after user context, before agent prompt)
-        if (userContext || agentCustomizations) {
-          systemPromptText = userContext + agentCustomizations + systemPromptText;
-        }
+        // Use selected model (default to gemini-3-pro for "auto")
+        const modelToUse = selectedChatModel === "auto" ? "gemini-3-pro" : selectedChatModel;
 
         const startTime = Date.now();
         let firstTokenTime: number | null = null;
@@ -466,8 +356,6 @@ export async function POST(request: Request) {
             attachments: [],
             chatId: id,
             tokenCount,
-            // ТЗ-2: Tag assistant messages with the responding agent
-            agentId: currentMessage.role === "assistant" ? resolvedAgentId || null : null,
           };
         });
 

@@ -21,9 +21,6 @@ import { ChatSDKError } from "../errors";
 import type { AppUsage } from "../usage";
 import { estimateMessageTokens, generateUUID } from "../utils";
 import {
-  type Agent,
-  agent,
-  type AgentCustomizations,
   type Chat,
   chat,
   type DBMessage,
@@ -34,8 +31,6 @@ import {
   suggestion,
   type User,
   user,
-  type UserAgent,
-  userAgent,
   vote,
 } from "./schema";
 import { generateHashedPassword } from "./utils";
@@ -122,23 +117,20 @@ export async function saveChat({
   userId,
   title,
   visibility,
-  agentId,
 }: {
   id: string;
   userId: string;
   title: string;
   visibility: VisibilityType;
-  agentId?: string;
 }) {
   try {
-    console.log('[saveChat] Attempting to save chat:', { id, userId, title, visibility, agentId });
+    console.log('[saveChat] Attempting to save chat:', { id, userId, title, visibility });
     return await db.insert(chat).values({
       id,
       createdAt: new Date(),
       userId,
       title,
       visibility,
-      agentId,
     });
   } catch (error) {
     console.error('[saveChat] Database error:', error);
@@ -219,7 +211,6 @@ export async function getChatsByUserId({
           title: chat.title,
           userId: chat.userId,
           visibility: chat.visibility,
-          agentId: chat.agentId,
           lastContext: sql<null>`NULL`.as("lastContext"),
         })
         .from(chat)
@@ -898,304 +889,6 @@ export async function getPublicDocument({ token }: { token: string }) {
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get public document"
-    );
-  }
-}
-
-// ============================================
-// Agent Functions (ТЗ-1)
-// ============================================
-
-/**
- * Get all active catalog agents ordered by sortOrder
- */
-export async function getAgents(): Promise<Agent[]> {
-  try {
-    return await db
-      .select()
-      .from(agent)
-      .where(eq(agent.isActive, true))
-      .orderBy(asc(agent.sortOrder));
-  } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to get agents");
-  }
-}
-
-/**
- * Get agent by name or slug (case-insensitive).
- * Used for resolving @-mentions in chat messages.
- */
-export async function getAgentByName({
-  name,
-}: {
-  name: string;
-}): Promise<Agent | null> {
-  try {
-    const allAgents = await getAgents();
-    const lowerName = name.toLowerCase();
-    return (
-      allAgents.find(
-        (a) =>
-          a.name.toLowerCase() === lowerName ||
-          a.slug.toLowerCase() === lowerName
-      ) || null
-    );
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get agent by name"
-    );
-  }
-}
-
-/**
- * Get agent by slug
- */
-export async function getAgentBySlug({
-  slug,
-}: {
-  slug: string;
-}): Promise<Agent | null> {
-  try {
-    const [selectedAgent] = await db
-      .select()
-      .from(agent)
-      .where(and(eq(agent.slug, slug), eq(agent.isActive, true)));
-    return selectedAgent || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get agent by slug"
-    );
-  }
-}
-
-/**
- * Get agent by ID
- */
-export async function getAgentById({
-  id,
-}: {
-  id: string;
-}): Promise<Agent | null> {
-  try {
-    const [selectedAgent] = await db
-      .select()
-      .from(agent)
-      .where(eq(agent.id, id));
-    return selectedAgent || null;
-  } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to get agent by id");
-  }
-}
-
-/**
- * Get user's personal agents
- */
-export async function getUserAgents({
-  userId,
-}: {
-  userId: string;
-}): Promise<UserAgent[]> {
-  try {
-    return await db
-      .select()
-      .from(userAgent)
-      .where(and(eq(userAgent.userId, userId), eq(userAgent.isActive, true)));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get user agents"
-    );
-  }
-}
-
-/**
- * ТЗ-3B: Get user's personal agents with source agent data
- */
-export async function getUserAgentsWithSource({
-  userId,
-}: {
-  userId: string;
-}): Promise<
-  (UserAgent & { sourceAgent: { icon: string; name: string; slug: string } })[]
-> {
-  try {
-    const results = await db
-      .select({
-        userAgent: userAgent,
-        sourceAgent: {
-          icon: agent.icon,
-          name: agent.name,
-          slug: agent.slug,
-        },
-      })
-      .from(userAgent)
-      .innerJoin(agent, eq(userAgent.sourceAgentId, agent.id))
-      .where(and(eq(userAgent.userId, userId), eq(userAgent.isActive, true)));
-
-    return results.map((r) => ({
-      ...r.userAgent,
-      sourceAgent: r.sourceAgent,
-    }));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get user agents with source"
-    );
-  }
-}
-
-/**
- * Get user agent by ID
- */
-export async function getUserAgentById({
-  id,
-  userId,
-}: {
-  id: string;
-  userId: string;
-}): Promise<UserAgent | null> {
-  try {
-    const [selectedUserAgent] = await db
-      .select()
-      .from(userAgent)
-      .where(and(eq(userAgent.id, id), eq(userAgent.userId, userId)));
-    return selectedUserAgent || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get user agent by id"
-    );
-  }
-}
-
-/**
- * ТЗ-3B: Create a personal agent
- */
-export async function createUserAgent({
-  userId,
-  sourceAgentId,
-  name,
-  customizations,
-}: {
-  userId: string;
-  sourceAgentId: string;
-  name: string;
-  customizations: AgentCustomizations | null;
-}): Promise<UserAgent> {
-  try {
-    const [newUserAgent] = await db
-      .insert(userAgent)
-      .values({
-        userId,
-        sourceAgentId,
-        name,
-        customizations,
-        isActive: true,
-      })
-      .returning();
-    return newUserAgent;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to create user agent"
-    );
-  }
-}
-
-/**
- * ТЗ-3B: Update a personal agent
- */
-export async function updateUserAgent({
-  id,
-  userId,
-  name,
-  customizations,
-}: {
-  id: string;
-  userId: string;
-  name?: string;
-  customizations?: AgentCustomizations | null;
-}): Promise<UserAgent | null> {
-  try {
-    const updateData: Record<string, unknown> = { updatedAt: new Date() };
-    if (name !== undefined) updateData.name = name;
-    if (customizations !== undefined) updateData.customizations = customizations;
-
-    const [updated] = await db
-      .update(userAgent)
-      .set(updateData)
-      .where(and(eq(userAgent.id, id), eq(userAgent.userId, userId)))
-      .returning();
-    return updated || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update user agent"
-    );
-  }
-}
-
-/**
- * ТЗ-3B: Delete a personal agent (soft delete)
- */
-export async function deleteUserAgent({
-  id,
-  userId,
-}: {
-  id: string;
-  userId: string;
-}): Promise<boolean> {
-  try {
-    const [deleted] = await db
-      .update(userAgent)
-      .set({ isActive: false, updatedAt: new Date() })
-      .where(and(eq(userAgent.id, id), eq(userAgent.userId, userId)))
-      .returning();
-    return !!deleted;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete user agent"
-    );
-  }
-}
-
-/**
- * Update chat agent
- */
-export async function updateChatAgent({
-  chatId,
-  agentId,
-  userId,
-}: {
-  chatId: string;
-  agentId: string;
-  userId: string;
-}) {
-  try {
-    // Verify chat ownership
-    const [existingChat] = await db
-      .select()
-      .from(chat)
-      .where(and(eq(chat.id, chatId), eq(chat.userId, userId)));
-
-    if (!existingChat) {
-      throw new ChatSDKError("not_found:database", "Chat not found");
-    }
-
-    return await db
-      .update(chat)
-      .set({ agentId })
-      .where(eq(chat.id, chatId));
-  } catch (error) {
-    if (error instanceof ChatSDKError) {
-      throw error;
-    }
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update chat agent"
     );
   }
 }

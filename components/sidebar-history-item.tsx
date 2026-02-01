@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { memo } from "react";
-import useSWR from "swr";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import type { Chat } from "@/lib/db/schema";
 import {
@@ -27,9 +26,6 @@ import {
   SidebarMenuItem,
 } from "./ui/sidebar";
 
-// Fetcher for SWR
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
 const PureChatItem = ({
   chat,
   isActive,
@@ -46,21 +42,10 @@ const PureChatItem = ({
     initialVisibilityType: chat.visibility,
   });
 
-  // Fetch agents to get icon
-  const { data: agents } = useSWR<Array<{ id: string; icon: string }>>(
-    "/api/agents",
-    fetcher
-  );
-
-  // Get agent icon if agentId is available
-  const agent = agents?.find((a) => a.id === chat.agentId);
-  const agentIcon = agent?.icon || "💬"; // Default fallback icon
-
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={isActive}>
         <Link href={`/chat/${chat.id}`} onClick={() => setOpenMobile(false)}>
-          <span className="mr-2">{agentIcon}</span>
           <span>{chat.title}</span>
         </Link>
       </SidebarMenuButton>

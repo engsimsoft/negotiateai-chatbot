@@ -3,12 +3,10 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { motion } from "framer-motion";
 import { memo } from "react";
-import type { Agent, AgentCapabilities } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { Suggestion } from "./elements/suggestion";
 import type { VisibilityType } from "./visibility-selector";
 
-// ТЗ-4: Default suggestions when no agent is selected
 const defaultSuggestions = [
   "Объясни простыми словами...",
   "Помоги составить план...",
@@ -20,22 +18,15 @@ type SuggestedActionsProps = {
   chatId: string;
   sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
   selectedVisibilityType: VisibilityType;
-  agent?: Agent;
 };
 
-function PureSuggestedActions({ chatId, sendMessage, agent }: SuggestedActionsProps) {
-  // ТЗ-4: Get suggestions from agent's exampleTasks or use defaults
-  const capabilities = agent?.capabilities as AgentCapabilities | undefined;
-  const suggestedActions = capabilities?.exampleTasks?.length
-    ? capabilities.exampleTasks.slice(0, 4) // Limit to 4 suggestions
-    : defaultSuggestions;
-
+function PureSuggestedActions({ chatId, sendMessage }: SuggestedActionsProps) {
   return (
     <div
       className="grid w-full gap-2 sm:grid-cols-2"
       data-testid="suggested-actions"
     >
-      {suggestedActions.map((suggestedAction, index) => (
+      {defaultSuggestions.map((suggestedAction, index) => (
         <motion.div
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
@@ -71,10 +62,6 @@ export const SuggestedActions = memo(
     if (prevProps.selectedVisibilityType !== nextProps.selectedVisibilityType) {
       return false;
     }
-    if (prevProps.agent?.id !== nextProps.agent?.id) {
-      return false;
-    }
-
     return true;
   }
 );

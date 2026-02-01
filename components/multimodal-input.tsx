@@ -22,7 +22,6 @@ import { saveChatModelAsCookie } from "@/app/(chat)/actions";
 import { SelectItem } from "@/components/ui/select";
 import { chatModels } from "@/lib/ai/models";
 import { myProvider } from "@/lib/ai/providers";
-import type { Agent } from "@/lib/db/schema";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
@@ -69,8 +68,6 @@ function PureMultimodalInput({
   selectedModelId,
   onModelChange,
   usage,
-  agents,
-  agentId,
 }: {
   chatId: string;
   input: string;
@@ -89,8 +86,6 @@ function PureMultimodalInput({
   selectedModelId: string;
   onModelChange?: (modelId: string) => void;
   usage?: AppUsage;
-  agents?: Agent[];
-  agentId?: string;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -329,7 +324,6 @@ function PureMultimodalInput({
             chatId={chatId}
             selectedVisibilityType={selectedVisibilityType}
             sendMessage={sendMessage}
-            agent={agentId ? agents?.find((a) => a.id === agentId) : undefined}
           />
         )}
 
@@ -498,9 +492,6 @@ export const MultimodalInput = memo(
       return false;
     }
     if (prevProps.delayState !== nextProps.delayState) {
-      return false;
-    }
-    if (!equal(prevProps.agents, nextProps.agents)) {
       return false;
     }
 

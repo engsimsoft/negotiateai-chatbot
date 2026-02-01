@@ -4,7 +4,7 @@ import { AnimatePresence } from "framer-motion";
 import { ArrowDownIcon } from "lucide-react";
 import { memo, useEffect } from "react";
 import { useMessages } from "@/hooks/use-messages";
-import type { Agent, Vote } from "@/lib/db/schema";
+import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { useDataStream } from "./data-stream-provider";
 import { Conversation, ConversationContent } from "./elements/conversation";
@@ -13,7 +13,6 @@ import { PreviewMessage, ThinkingMessage } from "./message";
 
 type MessagesProps = {
   chatId: string;
-  chatAgentId?: string;
   status: UseChatHelpers<ChatMessage>["status"];
   votes: Vote[] | undefined;
   messages: ChatMessage[];
@@ -22,14 +21,11 @@ type MessagesProps = {
   isReadonly: boolean;
   isArtifactVisible: boolean;
   selectedModelId: string;
-  agents?: Agent[];
   onActionButton?: (payload: string) => void;
-  streamingAgentId?: string | null;
 };
 
 function PureMessages({
   chatId,
-  chatAgentId,
   status,
   votes,
   messages,
@@ -37,9 +33,7 @@ function PureMessages({
   regenerate,
   isReadonly,
   selectedModelId,
-  agents,
   onActionButton,
-  streamingAgentId,
 }: MessagesProps) {
   const {
     containerRef: messagesContainerRef,
@@ -82,9 +76,7 @@ function PureMessages({
               status === "streaming" && messages.length - 1 === index;
             return (
               <PreviewMessage
-                agents={agents}
                 chatId={chatId}
-                chatAgentId={chatAgentId}
                 isLoading={isStreamingMessage}
                 isReadonly={isReadonly}
                 key={message.id}
@@ -95,7 +87,6 @@ function PureMessages({
                   hasSentMessage && index === messages.length - 1
                 }
                 setMessages={setMessages}
-                streamingAgentId={isStreamingMessage ? streamingAgentId : undefined}
                 vote={
                   votes
                     ? votes.find((vote) => vote.messageId === message.id)

@@ -10,12 +10,9 @@ import { convertToUIMessages } from "@/lib/utils";
 
 export default async function Page(props: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ agentId?: string }>;
 }) {
   const params = await props.params;
-  const searchParams = await props.searchParams;
   const { id } = params;
-  const { agentId } = searchParams;
 
   const session = await auth();
 
@@ -25,35 +22,9 @@ export default async function Page(props: {
 
   const chat = await getChatById({ id });
 
-  // New chat scenario: no chat in DB yet, but agentId provided
+  // New chat scenario: no chat in DB yet
   if (!chat) {
-    if (!agentId) {
-      // No chat and no agentId = invalid URL
-      return notFound();
-    }
-
-    // This is a new chat that will be created on first message
-    const cookieStore = await cookies();
-    const chatModelFromCookie = cookieStore.get("chat-model");
-
-    // Use user's preference from cookie, or default to "auto" (agent-specific model)
-    const initialModel = chatModelFromCookie?.value || DEFAULT_CHAT_MODEL;
-
-    // ТЗ-4: Greeting НЕ добавляется как сообщение — используем UI компонент Greeting + SuggestedActions
-    return (
-      <>
-        <Chat
-          autoResume={false}
-          id={id}
-          initialChatModel={initialModel}
-          initialMessages={[]}
-          initialVisibilityType="private"
-          isReadonly={false}
-          agentId={agentId}
-        />
-        <DataStreamHandler />
-      </>
-    );
+    return notFound();
   }
 
   // Existing chat scenario
@@ -90,7 +61,6 @@ export default async function Page(props: {
         initialMessages={uiMessages}
         initialVisibilityType={chat.visibility}
         isReadonly={session?.user?.id !== chat.userId}
-        agentId={chat.agentId ?? undefined}
       />
       <DataStreamHandler />
     </>
