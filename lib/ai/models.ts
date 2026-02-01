@@ -1,3 +1,10 @@
+/**
+ * Chat Models Configuration
+ *
+ * Источник правды для цен и характеристик: docs/ai-providers.md
+ * Этот файл содержит только UI-представление моделей.
+ */
+
 export const DEFAULT_CHAT_MODEL: string = "auto";
 
 export type ChatModel = {

@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 2.12.0 | **Статус:** Voice Input MVP завершён
+**Проект:** Simply | **Версия:** 2.13.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -41,7 +41,7 @@
 **AI:**
 - Vercel AI SDK (@ai-sdk/google, @ai-sdk/openai, @ai-sdk/anthropic)
 - Текущий: Google Gemini (3 Pro + 2.5 Flash)
-- Voice Input: AssemblyAI Universal-Streaming (Speech-to-Text)
+- Voice Input: Deepgram Nova-3 (русский язык)
 - План: мультипровайдер
 
 **Backend:** NextAuth 5.0-beta.25, PostgreSQL (Neon), Drizzle ORM
@@ -61,10 +61,10 @@
 - `lib/ai/tools/excel/` — Excel tools (create, parse, edit)
 - `lib/db/seed-agents.ts` — Агенты и промпты (БД)
 
-**Voice Input (ТЗ-VOICE-01):**
-- `app/(chat)/api/assemblyai/token/route.ts` — Token API для AssemblyAI
-- `lib/audio/` — Аудио утилиты (types, utils, constants)
-- `hooks/use-voice-recorder.ts` — Хук записи и стриминга
+**Voice Input (Deepgram):**
+- `app/(chat)/api/deepgram/token/route.ts` — Token API
+- `lib/audio/` — Аудио утилиты (types, constants, utils)
+- `hooks/use-voice-recorder.ts` — Хук записи (Deepgram Nova-3)
 - `components/voice-button.tsx` — Кнопка микрофона
 
 **Auth/DB:**
@@ -115,7 +115,7 @@
 
 ## 🚀 Текущий этап
 
-**Завершены:** Этапы 0-6, Performance Audit, Artifact Loading UX
+**Завершены:** Этапы 0-6, Performance Audit, Artifact Loading UX, Voice Input (Deepgram)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**
@@ -167,7 +167,8 @@ vercel --prod            # Deploy на Vercel
 - [CHANGELOG.md](CHANGELOG.md) — История изменений
 
 **Техническая (AI):**
-- [docs/ai-agents.md](docs/ai-agents.md) — AI-агенты, модели, промпты
+- [docs/ai-providers.md](docs/ai-providers.md) — Провайдеры, модели, цены (SSOT)
+- [docs/ai-agents.md](docs/ai-agents.md) — AI-агенты и промпты
 - [docs/ai-artifacts.md](docs/ai-artifacts.md) — Документы в холсте (text, markdown, presentations)
 - [docs/ai-tools.md](docs/ai-tools.md) — Инструменты (search, vision)
 
@@ -199,4 +200,4 @@ vercel --prod            # Deploy на Vercel
 
 ---
 
-**Обновлено:** 2026-01-30
+**Обновлено:** 2026-02-01
