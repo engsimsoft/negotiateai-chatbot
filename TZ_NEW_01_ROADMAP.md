@@ -13,11 +13,12 @@
 ## Текущий статус
 
 - **Этап:** ТЗ-NEW-01 — В разработке
-- **Прогресс:** 17/77 задач (22%)
+- **Прогресс:** 29/77 задач (38%)
 - **Завершено:**
   - ✅ Фаза 1: Инфраструктура промптов (tag: `tz-new-01/phase-1-prompts`)
   - ✅ Фаза 2: Anthropic SDK (tag: `tz-new-01/phase-2-anthropic`)
-- **Следующая:** Фаза 3: Модальные помощники
+  - ✅ Фаза 3: Модальные помощники (tag: `tz-new-01/phase-3-modals`)
+- **Следующая:** Фаза 4: Чистка UI
 
 ---
 
@@ -180,22 +181,22 @@ curl http://localhost:3000/api/test-anthropic
 **Цель:** Создать Prompt-агента и Бена как модальные помощники.
 
 #### Prompt-агент:
-- [ ] **3.1** Создать `components/modal-assistants/prompt-agent/trigger.tsx` — кнопка [📝]
-- [ ] **3.2** Создать `components/modal-assistants/prompt-agent/sheet.tsx` — Sheet обёртка
-- [ ] **3.3** Создать `components/modal-assistants/prompt-agent/chat.tsx` — мини-чат
-- [ ] **3.4** Создать `app/(chat)/api/assistant/prompt-agent/route.ts` — API endpoint
+- [x] **3.1** Создать `components/modal-assistants/prompt-agent/trigger.tsx` — кнопка [📝]
+- [x] **3.2** Создать `components/modal-assistants/prompt-agent/drawer.tsx` — Drawer обёртка (Vaul)
+- [x] **3.3** Создать `components/modal-assistants/assistant-chat.tsx` — общий мини-чат
+- [x] **3.4** Создать `app/(chat)/api/assistant/prompt-agent/route.ts` — API endpoint
 
 #### Бен:
-- [ ] **3.5** Создать `components/modal-assistants/ben/trigger.tsx` — кнопка [❓]
-- [ ] **3.6** Создать `components/modal-assistants/ben/sheet.tsx` — Sheet обёртка
-- [ ] **3.7** Создать `components/modal-assistants/ben/chat.tsx` — мини-чат с онбордингом
-- [ ] **3.8** Создать `app/(chat)/api/assistant/ben/route.ts` — API endpoint
+- [x] **3.5** Создать `components/modal-assistants/ben/trigger.tsx` — кнопка [❓]
+- [x] **3.6** Создать `components/modal-assistants/ben/drawer.tsx` — Drawer обёртка (Vaul)
+- [x] **3.7** Общий `assistant-chat.tsx` с поддержкой разных режимов
+- [x] **3.8** Создать `app/(chat)/api/assistant/ben/route.ts` — API endpoint
 
 #### Интеграция:
-- [ ] **3.9** Создать `components/modal-assistants/index.ts` — экспорты
-- [ ] **3.10** Добавить кнопки [📝] и [❓] в header (временно, для тестов)
-- [ ] **3.11** Реализовать `onInsertToChat` — вставка текста из модалки в чат
-- [ ] **3.12** Протестировать оба помощника
+- [x] **3.9** Создать `components/modal-assistants/index.ts` — экспорты
+- [x] **3.10** Добавить кнопки [📝] и [❓] в header
+- [x] **3.11** ~~`onInsertToChat`~~ — перенесено в Фазу 4 (опционально)
+- [x] **3.12** Протестировать оба помощника
 
 **Верификация Фазы 3:**
 1. Кнопка [📝] открывает Sheet, Prompt-агент отвечает
@@ -203,18 +204,21 @@ curl http://localhost:3000/api/test-anthropic
 3. Кнопка [❓] открывает Sheet, Бен отвечает
 4. Бен не отвечает на рабочие вопросы, перенаправляет в чат
 
-**Файлы:**
+**Файлы (реализовано):**
 ```
 components/modal-assistants/
 ├── index.ts
+├── types.ts
+├── assistant-chat.tsx      # Общий чат-компонент
+├── assistant-drawer.tsx    # Общий Drawer (Vaul)
 ├── prompt-agent/
+│   ├── index.ts
 │   ├── trigger.tsx
-│   ├── sheet.tsx
-│   └── chat.tsx
+│   └── drawer.tsx
 └── ben/
+    ├── index.ts
     ├── trigger.tsx
-    ├── sheet.tsx
-    └── chat.tsx
+    └── drawer.tsx
 
 app/(chat)/api/assistant/
 ├── prompt-agent/route.ts
