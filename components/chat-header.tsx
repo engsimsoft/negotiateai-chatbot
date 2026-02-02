@@ -14,7 +14,12 @@ import {
   BenDrawer,
 } from "@/components/modal-assistants";
 
-function PureChatHeader() {
+interface ChatHeaderProps {
+  /** Callback to insert text into main chat input */
+  onInsertToChat?: (text: string) => void;
+}
+
+function PureChatHeader({ onInsertToChat }: ChatHeaderProps) {
   const router = useRouter();
   const { open } = useSidebar();
   const { width: windowWidth } = useWindowSize();
@@ -55,6 +60,7 @@ function PureChatHeader() {
       <PromptAgentDrawer
         open={promptAgentOpen}
         onOpenChange={setPromptAgentOpen}
+        onInsertToChat={onInsertToChat}
       />
       <BenDrawer
         open={benOpen}

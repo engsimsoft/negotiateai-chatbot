@@ -37,20 +37,9 @@ function MessageBubble({
 }) {
   const isUser = message.role === "user";
 
-  // Extract prompt from message for "Insert to chat" button
-  const extractPrompt = (text: string): string | null => {
-    // Look for prompt block in markdown
-    const promptMatch = text.match(/📝\s*\*\*Улучшенный промпт:\*\*\s*\n\n([\s\S]*?)(?:\n\n|$)/);
-    if (promptMatch) return promptMatch[1].trim();
-
-    // Look for code blocks
-    const codeMatch = text.match(/```\s*\n?([\s\S]*?)\n?```/);
-    if (codeMatch) return codeMatch[1].trim();
-
-    return null;
-  };
-
-  const extractedPrompt = !isUser && showInsertButton ? extractPrompt(message.content) : null;
+  // For prompt-agent: always allow inserting assistant messages
+  // Users can select and copy specific parts if needed
+  const canInsert = !isUser && showInsertButton && message.content.trim().length > 0;
 
   return (
     <motion.div
@@ -73,7 +62,7 @@ function MessageBubble({
         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
 
         {/* Insert to chat button */}
-        {extractedPrompt && onInsert && (
+        {canInsert && onInsert && (
           <motion.div
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
@@ -83,7 +72,7 @@ function MessageBubble({
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => onInsert(extractedPrompt)}
+              onClick={() => onInsert(message.content)}
               className="w-full gap-2 bg-background hover:bg-background/80"
             >
               <ArrowRight className="h-4 w-4" />
