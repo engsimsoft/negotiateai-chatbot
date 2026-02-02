@@ -3,11 +3,13 @@
  *
  * Streaming chat endpoint for the Ben (help) modal assistant.
  * Helps users understand Simply platform.
+ *
+ * Uses new Skills + Agents architecture (v2).
  */
 
 import { convertToModelMessages, streamText } from "ai";
 import { myProvider } from "@/lib/ai/providers";
-import { benConfig } from "@/lib/prompts/ben/config";
+import { buildBenPrompt } from "@/lib/prompts/server";
 
 export const maxDuration = 60;
 
@@ -15,14 +17,12 @@ export async function POST(request: Request) {
   try {
     const { messages, isFirstTime } = await request.json();
 
-    // Add context about first-time user if needed
-    const systemWithContext = isFirstTime
-      ? `${benConfig.systemPrompt}\n\n## КОНТЕКСТ\nЭто новый пользователь, который только что прошёл онбординг. Будь особенно дружелюбным и объясняй всё подробнее.`
-      : benConfig.systemPrompt;
+    // Build prompt using new builder
+    const prompt = buildBenPrompt({}, isFirstTime === true);
 
     const result = streamText({
-      model: myProvider.languageModel(benConfig.defaultModel),
-      system: systemWithContext,
+      model: myProvider.languageModel(prompt.model),
+      system: prompt.systemPrompt,
       messages: convertToModelMessages(messages),
       temperature: 1.0,
     });

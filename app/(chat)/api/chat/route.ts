@@ -15,7 +15,8 @@ import { auth } from "@/app/(auth)/auth";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import type { ChatModel } from "@/lib/ai/models";
-import { buildChatPrompt, type BuildContext } from "@/lib/prompts";
+import { buildChatPrompt } from "@/lib/prompts/server";
+import type { BuildContext } from "@/lib/prompts";
 import { buildProjectContext } from "@/lib/prompts/contexts";
 import { myProvider } from "@/lib/ai/providers";
 import {

@@ -1,34 +1,28 @@
 /**
- * Simply Prompt System
+ * Simply Prompt System v2
  *
- * File-based prompt management with TypeScript configs.
- * Replaces database-driven agent system.
+ * Skills + Agents architecture based on Anthropic Agent Skills standard.
  *
- * @example
+ * IMPORTANT: Server-side functions (buildChatPrompt, loadAgent, etc.) that use
+ * Node.js 'fs' module should be imported from '@/lib/prompts/server'.
+ *
+ * This file only exports types and client-safe utilities.
+ *
+ * @example Server-side (API routes, server components):
  * ```ts
- * import { buildPrompt } from '@/lib/prompts';
+ * import { buildChatPrompt, buildAgentPrompt } from '@/lib/prompts/server';
+ * ```
  *
- * // Build chat prompt with user context
- * const result = buildPrompt('chat', {
- *   user: { displayName: 'Владимир' },
- * });
- *
- * console.log(result.systemPrompt);
- * console.log(result.model); // 'gemini-3-pro'
+ * @example Client-side (React components):
+ * ```ts
+ * import type { BuildContext, BuiltPrompt } from '@/lib/prompts';
  * ```
  */
 
-// Main exports
-export {
-  buildPrompt,
-  buildChatPrompt,
-  buildBenPrompt,
-  buildPromptAgentPrompt,
-  getConfig,
-  getAvailablePrompts,
-} from './builder';
+// =============================================================================
+// Types (safe for client and server)
+// =============================================================================
 
-// Types
 export type {
   PromptId,
   ModelId,
@@ -41,10 +35,16 @@ export type {
   PromptBlock,
 } from './types';
 
-// Template utilities
+// =============================================================================
+// Template utilities (safe for client and server)
+// =============================================================================
+
 export { render, hasVariable, extractVariables, conditional, joinBlocks } from './template';
 
-// Context builders
+// =============================================================================
+// Context builders (safe for client and server)
+// =============================================================================
+
 export {
   buildUserProfileContext,
   buildPersonalizationContext,
@@ -54,10 +54,21 @@ export {
   type MemoryEntry,
 } from './contexts';
 
-// Core blocks (for advanced usage)
-export * as core from './core';
+// =============================================================================
+// Server-only note
+// =============================================================================
 
-// Individual configs (for direct access)
-export { chatConfig } from './chat/config';
-export { benConfig, getBenGreeting } from './ben/config';
-export { promptAgentConfig } from './assistants/prompt-agent/config';
+/**
+ * Server-only functions have been moved to '@/lib/prompts/server'.
+ *
+ * Moved functions:
+ * - buildChatPrompt, buildAgentPrompt, buildBenPrompt, buildSkillPrompt
+ * - getSkillsRegistry, getAgentsRegistry
+ * - loadSkill, loadAgent, getAgentGreeting
+ * - composeChatPrompt, composeAgentPrompt, composeSkillPrompt
+ *
+ * Import them from server module:
+ * ```ts
+ * import { buildChatPrompt } from '@/lib/prompts/server';
+ * ```
+ */

@@ -1,8 +1,8 @@
 # Simply — Система промптов и помощники
 
-**Версия:** 3.0.0
+**Версия:** 3.3.1
 **Последнее обновление:** 2026-02-02
-**Статус:** Новая архитектура (файловая система промптов)
+**Статус:** Skills + Agents Architecture
 
 ---
 
@@ -17,18 +17,132 @@
 
 ---
 
-## Обзор архитектуры
+## Обзор архитектуры (v3.3)
 
-Simply использует **файловую систему промптов** с TypeScript конфигами. Это заменяет предыдущую систему агентов в БД.
+Simply использует **Skills + Agents** архитектуру по стандарту Anthropic (agentskills.io).
 
-### Преимущества новой архитектуры
+### Концепции
 
-| Было (агенты в БД) | Стало (файловые промпты) |
-|-------------------|--------------------------|
-| 8 агентов с отдельными промптами | 1 универсальный чат + 2 модальных помощника |
-| Промпты в БД (seed-agents.ts) | Промпты в TypeScript файлах |
-| Сложный UI выбора агента | Чистый интерфейс |
-| @-mentions для смены агента | Нет @-mentions — просто пиши |
+| Концепция | Описание |
+|-----------|----------|
+| **Skills** | Атомарные навыки в формате Markdown (SKILL.md) |
+| **Agents** | Персонажи-дирижёры с набором skills (AGENT.md + config.yaml) |
+| **Builder** | Модульная система сборки промптов |
+| **Progressive Disclosure** | Загрузка только необходимой информации |
+
+### Преимущества
+
+| Было (v3.0 — файловые промпты) | Стало (v3.3 — Skills + Agents) |
+|--------------------------------|--------------------------------|
+| Промпты в TypeScript файлах | Промпты в Markdown с frontmatter |
+| Статическая конфигурация | Progressive Disclosure (metadata → full) |
+| Жёсткая связь | Модульная сборка через Builder |
+| Один формат | Skills (навыки) + Agents (персонажи) |
+
+---
+
+## Skills
+
+Skills — атомарные навыки, которые можно переиспользовать между агентами.
+
+### Формат SKILL.md
+
+```markdown
+---
+name: skill-id
+description: >
+  Описание навыка на нескольких строках.
+tools: [tool1, tool2]
+---
+
+# Название навыка
+
+Инструкции для AI...
+```
+
+### Текущие Skills
+
+| Skill | Категория | Tools | Описание |
+|-------|-----------|-------|----------|
+| **create-presentation** | document | createDocument | Создание презентаций (Reveal.js, PPTX) |
+| **create-spreadsheet** | document | createDocument | Создание таблиц Excel с формулами |
+| **create-text-document** | document | createDocument | Создание текстовых документов |
+| **analyze-document** | document | readDocument, parseExcel | Анализ загруженных файлов |
+| **web-research** | research | webSearch | Поиск информации в интернете |
+| **prompt-helper** | utility | — | Помощь в формулировке эффективных промптов |
+
+### Структура файлов
+
+```
+lib/prompts/skills/
+├── _template/SKILL.md      # Шаблон для новых skills
+├── document/               # Skills для документов
+│   ├── create-presentation/SKILL.md
+│   ├── create-spreadsheet/SKILL.md
+│   ├── create-text-document/SKILL.md
+│   └── analyze-document/SKILL.md
+├── research/               # Skills для исследований
+│   └── web-research/SKILL.md
+└── utility/
+    └── prompt-helper/
+        └── SKILL.md        # Skill для улучшения промптов
+```
+
+---
+
+## Agents
+
+Agents — персонажи со своей личностью, моделью и набором skills.
+
+### Формат файлов
+
+**AGENT.md:**
+```markdown
+---
+name: agent-id
+displayName: Имя Агента
+description: >
+  Описание агента.
+model: gemini-2.5-flash
+skills: [skill1, skill2]
+---
+
+# Личность
+
+Ты — **Имя**, описание роли...
+```
+
+**config.yaml:**
+```yaml
+name: agent-id
+displayName: Имя Агента
+description: Описание агента
+model: gemini-2.5-flash
+skills: []
+icon: "❓"
+```
+
+### Текущие Agents
+
+| Agent | Модель | Описание | UI |
+|-------|--------|----------|-------|
+| **ben** | Gemini 2.5 Flash | Гид по платформе Simply | Модальное окно (❓) |
+
+### Структура файлов
+
+```
+lib/prompts/agents/
+├── _template/              # Шаблон для новых агентов
+│   ├── AGENT.md
+│   └── config.yaml
+└── ben/                    # Агент Бен
+    ├── AGENT.md            # Личность и правила
+    ├── config.yaml         # Метаданные
+    ├── onboarding.md       # Приветствие для новых пользователей
+    └── references/
+        ├── features.md     # Описание фич платформы
+        └── scenarios.md    # Сценарии помощи
+```
 
 ---
 
@@ -43,7 +157,7 @@ Simply использует **файловую систему промптов**
 | ID | `chat` |
 | Модель | Gemini 3 Pro |
 | Инструменты | Все (search, documents, weather и др.) |
-| Файл | [lib/prompts/chat/config.ts](../lib/prompts/chat/config.ts) |
+| Сборка | `buildChatPrompt()` |
 
 ### Prompt-агент (`prompt-agent`)
 
@@ -52,10 +166,11 @@ Simply использует **файловую систему промптов**
 | Параметр | Значение |
 |----------|----------|
 | ID | `prompt-agent` |
+| Тип | Skill (utility/prompt-helper) |
 | Модель | Gemini 3 Pro |
 | Инструменты | Нет (только текст) |
 | UI | Модальное окно (кнопка 📝) |
-| Файл | [lib/prompts/assistants/prompt-agent/config.ts](../lib/prompts/assistants/prompt-agent/config.ts) |
+| Сборка | `buildPromptAgentPrompt()` |
 
 **Что делает:**
 1. Анализирует исходный запрос
@@ -70,10 +185,11 @@ Simply использует **файловую систему промптов**
 | Параметр | Значение |
 |----------|----------|
 | ID | `ben` |
+| Тип | Agent (agents/ben) |
 | Модель | Gemini 2.5 Flash |
 | Инструменты | Нет (только текст) |
 | UI | Модальное окно (кнопка ❓) |
-| Файл | [lib/prompts/ben/config.ts](../lib/prompts/ben/config.ts) |
+| Сборка | `buildBenPrompt()` |
 
 **Что делает:**
 - Отвечает на вопросы о платформе
@@ -86,83 +202,90 @@ Simply использует **файловую систему промптов**
 
 ---
 
-## Структура файлов
+## Builder System
+
+Модульная система сборки промптов с Progressive Disclosure.
+
+### Архитектура
 
 ```
-lib/prompts/
-├── index.ts                 # Экспорты (buildPrompt, типы)
-├── types.ts                 # TypeScript типы
-├── builder.ts               # Логика сборки промптов
-├── template.ts              # Template engine ({{variables}})
-├── core/                    # Переиспользуемые блоки
-│   ├── index.ts
-│   ├── base.ts              # Базовые правила
-│   ├── formatting.ts        # Форматирование
-│   ├── safety.ts            # Безопасность
-│   └── russian-market.ts    # Специфика РФ рынка
-├── chat/
-│   └── config.ts            # Конфиг основного чата
-├── ben/
-│   └── config.ts            # Конфиг Бена
-├── assistants/
-│   └── prompt-agent/
-│       └── config.ts        # Конфиг Prompt-агента
-└── contexts/
-    ├── index.ts
-    ├── user-profile.ts      # Контекст профиля
-    └── chat-memory.ts       # Контекст памяти (план)
+lib/prompts/builder/
+├── index.ts            # Public API (buildChatPrompt, buildBenPrompt, etc.)
+├── registry.ts         # Сканирование skills/agents, чтение metadata
+├── skill-loader.ts     # Загрузка полного SKILL.md
+├── agent-loader.ts     # Загрузка AGENT.md + config.yaml
+└── composer.ts         # Сборка финального промпта
+```
+
+### Progressive Disclosure
+
+3 уровня загрузки информации:
+
+| Уровень | Что загружается | Когда |
+|---------|-----------------|-------|
+| **1. Metadata** | name, description, model | При старте приложения |
+| **2. Full Content** | SKILL.md / AGENT.md | При выборе skill/agent |
+| **3. References** | references/*.md | При необходимости |
+
+### API использования
+
+```typescript
+// Server-side only!
+import {
+  buildChatPrompt,
+  buildBenPrompt,
+  buildPromptAgentPrompt
+} from '@/lib/prompts/server';
+
+// Основной чат
+const chatPrompt = buildChatPrompt({
+  user: { displayName: 'Владимир' },
+});
+
+// Бен (с онбордингом)
+const benPrompt = buildBenPrompt({}, true);
+
+// Prompt-агент
+const promptAgentPrompt = buildPromptAgentPrompt({});
+```
+
+### Server-only vs Client-safe
+
+```typescript
+// В API routes и серверных компонентах:
+import { buildChatPrompt, buildBenPrompt } from '@/lib/prompts/server';
+
+// В клиентских компонентах (только типы и утилиты):
+import type { BuildContext, BuiltPrompt } from '@/lib/prompts';
+import { render, hasVariable } from '@/lib/prompts';
 ```
 
 ---
 
-## API использования
+## Core Prompts
 
-### Сборка промпта
+Переиспользуемые блоки промптов в формате Markdown.
 
-```typescript
-import { buildPrompt } from '@/lib/prompts';
-
-// Основной чат
-const chatPrompt = buildPrompt('chat', {
-  user: { displayName: 'Владимир' },
-});
-
-console.log(chatPrompt.systemPrompt); // Содержит "Владимир"
-console.log(chatPrompt.model);        // 'gemini-3-pro'
-
-// Бен
-const benPrompt = buildPrompt('ben');
-
-// Prompt-агент
-const promptAgentPrompt = buildPrompt('prompt-agent');
+```
+lib/prompts/core/
+├── index.ts            # Загрузчик .md файлов
+├── base.md             # Базовые правила AI
+├── safety.md           # Правила безопасности
+├── formatting.md       # Правила форматирования
+└── russian-market.md   # Специфика РФ рынка
 ```
 
-### Специализированные билдеры
+### Пример base.md
 
-```typescript
-import { buildChatPrompt, buildBenPrompt, buildPromptAgentPrompt } from '@/lib/prompts';
+```markdown
+# Базовые правила
 
-// С типизированным контекстом
-const result = buildChatPrompt({
-  user: {
-    displayName: 'Анна',
-    occupation: 'Маркетолог',
-    pronouns: 'ты',
-  },
-});
-```
+## Идентичность
+Ты — Simply, дружелюбный AI-помощник для российских пользователей.
 
-### Получение конфигов
-
-```typescript
-import { getConfig, getAvailablePrompts } from '@/lib/prompts';
-
-// Конфиг по ID
-const benConfig = getConfig('ben');
-
-// Список доступных промптов
-const prompts = getAvailablePrompts();
-// ['chat', 'ben', 'prompt-agent']
+## Язык
+- Отвечай на том языке, на котором спрашивают
+- По умолчанию — русский
 ```
 
 ---
@@ -184,7 +307,8 @@ components/modal-assistants/
 └── ben/
     ├── index.ts
     ├── trigger.tsx          # Кнопка ❓
-    └── drawer.tsx           # Drawer обёртка
+    ├── drawer.tsx           # Drawer обёртка
+    └── intro-bubble.tsx     # Speech bubble для онбординга
 ```
 
 ### API endpoints
@@ -194,39 +318,6 @@ components/modal-assistants/
 | `/api/assistant/prompt-agent` | POST | Чат с Prompt-агентом |
 | `/api/assistant/ben` | POST | Чат с Беном |
 | `/api/user/ben-intro` | PATCH | Обновление hasSeenBenIntro |
-
----
-
-## Контекст пользователя
-
-### Профиль
-
-```typescript
-import { buildUserProfileContext } from '@/lib/prompts';
-
-const context = buildUserProfileContext({
-  displayName: 'Владимир',
-  pronouns: 'ты',
-  occupation: 'Предприниматель',
-  bio: 'Владелец интернет-магазина',
-});
-// "Пользователя зовут: Владимир\nОбращаться на: ты\n..."
-```
-
-### Template variables
-
-Промпты поддерживают переменные `{{variable}}`:
-
-```typescript
-import { render } from '@/lib/prompts';
-
-const template = 'Привет, {{userName}}! Ты работаешь в {{industry}}.';
-const result = render(template, {
-  userName: 'Анна',
-  industry: 'маркетинг',
-});
-// "Привет, Анна! Ты работаешь в маркетинг."
-```
 
 ---
 
@@ -265,33 +356,38 @@ const result = render(template, {
 
 | Категория | Файлы |
 |-----------|-------|
-| **Система промптов** | [lib/prompts/](../lib/prompts/) |
-| **Билдер** | [lib/prompts/builder.ts](../lib/prompts/builder.ts) |
-| **Конфиг чата** | [lib/prompts/chat/config.ts](../lib/prompts/chat/config.ts) |
-| **Конфиг Бена** | [lib/prompts/ben/config.ts](../lib/prompts/ben/config.ts) |
-| **Конфиг Prompt-агента** | [lib/prompts/assistants/prompt-agent/config.ts](../lib/prompts/assistants/prompt-agent/config.ts) |
+| **Builder** | [lib/prompts/builder/](../lib/prompts/builder/) |
+| **Server exports** | [lib/prompts/server.ts](../lib/prompts/server.ts) |
+| **Skills** | [lib/prompts/skills/](../lib/prompts/skills/) |
+| **Agents** | [lib/prompts/agents/](../lib/prompts/agents/) |
+| **Core** | [lib/prompts/core/](../lib/prompts/core/) |
 | **Модальные компоненты** | [components/modal-assistants/](../components/modal-assistants/) |
 | **API помощников** | [app/(chat)/api/assistant/](../app/(chat)/api/assistant/) |
 | **API чата** | [app/(chat)/api/chat/route.ts](../app/(chat)/api/chat/route.ts) |
 
 ---
 
-## Миграция с v2.x
+## Миграция с v3.0
 
-В версии 3.0.0 удалены:
+В версии 3.3.0 изменено:
 
-- Таблицы `Agent` и `UserAgent` из БД
-- Поля `agentId` из таблиц `Chat` и `Message`
-- UI выбора агента в header
-- @-mentions для смены агента
-- Каталог агентов `/agents`
-- Файл `lib/db/seed-agents.ts`
+### Удалено
+- `lib/prompts/chat/config.ts` → заменён на builder
+- `lib/prompts/ben/config.ts` → заменён на agents/ben/
+- `lib/prompts/assistants/` → заменён на skills/
+- `lib/prompts/builder.ts` → заменён на builder/ папку
+- `lib/prompts/core/*.ts` → заменены на .md файлы
 
-Добавлено:
+### Добавлено
+- `lib/prompts/builder/` — модульная система сборки
+- `lib/prompts/skills/` — атомарные навыки
+- `lib/prompts/agents/` — персонажи-агенты
+- `lib/prompts/server.ts` — server-only экспорты
+- `lib/prompts/core/*.md` — core промпты в Markdown
 
-- Файловая система промптов `lib/prompts/`
-- Модальные помощники (Prompt-агент, Бен)
-- Поле `hasSeenBenIntro` в таблице `User`
+### Изменено
+- `lib/prompts/index.ts` — теперь только client-safe экспорты
+- API routes импортируют из `@/lib/prompts/server`
 
 ---
 

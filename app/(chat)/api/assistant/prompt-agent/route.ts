@@ -3,11 +3,13 @@
  *
  * Streaming chat endpoint for the Prompt-agent modal assistant.
  * Helps users formulate better prompts.
+ *
+ * Uses new Skills + Agents architecture (v2).
  */
 
 import { convertToModelMessages, streamText } from "ai";
 import { myProvider } from "@/lib/ai/providers";
-import { promptAgentConfig } from "@/lib/prompts/assistants/prompt-agent/config";
+import { buildPromptAgentPrompt } from "@/lib/prompts/server";
 
 export const maxDuration = 60;
 
@@ -15,9 +17,12 @@ export async function POST(request: Request) {
   try {
     const { messages } = await request.json();
 
+    // Build prompt using new skill-based builder
+    const prompt = buildPromptAgentPrompt({});
+
     const result = streamText({
-      model: myProvider.languageModel(promptAgentConfig.defaultModel),
-      system: promptAgentConfig.systemPrompt,
+      model: myProvider.languageModel(prompt.model),
+      system: prompt.systemPrompt,
       messages: convertToModelMessages(messages),
       temperature: 1.0,
     });

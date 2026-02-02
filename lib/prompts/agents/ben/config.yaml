@@ -1,0 +1,26 @@
+# Конфигурация агента Ben
+
+name: ben
+displayName: Бен
+category: platform
+model: gemini-2.5-flash
+
+# Ben не использует skills — только отвечает на вопросы
+skills: []
+
+# Какие файлы загружать в промпт агента
+includes:
+  - AGENT.md
+  - onboarding.md
+
+# Для UI
+icon: "❓"
+description: "Помощник по платформе Simply"
+exampleTasks:
+  - "Что умеет Simply?"
+  - "Как создать таблицу?"
+  - "Как работает поиск?"
+
+# Специальные настройки
+toolAccess: []  # Нет инструментов
+supportsStreaming: true

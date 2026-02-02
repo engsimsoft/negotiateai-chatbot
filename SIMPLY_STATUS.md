@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.2.0
+**Версия:** 3.3.1
 **Дата:** 2026-02-02
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -66,9 +66,18 @@
 
 ---
 
-## Система промптов (v3.0)
+## Система промптов (v3.3 — Skills + Agents)
 
-> В версии 3.0.0 система агентов заменена на файловую систему промптов.
+> В версии 3.3.0 система промптов мигрирована на архитектуру Skills + Agents по стандарту Anthropic.
+
+### Архитектура
+
+| Концепция | Описание |
+|-----------|----------|
+| **Skills** | Атомарные навыки в формате Markdown (SKILL.md) |
+| **Agents** | Персонажи-дирижёры с набором skills (AGENT.md + config.yaml) |
+| **Builder** | Модульная система сборки промптов |
+| **Progressive Disclosure** | Загрузка только необходимой информации |
 
 ### Промпты
 
@@ -82,15 +91,53 @@
 
 ```
 lib/prompts/
-├── index.ts                 # Экспорты
+├── index.ts                 # Client-safe экспорты (типы, утилиты)
+├── server.ts                # Server-only экспорты (fs-зависимые)
 ├── types.ts                 # TypeScript типы
-├── builder.ts               # Логика сборки
 ├── template.ts              # Template engine
-├── core/                    # Переиспользуемые блоки
-├── chat/config.ts           # Конфиг чата
-├── ben/config.ts            # Конфиг Бена
-├── assistants/prompt-agent/ # Конфиг Prompt-агента
+│
+├── skills/                  # Атомарные навыки
+│   ├── _template/SKILL.md   # Шаблон skill
+│   ├── document/            # Skills для документов
+│   │   ├── create-presentation/SKILL.md
+│   │   ├── create-spreadsheet/SKILL.md
+│   │   ├── create-text-document/SKILL.md
+│   │   └── analyze-document/SKILL.md
+│   ├── research/            # Skills для исследований
+│   │   └── web-research/SKILL.md
+│   └── utility/
+│       └── prompt-helper/SKILL.md
+│
+├── agents/                  # Персонажи-агенты
+│   ├── _template/           # Шаблон агента
+│   │   ├── AGENT.md
+│   │   └── config.yaml
+│   └── ben/                 # Бен — гид по платформе
+│       ├── AGENT.md
+│       ├── config.yaml
+│       ├── onboarding.md
+│       └── references/
+│           ├── features.md
+│           └── scenarios.md
+│
+├── builder/                 # Система сборки промптов
+│   ├── index.ts             # Public API
+│   ├── registry.ts          # Сканирование skills/agents
+│   ├── skill-loader.ts      # Загрузка SKILL.md
+│   ├── agent-loader.ts      # Загрузка AGENT.md + config.yaml
+│   └── composer.ts          # Сборка финального промпта
+│
+├── core/                    # Переиспользуемые блоки (.md)
+│   ├── index.ts             # Загрузчик .md файлов
+│   ├── base.md
+│   ├── safety.md
+│   ├── formatting.md
+│   └── russian-market.md
+│
 └── contexts/                # Контексты пользователя
+    ├── index.ts
+    ├── user-profile.ts
+    └── chat-memory.ts
 ```
 
 ### Модальные помощники
@@ -219,6 +266,26 @@ components/projects/
 
 ## План развития
 
+### ТЗ-04: Skills + Agents Architecture — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Skills** — атомарные навыки в формате Markdown (SKILL.md с frontmatter)
+- **Agents** — персонажи с AGENT.md + config.yaml
+- **Builder** — модульная система сборки промптов
+- **Progressive Disclosure** — загрузка metadata → full content по требованию
+- **Server-only exports** — изоляция fs-зависимых функций
+- **Core в Markdown** — base.md, safety.md, formatting.md, russian-market.md
+- **Миграция Ben** — полноценный агент с references
+- **Миграция Prompt-agent** — skill в utility/prompt-helper/
+
+**Ключевые файлы:**
+- `lib/prompts/builder/` — система сборки (registry, loaders, composer)
+- `lib/prompts/agents/ben/` — агент Бен
+- `lib/prompts/skills/utility/prompt-helper/` — skill Prompt-helper
+- `lib/prompts/server.ts` — server-only экспорты
+
+**Детали:** [_archive/TZ_04_ROADMAP.md](_archive/TZ_04_ROADMAP.md)
+
 ### ТЗ-03: Проекты + Claude + Режим Профессор — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
@@ -318,9 +385,12 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.2.0 |
+| Версия | 3.3.1 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
+| Архитектура промптов | Skills + Agents (v3.3) |
+| Skills | 6 (document: 4, research: 1, utility: 1) |
+| Agents | 1 (ben) |
 | Промптов | 4 (chat, prompt-agent, ben, project) |
 | AI моделей | 5 (Gemini 3 Pro, 2.5 Flash, Claude Haiku, Sonnet, Opus) |
 | AI-инструментов | 8 |
@@ -348,6 +418,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_04_ROADMAP.md](_archive/TZ_04_ROADMAP.md) — ТЗ-04 Skills + Agents
 - [_archive/TZ_03_PROJECTS_ANTHROPIC_PROFESSOR.md](_archive/TZ_03_PROJECTS_ANTHROPIC_PROFESSOR.md) — ТЗ-03 Проекты + Claude
 - [_archive/TZ_02_ROADMAP.md](_archive/TZ_02_ROADMAP.md) — ТЗ-02 Dashboard + Sidebar
 - [_archive/TZ_NEW_01_ROADMAP.md](_archive/TZ_NEW_01_ROADMAP.md) — ТЗ-NEW-01 (v3.0.0)

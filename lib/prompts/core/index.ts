@@ -1,20 +1,69 @@
 /**
  * Core Prompt Blocks
  *
- * Re-exports all core blocks for easy importing.
+ * Loads core prompt blocks from .md files.
+ * Part of Skills + Agents architecture (v2).
  */
 
-// Base rules
-export { BASE_RULES, SIMPLY_IDENTITY, ANTI_PATTERNS } from './base';
+import fs from 'fs';
+import path from 'path';
 
-// Formatting
-export { RESPONSE_FORMAT, ARTIFACTS_RULES, MARKDOWN_GUIDELINES } from './formatting';
+// =============================================================================
+// File Loading
+// =============================================================================
 
-// Safety
-export { SAFETY_RULES, DATA_HANDLING, HONEST_LIMITATIONS } from './safety';
+const CORE_DIR = path.join(process.cwd(), 'lib', 'prompts', 'core');
 
-// Russian market
-export { RUSSIAN_CONTEXT, RUSSIAN_LANGUAGE, LOCAL_SERVICES } from './russian-market';
+/**
+ * Load a core markdown file
+ */
+function loadBlock(filename: string): string {
+  const filePath = path.join(CORE_DIR, filename);
+
+  if (!fs.existsSync(filePath)) {
+    console.warn(`Core block not found: ${filename}`);
+    return '';
+  }
+
+  try {
+    return fs.readFileSync(filePath, 'utf-8').trim();
+  } catch (error) {
+    console.error(`Error loading core block ${filename}:`, error);
+    return '';
+  }
+}
+
+// =============================================================================
+// Block Exports
+// =============================================================================
+
+/** Base rules and identity */
+export const BASE_RULES = loadBlock('base.md');
+
+/** Safety guidelines */
+export const SAFETY_RULES = loadBlock('safety.md');
+
+/** Formatting guidelines */
+export const FORMATTING_RULES = loadBlock('formatting.md');
+
+/** Russian market context */
+export const RUSSIAN_MARKET = loadBlock('russian-market.md');
+
+// Legacy aliases
+export const SIMPLY_IDENTITY = BASE_RULES;
+export const ANTI_PATTERNS = '';
+export const RESPONSE_FORMAT = FORMATTING_RULES;
+export const ARTIFACTS_RULES = '';
+export const MARKDOWN_GUIDELINES = '';
+export const DATA_HANDLING = '';
+export const HONEST_LIMITATIONS = '';
+export const RUSSIAN_CONTEXT = RUSSIAN_MARKET;
+export const RUSSIAN_LANGUAGE = '';
+export const LOCAL_SERVICES = '';
+
+// =============================================================================
+// Utility Functions
+// =============================================================================
 
 /**
  * Combine selected core blocks into a single string
@@ -27,35 +76,20 @@ export function combineBlocks(blocks: string[]): string {
  * Get all core blocks for main chat prompt
  */
 export function getAllCoreBlocks(): string {
-  const { BASE_RULES, SIMPLY_IDENTITY } = require('./base');
-  const { RESPONSE_FORMAT, ARTIFACTS_RULES } = require('./formatting');
-  const { SAFETY_RULES, HONEST_LIMITATIONS } = require('./safety');
-  const { RUSSIAN_CONTEXT, RUSSIAN_LANGUAGE } = require('./russian-market');
-
   return combineBlocks([
-    SIMPLY_IDENTITY,
     BASE_RULES,
-    RESPONSE_FORMAT,
-    ARTIFACTS_RULES,
-    RUSSIAN_CONTEXT,
-    RUSSIAN_LANGUAGE,
     SAFETY_RULES,
-    HONEST_LIMITATIONS,
+    FORMATTING_RULES,
+    RUSSIAN_MARKET,
   ]);
 }
 
 /**
- * Get minimal core blocks for assistant prompts (Ben, Prompt-agent)
+ * Get minimal core blocks for assistant prompts
  */
 export function getMinimalCoreBlocks(): string {
-  const { BASE_RULES } = require('./base');
-  const { SAFETY_RULES, HONEST_LIMITATIONS } = require('./safety');
-  const { RUSSIAN_LANGUAGE } = require('./russian-market');
-
   return combineBlocks([
     BASE_RULES,
-    RUSSIAN_LANGUAGE,
     SAFETY_RULES,
-    HONEST_LIMITATIONS,
   ]);
 }

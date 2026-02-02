@@ -12,6 +12,157 @@
 
 ---
 
+## [3.3.1] - 2026-02-02 - Base Skills for Tools
+
+**PATCH RELEASE**: Добавлены базовые skills, которые учат агентов использовать существующие tools.
+
+### Summary
+
+Создано 5 новых skills для работы с документами, таблицами, презентациями, анализа файлов и веб-поиска. Skills содержат инструкции когда и как использовать соответствующие tools.
+
+### Added
+
+#### Document Skills
+- **`document/create-presentation`** — создание презентаций (Reveal.js, PPTX)
+- **`document/create-spreadsheet`** — создание таблиц Excel с формулами
+- **`document/create-text-document`** — создание текстовых документов (text, markdown)
+- **`document/analyze-document`** — анализ загруженных файлов
+
+#### Research Skills
+- **`research/web-research`** — поиск информации в интернете
+
+### Files
+
+```
+lib/prompts/skills/
+├── document/
+│   ├── create-presentation/SKILL.md   # NEW
+│   ├── create-spreadsheet/SKILL.md    # NEW
+│   ├── create-text-document/SKILL.md  # NEW
+│   └── analyze-document/SKILL.md      # NEW
+└── research/
+    └── web-research/SKILL.md          # NEW
+```
+
+### Technical
+
+- Skills автоматически загружаются через registry
+- Metadata отображается в system prompt чата
+- Каждый skill указывает какие tools использует
+
+---
+
+## [3.3.0] - 2026-02-02 - Skills + Agents Architecture
+
+**MINOR RELEASE**: Миграция системы промптов на архитектуру Skills + Agents по стандарту Anthropic.
+
+### Summary
+
+Новая модульная архитектура промптов с Progressive Disclosure. Skills — атомарные навыки в Markdown. Agents — персонажи-дирижёры с набором skills. Builder — система сборки с registry, loaders и composer.
+
+### Added
+
+#### Skills System
+- **`lib/prompts/skills/`** — папка для атомарных навыков
+- **`SKILL.md`** — формат skill с YAML frontmatter (name, description, tools)
+- **`_template/SKILL.md`** — шаблон для создания новых skills
+- **`utility/prompt-helper/SKILL.md`** — skill для улучшения промптов
+
+#### Agents System
+- **`lib/prompts/agents/`** — папка для персонажей-агентов
+- **`AGENT.md`** — личность агента в Markdown
+- **`config.yaml`** — метаданные (model, skills, icon)
+- **`_template/`** — шаблон для создания новых агентов
+- **`ben/`** — полноценный агент с references
+
+#### Builder System
+- **`lib/prompts/builder/`** — модульная система сборки
+- **`registry.ts`** — сканирование skills и agents, чтение metadata
+- **`skill-loader.ts`** — загрузка SKILL.md по требованию
+- **`agent-loader.ts`** — загрузка AGENT.md + config.yaml
+- **`composer.ts`** — сборка финального промпта
+
+#### Server-only Exports
+- **`lib/prompts/server.ts`** — изоляция fs-зависимых функций
+- Использует `import 'server-only'` для предотвращения импорта в клиент
+
+#### Core в Markdown
+- **`lib/prompts/core/base.md`** — базовые правила
+- **`lib/prompts/core/safety.md`** — правила безопасности
+- **`lib/prompts/core/formatting.md`** — правила форматирования
+- **`lib/prompts/core/russian-market.md`** — специфика РФ рынка
+
+### Changed
+
+#### API Routes
+- `app/(chat)/api/chat/route.ts` — использует новый builder
+- `app/(chat)/api/assistant/ben/route.ts` — использует buildBenPrompt из server.ts
+- `app/(chat)/api/assistant/prompt-agent/route.ts` — использует buildPromptAgentPrompt
+
+#### Exports
+- `lib/prompts/index.ts` — только client-safe экспорты (типы, утилиты)
+- `lib/prompts/server.ts` — server-only экспорты (buildChatPrompt, buildBenPrompt и др.)
+
+### Removed
+
+- **`lib/prompts/chat/`** — заменён на builder
+- **`lib/prompts/ben/`** — заменён на agents/ben/
+- **`lib/prompts/assistants/`** — заменён на skills/
+- **`lib/prompts/builder.ts`** — заменён на builder/ папку
+- **`lib/prompts/core/*.ts`** — заменены на .md файлы
+
+### Technical
+
+- **gray-matter** — добавлена зависимость для парсинга YAML frontmatter
+- **Progressive Disclosure** — 3 уровня загрузки (metadata → full → references)
+- **TypeScript types** — SkillMetadata, AgentMetadata, BuiltPrompt, BuildContext
+
+### Files
+
+#### Created
+```
+lib/prompts/
+├── server.ts                    # Server-only exports
+├── skills/
+│   ├── _template/SKILL.md
+│   └── utility/prompt-helper/SKILL.md
+├── agents/
+│   ├── _template/
+│   │   ├── AGENT.md
+│   │   └── config.yaml
+│   └── ben/
+│       ├── AGENT.md
+│       ├── config.yaml
+│       ├── onboarding.md
+│       └── references/
+│           ├── features.md
+│           └── scenarios.md
+├── builder/
+│   ├── index.ts
+│   ├── registry.ts
+│   ├── skill-loader.ts
+│   ├── agent-loader.ts
+│   └── composer.ts
+└── core/
+    ├── index.ts
+    ├── base.md
+    ├── safety.md
+    ├── formatting.md
+    └── russian-market.md
+```
+
+#### Removed
+```
+lib/prompts/
+├── chat/config.ts              # → builder
+├── ben/config.ts               # → agents/ben/
+├── assistants/                 # → skills/
+├── builder.ts                  # → builder/
+└── core/*.ts                   # → core/*.md
+```
+
+---
+
 ## [3.2.0] - 2026-02-02 - Projects + Claude + Professor Mode
 
 **MINOR RELEASE**: Проекты как изолированные рабочие пространства с Claude (Anthropic).

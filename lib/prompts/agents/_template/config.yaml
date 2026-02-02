@@ -1,0 +1,20 @@
+# Конфигурация агента
+
+name: agent-name
+displayName: Название агента
+category: general
+model: gemini-2.5-flash
+
+# Какие skills использует этот агент
+skills: []
+
+# Какие файлы загружать в промпт агента
+includes:
+  - AGENT.md
+
+# Для UI
+icon: "🤖"
+description: "Краткое описание для UI"
+exampleTasks:
+  - "Пример задачи 1"
+  - "Пример задачи 2"
