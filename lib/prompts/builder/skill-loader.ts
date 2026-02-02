@@ -96,6 +96,24 @@ export function loadSkillReference(skillId: string, refName: string): string | n
 }
 
 /**
+ * Load skill content only (without metadata wrapper)
+ *
+ * Used by loadSkill tool for Progressive Disclosure.
+ * Returns just the markdown content for AI to read instructions.
+ *
+ * @param skillId - Skill ID (e.g. "document/create-presentation")
+ * @returns Markdown content string, or null if not found
+ *
+ * @example
+ * const content = loadSkillContent('document/create-presentation');
+ * // Returns full SKILL.md instructions for AI
+ */
+export function loadSkillContent(skillId: string): string | null {
+  const skill = loadSkill(skillId);
+  return skill ? skill.content : null;
+}
+
+/**
  * Load multiple skills and combine their content
  *
  * @param skillIds - Array of skill IDs

@@ -12,6 +12,58 @@
 
 ---
 
+## [3.3.2] - 2026-02-03 - loadSkill Tool for Dynamic Skill Loading
+
+**PATCH RELEASE**: Добавлен tool `loadSkill` для динамической загрузки инструкций из SKILL.md файлов.
+
+### Summary
+
+Модель теперь сама решает когда загрузить детальные инструкции через tool call. Это реализует Progressive Disclosure — metadata skills всегда в промпте, полный контент загружается по требованию.
+
+### Added
+
+#### loadSkill Tool
+- **`lib/ai/tools/load-skill.ts`** — новый tool для загрузки SKILL.md контента
+- **`loadSkillContent()`** — функция в `skill-loader.ts` для извлечения контента
+- Модель вызывает `loadSkill("document/create-presentation")` перед сложными задачами
+- Tool возвращает полные инструкции из SKILL.md
+
+#### System Prompt Updates
+- **`lib/prompts/core/base.md`** — секция "Инструкции для сложных задач (Skills)"
+- Удалён временный костыль с хардкодом правил создания документов
+- Модель знает когда использовать loadSkill и следует инструкциям
+
+### Changed
+
+#### Simplified SKILL.md Descriptions
+- Все descriptions упрощены: короткое описание + когда загружать
+- Убраны дублирующие инструкции из frontmatter
+
+### Files
+
+```
+lib/ai/tools/
+└── load-skill.ts                   # NEW
+
+lib/prompts/builder/
+└── skill-loader.ts                 # loadSkillContent() added
+
+lib/prompts/core/
+└── base.md                         # Skills section + костыль удалён
+
+lib/prompts/skills/*/SKILL.md       # Simplified descriptions
+
+app/(chat)/api/chat/route.ts        # loadSkill registered
+```
+
+### Technical
+
+- Tool использует `wrapToolExecution()` для error handling
+- Enum с доступными skills для валидации
+- 5 секунд timeout (простое чтение файла)
+
+---
+
 ## [3.3.1] - 2026-02-02 - Base Skills for Tools
 
 **PATCH RELEASE**: Добавлены базовые skills, которые учат агентов использовать существующие tools.

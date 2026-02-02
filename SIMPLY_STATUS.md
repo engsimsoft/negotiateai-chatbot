@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.3.1
-**Дата:** 2026-02-02
+**Версия:** 3.3.2
+**Дата:** 2026-02-03
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -242,6 +242,7 @@ components/projects/
 - Update Document (редактирование артефактов)
 - Request Suggestions
 - Parse Excel (анализ загруженных файлов)
+- **Load Skill** (динамическая загрузка инструкций) ← v3.3.2
 
 **Планируемые:**
 - Website Analyzer (fetch, screenshot, SEO)
@@ -385,7 +386,7 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.3.1 |
+| Версия | 3.3.2 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
@@ -393,7 +394,7 @@ components/projects/
 | Agents | 1 (ben) |
 | Промптов | 4 (chat, prompt-agent, ben, project) |
 | AI моделей | 5 (Gemini 3 Pro, 2.5 Flash, Claude Haiku, Sonnet, Opus) |
-| AI-инструментов | 8 |
+| AI-инструментов | 9 |
 | Типов документов | 5 (text, markdown, excel, presentation-reveal, presentation-pptx) |
 | Тем презентаций | 5 |
 | Тем Excel | 5 |
@@ -434,4 +435,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-02
+**Обновлено:** 2026-02-03

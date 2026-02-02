@@ -34,6 +34,7 @@ import { readDocument } from "@/lib/ai/tools/read-document";
 import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
 import { updateDocument } from "@/lib/ai/tools/update-document";
 import { webSearch } from "@/lib/ai/tools/web-search";
+import { loadSkill } from "@/lib/ai/tools/load-skill";
 import { isProductionEnvironment } from "@/lib/constants";
 import {
   createStreamId,
@@ -338,6 +339,7 @@ export async function POST(request: Request) {
             "updateDocument",
             "requestSuggestions",
             "parseExcel",
+            "loadSkill",
           ],
           experimental_transform: smoothStream({ chunking: "word" }),
           tools: {
@@ -352,6 +354,7 @@ export async function POST(request: Request) {
             }),
             webSearch,
             parseExcel,
+            loadSkill,
           },
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
