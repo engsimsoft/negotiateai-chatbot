@@ -15,11 +15,7 @@ import { auth } from "@/app/(auth)/auth";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import type { ChatModel } from "@/lib/ai/models";
-import {
-  type RequestHints,
-  systemPrompt,
-  buildUserContext,
-} from "@/lib/ai/prompts";
+import { buildChatPrompt, type BuildContext } from "@/lib/prompts";
 import { myProvider } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
 import { parseExcel } from "@/lib/ai/tools/excel";
@@ -103,8 +99,7 @@ export async function POST(request: Request) {
       getChatById({ id }),
     ]);
 
-    // ТЗ-3A: Build user context for system prompt
-    const userContext = userProfile ? buildUserContext(userProfile) : "";
+    // User profile will be passed to buildChatPrompt later
 
     if (messageCount > userEntitlements.maxMessagesPerDay) {
       return new ChatSDKError("rate_limit:chat").toResponse();
@@ -158,11 +153,20 @@ export async function POST(request: Request) {
 
     const { longitude, latitude, city, country } = geolocation(request);
 
-    const requestHints: RequestHints = {
-      longitude,
-      latitude,
-      city,
-      country,
+    // Build context for new prompt system
+    const promptContext: BuildContext = {
+      user: userProfile ? {
+        displayName: userProfile.displayName,
+        pronouns: userProfile.pronouns,
+        occupation: userProfile.occupation,
+        bio: userProfile.bio,
+      } : undefined,
+      requestHints: {
+        longitude: longitude ?? undefined,
+        latitude: latitude ?? undefined,
+        city: city ?? undefined,
+        country: country ?? undefined,
+      },
     };
 
     await saveMessages({
@@ -186,9 +190,9 @@ export async function POST(request: Request) {
 
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
-        // Build system prompt with user context
-        const basePrompt = await systemPrompt({ selectedChatModel, requestHints });
-        const systemPromptText = userContext ? userContext + basePrompt : basePrompt;
+        // ТЗ-NEW-01: Build system prompt using new prompt system
+        const builtPrompt = buildChatPrompt(promptContext);
+        const systemPromptText = builtPrompt.systemPrompt;
 
         // Use selected model (default to gemini-3-pro for "auto")
         const modelToUse = selectedChatModel === "auto" ? "gemini-3-pro" : selectedChatModel;

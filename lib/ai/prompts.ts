@@ -94,8 +94,11 @@ About the origin of user's request:
 - country: ${requestHints.country}
 `;
 
+/**
+ * @deprecated Use buildChatPrompt from '@/lib/prompts' instead
+ */
 export const systemPrompt = async ({
-  selectedChatModel,
+  selectedChatModel: _selectedChatModel,
   requestHints,
 }: {
   selectedChatModel: string;
@@ -112,14 +115,17 @@ export const systemPrompt = async ({
 
 export const updateDocumentPrompt = (
   currentContent: string | null,
-  type: ArtifactKind
+  _type: ArtifactKind
 ) => {
   return `Improve the following contents of the document based on the given prompt.
 
 ${currentContent}`;
 };
 
-// ТЗ-3A: Build user context block for system prompts
+/**
+ * @deprecated Use buildFullUserContext from '@/lib/prompts' instead
+ * ТЗ-3A: Build user context block for system prompts
+ */
 export function buildUserContext(user: {
   displayName: string | null;
   pronouns: string | null;
@@ -147,33 +153,5 @@ export function buildUserContext(user: {
   return parts.join("\n");
 }
 
-// ТЗ-3B: Build agent customizations block for personalized agents
-export function buildAgentCustomizations(customizations: {
-  communicationStyle?: "formal" | "friendly" | "expert";
-  specialization?: string;
-} | null): string {
-  if (!customizations) {
-    return "";
-  }
-
-  const parts: string[] = ["# Персонализация агента", ""];
-
-  if (customizations.communicationStyle) {
-    const styleDescriptions: Record<string, string> = {
-      friendly: "Дружелюбный — общайся как с коллегой, неформально, но профессионально",
-      formal: "Деловой — чётко и по делу, без лишних слов, структурированно",
-      expert: "Экспертный — подробно и профессионально, с глубоким анализом и деталями",
-    };
-    const description = styleDescriptions[customizations.communicationStyle];
-    parts.push(`- Стиль общения: ${description}`);
-  }
-
-  if (customizations.specialization) {
-    parts.push(`- Специализация: ${customizations.specialization}`);
-    parts.push(`  Учитывай эту специализацию при ответах.`);
-  }
-
-  parts.push("", "");
-
-  return parts.join("\n");
-}
+// ТЗ-NEW-01: buildAgentCustomizations removed — agents system deprecated
+// Use buildPersonalizationContext from '@/lib/prompts' instead

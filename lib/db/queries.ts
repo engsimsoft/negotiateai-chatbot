@@ -112,6 +112,28 @@ export async function updateUserProfile({
   }
 }
 
+// ТЗ-NEW-01: Update Ben intro flag
+export async function updateUserBenIntro({
+  id,
+  hasSeenBenIntro,
+}: {
+  id: string;
+  hasSeenBenIntro: boolean;
+}) {
+  try {
+    return await db
+      .update(user)
+      .set({ hasSeenBenIntro })
+      .where(eq(user.id, id))
+      .returning();
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update Ben intro flag"
+    );
+  }
+}
+
 export async function saveChat({
   id,
   userId,

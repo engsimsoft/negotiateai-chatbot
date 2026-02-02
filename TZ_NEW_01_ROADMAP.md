@@ -13,7 +13,7 @@
 ## Текущий статус
 
 - **Этап:** ТЗ-NEW-01 — В разработке
-- **Прогресс:** 58/77 задач (75%)
+- **Прогресс:** 64/77 задач (83%)
 - **Завершено:**
   - ✅ Фаза 1: Инфраструктура промптов (tag: `tz-new-01/phase-1-prompts`)
   - ✅ Фаза 2: Anthropic SDK (tag: `tz-new-01/phase-2-anthropic`)
@@ -21,7 +21,8 @@
   - ✅ Фаза 4: Чистка UI (tag: `tz-new-01/phase-4-ui-clean`)
   - ✅ Фаза 5: Чистка кода (tag: `tz-new-01/phase-5-code-clean`)
   - ✅ Фаза 6: Миграция БД (tag: `tz-new-01/phase-6-db-migration`)
-- **Следующая:** Фаза 7: Интеграция
+  - ✅ Фаза 7: Интеграция (tag: `tz-new-01/phase-7-integration`)
+- **Следующая:** Фаза 8: Тестирование
 
 ---
 
@@ -349,30 +350,30 @@ npm run db:migrate  # Успешно
 
 ---
 
-### Фаза 7: Интеграция (6 задач)
+### Фаза 7: Интеграция (6 задач) ✅
 
 **Цель:** Связать всё вместе, переключить chat route на builder.
 
-- [ ] **7.1** Обновить `app/(chat)/api/chat/route.ts`:
+- [x] **7.1** Обновить `app/(chat)/api/chat/route.ts`:
   - Использовать `buildPrompt('chat', context)` вместо загрузки из БД
   - Убрать всю логику агентов (resolveAgent, @-mentions)
   - Убрать buildAgentCustomizations
 
-- [ ] **7.2** Обновить `components/onboarding-dialog.tsx`:
+- [x] **7.2** Обновить `components/onboarding-dialog.tsx`:
   - После завершения проверить `hasSeenBenIntro`
   - Если false → открыть BenSheet с `isFirstTime={true}`
   - После закрытия → PATCH user `hasSeenBenIntro = true`
 
-- [ ] **7.3** Создать API для обновления `hasSeenBenIntro`:
+- [x] **7.3** Создать API для обновления `hasSeenBenIntro`:
   - `app/(chat)/api/user/ben-intro/route.ts` — PATCH
 
-- [ ] **7.4** Очистить неиспользуемые импорты во всех файлах
+- [x] **7.4** Очистить неиспользуемые импорты во всех файлах
 
-- [ ] **7.5** Обновить `lib/ai/prompts.ts`:
+- [x] **7.5** Обновить `lib/ai/prompts.ts`:
   - Удалить `buildAgentCustomizations` (перенесено в lib/prompts)
   - Оставить `buildUserContext` для обратной совместимости или удалить
 
-- [ ] **7.6** Production build
+- [x] **7.6** Production build
 
 **Верификация Фазы 7:**
 ```bash
@@ -538,8 +539,8 @@ package.json                              # +@ai-sdk/anthropic
 - [x] Таблицы `agent` и `userAgent` удалены из БД
 - [x] Поля `agentId` удалены из `chat` и `message`
 - [x] Поле `hasSeenBenIntro` добавлено в `user`
-- [ ] Структура `lib/prompts/` создана и работает
-- [ ] `buildPrompt()` возвращает корректный промпт
+- [x] Структура `lib/prompts/` создана и работает
+- [x] `buildPrompt()` возвращает корректный промпт
 - [ ] Header: logo, новый чат, [📝], [❓], профиль
 - [ ] @-mentions не работают (просто текст)
 - [ ] Нет визуального различия сообщений

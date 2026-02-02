@@ -32,9 +32,11 @@ const OCCUPATION_OPTIONS = [
 
 interface OnboardingDialogProps {
   onComplete: () => void;
+  /** ТЗ-NEW-01: Called after onboarding to show Ben intro (if user hasn't seen it) */
+  onOpenBen?: () => void;
 }
 
-export function OnboardingDialog({ onComplete }: OnboardingDialogProps) {
+export function OnboardingDialog({ onComplete, onOpenBen }: OnboardingDialogProps) {
   const [step, setStep] = useState(1);
   const [displayName, setDisplayName] = useState("");
   const [pronouns, setPronouns] = useState("вы");
@@ -66,6 +68,11 @@ export function OnboardingDialog({ onComplete }: OnboardingDialogProps) {
       }
 
       onComplete();
+
+      // ТЗ-NEW-01: Open Ben intro for new users
+      if (onOpenBen) {
+        onOpenBen();
+      }
     } catch {
       toast({ type: "error", description: "Ошибка при сохранении профиля" });
     } finally {
