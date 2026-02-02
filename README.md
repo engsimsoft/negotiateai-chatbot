@@ -1,22 +1,22 @@
 # Simply
 
-Платформа AI-агентов для российского рынка. Шлюз к лучшим мировым AI-моделям с оплатой в рублях, без VPN.
+AI-платформа для российского рынка. Шлюз к лучшим мировым AI-моделям с оплатой в рублях, без VPN.
 
 **Production:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
-**Версия:** 2.7.0
-**Статус:** ТЗ-4 завершён (Упрощение UX)
+**Версия:** 3.0.0
+**Статус:** Active development
 
 ---
 
-## 🎯 О проекте
+## О проекте
 
-**Simply** — платформа качественных AI-агентов для бизнес-пользователей в России.
+**Simply** — AI-платформа для бизнес-пользователей в России.
 
-**Философия:** Apple-подход. Лучше 10 идеально работающих агентов, чем 100 посредственных.
+**Философия:** Apple-подход. Качество важнее количества.
 
 **Ключевые отличия:**
-- Проработанные агенты с проверенными промптами
-- Персонализация готовых агентов (не создание с нуля)
+- Универсальный AI-чат с мощными инструментами
+- Модальные помощники: Prompt-агент (📝), Бен (❓)
 - Умный выбор AI-модели для экономии без потери качества
 - Оплата в рублях
 
@@ -24,19 +24,20 @@
 
 ---
 
-## ✨ Возможности
+## Возможности
 
-- **AI-агенты:** 8 специализированных агентов (Помощник, Маркетолог, Копирайтер, Презентатор и др.)
-- **Мультипровайдер:** GPT, Claude, Gemini — через единый интерфейс
-- **Smart Routing:** Автоматический выбор оптимальной модели
-- **Инструменты:** Web search, анализ сайтов, документы, презентации
+- **Универсальный чат:** Один мощный AI-помощник со всеми инструментами
+- **Модальные помощники:** Prompt-агент для улучшения запросов, Бен для помощи по платформе
+- **Мультипровайдер:** Gemini (текущий), Claude, GPT (планируется)
+- **Инструменты:** Web search, Excel, презентации, документы
+- **Голосовой ввод:** Deepgram Nova-3 (русский язык)
 - **Streaming:** Быстрые ответы через streaming API
 
 **Возможности AI:** [docs/ai-agents.md](docs/ai-agents.md) | [docs/ai-artifacts.md](docs/ai-artifacts.md) | [docs/ai-tools.md](docs/ai-tools.md)
 
 ---
 
-## 🚀 Быстрый старт
+## Быстрый старт
 
 ```bash
 # Установка
@@ -55,13 +56,14 @@ npm run dev  # http://localhost:3000
 **Требуется в .env.local:**
 - `GOOGLE_GENERATIVE_AI_API_KEY` — [aistudio.google.com](https://aistudio.google.com/app/apikey)
 - `BRAVE_SEARCH_API_KEY` — [brave.com/search/api](https://brave.com/search/api)
+- `DEEPGRAM_API_KEY` — [deepgram.com](https://deepgram.com)
 - `AUTH_SECRET` — `openssl rand -base64 32`
 - `POSTGRES_URL` — [neon.tech](https://neon.tech)
 - `BLOB_READ_WRITE_TOKEN` — [vercel.com/storage](https://vercel.com/storage)
 
 ---
 
-## 🔧 Технологии
+## Технологии
 
 | Слой | Технология |
 |------|------------|
@@ -70,11 +72,12 @@ npm run dev  # http://localhost:3000
 | Auth | NextAuth 5.0-beta.25 |
 | Database | PostgreSQL (Neon) + Drizzle ORM |
 | Storage | Vercel Blob Storage |
+| Voice | Deepgram Nova-3 |
 | Deploy | Vercel |
 
 ---
 
-## 📋 Команды
+## Команды
 
 ```bash
 npm run dev          # Разработка (localhost:3000)
@@ -86,7 +89,7 @@ npm run db:studio    # Drizzle Studio (UI для БД)
 
 ---
 
-## 📖 Документация
+## Документация
 
 **Основные:**
 - [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md) — Видение продукта
@@ -97,7 +100,7 @@ npm run db:studio    # Drizzle Studio (UI для БД)
 **Техническая:**
 - [docs/setup.md](docs/setup.md) — Детальная установка
 - [docs/architecture.md](docs/architecture.md) — Архитектура
-- [docs/ai-agents.md](docs/ai-agents.md) — AI-агенты
+- [docs/ai-agents.md](docs/ai-agents.md) — Система промптов и помощники
 - [docs/ai-artifacts.md](docs/ai-artifacts.md) — Артефакты
 - [docs/ai-tools.md](docs/ai-tools.md) — Инструменты
 - [docs/decisions/](docs/decisions/) — Architecture Decision Records
@@ -107,17 +110,18 @@ npm run db:studio    # Drizzle Studio (UI для БД)
 
 ---
 
-## 🛣️ Roadmap
+## Roadmap
 
-**Этап 0:** Документация и ребрендинг — ✅
-**Этап 1:** Архитектура агентов (ТЗ-1) — ✅
-**Этап 2:** Мультиагентный чат (ТЗ-2) — ✅
-**Этап 3A:** Профиль пользователя (ТЗ-3A) — ✅
-**Этап 3B:** Персонализация агентов (ТЗ-3B) — ✅
-**Этап 4:** Упрощение UX (ТЗ-4) — ✅
-**Этап 5+:** Мультипровайдер, Биллинг ← следующий
+**Завершено:**
+- ТЗ-NEW-01: Новая архитектура промптов (v3.0.0) ✅
+- Этапы 0-6, Performance Audit, Voice Input ✅
 
-**Детали:** [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md)
+**Следующее:**
+- Этап 7: Tool Activity UX
+- Этап 8: Инструменты Фаза 1 (Perplexity, Plus AI, Ideogram)
+- Мультипровайдер, RAG, Биллинг
+
+**Детали:** [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 ---
 
