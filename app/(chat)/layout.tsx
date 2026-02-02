@@ -1,9 +1,8 @@
 import { cookies } from "next/headers";
 import Script from "next/script";
-import { AppSidebar } from "@/components/app-sidebar";
 import { DataStreamProvider } from "@/components/data-stream-provider";
+import { SidebarLayout } from "@/components/sidebar-layout";
 import { SWRProvider } from "@/components/swr-provider";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { auth } from "../(auth)/auth";
 
 export const experimental_ppr = true;
@@ -24,10 +23,9 @@ export default async function Layout({
       />
       <SWRProvider>
         <DataStreamProvider>
-          <SidebarProvider defaultOpen={!isCollapsed}>
-            <AppSidebar user={session?.user} />
-            <SidebarInset>{children}</SidebarInset>
-          </SidebarProvider>
+          <SidebarLayout user={session?.user} defaultOpen={!isCollapsed}>
+            {children}
+          </SidebarLayout>
         </DataStreamProvider>
       </SWRProvider>
     </>

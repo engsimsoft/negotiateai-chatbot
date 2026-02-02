@@ -16,3 +16,9 @@ export {
   retrieveRelevantContext,
   type MemoryEntry,
 } from './chat-memory';
+
+export {
+  buildProjectContext,
+  buildSimpleProjectContext,
+  type ProjectContext,
+} from './project-context';

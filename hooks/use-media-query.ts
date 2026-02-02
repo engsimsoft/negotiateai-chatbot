@@ -3,12 +3,15 @@ import { useState, useEffect } from "react";
 /**
  * Hook to track media query matches
  *
+ * Returns `null` during SSR/hydration, then actual value after mount.
+ * Use this to prevent hydration mismatches.
+ *
  * @example
  * const isDesktop = useMediaQuery("(min-width: 768px)");
- * const prefersDark = useMediaQuery("(prefers-color-scheme: dark)");
+ * if (isDesktop === null) return null; // or skeleton
  */
-export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
+export function useMediaQuery(query: string): boolean | null {
+  const [matches, setMatches] = useState<boolean | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia(query);

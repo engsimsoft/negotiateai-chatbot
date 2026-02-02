@@ -8,8 +8,9 @@
  * - Desktop: Right side sheet
  */
 
+import { useEffect, useRef } from "react";
 import { Drawer } from "vaul";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import type { AssistantDrawerProps } from "./types";
@@ -22,17 +23,28 @@ export function AssistantDrawer({
   children,
 }: AssistantDrawerProps) {
   const isDesktop = useMediaQuery("(min-width: 768px)");
+  const prevIsDesktop = useRef<boolean | null>(null);
 
-  // Snap points for mobile drawer
-  const snapPoints = [0.6, 0.9];
+  // Close drawer when switching between mobile/desktop to prevent position bugs
+  useEffect(() => {
+    // Skip until we know the actual value
+    if (isDesktop === null) return;
+
+    // Close drawer if mode changed while open
+    if (open && prevIsDesktop.current !== null && prevIsDesktop.current !== isDesktop) {
+      onOpenChange(false);
+    }
+    prevIsDesktop.current = isDesktop;
+  }, [isDesktop, open, onOpenChange]);
+
+  // Don't render until we know if desktop or mobile
+  if (isDesktop === null) return null;
 
   return (
     <Drawer.Root
       open={open}
       onOpenChange={onOpenChange}
       direction={isDesktop ? "right" : "bottom"}
-      snapPoints={isDesktop ? undefined : snapPoints}
-      activeSnapPoint={isDesktop ? undefined : snapPoints[0]}
       modal={true}
     >
       <Drawer.Portal>
@@ -42,7 +54,7 @@ export function AssistantDrawer({
             fixed z-50 flex flex-col bg-background
             ${isDesktop
               ? "inset-y-0 right-0 w-[400px] border-l rounded-l-2xl"
-              : "inset-x-0 bottom-0 max-h-[96vh] rounded-t-2xl border-t"
+              : "inset-x-0 bottom-0 h-[85vh] rounded-t-2xl border-t"
             }
           `}
         >

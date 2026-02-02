@@ -21,6 +21,7 @@ import { useLocalStorage, useWindowSize } from "usehooks-ts";
 import { saveChatModelAsCookie } from "@/app/(chat)/actions";
 import { SelectItem } from "@/components/ui/select";
 import { chatModels } from "@/lib/ai/models";
+import { getProjectModelTiers, type ProjectModelTier } from "@/lib/ai/model-tiers";
 import { myProvider } from "@/lib/ai/providers";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
@@ -68,6 +69,9 @@ function PureMultimodalInput({
   selectedModelId,
   onModelChange,
   usage,
+  isProjectChat,
+  projectModelTier,
+  onProjectModelChange,
 }: {
   chatId: string;
   input: string;
@@ -86,6 +90,9 @@ function PureMultimodalInput({
   selectedModelId: string;
   onModelChange?: (modelId: string) => void;
   usage?: AppUsage;
+  isProjectChat?: boolean;
+  projectModelTier?: string;
+  onProjectModelChange?: (tier: string) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -422,6 +429,9 @@ function PureMultimodalInput({
             <ModelSelectorCompact
               onModelChange={onModelChange}
               selectedModelId={selectedModelId}
+              isProjectChat={isProjectChat}
+              projectModelTier={projectModelTier}
+              onProjectModelChange={onProjectModelChange}
             />
             {/* ТЗ-5: Hints panel button */}
             <Button
@@ -531,16 +541,83 @@ const AttachmentsButton = memo(PureAttachmentsButton);
 function PureModelSelectorCompact({
   selectedModelId,
   onModelChange,
+  isProjectChat,
+  projectModelTier,
+  onProjectModelChange,
 }: {
   selectedModelId: string;
   onModelChange?: (modelId: string) => void;
+  isProjectChat?: boolean;
+  projectModelTier?: string;
+  onProjectModelChange?: (tier: string) => void;
 }) {
   const [optimisticModelId, setOptimisticModelId] = useState(selectedModelId);
+  const [optimisticTier, setOptimisticTier] = useState<ProjectModelTier>(
+    (projectModelTier as ProjectModelTier) || "expert"
+  );
 
   useEffect(() => {
     setOptimisticModelId(selectedModelId);
   }, [selectedModelId]);
 
+  useEffect(() => {
+    if (projectModelTier) {
+      setOptimisticTier(projectModelTier as ProjectModelTier);
+    }
+  }, [projectModelTier]);
+
+  // Project chat: show PROJECT_MODELS
+  if (isProjectChat) {
+    const projectModels = getProjectModelTiers();
+    const selectedProjectModel = projectModels.find((m) => m.id === optimisticTier);
+
+    return (
+      <PromptInputModelSelect
+        onValueChange={(modelName) => {
+          const model = projectModels.find((m) => m.name === modelName);
+          if (model) {
+            setOptimisticTier(model.id);
+            onProjectModelChange?.(model.id);
+            // Save to cookie for persistence
+            startTransition(() => {
+              document.cookie = `project-model-tier=${model.id};path=/;max-age=31536000`;
+            });
+          }
+        }}
+        value={selectedProjectModel?.name}
+      >
+        <Trigger
+          className="flex h-8 items-center gap-2 rounded-lg border-0 bg-background px-2 text-foreground shadow-none transition-colors hover:bg-accent focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+          type="button"
+        >
+          <span className="text-sm">{selectedProjectModel?.icon}</span>
+          <span className="hidden font-medium text-xs sm:block">
+            {selectedProjectModel?.name}
+          </span>
+          <ChevronDownIcon size={16} />
+        </Trigger>
+        <PromptInputModelSelectContent className="min-w-[260px] p-0">
+          <div className="flex flex-col gap-px">
+            {projectModels.map((model) => (
+              <SelectItem key={model.id} value={model.name}>
+                <div className="flex items-center gap-2">
+                  <span>{model.icon}</span>
+                  <div>
+                    <div className="truncate font-medium text-xs">{model.name}</div>
+                    <div className="mt-px truncate text-[10px] text-muted-foreground leading-tight">
+                      {model.description}
+                    </div>
+                  </div>
+                </div>
+              </SelectItem>
+            ))}
+          </div>
+        </PromptInputModelSelectContent>
+      </PromptInputModelSelect>
+    );
+  }
+
+  // Regular chat: show Gemini models
   const selectedModel = chatModels.find(
     (model) => model.id === optimisticModelId
   );

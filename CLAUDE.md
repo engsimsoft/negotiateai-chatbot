@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.0.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.2.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -26,10 +26,11 @@
 - **Best-in-Class API** — не изобретаем велосипеды, интегрируем лучшие решения
 
 **Ключевые особенности:**
-- Универсальный AI-чат с инструментами
+- Универсальный AI-чат с инструментами (Gemini)
+- Проекты: изолированные рабочие пространства (Claude)
 - Модальные помощники: Prompt-агент (📝), Бен (❓)
 - Три уровня персонализации: Профиль + RAG + Chat Memory
-- Мультипровайдер: Gemini (текущий), Claude, GPT (планируется)
+- Мультипровайдер: Gemini + Claude (GPT планируется)
 - Оплата в рублях (ЮKassa, Тинькофф, СБП)
 
 ---
@@ -65,15 +66,37 @@
 **Modal Assistants:**
 - `components/modal-assistants/` — UI модальных помощников
 - `components/modal-assistants/prompt-agent/` — Prompt-агент (📝)
-- `components/modal-assistants/ben/` — Бен (❓)
+- `components/modal-assistants/ben/` — Бен (❓), intro-bubble.tsx
 - `app/(chat)/api/assistant/prompt-agent/route.ts` — API Prompt-агента
 - `app/(chat)/api/assistant/ben/route.ts` — API Бена
+
+**Dashboard:**
+- `app/(dashboard)/` — Route group без sidebar
+- `app/(dashboard)/dashboard/page.tsx` — Главная страница с карточками
+- `components/dashboard/` — Dashboard компоненты (header, greeting, tool-card, tools-grid)
+
+**Sidebar:**
+- `components/sidebar-layout.tsx` — Layout с табами вне Sidebar
+- `components/sidebar-tabs.tsx` — Вертикальные иконки (Search, Chats, Projects)
+- `components/app-sidebar.tsx` — Sidebar с историей чатов
+- `components/ui/sidebar.tsx` — CSS variable `--sidebar-left-offset`
 
 **AI/Chat:**
 - `app/(chat)/api/chat/route.ts` — Chat endpoint (streaming)
 - `lib/ai/providers.ts` — Конфигурация AI-моделей
+- `lib/ai/model-tiers.ts` — Уровни моделей для проектов (Haiku/Sonnet/Opus)
+- `lib/ai/professor-pipeline.ts` — Pipeline для режима Профессор
 - `lib/ai/tools/` — Инструменты (search, excel, web scraping)
 - `lib/ai/tools/excel/` — Excel tools (create, parse, edit)
+
+**Projects (v3.2.0):**
+- `app/(chat)/projects/` — Страницы проектов
+- `app/(chat)/projects/page.tsx` — Список проектов
+- `app/(chat)/projects/new/page.tsx` — Создание проекта
+- `app/(chat)/projects/[id]/page.tsx` — Страница проекта
+- `app/(chat)/projects/[id]/chat/` — Чаты проекта
+- `app/(chat)/api/projects/` — API проектов (CRUD)
+- `components/projects/professor-progress.tsx` — UI прогресса pipeline
 
 **Voice Input (Deepgram):**
 - `app/(chat)/api/deepgram/token/route.ts` — Token API
@@ -88,8 +111,8 @@
 
 **User Profile:**
 - `app/(chat)/api/user/profile/route.ts` — API профиля (GET/PATCH)
-- `app/(chat)/api/user/ben-intro/route.ts` — API флага Бена (PATCH)
-- `app/(chat)/settings/page.tsx` — Страница настроек
+- `app/(chat)/api/user/ben-intro/route.ts` — API флага Бена (GET/PATCH)
+- `app/(dashboard)/settings/page.tsx` — Страница настроек (без sidebar)
 - `components/onboarding-dialog.tsx` — Онбординг
 
 **Config:**
@@ -101,7 +124,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**
@@ -111,7 +134,7 @@
 | 8 | Инструменты Фаза 1 (Perplexity, Plus AI, Ideogram) | Высокий |
 | 9 | RAG (База знаний) | Средний |
 | 10 | Chat Memory | Средний |
-| 11 | Мультипровайдер (GPT, Claude) | Средний |
+| 11 | Мультипровайдер GPT | Средний |
 | 12 | Биллинг (Pay-as-you-go) | Средний |
 
 **Документы в холсте (5 типов):**

@@ -30,6 +30,8 @@ const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+// Offset for sidebar when tabs are visible (w-12 = 3rem)
+const SIDEBAR_LEFT_OFFSET = "3rem";
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed";
@@ -147,6 +149,7 @@ const SidebarProvider = React.forwardRef<
               {
                 "--sidebar-width": SIDEBAR_WIDTH,
                 "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
+                "--sidebar-left-offset": SIDEBAR_LEFT_OFFSET,
                 ...style,
               } as React.CSSProperties
             }
@@ -245,7 +248,7 @@ const Sidebar = React.forwardRef<
           className={cn(
             "fixed inset-y-0 z-10 hidden h-svh w-[var(--sidebar-width)] transition-[left,right,width] duration-200 ease-linear md:flex",
             side === "left"
-              ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
+              ? "left-[var(--sidebar-left-offset)] group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-left-offset)_-_var(--sidebar-width))]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
             // Adjust the padding for floating and inset variants.
             variant === "floating" || variant === "inset"

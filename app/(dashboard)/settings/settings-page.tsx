@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SidebarToggle } from "@/components/sidebar-toggle";
 import { toast } from "@/components/toast";
 import { fetcher } from "@/lib/utils";
 
@@ -60,7 +59,7 @@ const SECTIONS: { id: Section; label: string; icon: React.ReactNode }[] = [
 
 export function SettingsPage() {
   const router = useRouter();
-  const { setTheme, resolvedTheme } = useTheme();
+  const { setTheme } = useTheme();
   const { data: profile, mutate } = useSWR<UserProfile>(
     "/api/user/profile",
     fetcher
@@ -131,16 +130,15 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="flex h-dvh flex-col bg-background">
+    <div className="flex min-h-svh flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4">
-        <SidebarToggle />
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push("/dashboard")}
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="size-4" />
-          Назад
+          Dashboard
         </button>
         <h1 className="text-lg font-semibold">Настройки</h1>
       </header>
@@ -230,7 +228,7 @@ function ProfileSection({
       <div>
         <h2 className="text-xl font-semibold">Профиль</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Информация о вас, которую используют агенты
+          Информация о вас для персонализации
         </p>
       </div>
 
@@ -245,7 +243,7 @@ function ProfileSection({
             maxLength={100}
           />
           <p className="text-xs text-muted-foreground">
-            Агенты будут использовать это имя
+            Это имя будет использоваться в приветствиях и ответах
           </p>
         </div>
 
@@ -291,14 +289,14 @@ function ProfileSection({
           <Label htmlFor="bio">О себе</Label>
           <Textarea
             id="bio"
-            placeholder="Расскажите о себе — это поможет агентам давать более релевантные ответы"
+            placeholder="Расскажите о себе — это поможет давать более релевантные ответы"
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             maxLength={1000}
             rows={4}
           />
           <p className="text-xs text-muted-foreground">
-            Поможет агентам давать релевантные советы
+            Поможет давать релевантные советы
           </p>
         </div>
       </div>

@@ -8,7 +8,198 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- Этап 7+: Tool Activity UX, мультипровайдер, биллинг
+- Этап 7+: Tool Activity UX, RAG, Chat Memory, биллинг
+
+---
+
+## [3.2.0] - 2026-02-02 - Projects + Claude + Professor Mode
+
+**MINOR RELEASE**: Проекты как изолированные рабочие пространства с Claude (Anthropic).
+
+### Summary
+
+Добавлены Проекты — изолированные рабочие пространства с чатами на базе Claude. Три уровня моделей (Исполнитель/Эксперт/Профессор) с режимом Профессор (Pipeline) для сложных задач.
+
+### Added
+
+#### Projects System
+- **`/projects`** — список проектов пользователя
+- **`/projects/new`** — создание нового проекта
+- **`/projects/[id]`** — страница проекта с чатами
+- **`/projects/[id]/chat`** — новый чат в проекте
+- **`/projects/[id]/chat/[chatId]`** — существующий чат
+- **Database** — таблица `Project`, поле `projectId` в `Chat`
+
+#### Claude Integration (via OpenRouter)
+- **Claude Haiku** — Исполнитель (⚡) — быстрый, экономичный
+- **Claude Sonnet** — Эксперт (🎯) — баланс качества (по умолчанию)
+- **Claude Opus** — Профессор (🎓) — максимальное качество
+
+#### Professor Pipeline
+- **Многоэтапный reasoning** — Opus → Haiku → Opus
+- **Анализ** — Opus разбивает задачу на подзадачи
+- **Исполнение** — Haiku параллельно выполняет подзадачи (с retry)
+- **Синтез** — Opus объединяет результаты
+- **UI прогресса** — галочки для каждой подзадачи
+
+#### UI Components
+- **`components/projects/professor-progress.tsx`** — прогресс pipeline
+- **Breadcrumb навигация** — Home > Project > Чат
+- **Model selector** — переключение уровней в чате проекта
+
+### Changed
+
+#### Chat Component
+- Поддержка `projectId`, `projectName`, `projectModelTier` props
+- Обработка streaming events для Professor Pipeline
+- Ref для `currentProjectTier` в transport
+
+#### Chat Header
+- Breadcrumb: Home → Project Name → Чат
+- Иконки FolderOpen и ChevronRight
+
+#### Multimodal Input
+- Отображение уровней проекта вместо моделей Gemini
+- Props `isProjectChat`, `projectModelTier`, `onProjectModelChange`
+
+### Files
+
+#### Created
+```
+app/(chat)/projects/
+├── page.tsx                    # Список проектов
+├── new/page.tsx                # Создание проекта
+└── [id]/
+    ├── page.tsx                # Страница проекта
+    └── chat/
+        ├── page.tsx            # Новый чат в проекте
+        └── [chatId]/page.tsx   # Существующий чат
+
+app/(chat)/api/projects/
+├── route.ts                    # GET/POST проекты
+└── [id]/
+    ├── route.ts                # GET/PATCH/DELETE проект
+    └── chats/route.ts          # GET чаты проекта
+
+lib/ai/
+├── model-tiers.ts              # Конфиг уровней моделей
+└── professor-pipeline.ts       # Pipeline для режима Профессор
+
+components/projects/
+└── professor-progress.tsx      # UI прогресса pipeline
+
+lib/db/migrations/
+└── 0016_large_madrox.sql       # Миграция для projects
+```
+
+#### Modified
+```
+app/(chat)/api/chat/route.ts    # Professor pipeline integration
+components/chat.tsx             # Professor state, project props
+components/chat-header.tsx      # Breadcrumb navigation
+components/multimodal-input.tsx # Project model selector
+lib/db/schema.ts                # Project table, projectId
+lib/db/queries.ts               # Project queries
+```
+
+### Not Implemented (from ТЗ-03)
+
+| Feature | Note |
+|---------|------|
+| "думает..." indicator | During generation |
+| Dynamic pipeline indicator in header | Status updates |
+| Drag & drop files | Nice to have |
+| File preview | Nice to have |
+| Project search | Nice to have |
+| Project sorting | Nice to have |
+
+---
+
+## [3.1.0] - 2026-02-02 - Dashboard + Sidebar + Routing
+
+**MINOR RELEASE**: Dashboard как новая точка входа, реструктуризация навигации и улучшения UX.
+
+### Summary
+
+Dashboard (`/dashboard`) заменил `/` как главную страницу. Sidebar получил вертикальные вкладки (Search, Chats, Projects), которые остаются видимыми при сворачивании. Модальные помощники работают корректно при смене режима desktop/mobile.
+
+### Added
+
+#### Dashboard
+- **`/dashboard`** — новая главная страница с карточками инструментов
+- **Карточка "Чат"** — переход в `/chat`
+- **Карточка "Проекты"** — заблокирована с меткой "Скоро"
+- **Приветствие** — персонализированное с именем пользователя
+- **Ben hint** — подсказка о помощнике
+
+#### Sidebar Architecture
+- **`components/sidebar-layout.tsx`** — layout с табами вне Sidebar
+- **`components/sidebar-tabs.tsx`** — вертикальные иконки (Search, Chats, Projects)
+- **`components/sidebar-search.tsx`** — заглушка поиска
+- **`components/sidebar-projects.tsx`** — заглушка проектов ("Скоро")
+- **CSS variable `--sidebar-left-offset`** — позиционирование sidebar относительно табов
+
+#### Ben Personalization
+- **`components/modal-assistants/ben/intro-bubble.tsx`** — speech bubble для новых пользователей
+- **Tooltip** — подсказка при hover на кнопку ❓
+- **`/api/user/ben-intro`** — API для флага онбординга
+
+#### Responsive Improvements
+- **Modal drawer** — закрывается при смене desktop/mobile режима
+- **`useMediaQuery`** — возвращает `null` во время SSR (предотвращает hydration mismatch)
+- **Fixed height drawer** — `h-[85vh]` вместо snapPoints для стабильности
+
+### Changed
+
+#### Routes
+- **`/`** — редирект на `/dashboard`
+- **`/settings`** — вынесен из `(chat)` route group, без sidebar
+- **`/chat`** — сохраняет sidebar с новыми табами
+
+#### Layout
+- **`app/(dashboard)/`** — новый route group без sidebar
+- **`app/(chat)/`** — route group с sidebar для чатов
+
+#### Header
+- **Dashboard header** — Simply logo, Ben trigger, User menu
+- **Chat header** — Home → `/dashboard`, SidebarToggle, модальные помощники
+
+### Files
+
+#### Created
+```
+app/(dashboard)/
+├── layout.tsx
+├── page.tsx
+├── dashboard/page.tsx
+└── settings/page.tsx
+
+components/dashboard/
+├── index.ts
+├── dashboard-header.tsx
+├── greeting.tsx
+├── tool-card.tsx
+├── tools-grid.tsx
+└── ben-hint.tsx
+
+components/
+├── sidebar-layout.tsx
+├── sidebar-tabs.tsx
+├── sidebar-search.tsx
+└── sidebar-projects.tsx
+
+components/modal-assistants/ben/
+└── intro-bubble.tsx
+```
+
+#### Modified
+```
+components/ui/sidebar.tsx          — CSS variable --sidebar-left-offset
+components/app-sidebar.tsx         — tabs layout внутри
+components/chat-header.tsx         — Ben intro bubble, Home → /dashboard
+components/modal-assistants/assistant-drawer.tsx — responsive fix
+hooks/use-media-query.ts           — returns null during SSR
+```
 
 ---
 

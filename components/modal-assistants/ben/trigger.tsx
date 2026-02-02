@@ -36,7 +36,7 @@ export function BenTrigger({ onClick, className }: TriggerButtonProps) {
           </motion.div>
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          <p>Помощь</p>
+          <p>Бен, help</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

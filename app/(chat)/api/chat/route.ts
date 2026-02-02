@@ -16,7 +16,15 @@ import type { VisibilityType } from "@/components/visibility-selector";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import type { ChatModel } from "@/lib/ai/models";
 import { buildChatPrompt, type BuildContext } from "@/lib/prompts";
+import { buildProjectContext } from "@/lib/prompts/contexts";
 import { myProvider } from "@/lib/ai/providers";
+import {
+  getProjectModel,
+  isValidModelTier,
+  DEFAULT_PROJECT_MODEL,
+  type ProjectModelTier,
+} from "@/lib/ai/model-tiers";
+import { executeProfessorPipeline } from "@/lib/ai/professor-pipeline";
 import { createDocument } from "@/lib/ai/tools/create-document";
 import { parseExcel } from "@/lib/ai/tools/excel";
 import { getCurrentDate } from "@/lib/ai/tools/get-current-date";
@@ -30,8 +38,10 @@ import {
   createStreamId,
   deleteChatById,
   getChatById,
+  getFilesByProjectId,
   getMessageCountByUserId,
   getMessagesByChatId,
+  getProjectById,
   getUserById,
   saveChat,
   saveMessages,
@@ -79,11 +89,15 @@ export async function POST(request: Request) {
       message,
       selectedChatModel,
       selectedVisibilityType,
+      projectId,
+      projectModelTier,
     }: {
       id: string;
       message: ChatMessage;
       selectedChatModel: ChatModel["id"];
       selectedVisibilityType: VisibilityType;
+      projectId?: string;
+      projectModelTier?: ProjectModelTier;
     } = requestBody;
 
     const session = await auth();
@@ -98,6 +112,22 @@ export async function POST(request: Request) {
       getMessageCountByUserId({ id: session.user.id, differenceInHours: 24 }),
       getChatById({ id }),
     ]);
+
+    // ТЗ-03: Fetch project data if projectId is provided
+    let project = null;
+    let projectFiles: Awaited<ReturnType<typeof getFilesByProjectId>> = [];
+
+    if (projectId) {
+      [project, projectFiles] = await Promise.all([
+        getProjectById({ id: projectId }),
+        getFilesByProjectId({ projectId }),
+      ]);
+
+      // Verify project exists and belongs to user
+      if (!project || project.userId !== session.user.id) {
+        return new ChatSDKError("forbidden:chat", "Project not found or access denied").toResponse();
+      }
+    }
 
     // User profile will be passed to buildChatPrompt later
 
@@ -114,8 +144,9 @@ export async function POST(request: Request) {
       await saveChat({
         id,
         userId: session.user.id,
-        title: "Новый чат",
+        title: projectId ? `Чат проекта` : "Новый чат",
         visibility: selectedVisibilityType,
+        projectId: projectId || undefined,
       });
 
       // Generate title in background (non-blocking)
@@ -190,23 +221,106 @@ export async function POST(request: Request) {
 
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
-        // ТЗ-NEW-01: Build system prompt using new prompt system
-        const builtPrompt = buildChatPrompt(promptContext);
-        const systemPromptText = builtPrompt.systemPrompt;
+        // ТЗ-03: Build system prompt - different for project vs regular chat
+        let systemPromptText: string;
+        let modelToUse;
+        const isProjectChat = !!(project && projectId);
+        const tier = projectModelTier && isValidModelTier(projectModelTier)
+          ? projectModelTier
+          : DEFAULT_PROJECT_MODEL;
+        const isProfessorMode = isProjectChat && tier === "professor";
 
-        // Use selected model (default to gemini-3-pro for "auto")
-        const modelToUse = selectedChatModel === "auto" ? "gemini-3-pro" : selectedChatModel;
+        if (isProjectChat && project) {
+          // Project chat: use Claude model and project context
+          const projectModelConfig = getProjectModel(tier);
+          modelToUse = projectModelConfig.model;
+
+          // Build project-specific system prompt
+          const projectContext = buildProjectContext({
+            project,
+            files: projectFiles,
+          });
+
+          // Combine base prompt with project context
+          const builtPrompt = buildChatPrompt(promptContext);
+          systemPromptText = `${builtPrompt.systemPrompt}\n\n${projectContext}`;
+
+          console.log(`[Project Chat] Using ${projectModelConfig.name} (${tier}) for project ${project.name}`);
+        } else {
+          // Regular chat: use Gemini
+          const builtPrompt = buildChatPrompt(promptContext);
+          systemPromptText = builtPrompt.systemPrompt;
+          const geminiModel = selectedChatModel === "auto" ? "gemini-3-pro" : selectedChatModel;
+          modelToUse = myProvider.languageModel(geminiModel);
+        }
 
         const startTime = Date.now();
         let firstTokenTime: number | null = null;
 
+        // ТЗ-03 Фаза 7: Professor Pipeline Mode
+        if (isProfessorMode) {
+          console.log(`[Professor] Starting pipeline mode for chat ${id}`);
+
+          // Extract user message text
+          const userMessageText = message.parts
+            .filter((p): p is { type: "text"; text: string } => p.type === "text")
+            .map((p) => p.text)
+            .join("\n");
+
+          // Convert UI messages to CoreMessage format for pipeline
+          const coreMessages = convertToModelMessages(uiMessages.slice(0, -1)); // Exclude current message
+
+          try {
+            let accumulatedContent = "";
+
+            await executeProfessorPipeline({
+              systemPrompt: systemPromptText,
+              userMessage: userMessageText,
+              messages: coreMessages,
+              onEvent: (event) => {
+                // Stream pipeline events to client using data- prefix for custom types
+                dataStream.write({
+                  type: `data-${event.type}` as const,
+                  data: event,
+                });
+
+                // Track first content token and accumulate content
+                if (event.type === "professor-content") {
+                  if (firstTokenTime === null) {
+                    firstTokenTime = Date.now() - startTime;
+                    console.log(`[Performance] Chat ${id}: first professor content = ${firstTokenTime}ms`);
+                  }
+                  accumulatedContent += event.content;
+                }
+              },
+            });
+
+            const totalTime = Date.now() - startTime;
+            console.log(`[Performance] Chat ${id}: Professor pipeline completed in ${totalTime}ms`);
+
+            // Signal completion
+            dataStream.write({
+              type: "finish",
+            });
+          } catch (error) {
+            console.error("[Professor] Pipeline error:", error);
+            dataStream.write({
+              type: "error",
+              errorText: error instanceof Error ? error.message : "Pipeline error",
+            });
+          }
+
+          return; // Exit execute for professor mode
+        }
+
+        // Standard streaming mode (non-professor)
         const result = streamText({
-          model: myProvider.languageModel(modelToUse),
+          model: modelToUse,
           system: systemPromptText,
           messages: convertToModelMessages(uiMessages),
-          // Gemini works best when creativity budget is not artificially limited
           temperature: 1.0,
-          providerOptions: {
+          // Gemini-specific options (only apply for non-project chats)
+          providerOptions: isProjectChat ? {} : {
             google: {
               thinkingConfig: {
                 thinkingBudget: 1024,

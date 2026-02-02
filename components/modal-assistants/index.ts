@@ -16,4 +16,4 @@ export { AssistantChat } from "./assistant-chat";
 export { PromptAgentTrigger, PromptAgentDrawer } from "./prompt-agent";
 
 // Ben (help assistant)
-export { BenTrigger, BenDrawer } from "./ben";
+export { BenTrigger, BenDrawer, BenIntroBubble } from "./ben";

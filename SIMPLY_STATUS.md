@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.0.0
+**Версия:** 3.2.0
 **Дата:** 2026-02-02
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -25,10 +25,11 @@
 | Особенность | Описание | Статус |
 |-------------|----------|--------|
 | **Универсальный AI-чат** | Один мощный чат со всеми инструментами | ✅ |
+| **Проекты** | Изолированные рабочие пространства с Claude | ✅ v3.2.0 |
 | **Модальные помощники** | Prompt-агент (📝), Бен (❓) | ✅ |
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG/Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity, Plus AI, Ideogram, AssemblyAI | 📋 Фаза 1 |
-| **Мультипровайдер** | GPT, Claude, Gemini через единый интерфейс | 📋 |
+| **Мультипровайдер** | GPT, Claude, Gemini через единый интерфейс | ✅ v3.2.0 (Claude) |
 | **Smart Routing** | Автовыбор модели для экономии без потери качества | 📋 |
 | **Оплата в рублях** | ЮKassa, Тинькофф, СБП | 📋 |
 
@@ -101,6 +102,65 @@ lib/prompts/
 
 ---
 
+## Проекты (v3.2.0)
+
+> Изолированные рабочие пространства с Claude (Anthropic) через OpenRouter.
+
+### Концепция
+
+Проект = изолированное рабочее пространство со своими чатами и настройками. В отличие от основного чата (Gemini), проекты используют модели Claude.
+
+### Три уровня моделей
+
+| Уровень | Модель | Иконка | Назначение |
+|---------|--------|--------|------------|
+| **Исполнитель** | Claude Haiku | ⚡ | Быстрый, экономичный, простые задачи |
+| **Эксперт** | Claude Sonnet | 🎯 | Баланс скорости и качества (по умолчанию) |
+| **Профессор** | Claude Opus | 🎓 | Максимальное качество, сложный reasoning |
+
+### Режим Профессор (Pipeline)
+
+Многоэтапный reasoning pipeline:
+1. **Анализ (Opus)** — разбивает задачу на подзадачи
+2. **Исполнение (Haiku)** — параллельно выполняет подзадачи
+3. **Синтез (Opus)** — объединяет результаты в финальный ответ
+
+UI показывает прогресс с галочками для каждой подзадачи.
+
+### Структура файлов
+
+```
+app/(chat)/projects/
+├── page.tsx                    # Список проектов
+├── new/page.tsx                # Создание проекта
+└── [id]/
+    ├── page.tsx                # Страница проекта
+    └── chat/
+        ├── page.tsx            # Новый чат в проекте
+        └── [chatId]/page.tsx   # Существующий чат
+
+lib/ai/
+├── model-tiers.ts              # Конфиг уровней моделей
+└── professor-pipeline.ts       # Pipeline для режима Профессор
+
+components/projects/
+└── professor-progress.tsx      # UI прогресса pipeline
+```
+
+### Не реализовано из ТЗ-03
+
+| Функция | Статус | Примечание |
+|---------|--------|------------|
+| Иконки уровней | Изменено | ⚡🎯🎓 вместо ⚙️💼🎓 |
+| "думает..." индикатор | Не реализовано | Во время генерации |
+| Pipeline индикатор в header | Не реализовано | Динамический статус |
+| Drag & drop файлов | Nice to have | Не в MVP |
+| Предпросмотр файлов | Nice to have | Не в MVP |
+| Поиск в проектах | Nice to have | Не в MVP |
+| Сортировка проектов | Nice to have | Не в MVP |
+
+---
+
 ## Профиль пользователя
 
 ### Поля профиля
@@ -158,6 +218,42 @@ lib/prompts/
 ---
 
 ## План развития
+
+### ТЗ-03: Проекты + Claude + Режим Профессор — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Проекты** — изолированные рабочие пространства
+- **Claude интеграция** — Haiku, Sonnet, Opus через OpenRouter
+- **Три уровня моделей** — Исполнитель/Эксперт/Профессор
+- **Режим Профессор** — Pipeline с Opus→Haiku→Opus
+- **UI прогресса** — галочки для подзадач в pipeline
+- **Breadcrumb навигация** — Home > Project > Чат
+- **Database** — таблица `Project`, поле `projectId` в `Chat`
+
+**Ключевые файлы:**
+- `lib/ai/model-tiers.ts` — конфиг уровней моделей
+- `lib/ai/professor-pipeline.ts` — pipeline для Профессора
+- `components/projects/professor-progress.tsx` — UI прогресса
+- `app/(chat)/projects/` — страницы проектов
+
+**Детали:** [_archive/TZ_03_PROJECTS_ANTHROPIC_PROFESSOR.md](_archive/TZ_03_PROJECTS_ANTHROPIC_PROFESSOR.md)
+
+### ТЗ-02: Dashboard + Sidebar + Routing — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- Dashboard (`/dashboard`) — новая точка входа с карточками инструментов
+- Sidebar с вертикальными вкладками (Search, Chats, Projects)
+- SidebarLayout — табы остаются видимыми при сворачивании sidebar
+- Settings без sidebar (`/settings`)
+- Ben персонализация — intro bubble для новых пользователей
+- Modal drawer responsive — корректная работа при смене desktop/mobile
+
+**Ключевые файлы:**
+- `components/sidebar-layout.tsx` — layout с табами вне Sidebar
+- `components/modal-assistants/ben/intro-bubble.tsx` — speech bubble для онбординга
+- `components/ui/sidebar.tsx` — CSS variable `--sidebar-left-offset`
+
+**Детали:** [_archive/TZ_02_ROADMAP.md](_archive/TZ_02_ROADMAP.md)
 
 ### ТЗ-NEW-01: Новая архитектура (v3.0.0) — ✅ ЗАВЕРШЁН
 
@@ -222,11 +318,11 @@ lib/prompts/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.0.0 |
+| Версия | 3.2.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
-| Промптов | 3 (chat, prompt-agent, ben) |
-| AI моделей | 2 (Gemini 3 Pro, 2.5 Flash) |
+| Промптов | 4 (chat, prompt-agent, ben, project) |
+| AI моделей | 5 (Gemini 3 Pro, 2.5 Flash, Claude Haiku, Sonnet, Opus) |
 | AI-инструментов | 8 |
 | Типов документов | 5 (text, markdown, excel, presentation-reveal, presentation-pptx) |
 | Тем презентаций | 5 |
@@ -252,7 +348,10 @@ lib/prompts/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_03_PROJECTS_ANTHROPIC_PROFESSOR.md](_archive/TZ_03_PROJECTS_ANTHROPIC_PROFESSOR.md) — ТЗ-03 Проекты + Claude
+- [_archive/TZ_02_ROADMAP.md](_archive/TZ_02_ROADMAP.md) — ТЗ-02 Dashboard + Sidebar
 - [_archive/TZ_NEW_01_ROADMAP.md](_archive/TZ_NEW_01_ROADMAP.md) — ТЗ-NEW-01 (v3.0.0)
+- [_archive/TZ_VOICE_01_MIGRATION_TO_DEEPGRAM.md](_archive/TZ_VOICE_01_MIGRATION_TO_DEEPGRAM.md) — Voice Input Deepgram
 - [_archive/TZ_01_AGENTS_ARCHITECTURE.md](_archive/TZ_01_AGENTS_ARCHITECTURE.md) — Этап 1
 - [_archive/TZ_02_MULTIAGENT_CHAT.md](_archive/TZ_02_MULTIAGENT_CHAT.md) — Этап 2
 - [_archive/TZ_03A_USER_PROFILE.md](_archive/TZ_03A_USER_PROFILE.md) — Этап 3A
@@ -261,7 +360,6 @@ lib/prompts/
 - [_archive/TZ_05_MARKDOWN_ARTIFACTS.md](_archive/TZ_05_MARKDOWN_ARTIFACTS.md) — Этап 5
 - [_archive/TZ_EXCEL_TOOL.md](_archive/TZ_EXCEL_TOOL.md) — Этап 6
 - [_archive/TZ_06_ROADMAP.md](_archive/TZ_06_ROADMAP.md) — Этап 6 Roadmap
-- [TZ_VOICE_01_MIGRATION_TO_DEEPGRAM.md](TZ_VOICE_01_MIGRATION_TO_DEEPGRAM.md) — Voice Input Deepgram
 
 ---
 

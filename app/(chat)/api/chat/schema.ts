@@ -32,6 +32,9 @@ export const postRequestBodySchema = z.object({
     "gemini-2.5-flash",     // Gemini 2.5 Flash - простые задачи
   ]),
   selectedVisibilityType: z.enum(["public", "private"]),
+  // ТЗ-03: Project chat support
+  projectId: z.string().uuid().optional(),
+  projectModelTier: z.enum(["executor", "expert", "professor"]).optional(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

@@ -35,6 +35,49 @@ export const user = pgTable("User", {
 export type User = InferSelectModel<typeof user>;
 
 // ============================================================================
+// Project (ТЗ-03)
+// ============================================================================
+
+export const project = pgTable("Project", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  instruction: text("instruction"),
+  createdAt: timestamp("createdAt").notNull(),
+  updatedAt: timestamp("updatedAt").notNull(),
+});
+
+export type Project = InferSelectModel<typeof project>;
+
+// ============================================================================
+// ProjectFile (ТЗ-03)
+// ============================================================================
+
+export const projectFile = pgTable("ProjectFile", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  projectId: uuid("projectId")
+    .notNull()
+    .references(() => project.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // document, audio, image, other
+  mimeType: varchar("mimeType", { length: 100 }).notNull(),
+  size: integer("size").notNull(), // bytes
+  url: text("url").notNull(), // Vercel Blob URL
+  metadata: jsonb("metadata").$type<{
+    extractedContent?: string;
+    pageCount?: number;
+    duration?: number; // for audio/video
+    dimensions?: { width: number; height: number }; // for images
+  } | null>(),
+  createdAt: timestamp("createdAt").notNull(),
+});
+
+export type ProjectFile = InferSelectModel<typeof projectFile>;
+
+// ============================================================================
 // Chat
 // ============================================================================
 
@@ -45,6 +88,8 @@ export const chat = pgTable("Chat", {
   userId: uuid("userId")
     .notNull()
     .references(() => user.id),
+  // ТЗ-03: Привязка к проекту (null = свободный чат)
+  projectId: uuid("projectId").references(() => project.id),
   visibility: varchar("visibility", { enum: ["public", "private"] })
     .notNull()
     .default("private"),

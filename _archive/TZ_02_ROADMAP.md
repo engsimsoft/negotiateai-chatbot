@@ -1,260 +1,251 @@
-# Дорожная карта: ТЗ-2 — Мультиагентный чат и система помощников
+# Дорожная карта: ТЗ-02 — Dashboard + Sidebar + Роутинг
 
 ## Цель
 
-Реализовать мультиагентный чат с @-mentions, полноценного Агента-Помощника (консьерж платформы) и Prompt-агента (помощник в формулировке запросов).
+Создать Dashboard как новую точку входа и реструктуризировать навигацию:
+- Dashboard (`/dashboard`) — панель инструментов без sidebar
+- Sidebar с вертикальными вкладками (Search, Chats, Projects)
+- Чистое разделение layout-ов (с sidebar / без sidebar)
+- Подготовка к ТЗ-03 (Проекты)
 
-**Детали:** См. [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md)
+**Детали:** См. [TZ_02_DASHBOARD_SIDEBAR_ROUTING.md](TZ_02_DASHBOARD_SIDEBAR_ROUTING.md)
 
 ## Текущий статус
 
-- **Этап:** ТЗ-2 (Мультиагентный чат) — ✅ ЗАВЕРШЁН
-- **Прогресс:** 45/45 задач (100%)
-- **Предыдущий:** ТЗ-1 — Архитектура агентов (завершён)
+- **Этап:** ТЗ-02 — ✅ ЗАВЕРШЁН
+- **Прогресс:** 56/56 задач (100%)
+- **Предыдущий:** ТЗ-NEW-01 (v3.0.0) ✅
+
+### ~~БЛОКЕР~~ ✅ РЕШЕНО: Tabs при сворачивании sidebar
+
+**Проблема:** При сворачивании sidebar табы тоже исчезали.
+
+**Решение:** `components/sidebar-layout.tsx` — табы рендерятся ВНЕ компонента Sidebar в отдельном fixed div. CSS variable `--sidebar-left-offset` в `sidebar.tsx` для позиционирования.
+
+**Дополнительно исправлено:**
+- Modal drawer — корректная работа при смене desktop/mobile (removed snapPoints, fixed height)
+- Ben intro bubble — speech bubble для онбординга новых пользователей
+- `useMediaQuery` — возвращает `null` во время SSR
+
+---
+
+## Архитектурные решения
+
+| Вопрос | Решение | Причина |
+|--------|---------|---------|
+| Sidebar tabs UI | Вертикальные иконки слева | По образцу Claude.ai, удобнее |
+| Settings без sidebar | Отдельный route group | Чистое разделение, меньше условий |
+| Редирект `/` | Server-side в page.tsx | Проще, не нужен middleware |
+| Header навигация | Home иконка + текст | Вместо логотипа Simply в header |
 
 ---
 
 ## Этапы реализации
 
-### 2.0 Пререквизиты — Валидация ТЗ-1
+### Фаза 1: Структура route groups (8 задач) ✅
 
-**Цель:** Убедиться, что ТЗ-1 полностью работоспособно перед началом ТЗ-2.
+**Цель:** Разделить layout-ы на "с sidebar" и "без sidebar".
 
-- [x] Таблицы `agents` и `user_agents` работают корректно
-- [x] Все 7 агентов в БД с заполненными `capabilities`
-- [x] Страница каталога `/agents` отображает агентов
-- [x] Страница агента `/agents/[slug]` показывает полную информацию
-- [x] Создание чата с агентом работает
-- [x] Смена агента в чате работает
-- [x] Промпты загружаются из БД и используются в AI
-- [x] Production build успешен
-- [x] Мануальное тестирование в браузере пройдено
+#### Route groups:
+- [x] **1.1** Создать `app/(dashboard)/layout.tsx` — layout без sidebar
+- [x] **1.2** Создать `app/(dashboard)/page.tsx` — redirect на `/dashboard`
+- [x] **1.3** Создать `app/(dashboard)/dashboard/page.tsx` — страница Dashboard
+- [x] **1.4** Переместить `app/(chat)/settings/` → `app/(dashboard)/settings/`
+- [x] **1.5** Обновить `app/(chat)/page.tsx` — redirect на `/dashboard`
+- [x] **1.6** Создать общие провайдеры для обоих layout-ов
 
----
-
-### 2.1 База данных — Изменения схемы (3 задачи)
-
-**Цель:** Добавить привязку сообщений к агентам для мультиагентного чата.
-
-- [x] Миграция: добавить `Message_v2.agentId` (uuid, FK → agents.id, nullable) (30 мин)
-- [x] Миграция данных: существующие сообщения ассистента → `agentId = Chat.agentId` (30 мин)
-- [x] Обновить `lib/db/schema.ts` — поле agentId в message, обновить типы (30 мин)
-
-**Файлы:**
-- `lib/db/schema.ts`
-- `lib/db/migrations/` (новая миграция)
+#### Настройка layout без sidebar:
+- [x] **1.7** `app/(dashboard)/layout.tsx` с SWRProvider
+- [x] **1.8** Settings работает без sidebar
 
 ---
 
-### 2.2 @-mentions — Парсинг и API (4 задачи)
+### Фаза 2: Dashboard page (10 задач) ✅
 
-**Цель:** Backend-обработка @-mentions в сообщениях пользователя.
+**Цель:** Создать Dashboard с карточками инструментов.
 
-- [x] Утилита `parseMentions(text)` — парсинг @name/@slug из текста (регистронезависимо) (1 час)
-- [x] API: GET `/api/agents/by-name/:name` — поиск агента по имени или slug (1 час)
-- [x] Обновить POST `/api/chat` — определение целевого агента из @-mention (1-2 часа)
-- [x] Сохранение `Message.agentId` при ответе ассистента + обновление `Chat.agentId` (1 час)
+#### Компоненты Dashboard:
+- [x] **2.1** Создать `components/dashboard/index.ts` — экспорты
+- [x] **2.2** Создать `components/dashboard/dashboard-header.tsx` — header для Dashboard
+- [x] **2.3** Создать `components/dashboard/greeting.tsx` — приветствие с именем
+- [x] **2.4** Создать `components/dashboard/tool-card.tsx` — карточка инструмента
+- [x] **2.5** Создать `components/dashboard/tools-grid.tsx` — сетка карточек
+- [x] **2.6** Создать `components/dashboard/ben-hint.tsx` — подсказка Бена
 
-**Файлы:**
-- `lib/utils/parse-mentions.ts` (новый)
-- `app/api/agents/by-name/[name]/route.ts` (новый)
-- `app/(chat)/api/chat/route.ts`
-
----
-
-### 2.3 @-mentions — UI автокомплит (5 задач)
-
-**Цель:** Dropdown-автокомплит при вводе `@` в поле сообщения.
-
-- [x] Компонент `MentionAutocomplete` — dropdown со списком агентов (1-2 часа)
-- [x] Фильтрация списка по мере ввода (`@Мар` → Маркетолог) (30 мин)
-- [x] Вставка `@Имя ` в текст при Enter или клике (30 мин)
-- [x] Закрытие dropdown по Escape (15 мин)
-- [x] Интеграция в `multimodal-input.tsx` — отслеживание позиции курсора и триггер @ (1-2 часа)
-
-**Файлы:**
-- `components/mention-autocomplete.tsx` (новый)
-- `components/multimodal-input.tsx`
+#### Интеграция:
+- [x] **2.7** Обновить `app/(dashboard)/dashboard/page.tsx` — собрать компоненты
+- [x] **2.8** Добавить карточку "Чат" (💬) — ведёт на `/chat`
+- [x] **2.9** Добавить карточку "Проекты" (📁) — заблокирована, метка "Скоро"
+- [x] **2.10** Стилизация: крупные карточки, hover эффекты
 
 ---
 
-### 2.4 Мультиагентный чат — Отображение (4 задачи)
+### Фаза 3: Sidebar с вкладками (12 задач) ✅
 
-**Цель:** Визуальное различие сообщений от разных агентов в чате.
+**Цель:** Переделать sidebar с вертикальными tabs (Search, Chats, Projects).
 
-- [x] Иконка и имя агента на каждом сообщении ассистента в `message.tsx` (1-2 часа)
-- [x] Визуальное различие сообщений разных агентов (цвет/стиль) (1 час)
-- [x] Индикатор текущего агента в шапке чата — кто ответит без @-mention (1 час)
-- [x] Обновить dropdown смены агента в `chat-header.tsx` (30 мин)
+#### Компоненты:
+- [x] **3.1** Создать `components/sidebar-tabs.tsx` — вертикальные иконки
+- [x] **3.2** ~~Создать `components/sidebar-tab-content.tsx`~~ — не нужен, используем условный рендер
+- [x] **3.3** Создать `components/sidebar-search.tsx` — Search tab (заглушка)
+- [x] **3.4** ~~Создать `components/sidebar-chats.tsx`~~ — используем существующий SidebarHistory
+- [x] **3.5** Создать `components/sidebar-projects.tsx` — Projects tab (заглушка "Скоро")
 
-**Файлы:**
-- `components/message.tsx`
-- `components/chat-header.tsx`
+#### Интеграция в AppSidebar:
+- [x] **3.6** Обновить `components/app-sidebar.tsx` — добавить tabs layout
+- [x] **3.7** State для активной вкладки (default: 'chats')
+- [x] **3.8** Переключение контента при клике на tab
+- [x] **3.9** Tooltip на hover для каждой иконки
 
----
+#### Стилизация:
+- [x] **3.10** Ширина tabs полоски: ~48px
+- [x] **3.11** Активный tab: подсветка фона
+- [x] **3.12** Hover эффекты на иконках
 
-### 2.5 Агент-Помощник — Полная реализация (4 задачи)
-
-**Цель:** Превратить заглушку Помощника в полноценного консьержа платформы.
-
-- [x] Обновить промпт Помощника в `seed-agents.ts` (полная версия из ТЗ-2) (1 час)
-- [x] Динамическая подстановка `{AGENTS_LIST}` в chat route при загрузке промпта (1-2 часа)
-- [x] Обновить capabilities Помощника (superpowers, exampleTasks, limitations) (30 мин)
-- [x] Тест: Помощник рекомендует агентов и объясняет платформу (30 мин)
-
-**Файлы:**
-- `lib/db/seed-agents.ts`
-- `app/(chat)/api/chat/route.ts`
+**✅ РЕШЕНО:** `components/sidebar-layout.tsx` — табы рендерятся вне Sidebar, CSS variable `--sidebar-left-offset`
 
 ---
 
-### 2.6 Prompt-агент — Новый агент (4 задачи)
+### Фаза 4: Header адаптация (6 задач) ✅
 
-**Цель:** Создать агента, который помогает формулировать запросы для других агентов.
+**Цель:** Адаптировать header под разные routes.
 
-- [x] Добавить Prompt-агента в `seed-agents.ts` (slug: `prompt-agent`, sortOrder: 2) (30 мин)
-- [x] Системный промпт с техниками улучшения запросов (из ТЗ-2) (1 час)
-- [x] Capabilities и greeting (30 мин)
-- [x] Тест: улучшение размытых запросов, предложение профильного агента (30 мин)
+#### Dashboard Header:
+- [x] **4.1** `components/dashboard/dashboard-header.tsx` с Simply, Ben, User menu
 
-**Файлы:**
-- `lib/db/seed-agents.ts`
+#### Chat Header:
+- [x] **4.2** Обновить `components/chat-header.tsx`:
+  - Home иконка → `/dashboard`
+  - SidebarToggle
+  - [📝] Prompt-agent trigger
+  - [❓] Ben trigger
 
----
-
-### 2.7 Кнопки действий в сообщениях (3 задачи)
-
-**Цель:** Prompt-агент может генерировать кликабельные кнопки для отправки запроса другому агенту.
-
-- [x] Парсинг формата `[button:Label|@Agent text]` в тексте сообщений (1 час)
-- [x] Рендеринг кнопок в `message.tsx` (кликабельные, стилизованные) (1 час)
-- [x] Обработка клика: вставка текста после `|` в поле ввода и отправка (1 час)
-
-**Файлы:**
-- `components/message.tsx`
-- `components/multimodal-input.tsx` (callback для вставки текста)
+#### Навигация:
+- [x] **4.3** Home везде ведёт на `/dashboard`
+- [x] **4.4** [+ Новый чат] ведёт на `/chat`
+- [x] **4.5** Модальные помощники работают (📝 ❓)
+- [x] **4.6** User menu работает
 
 ---
 
-### 2.8 Подсказки системы (4 задачи)
+### Фаза 5: Финальные правки (6 задач) ✅
 
-**Цель:** Подсказки для новых пользователей про @-mentions и Помощника.
+**Цель:** Полировка, тестирование, документация.
 
-- [x] Компонент `ChatHint` — подсказка над полем ввода с кнопкой закрытия (1 час)
-- [x] Логика показа: первый чат пользователя / первое сообщение (30 мин)
-- [x] Не показывать повторно после закрытия (localStorage) (30 мин)
-- [x] Не показывать если пользователь уже использовал @-mentions (30 мин)
+#### Чистка:
+- [x] **5.1** Удалить неиспользуемые импорты
+- [x] **5.2** Удалить `components/sidebar-with-tabs.tsx` (не используется)
+- [x] **5.3** TypeScript типы проверены
 
-**Файлы:**
-- `components/chat-hint.tsx` (новый)
-- `components/chat.tsx` (интеграция)
+#### Адаптивность:
+- [x] **5.4** Mobile: Dashboard корректно отображается
+- [x] **5.5** Mobile: Sidebar открывается/закрывается
+- [x] **5.6** Production build успешен
 
 ---
 
-### 2.9 Финализация (5 задач)
+### Фаза 6: Тестирование (8 задач) ✅
 
-**Цель:** Тестирование, сборка, документация.
+- [x] **6.1** `npm run build` — без ошибок
+- [x] **6.2** `npm run lint` — без ошибок
+- [x] **6.3** Сценарий: Роутинг
+- [x] **6.4** Сценарий: Dashboard
+- [x] **6.5** Сценарий: Sidebar tabs
+- [x] **6.6** Сценарий: Навигация
+- [x] **6.7** Сценарий: Помощники — modal drawer responsive fix
+- [x] **6.8** Сценарий: Chat работает
 
-- [x] Мануальное тестирование 4 сценариев из ТЗ-2 (30 мин)
-- [x] `npm run build` — production build успешен (15 мин)
-- [x] Обновить документацию: SIMPLY_STATUS.md, SIMPLY_ROADMAP.md, CLAUDE.md (30 мин)
-- [x] Обновить CHANGELOG.md (v2.4.0) (15 мин)
-- [x] Коммит: "feat: multi-agent chat with @-mentions — ТЗ-2 complete" (15 мин)
+---
+
+### Фаза 7: Документация (6 задач) ✅
+
+- [x] **7.1** Обновить `SIMPLY_STATUS.md`
+- [x] **7.2** Обновить `CHANGELOG.md`
+- [x] **7.3** Обновить `CLAUDE.md`
+- [x] **7.4** Проверить все docs/
+- [x] **7.5** Переместить ТЗ в `_archive/`
+- [x] **7.6** Git tag финальный
 
 ---
 
 ## Ключевые файлы
 
-**Модифицируемые:**
-- `lib/db/schema.ts` — поле agentId в Message_v2
-- `lib/db/seed-agents.ts` — Prompt-агент, обновлённый Помощник
-- `app/(chat)/api/chat/route.ts` — @-mentions парсинг, динамический промпт
-- `components/multimodal-input.tsx` — автокомплит @-mentions
-- `components/message.tsx` — иконка агента, кнопки действий
-- `components/chat-header.tsx` — индикатор текущего агента
+### Созданы ✅:
 
-**Новые:**
-- `lib/utils/parse-mentions.ts` — утилита парсинга @-mentions
-- `app/api/agents/by-name/[name]/route.ts` — поиск агента по имени
-- `components/mention-autocomplete.tsx` — UI автокомплита
-- `components/chat-hint.tsx` — подсказки для новых пользователей
-- Миграция в `lib/db/migrations/`
+```
+app/(dashboard)/
+├── layout.tsx                    ✅
+├── page.tsx                      ✅
+├── dashboard/
+│   └── page.tsx                  ✅
+└── settings/
+    └── page.tsx                  ✅ (перенесено)
 
-**Документация (обновить после):**
-- SIMPLY_STATUS.md, SIMPLY_ROADMAP.md, CLAUDE.md, CHANGELOG.md
+components/dashboard/
+├── index.ts                      ✅
+├── dashboard-header.tsx          ✅
+├── greeting.tsx                  ✅
+├── tool-card.tsx                 ✅
+├── tools-grid.tsx                ✅
+└── ben-hint.tsx                  ✅
+
+components/
+├── sidebar-layout.tsx            ✅ NEW: Tabs вне Sidebar
+├── sidebar-tabs.tsx              ✅
+├── sidebar-search.tsx            ✅
+└── sidebar-projects.tsx          ✅
+
+components/modal-assistants/ben/
+└── intro-bubble.tsx              ✅ NEW: Speech bubble для онбординга
+```
+
+### Изменены ✅:
+
+```
+app/(chat)/page.tsx               ✅ Redirect на /dashboard
+app/(chat)/layout.tsx             ✅ Без settings
+components/app-sidebar.tsx        ✅ Tabs layout внутри
+components/chat-header.tsx        ✅ Home → /dashboard, Ben intro bubble
+components/ui/sidebar.tsx         ✅ CSS variable --sidebar-left-offset
+components/modal-assistants/assistant-drawer.tsx  ✅ Responsive fix
+hooks/use-media-query.ts          ✅ Returns null during SSR
+```
+
+### Удалены:
+
+```
+components/sidebar-with-tabs.tsx  ✅ Удалён (неудачная попытка)
+```
 
 ---
 
 ## Критерии готовности
 
-### Схема БД
-- [x] Поле `Message.agentId` добавлено
-- [x] Миграция существующих сообщений выполнена
-
-### @-mentions
-- [x] Парсинг @-mentions работает (по имени и slug)
-- [x] UI автокомплит появляется при вводе @
-- [x] Фильтрация списка агентов работает
-- [x] Сообщение отправляется указанному агенту
-- [x] `Message.agentId` сохраняется корректно
-- [x] `Chat.agentId` обновляется при @-mention
-
-### Отображение
-- [x] Сообщения показывают иконку и имя агента
-- [x] Индикатор текущего агента в шапке чата
-- [x] Разные агенты визуально различимы
-
-### Агент-Помощник
-- [x] Промпт обновлён с полным функционалом
-- [x] Динамическая подстановка списка агентов работает
-- [x] Помощник корректно рекомендует агентов
-
-### Prompt-агент
-- [x] Агент добавлен в каталог
-- [x] Кнопки "Отправить агенту" работают
-- [x] Улучшает размытые запросы
-
-### Подсказки
-- [x] Подсказка для новых пользователей показывается
-- [x] Подсказку можно закрыть, не показывается повторно
-
-### Общее
-- [x] Мануальное тестирование всех сценариев
+### Must have:
+- [x] `/` редиректит на `/dashboard`
+- [x] `/dashboard` отображает карточки инструментов (без sidebar)
+- [x] `/settings` без sidebar
+- [x] `/chat` и `/chat/[id]` с sidebar
+- [x] Sidebar с вертикальными tabs (Search, Chats, Projects)
+- [x] Tab Chats показывает историю чатов
+- [x] Tab Projects показывает заглушку "Скоро"
+- [x] Карточка "Чат" ведёт на `/chat`
+- [x] Карточка "Проекты" заблокирована
+- [x] Home ведёт на `/dashboard`
+- [x] Существующий функционал чата работает
+- [x] Модальные помощники работают (responsive fix)
 - [x] Production build успешен
-- [x] Нет регрессий в функционале ТЗ-1
-- [x] Документация обновлена
+
+### Блокеры:
+- [x] **Табы остаются видимыми при сворачивании sidebar** — ✅ РЕШЕНО (sidebar-layout.tsx)
+
+### Nice to have:
+- [ ] Поиск по чатам работает (не заглушка) — отложено на ТЗ-03
+- [x] Анимация переключения tabs
+- [x] Подсказка Бена контекстная (для новых пользователей) — intro-bubble.tsx
 
 ---
 
-## Текущая сессия
-
-**2026-01-28:**
-- [x] Валидация ТЗ-1 (build, БД, агенты) — пройдена
-- [x] Миграция: `Message_v2.agentId` (uuid, nullable) + backfill из Chat.agentId
-- [x] Обновлён Помощник: полный промпт с `{AGENTS_LIST}`, обновлены capabilities
-- [x] Добавлен Prompt-агент: slug `prompt-agent`, техники улучшения запросов, кнопки действий
-- [x] Утилита `parseMention` в `lib/agents/parse-mentions.ts`
-- [x] API: GET `/api/agents/by-name/[name]` — резолвинг агента по имени/slug
-- [x] Chat route: парсинг @-mentions, подстановка `{AGENTS_LIST}`, `agentId` на сообщениях
-- [x] `MentionAutocomplete` компонент — dropdown при вводе @, стрелки, Enter/Tab/Escape
-- [x] Интеграция в `multimodal-input.tsx` с фильтрацией
-- [x] Иконка и имя агента на сообщениях ассистента в `message.tsx`
-- [x] `ActionButtons` компонент — парсинг `[button:Label|payload]`, рендеринг, клик → отправка
-- [x] Проброс `onActionButton` через Messages → PreviewMessage → Chat
-- [x] `ChatHint` компонент — подсказка для новых пользователей, localStorage dismiss
-- [x] npm run build — успешно
-- ✅ ТЗ-2 завершён
-
----
-
-## Связанные документы
-
-- [TZ_02_MULTIAGENT_CHAT.md](TZ_02_MULTIAGENT_CHAT.md) — полное ТЗ
-- [TZ_01_AGENTS_ARCHITECTURE.md](TZ_01_AGENTS_ARCHITECTURE.md) — ТЗ-1 (завершено)
-- [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md) — видение продукта
-- [SIMPLY_ROADMAP.md](SIMPLY_ROADMAP.md) — общая дорожная карта проекта
-
----
-
-**Создано:** 2026-01-28
-**Источник:** TZ_02_MULTIAGENT_CHAT.md
+**Создано:** 2026-02-02
+**Обновлено:** 2026-02-02
+**Статус:** ✅ ЗАВЕРШЁН

@@ -33,9 +33,11 @@ import { Artifact } from "./artifact";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
+import { ProfessorProgress } from "./projects/professor-progress";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
+import type { PipelinePhase, Subtask } from "@/lib/ai/professor-pipeline";
 
 export function Chat({
   id,
@@ -45,6 +47,9 @@ export function Chat({
   isReadonly,
   autoResume,
   initialLastContext,
+  projectId,
+  projectName,
+  projectModelTier,
 }: {
   id: string;
   initialMessages: ChatMessage[];
@@ -53,6 +58,9 @@ export function Chat({
   isReadonly: boolean;
   autoResume: boolean;
   initialLastContext?: AppUsage;
+  projectId?: string;
+  projectName?: string;
+  projectModelTier?: string;
 }) {
   const { visibilityType } = useChatVisibility({
     chatId: id,
@@ -67,16 +75,29 @@ export function Chat({
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   const currentModelIdRef = useRef(currentModelId);
+  const [currentProjectTier, setCurrentProjectTier] = useState(projectModelTier || "expert");
+  const currentProjectTierRef = useRef(currentProjectTier);
   const [retryState, setRetryState] = useState({ count: 0, maxRetries: 3 });
   const [delayState, setDelayState] = useState<"normal" | "slow" | "timeout">(
     "normal"
   );
+
+  // ТЗ-03 Фаза 7: Professor Pipeline state
+  const [professorPhase, setProfessorPhase] = useState<PipelinePhase | null>(null);
+  const [professorSubtasks, setProfessorSubtasks] = useState<Subtask[]>([]);
+  const [professorComplete, setProfessorComplete] = useState(false);
+  const [professorError, setProfessorError] = useState<string | undefined>();
+  const isProfessorMode = currentProjectTier === "professor";
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     currentModelIdRef.current = currentModelId;
   }, [currentModelId]);
+
+  useEffect(() => {
+    currentProjectTierRef.current = currentProjectTier;
+  }, [currentProjectTier]);
 
   const clearDelayTimers = useCallback(() => {
     if (slowTimerRef.current) {
@@ -151,12 +172,15 @@ export function Chat({
               message: request.messages.at(-1),
               selectedChatModel: currentModelIdRef.current,
               selectedVisibilityType: visibilityType,
+              // ТЗ-03: Project chat support
+              ...(projectId && { projectId }),
+              ...(projectId && { projectModelTier: currentProjectTierRef.current }),
               ...request.body,
             },
           };
         },
       }),
-    [retryableFetch, visibilityType]
+    [retryableFetch, visibilityType, projectId]
   );
 
   const {
@@ -178,11 +202,61 @@ export function Chat({
       if (dataPart.type === "data-usage") {
         setUsage(dataPart.data);
       }
+
+      // ТЗ-03 Фаза 7: Handle Professor Pipeline events
+      if (dataPart.type.startsWith("data-professor-") && dataPart.data) {
+        const event = dataPart.data as {
+          type: string;
+          phase?: PipelinePhase;
+          subtasks?: Subtask[];
+          subtask?: Subtask;
+          error?: string;
+        };
+        switch (event.type) {
+          case "professor-phase":
+            if (event.phase) {
+              setProfessorPhase(event.phase);
+              setProfessorComplete(false);
+              setProfessorError(undefined);
+            }
+            break;
+          case "professor-subtasks":
+            if (event.subtasks) {
+              setProfessorSubtasks(event.subtasks);
+            }
+            break;
+          case "professor-subtask-update":
+            if (event.subtask) {
+              const updatedSubtask = event.subtask;
+              setProfessorSubtasks((prev) =>
+                prev.map((st) =>
+                  st.id === updatedSubtask.id ? updatedSubtask : st
+                )
+              );
+            }
+            break;
+          case "professor-complete":
+            setProfessorComplete(true);
+            break;
+          case "professor-error":
+            setProfessorError(event.error);
+            break;
+        }
+      }
     },
     onFinish: () => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));
       setRetryState({ count: 0, maxRetries: retryState.maxRetries });
       setDelayState("normal");
+      // Reset professor state after completion (with delay to show completion)
+      if (isProfessorMode) {
+        setTimeout(() => {
+          setProfessorPhase(null);
+          setProfessorSubtasks([]);
+          setProfessorComplete(false);
+          setProfessorError(undefined);
+        }, 3000);
+      }
     },
     onError: (error) => {
       if (error instanceof ChatSDKError) {
@@ -274,7 +348,23 @@ export function Chat({
   return (
     <>
       <div className="overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-background">
-        <ChatHeader onInsertToChat={setInput} />
+        <ChatHeader
+          onInsertToChat={setInput}
+          projectId={projectId}
+          projectName={projectName}
+        />
+
+        {/* ТЗ-03 Фаза 7: Professor Pipeline Progress */}
+        {isProfessorMode && (professorPhase || professorSubtasks.length > 0 || professorError) && (
+          <div className="mx-auto w-full max-w-4xl px-2 md:px-4">
+            <ProfessorProgress
+              phase={professorPhase}
+              subtasks={professorSubtasks}
+              isComplete={professorComplete}
+              error={professorError}
+            />
+          </div>
+        )}
 
         <Messages
           chatId={id}
@@ -308,6 +398,9 @@ export function Chat({
                 status={status}
                 stop={stop}
                 usage={usage}
+                isProjectChat={!!projectId}
+                projectModelTier={currentProjectTier}
+                onProjectModelChange={setCurrentProjectTier}
               />
             )}
         </div>

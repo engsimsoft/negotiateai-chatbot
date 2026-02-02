@@ -9,6 +9,7 @@ import {
   gt,
   gte,
   inArray,
+  isNull,
   lt,
   sql,
   type SQL,
@@ -26,6 +27,10 @@ import {
   type DBMessage,
   document,
   message,
+  type Project,
+  project,
+  type ProjectFile,
+  projectFile,
   type Suggestion,
   stream,
   suggestion,
@@ -139,20 +144,23 @@ export async function saveChat({
   userId,
   title,
   visibility,
+  projectId,
 }: {
   id: string;
   userId: string;
   title: string;
   visibility: VisibilityType;
+  projectId?: string;
 }) {
   try {
-    console.log('[saveChat] Attempting to save chat:', { id, userId, title, visibility });
+    console.log('[saveChat] Attempting to save chat:', { id, userId, title, visibility, projectId });
     return await db.insert(chat).values({
       id,
       createdAt: new Date(),
       userId,
       title,
       visibility,
+      projectId: projectId || null,
     });
   } catch (error) {
     console.error('[saveChat] Database error:', error);
@@ -181,10 +189,11 @@ export async function deleteChatById({ id }: { id: string }) {
 
 export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
   try {
+    // ТЗ-03: Only delete free chats (projectId = null), not project chats
     const userChats = await db
       .select({ id: chat.id })
       .from(chat)
-      .where(eq(chat.userId, userId));
+      .where(and(eq(chat.userId, userId), isNull(chat.projectId)));
 
     if (userChats.length === 0) {
       return { deletedCount: 0 };
@@ -198,7 +207,7 @@ export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
 
     const deletedChats = await db
       .delete(chat)
-      .where(eq(chat.userId, userId))
+      .where(and(eq(chat.userId, userId), isNull(chat.projectId)))
       .returning();
 
     return { deletedCount: deletedChats.length };
@@ -225,6 +234,9 @@ export async function getChatsByUserId({
     const extendedLimit = limit + 1;
 
     // Performance: Exclude lastContext (heavy JSONB) from history listing
+    // ТЗ-03: Filter out project chats - only show free chats (projectId = null)
+    const baseCondition = and(eq(chat.userId, id), isNull(chat.projectId));
+
     const query = (whereCondition?: SQL<any>) =>
       db
         .select({
@@ -232,14 +244,15 @@ export async function getChatsByUserId({
           createdAt: chat.createdAt,
           title: chat.title,
           userId: chat.userId,
+          projectId: chat.projectId,
           visibility: chat.visibility,
           lastContext: sql<null>`NULL`.as("lastContext"),
         })
         .from(chat)
         .where(
           whereCondition
-            ? and(whereCondition, eq(chat.userId, id))
-            : eq(chat.userId, id)
+            ? and(whereCondition, baseCondition)
+            : baseCondition
         )
         .orderBy(desc(chat.createdAt))
         .limit(extendedLimit);
@@ -911,6 +924,331 @@ export async function getPublicDocument({ token }: { token: string }) {
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get public document"
+    );
+  }
+}
+
+// ============================================
+// Project Functions (ТЗ-03)
+// ============================================
+
+/**
+ * Get all projects for a user
+ */
+export async function getProjectsByUserId({ userId }: { userId: string }) {
+  try {
+    const projects = await db
+      .select()
+      .from(project)
+      .where(eq(project.userId, userId))
+      .orderBy(desc(project.updatedAt));
+
+    return projects;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get projects by user id"
+    );
+  }
+}
+
+/**
+ * Get a single project by ID
+ */
+export async function getProjectById({ id }: { id: string }) {
+  try {
+    const [selectedProject] = await db
+      .select()
+      .from(project)
+      .where(eq(project.id, id));
+
+    return selectedProject || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get project by id"
+    );
+  }
+}
+
+/**
+ * Create a new project
+ */
+export async function saveProject({
+  id,
+  userId,
+  name,
+  description,
+  instruction,
+}: {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  instruction?: string;
+}) {
+  try {
+    const now = new Date();
+    const [newProject] = await db
+      .insert(project)
+      .values({
+        id,
+        userId,
+        name,
+        description: description || null,
+        instruction: instruction || null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+
+    return newProject;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to save project");
+  }
+}
+
+/**
+ * Update project details
+ */
+export async function updateProject({
+  id,
+  name,
+  description,
+  instruction,
+}: {
+  id: string;
+  name?: string;
+  description?: string;
+  instruction?: string;
+}) {
+  try {
+    const updateData: Partial<Project> = {
+      updatedAt: new Date(),
+    };
+
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (instruction !== undefined) updateData.instruction = instruction;
+
+    const [updated] = await db
+      .update(project)
+      .set(updateData)
+      .where(eq(project.id, id))
+      .returning();
+
+    return updated;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to update project");
+  }
+}
+
+/**
+ * Delete a project and all its files and chats (cascade)
+ */
+export async function deleteProjectById({ id }: { id: string }) {
+  try {
+    // Get all chats in this project
+    const projectChats = await db
+      .select({ id: chat.id })
+      .from(chat)
+      .where(eq(chat.projectId, id));
+
+    const chatIds = projectChats.map((c) => c.id);
+
+    // Delete messages and votes for project chats
+    if (chatIds.length > 0) {
+      // Delete votes first (FK constraint)
+      await db.delete(vote).where(inArray(vote.chatId, chatIds));
+
+      // Delete messages
+      await db.delete(message).where(inArray(message.chatId, chatIds));
+
+      // Delete chats
+      await db.delete(chat).where(inArray(chat.id, chatIds));
+    }
+
+    // Delete project files
+    await db.delete(projectFile).where(eq(projectFile.projectId, id));
+
+    // Delete project
+    await db.delete(project).where(eq(project.id, id));
+
+    return { success: true };
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to delete project");
+  }
+}
+
+// ============================================
+// ProjectFile Functions (ТЗ-03)
+// ============================================
+
+/**
+ * Get all files for a project
+ */
+export async function getFilesByProjectId({ projectId }: { projectId: string }) {
+  try {
+    const files = await db
+      .select()
+      .from(projectFile)
+      .where(eq(projectFile.projectId, projectId))
+      .orderBy(desc(projectFile.createdAt));
+
+    return files;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get files by project id"
+    );
+  }
+}
+
+/**
+ * Save a new project file
+ */
+export async function saveProjectFile({
+  id,
+  projectId,
+  name,
+  type,
+  mimeType,
+  size,
+  url,
+  metadata,
+}: {
+  id: string;
+  projectId: string;
+  name: string;
+  type: string;
+  mimeType: string;
+  size: number;
+  url: string;
+  metadata?: ProjectFile["metadata"];
+}) {
+  try {
+    const [newFile] = await db
+      .insert(projectFile)
+      .values({
+        id,
+        projectId,
+        name,
+        type,
+        mimeType,
+        size,
+        url,
+        metadata: metadata || null,
+        createdAt: new Date(),
+      })
+      .returning();
+
+    // Update project's updatedAt
+    await db
+      .update(project)
+      .set({ updatedAt: new Date() })
+      .where(eq(project.id, projectId));
+
+    return newFile;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to save project file"
+    );
+  }
+}
+
+/**
+ * Delete a project file
+ */
+export async function deleteProjectFile({ id }: { id: string }) {
+  try {
+    const [deleted] = await db
+      .delete(projectFile)
+      .where(eq(projectFile.id, id))
+      .returning();
+
+    if (deleted) {
+      // Update project's updatedAt
+      await db
+        .update(project)
+        .set({ updatedAt: new Date() })
+        .where(eq(project.id, deleted.projectId));
+    }
+
+    return deleted || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete project file"
+    );
+  }
+}
+
+/**
+ * Get chats for a specific project
+ */
+export async function getChatsByProjectId({ projectId }: { projectId: string }) {
+  try {
+    const chats = await db
+      .select({
+        id: chat.id,
+        createdAt: chat.createdAt,
+        title: chat.title,
+        userId: chat.userId,
+        projectId: chat.projectId,
+        visibility: chat.visibility,
+        lastContext: sql<null>`NULL`.as("lastContext"),
+      })
+      .from(chat)
+      .where(eq(chat.projectId, projectId))
+      .orderBy(desc(chat.createdAt));
+
+    return chats;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get chats by project id"
+    );
+  }
+}
+
+/**
+ * Get project with file count and chat count (for listing)
+ */
+export async function getProjectsWithStats({ userId }: { userId: string }) {
+  try {
+    const projects = await db
+      .select()
+      .from(project)
+      .where(eq(project.userId, userId))
+      .orderBy(desc(project.updatedAt));
+
+    // Get counts for each project
+    const projectsWithStats = await Promise.all(
+      projects.map(async (p) => {
+        const [fileStats] = await db
+          .select({ count: count(projectFile.id) })
+          .from(projectFile)
+          .where(eq(projectFile.projectId, p.id));
+
+        const [chatStats] = await db
+          .select({ count: count(chat.id) })
+          .from(chat)
+          .where(eq(chat.projectId, p.id));
+
+        return {
+          ...p,
+          fileCount: fileStats?.count ?? 0,
+          chatCount: chatStats?.count ?? 0,
+        };
+      })
+    );
+
+    return projectsWithStats;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get projects with stats"
     );
   }
 }
