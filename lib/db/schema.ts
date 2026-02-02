@@ -28,6 +28,8 @@ export const user = pgTable("User", {
   occupation: varchar("occupation", { length: 100 }),
   bio: text("bio"),
   theme: varchar("theme", { length: 20 }), // "light" | "dark" | "system"
+  // ТЗ-NEW-01: Ben intro flag
+  hasSeenBenIntro: boolean("has_seen_ben_intro").default(false),
 });
 
 export type User = InferSelectModel<typeof user>;
