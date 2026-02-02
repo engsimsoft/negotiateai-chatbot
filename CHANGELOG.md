@@ -12,6 +12,142 @@
 
 ---
 
+## [3.0.0] - 2026-02-02 - New Prompt Architecture
+
+**MAJOR RELEASE**: Новая архитектура промптов. Система агентов заменена на файловую систему промптов + модальные помощники.
+
+### Summary
+
+Полная перестройка системы промптов. Вместо 8 агентов в БД теперь используется файловая система TypeScript-конфигов с одним универсальным чатом и двумя модальными помощниками.
+
+### Breaking Changes
+
+#### Удалено
+- **Таблицы БД:** `Agent`, `UserAgent` — полностью удалены
+- **Поля БД:** `agentId` из таблиц `Chat` и `Message_v2`
+- **UI:** Выбор агента в header, @-mentions для смены агента
+- **Страницы:** `/agents` каталог и все связанные страницы
+- **API:** `/api/agents/`, `/api/user-agents/`, `/api/chats/[id]/agent`
+- **Компоненты:** `agent-selector`, `sidebar-agents`, `mention-autocomplete`, `personalization-dialog`
+- **Библиотеки:** `lib/agents/`, `lib/db/seed-agents.ts`
+
+### Added
+
+#### File-based Prompt System
+- **`lib/prompts/`** — новая файловая система промптов
+- **TypeScript конфиги** — type safety, автокомплит
+- **Template engine** — поддержка `{{переменных}}`
+- **Core blocks** — переиспользуемые блоки (base, formatting, safety, russian-market)
+- **Builder API** — `buildPrompt('chat', context)` для сборки промптов
+
+#### Modal Assistants
+- **Prompt-агент (📝)** — помогает сформулировать эффективный промпт
+  - Анализирует запрос, задаёт уточнения, формирует улучшенный промпт
+  - Кнопка "В чат" для вставки в основной чат
+- **Бен (❓)** — гид по платформе
+  - Отвечает на вопросы о Simply
+  - Перенаправляет рабочие задачи в основной чат
+  - Онбординг для новых пользователей
+
+#### API Endpoints
+- `POST /api/assistant/prompt-agent` — чат с Prompt-агентом
+- `POST /api/assistant/ben` — чат с Беном
+- `PATCH /api/user/ben-intro` — обновление флага онбординга
+
+#### Database
+- **`hasSeenBenIntro`** — новое поле в таблице `User` (boolean, default false)
+
+#### Anthropic SDK
+- Установлен `@ai-sdk/openai` для OpenRouter
+- Настроены модели Claude через OpenRouter
+- Тестовый endpoint `/api/test-anthropic`
+
+### Changed
+
+#### Chat Route
+- Использует `buildChatPrompt()` вместо загрузки из БД
+- Убрана вся логика агентов и @-mentions
+
+#### UI
+- Header чистый: logo, новый чат, 📝, ❓, профиль
+- Ввод `@` = просто текст (нет автокомплита)
+- Sidebar без секции агентов
+
+### Files
+
+#### Created (28 files)
+```
+lib/prompts/
+├── index.ts, types.ts, builder.ts, template.ts
+├── core/{base,formatting,safety,russian-market}.ts
+├── chat/config.ts
+├── ben/config.ts
+├── assistants/prompt-agent/config.ts
+└── contexts/{user-profile,chat-memory}.ts
+
+components/modal-assistants/
+├── index.ts, types.ts
+├── assistant-chat.tsx, assistant-drawer.tsx
+├── prompt-agent/{index,trigger,drawer}.tsx
+└── ben/{index,trigger,drawer}.tsx
+
+app/(chat)/api/assistant/{prompt-agent,ben}/route.ts
+app/(chat)/api/user/ben-intro/route.ts
+app/(chat)/api/test-anthropic/route.ts
+```
+
+#### Deleted (17 files)
+```
+app/(chat)/api/agents/, app/(chat)/api/user-agents/
+app/(chat)/agents/
+components/{agent-selector,delete-agent-dialog,sidebar-agents,mention-autocomplete,personalization-dialog}.tsx
+lib/agents/, lib/db/seed-agents.ts
+```
+
+### Technical
+
+- **Prompt system:** TypeScript configs replace DB-driven agents
+- **Template engine:** Simple regex-based (no Handlebars, -80KB bundle)
+- **Модели:**
+  - `chat` → Gemini 3 Pro
+  - `prompt-agent` → Gemini 3 Pro
+  - `ben` → Gemini 2.5 Flash
+
+### Migration
+
+Для существующих пользователей:
+1. История чатов сохранена (поля `agentId` удалены, но сообщения остались)
+2. Персональные агенты удалены (таблица `UserAgent` очищена)
+3. Пользователи увидят онбординг Бена при первом открытии (если `hasSeenBenIntro = false`)
+
+### Documentation
+- Переписан `docs/ai-agents.md` — система промптов и помощники
+- Обновлён `CLAUDE.md` — новая структура кода
+- Обновлён `SIMPLY_STATUS.md` — версия 3.0.0, статистика
+
+---
+
+## [2.13.0] - 2026-02-01 - Voice Input (Deepgram)
+
+**MINOR RELEASE**: Миграция голосового ввода с AssemblyAI на Deepgram Nova-3.
+
+### Summary
+
+Deepgram Nova-3 поддерживает русский язык в real-time streaming (AssemblyAI — нет). Ручная остановка записи без автостопа по паузе.
+
+### Changed
+
+- **Провайдер:** AssemblyAI → Deepgram Nova-3
+- **Остановка:** Автостоп → Ручная (можно думать, мычать)
+- **Лимит:** 3 минуты (защита от забытой записи)
+
+### Files Changed
+- `app/(chat)/api/deepgram/token/route.ts` — новый Token API
+- `hooks/use-voice-recorder.ts` — переписан под Deepgram WebSocket
+- `lib/audio/constants.ts` — DEEPGRAM_PARAMS
+
+---
+
 ## [2.12.0] - 2026-02-01 - Voice Input MVP
 
 **MINOR RELEASE**: Добавлен голосовой ввод сообщений через AssemblyAI.

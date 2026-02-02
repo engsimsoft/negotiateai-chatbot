@@ -1,12 +1,12 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 2.13.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.0.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 ---
 
-## 📖 Начни здесь
+## Начни здесь
 
 1. **[README.md](README.md)** — О проекте Simply
 2. **[SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md)** — Видение продукта (roadmap, инструменты, концепции)
@@ -17,24 +17,24 @@
 
 ---
 
-## 🎯 О проекте
+## О проекте
 
-**Simply** — платформа AI-агентов для российского рынка. Шлюз к лучшим мировым AI-моделям с оплатой в рублях.
+**Simply** — AI-платформа для российского рынка. Шлюз к лучшим мировым AI-моделям с оплатой в рублях.
 
 **Философия:**
 - **Apple-подход** — качество важнее количества
-- **Best-in-Class API** — не изобретаем велосипеды, интегрируем лучшие решения (Perplexity, Plus AI, Ideogram)
+- **Best-in-Class API** — не изобретаем велосипеды, интегрируем лучшие решения
 
 **Ключевые особенности:**
-- Каталог проработанных AI-агентов (8 агентов)
+- Универсальный AI-чат с инструментами
+- Модальные помощники: Prompt-агент (📝), Бен (❓)
 - Три уровня персонализации: Профиль + RAG + Chat Memory
-- Мультипровайдер: GPT, Claude, Gemini (планируется)
-- Smart Routing — автовыбор модели
+- Мультипровайдер: Gemini (текущий), Claude, GPT (планируется)
 - Оплата в рублях (ЮKassa, Тинькофф, СБП)
 
 ---
 
-## 🔧 Технологии
+## Технологии
 
 **Frontend:** Next.js 15.3 (App Router, RSC), TypeScript, Tailwind CSS
 
@@ -52,14 +52,28 @@
 
 ---
 
-## 📁 Структура кода
+## Структура кода
+
+**Prompt System (v3.0):**
+- `lib/prompts/` — Файловая система промптов
+- `lib/prompts/chat/config.ts` — Конфиг основного чата
+- `lib/prompts/ben/config.ts` — Конфиг Бена
+- `lib/prompts/assistants/prompt-agent/config.ts` — Конфиг Prompt-агента
+- `lib/prompts/builder.ts` — Логика сборки промптов
+- `lib/prompts/contexts/` — Контексты (user-profile, chat-memory)
+
+**Modal Assistants:**
+- `components/modal-assistants/` — UI модальных помощников
+- `components/modal-assistants/prompt-agent/` — Prompt-агент (📝)
+- `components/modal-assistants/ben/` — Бен (❓)
+- `app/(chat)/api/assistant/prompt-agent/route.ts` — API Prompt-агента
+- `app/(chat)/api/assistant/ben/route.ts` — API Бена
 
 **AI/Chat:**
 - `app/(chat)/api/chat/route.ts` — Chat endpoint (streaming)
 - `lib/ai/providers.ts` — Конфигурация AI-моделей
 - `lib/ai/tools/` — Инструменты (search, excel, web scraping)
 - `lib/ai/tools/excel/` — Excel tools (create, parse, edit)
-- `lib/db/seed-agents.ts` — Агенты и промпты (БД)
 
 **Voice Input (Deepgram):**
 - `app/(chat)/api/deepgram/token/route.ts` — Token API
@@ -72,39 +86,11 @@
 - `lib/db/schema.ts` — Database schema (Drizzle)
 - `lib/db/queries.ts` — Database queries
 
-**Agents UI:**
-- `app/(chat)/agents/page.tsx` — Каталог агентов
-- `app/(chat)/agents/[slug]/page.tsx` — Страница агента
-- `components/sidebar-agents.tsx` — Секция агентов в sidebar
-
-**Agents API:**
-- `app/api/agents/route.ts` — GET список агентов
-- `app/api/agents/[slug]/route.ts` — GET агент по slug
-- `app/api/agents/by-name/[name]/route.ts` — GET агент по имени (ТЗ-2)
-- `app/api/chats/[id]/agent/route.ts` — PATCH смена агента
-
-**@-mentions & UI (ТЗ-2):**
-- `lib/agents/parse-mentions.ts` — Парсинг @-mentions
-- `components/mention-autocomplete.tsx` — Автокомплит @-mentions
-- `components/action-buttons.tsx` — Кнопки действий в сообщениях
-- `components/chat-hint.tsx` — Подсказки для новых пользователей
-
-**User Profile (ТЗ-3A):**
+**User Profile:**
 - `app/(chat)/api/user/profile/route.ts` — API профиля (GET/PATCH)
+- `app/(chat)/api/user/ben-intro/route.ts` — API флага Бена (PATCH)
 - `app/(chat)/settings/page.tsx` — Страница настроек
-- `app/(chat)/settings/settings-page.tsx` — UI настроек
-- `components/sidebar-user-nav.tsx` — Меню пользователя
 - `components/onboarding-dialog.tsx` — Онбординг
-- `hooks/use-theme-sync.ts` — Синхронизация темы
-- `lib/ai/prompts.ts` — buildUserContext
-
-**Agent Personalization (ТЗ-3B):**
-- `app/(chat)/api/user-agents/route.ts` — API персональных агентов (GET/POST)
-- `app/(chat)/api/user-agents/[id]/route.ts` — PATCH/DELETE персонального агента
-- `app/(chat)/agents/[slug]/add-to-my-agents-button.tsx` — Кнопка "В мои агенты"
-- `components/personalization-dialog.tsx` — Диалог персонализации (4 шага)
-- `components/delete-agent-dialog.tsx` — Подтверждение удаления
-- `lib/ai/prompts.ts` — buildAgentCustomizations
 
 **Config:**
 - `.env.local` — API keys (НЕ коммитить!)
@@ -113,9 +99,9 @@
 
 ---
 
-## 🚀 Текущий этап
+## Текущий этап
 
-**Завершены:** Этапы 0-6, Performance Audit, Artifact Loading UX, Voice Input (Deepgram)
+**Завершены:** ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**
@@ -139,7 +125,7 @@
 
 ---
 
-## 📋 Команды
+## Команды
 
 ```bash
 # Разработка
@@ -158,7 +144,7 @@ vercel --prod            # Deploy на Vercel
 
 ---
 
-## 🔍 Навигация
+## Навигация
 
 **Основная:**
 - [README.md](README.md) — О проекте
@@ -168,8 +154,8 @@ vercel --prod            # Deploy на Vercel
 
 **Техническая (AI):**
 - [docs/ai-providers.md](docs/ai-providers.md) — Провайдеры, модели, цены (SSOT)
-- [docs/ai-agents.md](docs/ai-agents.md) — AI-агенты и промпты
-- [docs/ai-artifacts.md](docs/ai-artifacts.md) — Документы в холсте (text, markdown, presentations)
+- [docs/ai-agents.md](docs/ai-agents.md) — Система промптов и помощники
+- [docs/ai-artifacts.md](docs/ai-artifacts.md) — Документы в холсте
 - [docs/ai-tools.md](docs/ai-tools.md) — Инструменты (search, vision)
 
 **Техническая (инфраструктура):**
@@ -185,7 +171,7 @@ vercel --prod            # Deploy на Vercel
 
 ---
 
-## 💡 Workflow
+## Workflow
 
 **Моя роль:** Получаю ТЗ → Пишу код → Документирую изменения в STATUS/CHANGELOG
 
@@ -200,4 +186,4 @@ vercel --prod            # Deploy на Vercel
 
 ---
 
-**Обновлено:** 2026-02-01
+**Обновлено:** 2026-02-02

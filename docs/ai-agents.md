@@ -1,150 +1,263 @@
-# AI-агенты
+# Simply — Система промптов и помощники
 
-**Версия:** 2.7.0
-**Последнее обновление:** 2026-01-29
-**Статус:** 9 специализированных агентов
+**Версия:** 3.0.0
+**Последнее обновление:** 2026-02-02
+**Статус:** Новая архитектура (файловая система промптов)
 
 ---
 
 ## О документе
 
-Этот документ — **источник правды** для системы AI-агентов в Simply.
+Этот документ — **источник правды** для системы промптов в Simply.
 
 **Связанные документы:**
 - [ai-artifacts.md](ai-artifacts.md) — система артефактов
-- [ai-tools.md](ai-tools.md) — инструменты агентов
-- [decisions/004-agent-system.md](decisions/004-agent-system.md) — ADR: почему 9 агентов
+- [ai-tools.md](ai-tools.md) — инструменты
+- [ai-providers.md](ai-providers.md) — AI-провайдеры и модели
 
 ---
 
-## Список агентов
+## Обзор архитектуры
 
-| Агент | Иконка | Модель | Назначение |
-|-------|--------|--------|------------|
-| **Маркетолог** | 📊 | Gemini 3 Pro | Маркетинговый консультант: стратегия, аналитика, ЦА |
-| **Копирайтер** | ✍️ | Gemini 3 Pro | Продающие тексты: посты, реклама, заголовки |
-| **Переводчик** | 🌐 | Gemini 3 Pro | Точный перевод с учетом контекста |
-| **Кулинар** | 🍳 | Gemini 2.5 Flash | Рецепты и советы по готовке |
-| **Астролог** | ⭐ | Gemini 2.5 Flash | Нумерология и гороскопы |
-| **Наставник** | 📚 | Gemini 3 Pro | Личностный рост по методике Кови |
-| **Универсальный** | 💬 | Gemini 2.5 Flash | Общий ассистент для любых задач |
-| **Одессит** | 😄 | Gemini 2.5 Flash | Одесский юмор и байки |
-| **Презентатор** | 🎯 | Gemini 3 Pro | Создание презентаций (PPTX, Reveal.js) |
+Simply использует **файловую систему промптов** с TypeScript конфигами. Это заменяет предыдущую систему агентов в БД.
+
+### Преимущества новой архитектуры
+
+| Было (агенты в БД) | Стало (файловые промпты) |
+|-------------------|--------------------------|
+| 8 агентов с отдельными промптами | 1 универсальный чат + 2 модальных помощника |
+| Промпты в БД (seed-agents.ts) | Промпты в TypeScript файлах |
+| Сложный UI выбора агента | Чистый интерфейс |
+| @-mentions для смены агента | Нет @-mentions — просто пиши |
+
+---
+
+## Промпты
+
+### Основной чат (`chat`)
+
+Универсальный AI-помощник с доступом ко всем инструментам.
+
+| Параметр | Значение |
+|----------|----------|
+| ID | `chat` |
+| Модель | Gemini 3 Pro |
+| Инструменты | Все (search, documents, weather и др.) |
+| Файл | [lib/prompts/chat/config.ts](../lib/prompts/chat/config.ts) |
+
+### Prompt-агент (`prompt-agent`)
+
+Помогает сформулировать эффективный промпт для AI.
+
+| Параметр | Значение |
+|----------|----------|
+| ID | `prompt-agent` |
+| Модель | Gemini 3 Pro |
+| Инструменты | Нет (только текст) |
+| UI | Модальное окно (кнопка 📝) |
+| Файл | [lib/prompts/assistants/prompt-agent/config.ts](../lib/prompts/assistants/prompt-agent/config.ts) |
+
+**Что делает:**
+1. Анализирует исходный запрос
+2. Задаёт уточняющие вопросы
+3. Формулирует улучшенный промпт
+4. Предлагает вставить в основной чат
+
+### Бен (`ben`)
+
+Помощник по платформе Simply. Отвечает на вопросы о возможностях.
+
+| Параметр | Значение |
+|----------|----------|
+| ID | `ben` |
+| Модель | Gemini 2.5 Flash |
+| Инструменты | Нет (только текст) |
+| UI | Модальное окно (кнопка ❓) |
+| Файл | [lib/prompts/ben/config.ts](../lib/prompts/ben/config.ts) |
+
+**Что делает:**
+- Отвечает на вопросы о платформе
+- Объясняет как работают инструменты
+- НЕ выполняет рабочие задачи — перенаправляет в основной чат
+
+**Онбординг:**
+- Для новых пользователей показывает приветственное сообщение
+- Флаг `hasSeenBenIntro` в таблице `User` предотвращает повтор
+
+---
+
+## Структура файлов
+
+```
+lib/prompts/
+├── index.ts                 # Экспорты (buildPrompt, типы)
+├── types.ts                 # TypeScript типы
+├── builder.ts               # Логика сборки промптов
+├── template.ts              # Template engine ({{variables}})
+├── core/                    # Переиспользуемые блоки
+│   ├── index.ts
+│   ├── base.ts              # Базовые правила
+│   ├── formatting.ts        # Форматирование
+│   ├── safety.ts            # Безопасность
+│   └── russian-market.ts    # Специфика РФ рынка
+├── chat/
+│   └── config.ts            # Конфиг основного чата
+├── ben/
+│   └── config.ts            # Конфиг Бена
+├── assistants/
+│   └── prompt-agent/
+│       └── config.ts        # Конфиг Prompt-агента
+└── contexts/
+    ├── index.ts
+    ├── user-profile.ts      # Контекст профиля
+    └── chat-memory.ts       # Контекст памяти (план)
+```
+
+---
+
+## API использования
+
+### Сборка промпта
+
+```typescript
+import { buildPrompt } from '@/lib/prompts';
+
+// Основной чат
+const chatPrompt = buildPrompt('chat', {
+  user: { displayName: 'Владимир' },
+});
+
+console.log(chatPrompt.systemPrompt); // Содержит "Владимир"
+console.log(chatPrompt.model);        // 'gemini-3-pro'
+
+// Бен
+const benPrompt = buildPrompt('ben');
+
+// Prompt-агент
+const promptAgentPrompt = buildPrompt('prompt-agent');
+```
+
+### Специализированные билдеры
+
+```typescript
+import { buildChatPrompt, buildBenPrompt, buildPromptAgentPrompt } from '@/lib/prompts';
+
+// С типизированным контекстом
+const result = buildChatPrompt({
+  user: {
+    displayName: 'Анна',
+    occupation: 'Маркетолог',
+    pronouns: 'ты',
+  },
+});
+```
+
+### Получение конфигов
+
+```typescript
+import { getConfig, getAvailablePrompts } from '@/lib/prompts';
+
+// Конфиг по ID
+const benConfig = getConfig('ben');
+
+// Список доступных промптов
+const prompts = getAvailablePrompts();
+// ['chat', 'ben', 'prompt-agent']
+```
+
+---
+
+## Модальные помощники (UI)
+
+### Компоненты
+
+```
+components/modal-assistants/
+├── index.ts
+├── types.ts
+├── assistant-chat.tsx       # Общий чат-компонент
+├── assistant-drawer.tsx     # Общий Drawer (Vaul)
+├── prompt-agent/
+│   ├── index.ts
+│   ├── trigger.tsx          # Кнопка 📝
+│   └── drawer.tsx           # Drawer обёртка
+└── ben/
+    ├── index.ts
+    ├── trigger.tsx          # Кнопка ❓
+    └── drawer.tsx           # Drawer обёртка
+```
+
+### API endpoints
+
+| Endpoint | Метод | Описание |
+|----------|-------|----------|
+| `/api/assistant/prompt-agent` | POST | Чат с Prompt-агентом |
+| `/api/assistant/ben` | POST | Чат с Беном |
+| `/api/user/ben-intro` | PATCH | Обновление hasSeenBenIntro |
+
+---
+
+## Контекст пользователя
+
+### Профиль
+
+```typescript
+import { buildUserProfileContext } from '@/lib/prompts';
+
+const context = buildUserProfileContext({
+  displayName: 'Владимир',
+  pronouns: 'ты',
+  occupation: 'Предприниматель',
+  bio: 'Владелец интернет-магазина',
+});
+// "Пользователя зовут: Владимир\nОбращаться на: ты\n..."
+```
+
+### Template variables
+
+Промпты поддерживают переменные `{{variable}}`:
+
+```typescript
+import { render } from '@/lib/prompts';
+
+const template = 'Привет, {{userName}}! Ты работаешь в {{industry}}.';
+const result = render(template, {
+  userName: 'Анна',
+  industry: 'маркетинг',
+});
+// "Привет, Анна! Ты работаешь в маркетинг."
+```
 
 ---
 
 ## AI-модели
 
-> **Источник правды:** Полная информация о моделях, ценах и настройках — в [ai-providers.md](ai-providers.md)
+| Промпт | Модель по умолчанию | Причина |
+|--------|---------------------|---------|
+| chat | Gemini 3 Pro | Качество, инструменты |
+| prompt-agent | Gemini 3 Pro | Сложные рассуждения |
+| ben | Gemini 2.5 Flash | Быстрые ответы, экономия |
 
-### Автоматический выбор (режим "auto")
-
-Система автоматически выбирает оптимальную модель для каждого агента:
-
-| Модель | ID | Агенты |
-|--------|-----|--------|
-| **Gemini 3 Pro** | `gemini-3-pro` | Маркетолог, Копирайтер, Переводчик, Наставник, Презентатор |
-| **Gemini 2.5 Flash** | `gemini-2.5-flash` | Кулинар, Астролог, Универсальный, Одессит |
-
-### Ручное переключение
-
-Пользователь может переключить модель через селектор в UI:
-- **Авто (рекомендуется)** — автовыбор на основе агента
-- **Gemini 3 Pro** — ручной выбор
-- **Gemini 2.5 Flash** — ручной выбор
+> **Источник правды:** [ai-providers.md](ai-providers.md) — полная информация о моделях и ценах.
 
 ---
 
-## Системные промпты
+## Инструменты
 
-### Структура промптов
+### Основной чат (все инструменты)
 
-Каждый агент имеет уникальный промпт в markdown файле:
-
-| Агент | Файл промпта |
-|-------|--------------|
-| Маркетолог | [lib/ai/agents/marketer.md](../lib/ai/agents/marketer.md) |
-| Копирайтер | [lib/ai/agents/copywriter.md](../lib/ai/agents/copywriter.md) |
-| Переводчик | [lib/ai/agents/translator.md](../lib/ai/agents/translator.md) |
-| Кулинар | [lib/ai/agents/cook.md](../lib/ai/agents/cook.md) |
-| Астролог | [lib/ai/agents/astrologer.md](../lib/ai/agents/astrologer.md) |
-| Наставник | [lib/ai/agents/mentor.md](../lib/ai/agents/mentor.md) |
-| Универсальный | [lib/ai/agents/universal.md](../lib/ai/agents/universal.md) |
-| Одессит | [lib/ai/agents/odessit.md](../lib/ai/agents/odessit.md) |
-| Презентатор | [lib/ai/agents/presentator.md](../lib/ai/agents/presentator.md) |
-
-### Загрузка промптов
-
-```typescript
-// lib/ai/prompts.ts
-loadAgentPrompt(agentId: string): Promise<string>
-```
-
-- Кеширование промптов в памяти (Map cache)
-- Fallback на `system-prompt.md` если агент не найден
-
-### Контекст пользователя
-
-```typescript
-// lib/ai/prompts.ts
-buildUserContext(user: User): string
-```
-
-Добавляет в промпт информацию о пользователе:
-- Имя
-- Роль
-- Предпочтения из профиля
-
-### Кастомизация агента
-
-```typescript
-// lib/ai/prompts.ts
-buildAgentCustomizations(userAgent: UserAgent): string
-```
-
-Добавляет персональные настройки агента (если есть):
-- Кастомное имя
-- Стиль общения
-- Специальные инструкции
-
----
-
-## Доступ к инструментам
-
-### Базовые инструменты (все агенты)
-
-Все агенты имеют доступ к:
 - `webSearch` — поиск в интернете
 - `getWeather` — погода
 - `getCurrentDate` — текущая дата
-- `readDocument` — чтение из knowledge/
-- `createDocument` — создание text артефактов
-- `updateDocument` — обновление артефактов
+- `readDocument` — чтение из базы знаний
+- `createDocument` — создание артефактов
+- `updateDocument` — редактирование артефактов
+- `parseExcel` — анализ Excel файлов
+- `exportDocument` — экспорт в DOCX
 
-### Эксклюзивные инструменты
+### Модальные помощники
 
-**Презентатор** имеет эксклюзивный доступ к:
-- `createDocument` с `kind: "presentation-reveal"`
-- `createDocument` с `kind: "presentation-pptx"`
-
-Другие агенты при запросе на презентацию направляют пользователя к Презентатору.
-
----
-
-## Выбор агента в UI
-
-### Главный экран
-
-1. Пользователь видит карточки доступных агентов
-2. При клике создается новый чат с `agentId`
-3. Редирект на `/chat/{id}?agentId={agentId}`
-
-### @-mentions (гостевой вызов)
-
-Пользователь может вызвать агента в середине чата через `@Агент`:
-- Не меняет `Chat.agentId`
-- Сообщение визуально выделено (отступ + фон + метка)
-- Агент отвечает один раз, затем возвращается основной агент
+**Prompt-агент и Бен** не имеют доступа к инструментам — только текстовое общение.
 
 ---
 
@@ -152,47 +265,34 @@ buildAgentCustomizations(userAgent: UserAgent): string
 
 | Категория | Файлы |
 |-----------|-------|
-| **Конфигурация агентов** | [lib/db/seed-agents.ts](../lib/db/seed-agents.ts) |
-| **Загрузка промптов** | [lib/ai/prompts.ts](../lib/ai/prompts.ts) |
-| **Выбор модели** | [lib/ai/models.ts](../lib/ai/models.ts) |
-| **Провайдеры AI** | [lib/ai/providers.ts](../lib/ai/providers.ts) |
+| **Система промптов** | [lib/prompts/](../lib/prompts/) |
+| **Билдер** | [lib/prompts/builder.ts](../lib/prompts/builder.ts) |
+| **Конфиг чата** | [lib/prompts/chat/config.ts](../lib/prompts/chat/config.ts) |
+| **Конфиг Бена** | [lib/prompts/ben/config.ts](../lib/prompts/ben/config.ts) |
+| **Конфиг Prompt-агента** | [lib/prompts/assistants/prompt-agent/config.ts](../lib/prompts/assistants/prompt-agent/config.ts) |
+| **Модальные компоненты** | [components/modal-assistants/](../components/modal-assistants/) |
+| **API помощников** | [app/(chat)/api/assistant/](../app/(chat)/api/assistant/) |
 | **API чата** | [app/(chat)/api/chat/route.ts](../app/(chat)/api/chat/route.ts) |
-| **UI каталога** | [app/(chat)/agents/page.tsx](../app/(chat)/agents/page.tsx) |
-| **UI страницы агента** | [app/(chat)/agents/[slug]/page.tsx](../app/(chat)/agents/[slug]/page.tsx) |
-| **Sidebar агентов** | [components/sidebar-agents.tsx](../components/sidebar-agents.tsx) |
 
 ---
 
-## Схема БД
+## Миграция с v2.x
 
-### Таблица `Agent`
+В версии 3.0.0 удалены:
 
-```sql
-CREATE TABLE "Agent" (
-  id UUID PRIMARY KEY,
-  name VARCHAR NOT NULL,           -- "Маркетолог"
-  slug VARCHAR UNIQUE NOT NULL,    -- "marketer"
-  description TEXT,
-  icon VARCHAR,                    -- "📊"
-  defaultModel VARCHAR,            -- "gemini-3-pro"
-  capabilities JSONB,              -- { exampleTasks: [...] }
-  createdAt TIMESTAMP
-);
-```
+- Таблицы `Agent` и `UserAgent` из БД
+- Поля `agentId` из таблиц `Chat` и `Message`
+- UI выбора агента в header
+- @-mentions для смены агента
+- Каталог агентов `/agents`
+- Файл `lib/db/seed-agents.ts`
 
-### Таблица `UserAgent` (персонализация)
+Добавлено:
 
-```sql
-CREATE TABLE "UserAgent" (
-  id UUID PRIMARY KEY,
-  userId UUID REFERENCES "User"(id),
-  agentId UUID REFERENCES "Agent"(id),
-  customName VARCHAR,              -- Кастомное имя
-  customInstructions TEXT,         -- Доп. инструкции
-  createdAt TIMESTAMP
-);
-```
+- Файловая система промптов `lib/prompts/`
+- Модальные помощники (Prompt-агент, Бен)
+- Поле `hasSeenBenIntro` в таблице `User`
 
 ---
 
-**Обновлено:** 2026-01-29
+**Обновлено:** 2026-02-02
