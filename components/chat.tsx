@@ -98,6 +98,9 @@ export function Chat({
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ТЗ-07A: Автонейминг — флаг чтобы вызвать только один раз
+  const hasTriggeredAutonaming = useRef(false);
+
   useEffect(() => {
     currentModelIdRef.current = currentModelId;
   }, [currentModelId]);
@@ -265,6 +268,23 @@ export function Chat({
           setProfessorComplete(false);
           setProfessorError(undefined);
         }, 3000);
+      }
+
+      // ТЗ-07A: Автонейминг после 2-го ответа AI (4 сообщения = 2 обмена)
+      // API проверяет: >= 4 сообщений И isRenamed === false
+      if (!hasTriggeredAutonaming.current) {
+        fetch(`/api/chat/${id}/generate-title`, { method: "POST" })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.generated) {
+              // Название сгенерировано — больше не вызываем
+              hasTriggeredAutonaming.current = true;
+              // Обновляем sidebar чтобы новое название отобразилось
+              mutate(unstable_serialize(getChatHistoryPaginationKey));
+            }
+            // Если skipped — попробуем ещё раз после следующего ответа AI
+          })
+          .catch((err) => console.warn("[Autonaming] Failed:", err));
       }
     },
     onError: (error) => {

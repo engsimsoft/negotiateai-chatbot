@@ -48,13 +48,12 @@ import {
   saveChat,
   saveMessages,
   updateChatLastContextById,
-  updateChatTitle,
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { convertToUIMessages, estimateMessageTokens, generateUUID } from "@/lib/utils";
-import { generateTitleFromUserMessage } from "../../actions";
+// ТЗ-07A: generateTitleFromUserMessage больше не используется здесь
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
 export const maxDuration = 180; // 3 minutes - increased for complex document generation
@@ -151,10 +150,7 @@ export async function POST(request: Request) {
         projectId: projectId || undefined,
       });
 
-      // Generate title in background (non-blocking)
-      generateTitleFromUserMessage({ message })
-        .then((title) => updateChatTitle({ chatId: id, title }))
-        .catch((err) => console.warn("Background title generation failed:", err));
+      // ТЗ-07A: Автонейминг теперь происходит после 2-го ответа AI (см. chat.tsx)
       // ТЗ-4: Greeting НЕ добавляется как сообщение — используем UI с заголовком + suggested actions
     }
 
@@ -237,6 +233,17 @@ export async function POST(request: Request) {
           const projectModelConfig = getProjectModel(tier);
           modelToUse = projectModelConfig.model;
 
+          // Diagnostic: log project files and their extractedContent status
+          console.log(`[Project Chat] Files for project "${project.name}":`, {
+            totalFiles: projectFiles.length,
+            files: projectFiles.map(f => ({
+              name: f.name,
+              type: f.type,
+              hasExtractedContent: !!(f.metadata as any)?.extractedContent,
+              contentLength: (f.metadata as any)?.extractedContent?.length || 0,
+            })),
+          });
+
           // Build project-specific system prompt
           const projectContext = buildProjectContext({
             project,
@@ -248,6 +255,7 @@ export async function POST(request: Request) {
           systemPromptText = `${builtPrompt.systemPrompt}\n\n${projectContext}`;
 
           console.log(`[Project Chat] Using ${projectModelConfig.name} (${tier}) for project ${project.name}`);
+          console.log(`[Project Chat] Context length: ${projectContext.length} chars`);
         } else {
           // Regular chat: use Gemini
           const builtPrompt = buildChatPrompt(promptContext);
@@ -330,22 +338,36 @@ export async function POST(request: Request) {
             },
           },
           stopWhen: stepCountIs(5),
-          experimental_activeTools: [
-            "getCurrentDate",
-            "getWeather",
-            "readDocument",
-            "webSearch",
-            "createDocument",
-            "updateDocument",
-            "requestSuggestions",
-            "parseExcel",
-            "loadSkill",
-          ],
+          // Tools: readDocument excluded from project chats (uses legacy knowledge/ folder)
+          // Project documents are already in context via buildProjectContext
+          experimental_activeTools: isProjectChat
+            ? [
+                "getCurrentDate",
+                "getWeather",
+                "webSearch",
+                "createDocument",
+                "updateDocument",
+                "requestSuggestions",
+                "parseExcel",
+                "loadSkill",
+              ]
+            : [
+                "getCurrentDate",
+                "getWeather",
+                "readDocument",
+                "webSearch",
+                "createDocument",
+                "updateDocument",
+                "requestSuggestions",
+                "parseExcel",
+                "loadSkill",
+              ],
           experimental_transform: smoothStream({ chunking: "word" }),
           tools: {
             getCurrentDate,
             getWeather,
-            readDocument,
+            // readDocument only for regular chats (legacy knowledge/ folder)
+            ...(isProjectChat ? {} : { readDocument }),
             createDocument: createDocument({ session, dataStream }),
             updateDocument: updateDocument({ session, dataStream }),
             requestSuggestions: requestSuggestions({
@@ -418,11 +440,59 @@ export async function POST(request: Request) {
               "tool-error",
             ]);
 
+            // Diagnostic: track tool call timing
+            const toolCallTimes: Record<string, number> = {};
+            const modelName = isProjectChat ? `Claude/${tier}` : "Gemini";
+
             while (true) {
               const { value, done } = await reader.read();
               if (done) {
                 controller.close();
                 break;
+              }
+
+              // Diagnostic logging for tool events
+              if (value && typeof value === "object" && "type" in value) {
+                const eventType = (value as any).type;
+
+                if (eventType === "tool-call") {
+                  const toolName = (value as any).toolName || "unknown";
+                  const toolCallId = (value as any).toolCallId || "unknown";
+                  toolCallTimes[toolCallId] = Date.now();
+                  console.log(`[Tool:${modelName}] 🔧 CALL started:`, {
+                    toolName,
+                    toolCallId,
+                    args: JSON.stringify((value as any).args || {}).substring(0, 300),
+                    timestamp: new Date().toISOString(),
+                  });
+                }
+
+                if (eventType === "tool-result") {
+                  const toolName = (value as any).toolName || "unknown";
+                  const toolCallId = (value as any).toolCallId || "unknown";
+                  const duration = toolCallTimes[toolCallId]
+                    ? Date.now() - toolCallTimes[toolCallId]
+                    : -1;
+                  const resultPreview = JSON.stringify((value as any).result || {}).substring(0, 300);
+                  console.log(`[Tool:${modelName}] ✅ RESULT received:`, {
+                    toolName,
+                    toolCallId,
+                    durationMs: duration,
+                    resultPreview,
+                    timestamp: new Date().toISOString(),
+                  });
+                }
+
+                if (eventType === "tool-error") {
+                  const toolName = (value as any).toolName || "unknown";
+                  const toolCallId = (value as any).toolCallId || "unknown";
+                  console.error(`[Tool:${modelName}] ❌ ERROR:`, {
+                    toolName,
+                    toolCallId,
+                    error: (value as any).error,
+                    timestamp: new Date().toISOString(),
+                  });
+                }
               }
 
               if (
