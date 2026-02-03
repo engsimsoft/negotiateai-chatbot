@@ -50,6 +50,9 @@ export function Chat({
   projectId,
   projectName,
   projectModelTier,
+  helperId,
+  helperName,
+  helperEmoji,
 }: {
   id: string;
   initialMessages: ChatMessage[];
@@ -61,6 +64,10 @@ export function Chat({
   projectId?: string;
   projectName?: string;
   projectModelTier?: string;
+  // ТЗ-07A: Helper chat support
+  helperId?: string;
+  helperName?: string;
+  helperEmoji?: string;
 }) {
   const { visibilityType } = useChatVisibility({
     chatId: id,
@@ -175,12 +182,14 @@ export function Chat({
               // ТЗ-03: Project chat support
               ...(projectId && { projectId }),
               ...(projectId && { projectModelTier: currentProjectTierRef.current }),
+              // ТЗ-07A: Helper chat support
+              ...(helperId && { helperId }),
               ...request.body,
             },
           };
         },
       }),
-    [retryableFetch, visibilityType, projectId]
+    [retryableFetch, visibilityType, projectId, helperId]
   );
 
   const {
@@ -352,6 +361,9 @@ export function Chat({
           onInsertToChat={setInput}
           projectId={projectId}
           projectName={projectName}
+          helperId={helperId}
+          helperName={helperName}
+          helperEmoji={helperEmoji}
         />
 
         {/* ТЗ-03 Фаза 7: Professor Pipeline Progress */}

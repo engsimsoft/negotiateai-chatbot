@@ -24,12 +24,29 @@ interface ChatHeaderProps {
   projectId?: string;
   /** Project name if this is a project chat */
   projectName?: string;
+  /** Helper ID if this is a helper chat (ТЗ-07A) */
+  helperId?: string;
+  /** Helper name if this is a helper chat */
+  helperName?: string;
+  /** Helper emoji if this is a helper chat */
+  helperEmoji?: string;
 }
 
-function PureChatHeader({ onInsertToChat, projectId, projectName }: ChatHeaderProps) {
+function PureChatHeader({
+  onInsertToChat,
+  projectId,
+  projectName,
+  helperId,
+  helperName,
+  helperEmoji,
+}: ChatHeaderProps) {
   const router = useRouter();
   const { open } = useSidebar();
   const { width: windowWidth } = useWindowSize();
+
+  // Track if component has mounted (for hydration-safe client-only rendering)
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // Modal assistants state
   const [promptAgentOpen, setPromptAgentOpen] = useState(false);
@@ -100,10 +117,27 @@ function PureChatHeader({ onInsertToChat, projectId, projectName }: ChatHeaderPr
             <span className="font-medium text-foreground">Чат</span>
           </>
         )}
+
+        {/* Helper breadcrumb (ТЗ-07A) */}
+        {helperId && helperName && (
+          <>
+            <ChevronRight className="size-3.5 text-muted-foreground/50" />
+            <Link
+              href={`/helpers/${helperId}`}
+              className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <span>{helperEmoji || "🤖"}</span>
+              <span className="max-w-[120px] truncate sm:max-w-[200px]">{helperName}</span>
+            </Link>
+            <ChevronRight className="size-3.5 text-muted-foreground/50" />
+            <span className="font-medium text-foreground">Чат</span>
+          </>
+        )}
       </div>
 
       {/* New Chat button - always visible when sidebar closed or on mobile */}
-      {(!open || windowWidth < 768) && (
+      {/* Use mounted check to avoid hydration mismatch with windowWidth */}
+      {mounted && (!open || windowWidth < 768) && (
         <Button
           className="ml-auto h-8 px-2 md:h-fit md:px-2"
           onClick={() => {
@@ -118,7 +152,8 @@ function PureChatHeader({ onInsertToChat, projectId, projectName }: ChatHeaderPr
       )}
 
       {/* Modal assistant triggers */}
-      <div className={`flex items-center gap-1 ${open && windowWidth >= 768 ? "ml-auto" : ""}`}>
+      {/* Use mounted check to avoid hydration mismatch with windowWidth */}
+      <div className={`flex items-center gap-1${mounted && open && windowWidth >= 768 ? " ml-auto" : ""}`}>
         <PromptAgentTrigger onClick={() => setPromptAgentOpen(true)} />
         <div className="relative">
           <BenTrigger onClick={() => {
