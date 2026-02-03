@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { User } from "next-auth";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -10,9 +10,6 @@ import { unstable_serialize } from "swr/infinite";
 import { PlusIcon, TrashIcon } from "@/components/icons";
 import { SidebarHistory, getChatHistoryPaginationKey } from "@/components/sidebar-history";
 import { SidebarUserNav } from "@/components/sidebar-user-nav";
-import { SidebarTabs, type SidebarTab } from "@/components/sidebar-tabs";
-import { SidebarSearch } from "@/components/sidebar-search";
-import { SidebarProjects } from "@/components/sidebar-projects";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
@@ -35,17 +32,45 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 
-interface AppSidebarProps {
-  user: User | undefined;
-  activeTab: SidebarTab;
-  onTabChange: (tab: SidebarTab) => void;
+// Типы контекста sidebar (ТЗ-07A)
+export type SidebarContext =
+  | { type: "general" }
+  | { type: "project"; projectId: string }
+  | { type: "helper"; helperId: string };
+
+/**
+ * Определить контекст sidebar на основе URL
+ */
+function getSidebarContext(pathname: string): SidebarContext {
+  // /projects/[id]/chat/* → проект
+  const projectMatch = pathname.match(/^\/projects\/([^/]+)\/chat/);
+  if (projectMatch) {
+    return { type: "project", projectId: projectMatch[1] };
+  }
+
+  // /helpers/[id]/* → помощник
+  const helperMatch = pathname.match(/^\/helpers\/([^/]+)/);
+  if (helperMatch) {
+    return { type: "helper", helperId: helperMatch[1] };
+  }
+
+  // /chat/* → общие чаты
+  return { type: "general" };
 }
 
-export function AppSidebar({ user, activeTab, onTabChange }: AppSidebarProps) {
+interface AppSidebarProps {
+  user: User | undefined;
+}
+
+export function AppSidebar({ user }: AppSidebarProps) {
+  const pathname = usePathname();
   const router = useRouter();
-  const { setOpenMobile, isMobile } = useSidebar();
+  const { setOpenMobile } = useSidebar();
   const { mutate } = useSWRConfig();
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
+
+  // ТЗ-07A: Определить контекст на основе URL
+  const context = getSidebarContext(pathname);
 
   // ТЗ-3A: Sync theme preference from DB
   useThemeSync();
@@ -67,84 +92,100 @@ export function AppSidebar({ user, activeTab, onTabChange }: AppSidebarProps) {
     });
   };
 
+  // Определить URL для кнопки "Новый чат" в зависимости от контекста
+  const getNewChatUrl = () => {
+    switch (context.type) {
+      case "project":
+        return `/projects/${context.projectId}/chat`;
+      case "helper":
+        return `/helpers/${context.helperId}/chat`;
+      default:
+        return "/chat";
+    }
+  };
+
+  // Заголовок для контекста
+  const getContextTitle = () => {
+    switch (context.type) {
+      case "project":
+        return "Чаты проекта";
+      case "helper":
+        return "Чаты помощника";
+      default:
+        return "Чаты";
+    }
+  };
+
   return (
     <>
       <Sidebar className="group-data-[side=left]:border-r-0">
-        <div className="flex h-full">
-          {/* Vertical tabs - only show in mobile (Sheet), desktop tabs are in SidebarLayout */}
-          {isMobile && (
-            <SidebarTabs activeTab={activeTab} onTabChange={onTabChange} />
-          )}
+        <SidebarHeader>
+          <SidebarMenu>
+            <div className="flex flex-row items-center justify-between">
+              <Link
+                className="flex flex-row items-center gap-3"
+                href="/dashboard"
+                onClick={() => setOpenMobile(false)}
+              >
+                <span className="cursor-pointer rounded-md px-2 font-semibold text-lg hover:bg-muted">
+                  Simply
+                </span>
+              </Link>
+              <div className="flex flex-row gap-1">
+                {/* Удалить все — только для общих чатов */}
+                {user && context.type === "general" && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        className="h-8 p-1 md:h-fit md:p-2"
+                        onClick={() => setShowDeleteAllDialog(true)}
+                        type="button"
+                        variant="ghost"
+                      >
+                        <TrashIcon />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent align="end" className="hidden md:block">
+                      Удалить все чаты
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                {/* Новый чат */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      className="h-8 p-1 md:h-fit md:p-2"
+                      onClick={() => {
+                        setOpenMobile(false);
+                        router.push(getNewChatUrl());
+                        router.refresh();
+                      }}
+                      type="button"
+                      variant="ghost"
+                    >
+                      <PlusIcon />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent align="end" className="hidden md:block">
+                    Новый чат
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+          </SidebarMenu>
+        </SidebarHeader>
 
-          {/* Main sidebar content */}
-          <div className="flex min-w-0 flex-1 flex-col">
-            <SidebarHeader>
-              <SidebarMenu>
-                <div className="flex flex-row items-center justify-between">
-                  <Link
-                    className="flex flex-row items-center gap-3"
-                    href="/dashboard"
-                    onClick={() => {
-                      setOpenMobile(false);
-                    }}
-                  >
-                    <span className="cursor-pointer rounded-md px-2 font-semibold text-lg hover:bg-muted">
-                      Simply
-                    </span>
-                  </Link>
-                  {activeTab === "chats" && (
-                    <div className="flex flex-row gap-1">
-                      {user && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              className="h-8 p-1 md:h-fit md:p-2"
-                              onClick={() => setShowDeleteAllDialog(true)}
-                              type="button"
-                              variant="ghost"
-                            >
-                              <TrashIcon />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent align="end" className="hidden md:block">
-                            Удалить все чаты
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            className="h-8 p-1 md:h-fit md:p-2"
-                            onClick={() => {
-                              setOpenMobile(false);
-                              router.push("/chat");
-                              router.refresh();
-                            }}
-                            type="button"
-                            variant="ghost"
-                          >
-                            <PlusIcon />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent align="end" className="hidden md:block">
-                          Новый чат
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  )}
-                </div>
-              </SidebarMenu>
-            </SidebarHeader>
-
-            <SidebarContent>
-              {activeTab === "search" && <SidebarSearch />}
-              {activeTab === "chats" && <SidebarHistory user={user} />}
-              {activeTab === "projects" && <SidebarProjects />}
-            </SidebarContent>
-
-            <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>
+        <SidebarContent>
+          {/* Заголовок контекста */}
+          <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
+            {getContextTitle()}
           </div>
-        </div>
+
+          {/* История чатов с контекстом */}
+          <SidebarHistory user={user} context={context} />
+        </SidebarContent>
+
+        <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>
       </Sidebar>
 
       <AlertDialog onOpenChange={setShowDeleteAllDialog} open={showDeleteAllDialog}>
@@ -152,7 +193,7 @@ export function AppSidebar({ user, activeTab, onTabChange }: AppSidebarProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Удалить все чаты?</AlertDialogTitle>
             <AlertDialogDescription>
-              Это действие нельзя отменить. Все ваши чаты будут удалены.
+              Это действие нельзя отменить. Все ваши общие чаты будут удалены.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

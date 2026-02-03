@@ -27,6 +27,7 @@ import type { Chat } from "@/lib/db/schema";
 import { fetcher } from "@/lib/utils";
 import { LoaderIcon } from "./icons";
 import { ChatItem } from "./sidebar-history-item";
+import type { SidebarContext } from "./app-sidebar";
 
 type GroupedChats = {
   today: Chat[];
@@ -97,30 +98,72 @@ export function getChatHistoryPaginationKey(
   return `/api/history?ending_before=${firstChatFromPage.id}&limit=${PAGE_SIZE}`;
 }
 
-export function SidebarHistory({ user }: { user: User | undefined }) {
+export function SidebarHistory({
+  user,
+  context = { type: "general" },
+}: {
+  user: User | undefined;
+  context?: SidebarContext;
+}) {
   const { setOpenMobile } = useSidebar();
   const { id } = useParams();
 
+  // ТЗ-07A: Определить API endpoint на основе контекста
+  const getApiUrl = () => {
+    switch (context.type) {
+      case "project":
+        return `/api/projects/${context.projectId}/chats`;
+      case "helper":
+        return `/api/helpers/${context.helperId}/chats`;
+      default:
+        return null; // Use pagination for general
+    }
+  };
+
+  const contextApiUrl = getApiUrl();
+  const isContextual = contextApiUrl !== null;
+
+  // Для контекстных чатов (проект/помощник) используем простой useSWR
+  const {
+    data: contextualChats,
+    isLoading: isContextualLoading,
+    mutate: mutateContextual,
+  } = useSWRInfinite<ChatHistory>(
+    isContextual ? () => contextApiUrl : getChatHistoryPaginationKey,
+    fetcher,
+    { fallbackData: [] }
+  );
+
+  // Для общих чатов используем пагинацию
   const {
     data: paginatedChatHistories,
     setSize,
     isValidating,
     isLoading,
     mutate,
-  } = useSWRInfinite<ChatHistory>(getChatHistoryPaginationKey, fetcher, {
-    fallbackData: [],
-  });
+  } = useSWRInfinite<ChatHistory>(
+    isContextual ? () => null : getChatHistoryPaginationKey,
+    fetcher,
+    { fallbackData: [] }
+  );
+
+  // Выбираем нужные данные в зависимости от контекста
+  const chatHistories = isContextual ? contextualChats : paginatedChatHistories;
+  const chatMutate = isContextual ? mutateContextual : mutate;
+  const chatIsLoading = isContextual ? isContextualLoading : isLoading;
 
   const router = useRouter();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const hasReachedEnd = paginatedChatHistories
-    ? paginatedChatHistories.some((page) => page.hasMore === false)
-    : false;
+  const hasReachedEnd = isContextual
+    ? true // Контекстные чаты загружаются сразу все
+    : chatHistories
+      ? chatHistories.some((page) => page.hasMore === false)
+      : false;
 
-  const hasEmptyChatHistory = paginatedChatHistories
-    ? paginatedChatHistories.every((page) => page.chats.length === 0)
+  const hasEmptyChatHistory = chatHistories
+    ? chatHistories.every((page) => page.chats.length === 0)
     : false;
 
   const handleDelete = () => {
@@ -129,20 +172,20 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     });
 
     toast.promise(deletePromise, {
-      loading: "Deleting chat...",
+      loading: "Удаление чата...",
       success: () => {
-        mutate((chatHistories) => {
-          if (chatHistories) {
-            return chatHistories.map((chatHistory) => ({
-              ...chatHistory,
-              chats: chatHistory.chats.filter((chat) => chat.id !== deleteId),
+        chatMutate((histories) => {
+          if (histories) {
+            return histories.map((history) => ({
+              ...history,
+              chats: history.chats.filter((chat) => chat.id !== deleteId),
             }));
           }
         });
 
-        return "Chat deleted successfully";
+        return "Чат удалён";
       },
-      error: "Failed to delete chat",
+      error: "Ошибка при удалении чата",
     });
 
     setShowDeleteDialog(false);
@@ -157,14 +200,14 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       <SidebarGroup>
         <SidebarGroupContent>
           <div className="flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-zinc-500">
-            Login to save and revisit previous chats!
+            Войдите, чтобы сохранять историю чатов
           </div>
         </SidebarGroupContent>
       </SidebarGroup>
     );
   }
 
-  if (isLoading) {
+  if (chatIsLoading) {
     return (
       <SidebarGroup>
         <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
@@ -198,7 +241,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       <SidebarGroup>
         <SidebarGroupContent>
           <div className="flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-zinc-500">
-            Your conversations will appear here once you start chatting!
+            Ваши чаты появятся здесь
           </div>
         </SidebarGroupContent>
       </SidebarGroup>
@@ -210,10 +253,10 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       <SidebarGroup>
         <SidebarGroupContent>
           <SidebarMenu>
-            {paginatedChatHistories &&
+            {chatHistories &&
               (() => {
-                const chatsFromHistory = paginatedChatHistories.flatMap(
-                  (paginatedChatHistory) => paginatedChatHistory.chats
+                const chatsFromHistory = chatHistories.flatMap(
+                  (chatHistory) => chatHistory.chats
                 );
 
                 const groupedChats = groupChatsByDate(chatsFromHistory);
@@ -223,7 +266,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                     {groupedChats.today.length > 0 && (
                       <div>
                         <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-                          Today
+                          Сегодня
                         </div>
                         {groupedChats.today.map((chat) => (
                           <ChatItem
@@ -243,7 +286,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                     {groupedChats.yesterday.length > 0 && (
                       <div>
                         <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-                          Yesterday
+                          Вчера
                         </div>
                         {groupedChats.yesterday.map((chat) => (
                           <ChatItem
@@ -263,7 +306,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                     {groupedChats.lastWeek.length > 0 && (
                       <div>
                         <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-                          Last 7 days
+                          За 7 дней
                         </div>
                         {groupedChats.lastWeek.map((chat) => (
                           <ChatItem
@@ -283,7 +326,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                     {groupedChats.lastMonth.length > 0 && (
                       <div>
                         <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-                          Last 30 days
+                          За 30 дней
                         </div>
                         {groupedChats.lastMonth.map((chat) => (
                           <ChatItem
@@ -303,7 +346,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                     {groupedChats.older.length > 0 && (
                       <div>
                         <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-                          Older than last month
+                          Старше месяца
                         </div>
                         {groupedChats.older.map((chat) => (
                           <ChatItem
@@ -324,25 +367,31 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
               })()}
           </SidebarMenu>
 
-          <motion.div
-            onViewportEnter={() => {
-              if (!isValidating && !hasReachedEnd) {
-                setSize((size) => size + 1);
-              }
-            }}
-          />
+          {/* Пагинация — только для общих чатов */}
+          {!isContextual && (
+            <motion.div
+              onViewportEnter={() => {
+                if (!isValidating && !hasReachedEnd) {
+                  setSize((size) => size + 1);
+                }
+              }}
+            />
+          )}
 
-          {hasReachedEnd ? (
-            <div className="mt-8 flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-zinc-500">
-              You have reached the end of your chat history.
-            </div>
-          ) : (
-            <div className="mt-8 flex flex-row items-center gap-2 p-2 text-zinc-500 dark:text-zinc-400">
-              <div className="animate-spin">
-                <LoaderIcon />
+          {/* Индикатор загрузки/конца — только для общих чатов */}
+          {!isContextual && (
+            hasReachedEnd ? (
+              <div className="mt-8 flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-zinc-500">
+                Вы достигли конца истории чатов.
               </div>
-              <div>Loading Chats...</div>
-            </div>
+            ) : (
+              <div className="mt-8 flex flex-row items-center gap-2 p-2 text-zinc-500 dark:text-zinc-400">
+                <div className="animate-spin">
+                  <LoaderIcon />
+                </div>
+                <div>Загрузка чатов...</div>
+              </div>
+            )
           )}
         </SidebarGroupContent>
       </SidebarGroup>
@@ -350,16 +399,15 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       <AlertDialog onOpenChange={setShowDeleteDialog} open={showDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>Удалить чат?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your
-              chat and remove it from our servers.
+              Это действие нельзя отменить. Чат будет удалён навсегда.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>
-              Continue
+              Удалить
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
