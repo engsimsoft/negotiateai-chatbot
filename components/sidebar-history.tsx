@@ -195,6 +195,37 @@ export function SidebarHistory({
     }
   };
 
+  // ТЗ-07A: Переименование чата
+  const handleRename = async (chatId: string, newTitle: string) => {
+    try {
+      const response = await fetch(`/api/chat?id=${chatId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to rename chat");
+      }
+
+      // Обновить в локальном кэше
+      chatMutate((histories) => {
+        if (histories) {
+          return histories.map((history) => ({
+            ...history,
+            chats: history.chats.map((chat) =>
+              chat.id === chatId ? { ...chat, title: newTitle } : chat
+            ),
+          }));
+        }
+      });
+
+      toast.success("Чат переименован");
+    } catch {
+      toast.error("Ошибка при переименовании чата");
+    }
+  };
+
   if (!user) {
     return (
       <SidebarGroup>
@@ -277,6 +308,7 @@ export function SidebarHistory({
                               setDeleteId(chatId);
                               setShowDeleteDialog(true);
                             }}
+                            onRename={handleRename}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -297,6 +329,7 @@ export function SidebarHistory({
                               setDeleteId(chatId);
                               setShowDeleteDialog(true);
                             }}
+                            onRename={handleRename}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -317,6 +350,7 @@ export function SidebarHistory({
                               setDeleteId(chatId);
                               setShowDeleteDialog(true);
                             }}
+                            onRename={handleRename}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -337,6 +371,7 @@ export function SidebarHistory({
                               setDeleteId(chatId);
                               setShowDeleteDialog(true);
                             }}
+                            onRename={handleRename}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -357,6 +392,7 @@ export function SidebarHistory({
                               setDeleteId(chatId);
                               setShowDeleteDialog(true);
                             }}
+                            onRename={handleRename}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}

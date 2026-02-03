@@ -622,3 +622,56 @@ export async function DELETE(request: Request) {
 
   return Response.json(deletedChat, { status: 200 });
 }
+
+/**
+ * PATCH /api/chat?id=...
+ * ТЗ-07A: Переименование чата (устанавливает isRenamed=true)
+ */
+export async function PATCH(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return new ChatSDKError("bad_request:api").toResponse();
+  }
+
+  const session = await auth();
+
+  if (!session?.user) {
+    return new ChatSDKError("unauthorized:chat").toResponse();
+  }
+
+  const chat = await getChatById({ id });
+
+  if (!chat) {
+    return new ChatSDKError("not_found:database", "Chat not found").toResponse();
+  }
+
+  if (chat.userId !== session.user.id) {
+    return new ChatSDKError("forbidden:chat").toResponse();
+  }
+
+  try {
+    const { title } = await request.json();
+
+    if (!title || typeof title !== "string" || title.trim().length === 0) {
+      return new ChatSDKError("bad_request:api", "Title is required").toResponse();
+    }
+
+    // Импортируем здесь чтобы не добавлять в imports вверху
+    const { updateChatTitleWithRenamedFlag } = await import("@/lib/db/queries");
+
+    await updateChatTitleWithRenamedFlag({
+      chatId: id,
+      title: title.trim(),
+      isRenamed: true, // Пометить что пользователь переименовал вручную
+    });
+
+    return Response.json({ success: true, title: title.trim() });
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      return error.toResponse();
+    }
+    return new ChatSDKError("bad_request:api", "Failed to rename chat").toResponse();
+  }
+}
