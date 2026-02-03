@@ -120,6 +120,13 @@
       "when": 1770043552649,
       "tag": "0016_large_madrox",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1770144008697,
+      "tag": "0017_special_queen_noir",
+      "breakpoints": true
     }
   ]
 }

@@ -26,6 +26,8 @@ import {
   chat,
   type DBMessage,
   document,
+  type Helper,
+  helper,
   message,
   type Project,
   project,
@@ -245,6 +247,8 @@ export async function getChatsByUserId({
           title: chat.title,
           userId: chat.userId,
           projectId: chat.projectId,
+          helperId: chat.helperId,
+          isRenamed: chat.isRenamed,
           visibility: chat.visibility,
           lastContext: sql<null>`NULL`.as("lastContext"),
         })
@@ -1196,6 +1200,8 @@ export async function getChatsByProjectId({ projectId }: { projectId: string }) 
         title: chat.title,
         userId: chat.userId,
         projectId: chat.projectId,
+        helperId: chat.helperId,
+        isRenamed: chat.isRenamed,
         visibility: chat.visibility,
         lastContext: sql<null>`NULL`.as("lastContext"),
       })
@@ -1249,6 +1255,221 @@ export async function getProjectsWithStats({ userId }: { userId: string }) {
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get projects with stats"
+    );
+  }
+}
+
+// ============================================
+// Helper Functions (ТЗ-07A) - Кастомные помощники
+// ============================================
+
+/**
+ * Get all custom helpers for a user
+ */
+export async function getHelpersByUserId({ userId }: { userId: string }) {
+  try {
+    const helpers = await db
+      .select()
+      .from(helper)
+      .where(eq(helper.userId, userId))
+      .orderBy(desc(helper.createdAt));
+
+    return helpers;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get helpers by user id"
+    );
+  }
+}
+
+/**
+ * Get a single helper by ID
+ */
+export async function getHelperById({ id }: { id: string }) {
+  try {
+    const [selectedHelper] = await db
+      .select()
+      .from(helper)
+      .where(eq(helper.id, id));
+
+    return selectedHelper || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get helper by id"
+    );
+  }
+}
+
+/**
+ * Create a new custom helper
+ */
+export async function saveHelper({
+  id,
+  userId,
+  name,
+  emoji,
+  instruction,
+  skills,
+}: {
+  id: string;
+  userId: string;
+  name: string;
+  emoji?: string;
+  instruction?: string;
+  skills?: string[];
+}) {
+  try {
+    const [newHelper] = await db
+      .insert(helper)
+      .values({
+        id,
+        userId,
+        name,
+        emoji: emoji || "🤖",
+        instruction: instruction || null,
+        skills: skills || null,
+        createdAt: new Date(),
+      })
+      .returning();
+
+    return newHelper;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to save helper");
+  }
+}
+
+/**
+ * Update helper details
+ */
+export async function updateHelper({
+  id,
+  name,
+  emoji,
+  instruction,
+  skills,
+}: {
+  id: string;
+  name?: string;
+  emoji?: string;
+  instruction?: string;
+  skills?: string[];
+}) {
+  try {
+    const updateData: Partial<Helper> = {};
+
+    if (name !== undefined) updateData.name = name;
+    if (emoji !== undefined) updateData.emoji = emoji;
+    if (instruction !== undefined) updateData.instruction = instruction;
+    if (skills !== undefined) updateData.skills = skills;
+
+    const [updated] = await db
+      .update(helper)
+      .set(updateData)
+      .where(eq(helper.id, id))
+      .returning();
+
+    return updated;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to update helper");
+  }
+}
+
+/**
+ * Delete a helper and unlink all its chats (set helperId to null)
+ */
+export async function deleteHelperById({ id }: { id: string }) {
+  try {
+    // First, unlink all chats from this helper (don't delete them)
+    await db
+      .update(chat)
+      .set({ helperId: null })
+      .where(eq(chat.helperId, id));
+
+    // Then delete the helper
+    await db.delete(helper).where(eq(helper.id, id));
+
+    return { success: true };
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to delete helper");
+  }
+}
+
+/**
+ * Get chats for a specific helper
+ */
+export async function getChatsByHelperId({ helperId }: { helperId: string }) {
+  try {
+    const chats = await db
+      .select({
+        id: chat.id,
+        createdAt: chat.createdAt,
+        title: chat.title,
+        userId: chat.userId,
+        projectId: chat.projectId,
+        helperId: chat.helperId,
+        isRenamed: chat.isRenamed,
+        visibility: chat.visibility,
+        lastContext: sql<null>`NULL`.as("lastContext"),
+      })
+      .from(chat)
+      .where(eq(chat.helperId, helperId))
+      .orderBy(desc(chat.createdAt));
+
+    return chats;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get chats by helper id"
+    );
+  }
+}
+
+/**
+ * Update chat isRenamed flag (for auto-naming feature)
+ */
+export async function updateChatIsRenamed({
+  chatId,
+  isRenamed,
+}: {
+  chatId: string;
+  isRenamed: boolean;
+}) {
+  try {
+    return await db
+      .update(chat)
+      .set({ isRenamed })
+      .where(eq(chat.id, chatId));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update chat isRenamed flag"
+    );
+  }
+}
+
+/**
+ * Update chat title with isRenamed flag (for manual rename)
+ */
+export async function updateChatTitleWithRenamedFlag({
+  chatId,
+  title,
+  isRenamed,
+}: {
+  chatId: string;
+  title: string;
+  isRenamed: boolean;
+}) {
+  try {
+    return await db
+      .update(chat)
+      .set({ title, isRenamed })
+      .where(eq(chat.id, chatId));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update chat title with renamed flag"
     );
   }
 }
