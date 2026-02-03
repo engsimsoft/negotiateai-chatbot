@@ -3,11 +3,13 @@ import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { getUserById } from "@/lib/db/queries";
 import {
-  DashboardHeader,
-  DashboardGreeting,
-  ToolsGrid,
-  BenHint,
-} from "@/components/dashboard";
+  GlavnayaHeader,
+  GlavnayaGreeting,
+  GlavnayaInput,
+  ProjectsSection,
+  HelpersSection,
+  ToolsSection,
+} from "@/components/glavnaya";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -21,13 +23,24 @@ export default async function DashboardPage() {
   const displayName = userProfile?.displayName || session.user.email?.split("@")[0] || "друг";
 
   return (
-    <div className="flex min-h-svh flex-col">
-      <DashboardHeader />
+    <div className="flex min-h-svh flex-col bg-muted/30">
+      <GlavnayaHeader />
 
-      <main className="flex flex-1 flex-col items-center justify-center gap-8 p-4 lg:p-6">
-        <DashboardGreeting displayName={displayName} />
-        <ToolsGrid />
-        <BenHint />
+      <main className="mx-auto w-full max-w-[880px] flex-1 px-4 py-10 lg:px-6">
+        {/* Greeting + Input */}
+        <section className="mb-12">
+          <GlavnayaGreeting displayName={displayName} />
+          <GlavnayaInput />
+        </section>
+
+        {/* Projects */}
+        <ProjectsSection />
+
+        {/* Helpers */}
+        <HelpersSection />
+
+        {/* Tools */}
+        <ToolsSection />
       </main>
     </div>
   );
