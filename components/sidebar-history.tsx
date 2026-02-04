@@ -163,7 +163,7 @@ export function SidebarHistory({
       : false;
 
   const hasEmptyChatHistory = chatHistories
-    ? chatHistories.every((page) => page.chats.length === 0)
+    ? chatHistories.every((page) => !page?.chats || page.chats.length === 0)
     : false;
 
   const handleDelete = () => {
@@ -287,7 +287,7 @@ export function SidebarHistory({
             {chatHistories &&
               (() => {
                 const chatsFromHistory = chatHistories.flatMap(
-                  (chatHistory) => chatHistory.chats
+                  (chatHistory) => chatHistory?.chats || []
                 );
 
                 const groupedChats = groupChatsByDate(chatsFromHistory);

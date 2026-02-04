@@ -1,13 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import {
-  ChevronLeft,
-  MessageSquare,
-  Settings,
-  FileText,
-  Mic,
-  FolderOpen,
-} from "lucide-react";
+import { ChevronLeft, Settings, FolderOpen } from "lucide-react";
 
 import { auth } from "@/app/(auth)/auth";
 import {
@@ -16,14 +9,27 @@ import {
   getChatsByProjectId,
 } from "@/lib/db/queries";
 import { Button } from "@/components/ui/button";
-import { ProjectInstruction } from "@/components/projects/project-instruction";
-import { ProjectFiles } from "@/components/projects/project-files";
-import { ProjectChats } from "@/components/projects/project-chats";
+import { ProjectInput } from "@/components/projects/project-input";
+import { ProjectPassport } from "@/components/projects/project-passport";
+import { ProjectFilesCard } from "@/components/projects/project-files-card";
+import { ProjectChatsCard } from "@/components/projects/project-chats-card";
+import { ProjectMeta } from "@/components/projects/project-meta";
 
 interface ProjectPageProps {
   params: Promise<{ id: string }>;
 }
 
+/**
+ * ТЗ-07A: Страница проекта
+ *
+ * Layout:
+ * - Header с breadcrumbs и кнопкой Настроить
+ * - Поле ввода сверху (как на главной)
+ * - Двухколоночный layout:
+ *   - Левая: Паспорт (табы) + Файлы
+ *   - Правая: Чаты
+ * - Project meta внизу
+ */
 export default async function ProjectPage({ params }: ProjectPageProps) {
   const session = await auth();
 
@@ -39,7 +45,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   }
 
   if (project.userId !== session.user.id) {
-    redirect("/projects");
+    redirect("/dashboard");
   }
 
   const [files, chats] = await Promise.all([
@@ -48,14 +54,14 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   ]);
 
   return (
-    <div className="flex min-h-svh flex-col">
+    <div className="flex min-h-svh flex-col bg-muted/30">
       {/* Header */}
-      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4">
+      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4 lg:px-8">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/projects">
+          <Button variant="ghost" size="sm" asChild className="gap-1.5">
+            <Link href="/dashboard">
               <ChevronLeft className="size-4" />
-              <span className="hidden sm:inline">Проекты</span>
+              <span className="hidden sm:inline">Главная</span>
             </Link>
           </Button>
           <span className="text-muted-foreground">/</span>
@@ -66,31 +72,44 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" asChild>
-            <Link href={`/projects/${id}/chat`}>
-              <MessageSquare className="size-4 mr-1" />
-              Чат
-            </Link>
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Settings className="size-4" />
+          <span className="hidden sm:inline">Настроить</span>
+        </Button>
       </header>
 
       {/* Content */}
-      <main className="flex-1 p-4 lg:p-6">
-        <div className="mx-auto max-w-3xl space-y-8">
-          {/* Instruction Section */}
-          <ProjectInstruction
-            projectId={id}
-            initialInstruction={project.instruction || ""}
-          />
+      <main className="mx-auto w-full max-w-[960px] flex-1 px-4 py-8 lg:px-6">
+        {/* Chat Input */}
+        <section className="mb-8">
+          <ProjectInput projectId={id} projectName={project.name} />
+        </section>
 
-          {/* Files Section */}
-          <ProjectFiles projectId={id} initialFiles={files} />
+        {/* Two-column layout */}
+        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+          {/* Left column — Context */}
+          <div className="flex flex-col gap-6">
+            {/* Passport / Instruction */}
+            <ProjectPassport
+              projectId={id}
+              description={project.description}
+              instruction={project.instruction}
+            />
 
-          {/* Chats Section */}
-          <ProjectChats projectId={id} chats={chats} />
+            {/* Files */}
+            <ProjectFilesCard projectId={id} files={files} />
+          </div>
+
+          {/* Right column — Chats */}
+          <ProjectChatsCard projectId={id} chats={chats} />
         </div>
+
+        {/* Project meta */}
+        <ProjectMeta
+          createdAt={project.createdAt}
+          chatsCount={chats.length}
+          filesCount={files.length}
+        />
       </main>
     </div>
   );

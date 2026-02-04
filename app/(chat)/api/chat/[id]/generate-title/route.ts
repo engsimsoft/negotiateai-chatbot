@@ -25,6 +25,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: chatId } = await params;
+  console.log("[generate-title] Called for chat:", chatId);
 
   const session = await auth();
   if (!session?.user) {
@@ -48,8 +49,10 @@ export async function POST(
 
     // Get messages for context
     const messages = await getMessagesByChatId({ id: chatId });
+    console.log("[generate-title] Messages count:", messages.length);
     if (messages.length < 4) {
       // Not enough messages for auto-naming (need at least 2 exchanges)
+      console.log("[generate-title] Skipped - not enough messages");
       return Response.json({ title: chat.title, skipped: true });
     }
 

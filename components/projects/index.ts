@@ -3,3 +3,8 @@ export { CreateProjectDialog } from "./create-project-dialog";
 export { ProjectInstruction } from "./project-instruction";
 export { ProjectFiles } from "./project-files";
 export { ProjectChats } from "./project-chats";
+export { ProjectInput } from "./project-input";
+export { ProjectPassport } from "./project-passport";
+export { ProjectFilesCard } from "./project-files-card";
+export { ProjectChatsCard } from "./project-chats-card";
+export { ProjectMeta } from "./project-meta";

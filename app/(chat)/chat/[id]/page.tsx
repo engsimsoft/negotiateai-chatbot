@@ -17,6 +17,7 @@ export default async function Page(props: {
   const session = await auth();
 
   if (!session) {
+    console.log(`[Chat Page] No session, redirecting to login for chat ${id}`);
     redirect("/login");
   }
 
@@ -24,16 +25,19 @@ export default async function Page(props: {
 
   // New chat scenario: no chat in DB yet
   if (!chat) {
+    console.log(`[Chat Page] Chat not found in DB: ${id}`);
     return notFound();
   }
 
   // Existing chat scenario
   if (chat.visibility === "private") {
     if (!session.user) {
+      console.log(`[Chat Page] No session.user for private chat ${id}`);
       return notFound();
     }
 
     if (session.user.id !== chat.userId) {
+      console.log(`[Chat Page] User mismatch: session=${session.user.id}, chat.userId=${chat.userId}`);
       return notFound();
     }
   }

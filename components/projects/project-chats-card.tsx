@@ -2,17 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { mutate } from "swr";
-import {
-  FolderOpen,
-  MoreVertical,
-  Pencil,
-  Trash2,
-  Loader2,
-} from "lucide-react";
+import { Plus, MessageSquare, MoreVertical, Pencil, Trash2, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,77 +32,78 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { Chat } from "@/lib/db/schema";
 
-interface ProjectCardProps {
-  project: {
-    id: string;
-    name: string;
-    description: string | null;
-    fileCount: number;
-    chatCount: number;
-    updatedAt: Date;
-  };
+interface ProjectChatsCardProps {
+  projectId: string;
+  chats: Chat[];
 }
 
-export function ProjectCard({ project }: ProjectCardProps) {
+function formatChatTime(date: Date): string {
+  return formatDistanceToNow(date, { addSuffix: false, locale: ru });
+}
+
+interface ChatItemProps {
+  chat: Chat;
+  projectId: string;
+  onUpdate: () => void;
+}
+
+function ChatItem({ chat, projectId, onUpdate }: ChatItemProps) {
+  const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
-  const [newName, setNewName] = useState(project.name);
-
-  const updatedAgo = formatDistanceToNow(project.updatedAt, {
-    addSuffix: false,
-    locale: ru,
-  });
+  const [newTitle, setNewTitle] = useState(chat.title || "");
 
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/projects/${project.id}`, {
+      const response = await fetch(`/api/chat/${chat.id}`, {
         method: "DELETE",
       });
 
       if (!response.ok) {
-        throw new Error("Failed to delete project");
+        throw new Error("Failed to delete chat");
       }
 
-      // Закрываем диалог и обновляем список через SWR
       setShowDeleteDialog(false);
       setIsDeleting(false);
-      mutate("/api/projects");
+      onUpdate();
+      router.refresh();
     } catch (error) {
-      console.error("Failed to delete project:", error);
+      console.error("Failed to delete chat:", error);
       setIsDeleting(false);
       setShowDeleteDialog(false);
     }
   };
 
   const handleRename = async () => {
-    if (!newName.trim() || newName === project.name) {
+    if (!newTitle.trim() || newTitle === chat.title) {
       setShowRenameDialog(false);
       return;
     }
 
     setIsRenaming(true);
     try {
-      const response = await fetch(`/api/projects/${project.id}`, {
+      const response = await fetch(`/api/chat/${chat.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName.trim() }),
+        body: JSON.stringify({ title: newTitle.trim() }),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to rename project");
+        throw new Error("Failed to rename chat");
       }
 
       setShowRenameDialog(false);
       setIsRenaming(false);
-      mutate("/api/projects");
+      onUpdate();
+      router.refresh();
     } catch (error) {
-      console.error("Failed to rename project:", error);
+      console.error("Failed to rename chat:", error);
       setIsRenaming(false);
       setShowRenameDialog(false);
     }
@@ -114,17 +111,18 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
   return (
     <>
-      <div className="group relative">
-        <Link href={`/projects/${project.id}`}>
-          <div className="flex items-center gap-3 rounded-xl border bg-background p-3 transition-colors hover:bg-muted/50">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-              <FolderOpen className="size-5 text-muted-foreground" />
+      <div className="group relative flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted">
+        <Link
+          href={`/projects/${projectId}/chat/${chat.id}`}
+          className="flex flex-1 items-center gap-3 min-w-0"
+        >
+          <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+          <div className="flex-1 min-w-0 pr-8">
+            <div className="truncate text-sm font-medium">
+              {chat.title || "Новый чат"}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium truncate pr-8">{project.name}</div>
-              <div className="text-xs text-muted-foreground">
-                {project.chatCount} чатов · {updatedAgo}
-              </div>
+            <div className="text-xs text-muted-foreground">
+              Обновлён {formatChatTime(chat.createdAt)}
             </div>
           </div>
         </Link>
@@ -135,7 +133,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-2 top-1/2 -translate-y-1/2 size-8 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute right-1 top-1/2 -translate-y-1/2 size-7 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => e.preventDefault()}
             >
               <MoreVertical className="size-4" />
@@ -145,7 +143,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <DropdownMenuItem
               onClick={(e) => {
                 e.preventDefault();
-                setNewName(project.name);
+                setNewTitle(chat.title || "");
                 setShowRenameDialog(true);
               }}
             >
@@ -171,9 +169,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Удалить проект?</AlertDialogTitle>
+            <AlertDialogTitle>Удалить чат?</AlertDialogTitle>
             <AlertDialogDescription>
-              Проект «{project.name}» и все его чаты будут удалены безвозвратно.
+              Чат «{chat.title || "Новый чат"}» будет удалён безвозвратно.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -198,12 +196,12 @@ export function ProjectCard({ project }: ProjectCardProps) {
       <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Переименовать проект</DialogTitle>
+            <DialogTitle>Переименовать чат</DialogTitle>
           </DialogHeader>
           <Input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Название проекта"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Название чата"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 handleRename();
@@ -214,7 +212,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
               Отмена
             </Button>
-            <Button onClick={handleRename} disabled={isRenaming || !newName.trim()}>
+            <Button onClick={handleRename} disabled={isRenaming || !newTitle.trim()}>
               {isRenaming && <Loader2 className="size-4 mr-2 animate-spin" />}
               Сохранить
             </Button>
@@ -222,5 +220,53 @@ export function ProjectCard({ project }: ProjectCardProps) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/**
+ * ТЗ-07A: Карточка чатов проекта с меню управления
+ */
+export function ProjectChatsCard({ projectId, chats }: ProjectChatsCardProps) {
+  const handleUpdate = () => {
+    // Trigger re-fetch of project data
+    mutate(`/api/projects/${projectId}`);
+  };
+
+  return (
+    <div className="rounded-xl border bg-background p-4">
+      {/* Header */}
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Чаты ({chats.length})
+        </h3>
+        <Button size="sm" className="h-7 gap-1.5 text-xs" asChild>
+          <Link href={`/projects/${projectId}/chat`}>
+            <Plus className="size-3.5" />
+            Новый чат
+          </Link>
+        </Button>
+      </div>
+
+      {/* Chats list */}
+      {chats.length > 0 ? (
+        <div className="space-y-1">
+          {chats.map((chat) => (
+            <ChatItem
+              key={chat.id}
+              chat={chat}
+              projectId={projectId}
+              onUpdate={handleUpdate}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="py-8 text-center">
+          <MessageSquare className="mx-auto mb-2 size-8 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">
+            Нет чатов. Начните общение с AI в контексте проекта.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }

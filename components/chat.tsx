@@ -50,6 +50,9 @@ export function Chat({
   projectId,
   projectName,
   projectModelTier,
+  helperId,
+  helperName,
+  helperEmoji,
 }: {
   id: string;
   initialMessages: ChatMessage[];
@@ -61,6 +64,9 @@ export function Chat({
   projectId?: string;
   projectName?: string;
   projectModelTier?: string;
+  helperId?: string;
+  helperName?: string;
+  helperEmoji?: string;
 }) {
   const { visibilityType } = useChatVisibility({
     chatId: id,
@@ -198,9 +204,10 @@ export function Chat({
     generateId: generateUUID,
     transport,
     onData: (dataPart) => {
-      setDataStream((ds) => (ds ? [...ds, dataPart] : []));
+      // Cast dataPart to match expected type
+      setDataStream((ds) => (ds ? [...ds, dataPart as typeof ds[number]] : []));
       if (dataPart.type === "data-usage") {
-        setUsage(dataPart.data);
+        setUsage(dataPart.data as AppUsage);
       }
 
       // ТЗ-03 Фаза 7: Handle Professor Pipeline events
@@ -257,6 +264,27 @@ export function Chat({
           setProfessorError(undefined);
         }, 3000);
       }
+
+      // ТЗ-07A: Автонейминг чата после 2-го ответа AI (4+ сообщений)
+      // Используем setTimeout чтобы messages успели обновиться
+      setTimeout(async () => {
+        // messages.length проверяем внутри timeout, т.к. state может быть stale
+        // Получаем актуальное количество через DOM или просто делаем запрос
+        try {
+          const response = await fetch(`/api/chat/${id}/generate-title`, {
+            method: "POST",
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.generated) {
+              // Обновить sidebar для отображения нового названия
+              mutate(unstable_serialize(getChatHistoryPaginationKey));
+            }
+          }
+        } catch {
+          // Ignore auto-naming errors silently
+        }
+      }, 500);
     },
     onError: (error) => {
       if (error instanceof ChatSDKError) {
@@ -305,19 +333,35 @@ export function Chat({
   const searchParams = useSearchParams();
   const query = searchParams.get("query");
 
-  const [hasAppendedQuery, setHasAppendedQuery] = useState(false);
+  const hasAppendedQueryRef = useRef(false);
 
   useEffect(() => {
-    if (query && !hasAppendedQuery) {
+    if (query && !hasAppendedQueryRef.current) {
+      hasAppendedQueryRef.current = true;
       sendMessage({
         role: "user" as const,
         parts: [{ type: "text", text: query }],
       });
-
-      setHasAppendedQuery(true);
-      window.history.replaceState({}, "", `/chat/${id}`);
+      // ТЗ-07A: Сохраняем контекст проекта в URL
+      const newUrl = projectId
+        ? `/projects/${projectId}/chat/${id}`
+        : `/chat/${id}`;
+      window.history.replaceState({}, "", newUrl);
     }
-  }, [query, sendMessage, hasAppendedQuery, id]);
+  }, [query, sendMessage, id, projectId]);
+
+  // ТЗ-07A: Обновляем URL при первом сообщении в чате проекта (без query параметра)
+  const hasUpdatedUrlRef = useRef(false);
+  useEffect(() => {
+    if (projectId && messages.length > 0 && !hasUpdatedUrlRef.current) {
+      hasUpdatedUrlRef.current = true;
+      const expectedUrl = `/projects/${projectId}/chat/${id}`;
+      // Проверяем, что URL ещё не содержит chatId
+      if (!window.location.pathname.includes(id)) {
+        window.history.replaceState({}, "", expectedUrl);
+      }
+    }
+  }, [projectId, messages.length, id]);
 
   const { data: votes } = useSWR<Vote[]>(
     messages.length >= 2 ? `/api/vote?chatId=${id}` : null,

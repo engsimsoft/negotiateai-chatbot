@@ -1,5 +1,5 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { customProvider } from "ai";
 import { isTestEnvironment } from "../constants";
 
@@ -17,6 +17,9 @@ import { isTestEnvironment } from "../constants";
  *    - claude-sonnet-4.5 — баланс скорости и качества, 1M контекст
  *    - claude-opus-4.5 — максимальное качество, reasoning
  *    - claude-haiku-4.5 — быстрый и дешёвый
+ *
+ * NOTE: Using official @openrouter/ai-sdk-provider for proper tool calling support.
+ * The generic OpenAI provider with baseURL doesn't handle Claude's tool call format correctly.
  */
 
 // Initialize Google provider
@@ -25,9 +28,9 @@ const google = createGoogleGenerativeAI({
 });
 
 // Initialize OpenRouter provider (for Claude models)
-const openRouter = createOpenAI({
+// Using official SDK for proper tool calling support
+const openRouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
 });
 
 export const myProvider = isTestEnvironment

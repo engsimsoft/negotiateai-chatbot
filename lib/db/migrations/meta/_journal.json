@@ -127,6 +127,13 @@
       "when": 1770144008697,
       "tag": "0017_special_queen_noir",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1770307200000,
+      "tag": "0018_performance_indexes",
+      "breakpoints": true
     }
   ]
 }

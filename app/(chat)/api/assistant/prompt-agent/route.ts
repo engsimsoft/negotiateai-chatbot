@@ -7,7 +7,7 @@
  * Uses new Skills + Agents architecture (v2).
  */
 
-import { convertToModelMessages, streamText } from "ai";
+import { convertToCoreMessages, streamText } from "ai";
 import { myProvider } from "@/lib/ai/providers";
 import { buildPromptAgentPrompt } from "@/lib/prompts/server";
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const result = streamText({
       model: myProvider.languageModel(prompt.model),
       system: prompt.systemPrompt,
-      messages: convertToModelMessages(messages),
+      messages: convertToCoreMessages(messages),
       temperature: 1.0,
     });
 

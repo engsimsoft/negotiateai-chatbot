@@ -147,15 +147,17 @@ export async function saveChat({
   title,
   visibility,
   projectId,
+  helperId,
 }: {
   id: string;
   userId: string;
   title: string;
   visibility: VisibilityType;
   projectId?: string;
+  helperId?: string;
 }) {
   try {
-    console.log('[saveChat] Attempting to save chat:', { id, userId, title, visibility, projectId });
+    console.log('[saveChat] Attempting to save chat:', { id, userId, title, visibility, projectId, helperId });
     return await db.insert(chat).values({
       id,
       createdAt: new Date(),
@@ -163,6 +165,7 @@ export async function saveChat({
       title,
       visibility,
       projectId: projectId || null,
+      helperId: helperId || null,
     });
   } catch (error) {
     console.error('[saveChat] Database error:', error);

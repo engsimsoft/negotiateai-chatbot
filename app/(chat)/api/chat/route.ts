@@ -1,6 +1,6 @@
 import { geolocation } from "@vercel/functions";
 import {
-  convertToModelMessages,
+  convertToCoreMessages,
   createUIMessageStream,
   JsonToSseTransformStream,
   smoothStream,
@@ -79,8 +79,19 @@ export async function POST(request: Request) {
 
   try {
     const json = await request.json();
+    console.log("[Chat API] Received request:", JSON.stringify(json, null, 2).slice(0, 1000));
     requestBody = postRequestBodySchema.parse(json);
-  } catch (_) {
+  } catch (error) {
+    // Log Zod validation errors in detail
+    const zodError = error as any;
+    console.error("[Chat API] Schema validation failed:", {
+      message: zodError?.message || "Unknown error",
+      issues: zodError?.issues?.map((i: any) => ({
+        path: i.path?.join("."),
+        message: i.message,
+        received: i.received,
+      })) || [],
+    });
     return new ChatSDKError("bad_request:api").toResponse();
   }
 
@@ -92,6 +103,7 @@ export async function POST(request: Request) {
       selectedVisibilityType,
       projectId,
       projectModelTier,
+      helperId,
     }: {
       id: string;
       message: ChatMessage;
@@ -99,6 +111,7 @@ export async function POST(request: Request) {
       selectedVisibilityType: VisibilityType;
       projectId?: string;
       projectModelTier?: ProjectModelTier;
+      helperId?: string;
     } = requestBody;
 
     const session = await auth();
@@ -145,9 +158,10 @@ export async function POST(request: Request) {
       await saveChat({
         id,
         userId: session.user.id,
-        title: projectId ? `Чат проекта` : "Новый чат",
+        title: projectId ? `Чат проекта` : helperId ? "Чат с помощником" : "Новый чат",
         visibility: selectedVisibilityType,
         projectId: projectId || undefined,
+        helperId: helperId || undefined,
       });
 
       // ТЗ-07A: Автонейминг теперь происходит после 2-го ответа AI (см. chat.tsx)
@@ -278,7 +292,7 @@ export async function POST(request: Request) {
             .join("\n");
 
           // Convert UI messages to CoreMessage format for pipeline
-          const coreMessages = convertToModelMessages(uiMessages.slice(0, -1)); // Exclude current message
+          const coreMessages = convertToCoreMessages(uiMessages.slice(0, -1)); // Exclude current message
 
           try {
             let accumulatedContent = "";
@@ -327,7 +341,7 @@ export async function POST(request: Request) {
         const result = streamText({
           model: modelToUse,
           system: systemPromptText,
-          messages: convertToModelMessages(uiMessages),
+          messages: convertToCoreMessages(uiMessages),
           temperature: 1.0,
           // Gemini-specific options (only apply for non-project chats)
           providerOptions: isProjectChat ? {} : {

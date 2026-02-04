@@ -160,8 +160,16 @@ function PureMultimodalInput({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadQueue, setUploadQueue] = useState<string[]>([]);
+  const isSubmittingRef = useRef(false);
 
   const submitForm = useCallback(() => {
+    // Guard against double submission
+    if (isSubmittingRef.current) {
+      console.warn("[MultimodalInput] Prevented double submission");
+      return;
+    }
+    isSubmittingRef.current = true;
+
     window.history.replaceState({}, "", `/chat/${chatId}`);
 
     sendMessage({
@@ -188,6 +196,11 @@ function PureMultimodalInput({
     if (width && width > 768) {
       textareaRef.current?.focus();
     }
+
+    // Reset guard after a short delay to allow next submission
+    setTimeout(() => {
+      isSubmittingRef.current = false;
+    }, 500);
   }, [
     input,
     setInput,

@@ -16,12 +16,14 @@ export async function GET(request: Request) {
   const session = await auth();
 
   if (!session?.user) {
+    console.log("[Vote API] Unauthorized - no session");
     return new ChatSDKError("unauthorized:vote").toResponse();
   }
 
   const chat = await getChatById({ id: chatId });
 
   if (!chat) {
+    console.log(`[Vote API] Chat not found: ${chatId}`);
     return new ChatSDKError("not_found:chat").toResponse();
   }
 

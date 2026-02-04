@@ -38,7 +38,7 @@ export async function GET(
     }
 
     const chats = await getChatsByProjectId({ projectId: id });
-    return Response.json(chats);
+    return Response.json({ chats, hasMore: false });
   } catch (error) {
     if (error instanceof ChatSDKError) {
       return error.toResponse();
