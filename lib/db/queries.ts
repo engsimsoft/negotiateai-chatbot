@@ -1223,37 +1223,32 @@ export async function getChatsByProjectId({ projectId }: { projectId: string }) 
 
 /**
  * Get project with file count and chat count (for listing)
+ * Optimized: Single query with LEFT JOINs instead of N+1 queries
  */
 export async function getProjectsWithStats({ userId }: { userId: string }) {
   try {
-    const projects = await db
-      .select()
+    // Single query with LEFT JOINs and GROUP BY
+    // This replaces N+1 queries (1 + N*2) with ONE query
+    const result = await db
+      .select({
+        id: project.id,
+        userId: project.userId,
+        name: project.name,
+        description: project.description,
+        instruction: project.instruction,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
+        fileCount: sql<number>`COALESCE(COUNT(DISTINCT ${projectFile.id}), 0)::int`,
+        chatCount: sql<number>`COALESCE(COUNT(DISTINCT ${chat.id}), 0)::int`,
+      })
       .from(project)
+      .leftJoin(projectFile, eq(projectFile.projectId, project.id))
+      .leftJoin(chat, eq(chat.projectId, project.id))
       .where(eq(project.userId, userId))
+      .groupBy(project.id)
       .orderBy(desc(project.updatedAt));
 
-    // Get counts for each project
-    const projectsWithStats = await Promise.all(
-      projects.map(async (p) => {
-        const [fileStats] = await db
-          .select({ count: count(projectFile.id) })
-          .from(projectFile)
-          .where(eq(projectFile.projectId, p.id));
-
-        const [chatStats] = await db
-          .select({ count: count(chat.id) })
-          .from(chat)
-          .where(eq(chat.projectId, p.id));
-
-        return {
-          ...p,
-          fileCount: fileStats?.count ?? 0,
-          chatCount: chatStats?.count ?? 0,
-        };
-      })
-    );
-
-    return projectsWithStats;
+    return result;
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
