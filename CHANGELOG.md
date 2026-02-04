@@ -12,6 +12,136 @@
 
 ---
 
+## [3.4.0] - 2026-02-04 - Glavnaya + Navigation + Sidebar (ТЗ-07A)
+
+**MINOR RELEASE**: Новая главная страница, унифицированная система инпутов, контекстный sidebar, автонейминг чатов.
+
+### Summary
+
+Полный редизайн пользовательского опыта: новая главная страница в стиле Google Gemini / Claude Desktop, композиционная система инпутов (как конструктор LEGO), контекстный sidebar, автоматическая генерация и редактирование названий чатов.
+
+### Added
+
+#### Unified Input System (`components/input/`)
+- **`input-context.tsx`** — React Context для связи компонентов
+- **`input-base.tsx`** — базовый контейнер с toolbar
+- **`input-textarea.tsx`** — поле ввода с auto-resize
+- **`input-voice-button.tsx`** — 🎤 кнопка диктовки (Deepgram)
+- **`input-voice-mode-button.tsx`** — 🔊 голосовой режим (Coming soon)
+- **`input-model-selector.tsx`** — селектор модели (Google/Anthropic)
+- **`input-attachments.tsx`** — 📎 кнопка вложений
+- **`input-submit-button.tsx`** — кнопка отправки
+- **`compact-input.tsx`** — готовый пресет для главной/проектов
+- **`index.tsx`** — экспорты
+
+#### New Glavnaya (Home Page)
+- **`components/glavnaya/`** — компоненты главной страницы
+- Инпут в центре экрана (дизайн Google Gemini)
+- Селектор модели в toolbar
+- Голосовой ввод работает сразу
+
+#### Chat Management
+- **`app/(chat)/api/chat/[id]/route.ts`** — DELETE/PATCH API для чатов
+- **`app/(chat)/api/chat/[id]/generate-title/route.ts`** — генерация заголовков
+- Автоматическое именование чатов после первого сообщения
+- Inline-переименование чатов в sidebar
+
+#### Universal Dialog System
+- **`components/universal-dialog/`** — унифицированный компонент диалогов
+- Поддержка confirm, prompt, custom форм
+- Используется для удаления и переименования
+
+#### Navigation
+- Breadcrumbs на всех уровнях (Главная > Проект > Чат)
+- Helper routes для навигации
+
+### Changed
+
+#### Contextual Sidebar
+- Sidebar показывает релевантные чаты в зависимости от контекста
+- На главной — чаты без проекта
+- В проекте — чаты этого проекта
+- Удалён функционал "Поделиться"
+
+#### Updated Components
+- **`components/glavnaya/glavnaya-input.tsx`** — использует CompactInput
+- **`components/projects/project-input.tsx`** — использует CompactInput
+- **`components/sidebar-history.tsx`** — контекстная фильтрация + меню
+- **`components/sidebar-history-item.tsx`** — inline-редактирование
+
+### Architecture
+
+#### Композиционный подход
+```tsx
+// Главная (Google Gemini)
+<CompactInput provider="google" redirectPath="/chat" />
+
+// Проект (Anthropic Claude)
+<CompactInput provider="anthropic" redirectPath={`/projects/${id}/chat`} />
+```
+
+#### Два режима работы
+- `mode="redirect"` — главная/проект (редирект с query params)
+- `mode="send"` — чат (отправка через useChat)
+
+### Files
+
+```
+components/input/                    # NEW - Unified input system (10 files)
+components/glavnaya/                 # NEW - Home page components
+components/universal-dialog/         # NEW - Dialog system
+app/(chat)/api/chat/[id]/route.ts   # NEW - Chat management API
+app/(chat)/api/chat/[id]/generate-title/route.ts  # NEW - Title generation
+```
+
+---
+
+## [3.3.3] - 2026-02-03 - OpenRouter SDK & Project Chat Fixes
+
+**PATCH RELEASE**: Исправлена работа tool calls для Claude через OpenRouter, фикс hydration error.
+
+### Summary
+
+Tool calls теперь работают корректно для Claude-моделей в проектных чатах. Проблема была в использовании generic OpenAI SDK вместо официального OpenRouter SDK.
+
+### Fixed
+
+#### OpenRouter SDK Migration
+- **`lib/ai/providers.ts`** — переход с `@ai-sdk/openai` на `@openrouter/ai-sdk-provider@1.5.4`
+- Tool calls теперь корректно работают для Claude Haiku/Sonnet/Opus
+- Совместимость с Vercel AI SDK v5.x
+
+#### Chat Header Hydration Fix
+- **`components/chat-header.tsx`** — добавлен `mounted` state для предотвращения hydration mismatch
+- `useWindowSize()` теперь корректно работает с SSR
+
+#### Project Chat Tools
+- **`app/(chat)/api/chat/route.ts`** — `readDocument` исключён из проектных чатов
+- Проектные документы уже включены в контекст через `buildProjectContext()`
+- `readDocument` остаётся доступным в обычных чатах для папки `knowledge/`
+
+### Changed
+
+#### Dependencies
+- Добавлен `@openrouter/ai-sdk-provider@1.5.4` (совместим с `ai@^5.0.0`)
+- Удалена зависимость OpenRouter от `@ai-sdk/openai`
+
+### Technical
+
+- OpenRouter SDK обеспечивает корректную передачу tool definitions в Claude API
+- Проектные файлы с `extractedContent` автоматически включаются в system prompt
+- Лимиты контекста: 50K символов на файл, 150K общий
+
+### Files
+
+```
+lib/ai/providers.ts              # OpenRouter SDK migration
+components/chat-header.tsx       # Hydration fix
+app/(chat)/api/chat/route.ts     # Conditional tools
+```
+
+---
+
 ## [3.3.2] - 2026-02-03 - loadSkill Tool for Dynamic Skill Loading
 
 **PATCH RELEASE**: Добавлен tool `loadSkill` для динамической загрузки инструкций из SKILL.md файлов.

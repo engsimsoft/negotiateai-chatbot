@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.3.2
-**Дата:** 2026-02-03
+**Версия:** 3.4.0
+**Дата:** 2026-02-04
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -256,7 +256,7 @@ components/projects/
 | Слой | Технология |
 |------|------------|
 | Frontend | Next.js 15.3, React 18, TypeScript, Tailwind CSS |
-| AI | Vercel AI SDK (@ai-sdk/google, @ai-sdk/openai, @ai-sdk/anthropic) |
+| AI | Vercel AI SDK (@ai-sdk/google, @openrouter/ai-sdk-provider) |
 | Auth | NextAuth 5.0-beta.25 |
 | Database | PostgreSQL (Neon) + Drizzle ORM |
 | Storage | Vercel Blob Storage |
@@ -266,6 +266,27 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-07A: Glavnaya + Navigation + Sidebar — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Новая главная страница** — `/` с инпутом в стиле Google Gemini / Claude Desktop
+- **Унифицированная система инпутов** — `components/input/` (композиционная архитектура)
+- **Контекстный sidebar** — показывает релевантные чаты (главные / проектные)
+- **Автонейминг чатов** — автоматическая генерация названий через Gemini Flash
+- **Переименование чатов** — inline-редактирование в sidebar
+- **Universal Dialog** — унифицированный компонент диалогов
+- **Breadcrumbs** — навигационные хлебные крошки на всех уровнях
+- **API управления чатами** — DELETE/PATCH для `/api/chat/[id]`
+
+**Ключевые файлы:**
+- `components/input/` — унифицированная система инпутов (10 файлов)
+- `components/glavnaya/` — компоненты главной страницы
+- `components/universal-dialog/` — система диалогов
+- `app/(chat)/api/chat/[id]/route.ts` — API чатов
+- `app/(chat)/api/chat/[id]/generate-title/route.ts` — генерация заголовков
+
+**Детали:** [_archive/TZ_07A_Glavnaya/](_archive/TZ_07A_Glavnaya/)
 
 ### ТЗ-04: Skills + Agents Architecture — ✅ ЗАВЕРШЁН
 
@@ -386,10 +407,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.3.2 |
+| Версия | 3.4.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
+| Архитектура UI | Унифицированные инпуты (v3.4) |
 | Skills | 6 (document: 4, research: 1, utility: 1) |
 | Agents | 1 (ben) |
 | Промптов | 4 (chat, prompt-agent, ben, project) |
@@ -419,6 +441,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_07A_Glavnaya/](_archive/TZ_07A_Glavnaya/) — ТЗ-07A Glavnaya + Navigation + Sidebar
 - [_archive/TZ_04_ROADMAP.md](_archive/TZ_04_ROADMAP.md) — ТЗ-04 Skills + Agents
 - [_archive/TZ_03_PROJECTS_ANTHROPIC_PROFESSOR.md](_archive/TZ_03_PROJECTS_ANTHROPIC_PROFESSOR.md) — ТЗ-03 Проекты + Claude
 - [_archive/TZ_02_ROADMAP.md](_archive/TZ_02_ROADMAP.md) — ТЗ-02 Dashboard + Sidebar
@@ -435,4 +458,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-03
+**Обновлено:** 2026-02-04

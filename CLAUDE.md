@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.2.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.4.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -55,13 +55,32 @@
 
 ## Структура кода
 
-**Prompt System (v3.0):**
-- `lib/prompts/` — Файловая система промптов
-- `lib/prompts/chat/config.ts` — Конфиг основного чата
-- `lib/prompts/ben/config.ts` — Конфиг Бена
-- `lib/prompts/assistants/prompt-agent/config.ts` — Конфиг Prompt-агента
-- `lib/prompts/builder.ts` — Логика сборки промптов
+**Prompt System (v3.3 — Skills + Agents):**
+- `lib/prompts/` — Система промптов (Skills + Agents)
+- `lib/prompts/server.ts` — Server-only экспорты (buildChatPrompt, buildBenPrompt)
+- `lib/prompts/index.ts` — Client-safe экспорты (типы, утилиты)
+- `lib/prompts/builder/` — Модульная система сборки (registry, loaders, composer)
+- `lib/prompts/skills/` — Атомарные навыки (SKILL.md)
+- `lib/prompts/agents/` — Персонажи-агенты (AGENT.md + config.yaml)
+- `lib/prompts/core/` — Базовые промпты (.md файлы)
 - `lib/prompts/contexts/` — Контексты (user-profile, chat-memory)
+
+**Unified Input System (v3.4.0):**
+- `components/input/` — Унифицированная система инпутов (композиция)
+- `components/input/input-context.tsx` — React Context для связи компонентов
+- `components/input/input-base.tsx` — Базовый контейнер + toolbar
+- `components/input/input-textarea.tsx` — Поле ввода с auto-resize
+- `components/input/input-voice-button.tsx` — 🎤 Диктовка (Deepgram)
+- `components/input/input-model-selector.tsx` — Селектор модели
+- `components/input/compact-input.tsx` — Готовый пресет для главной/проектов
+
+**Glavnaya (Home Page):**
+- `app/(chat)/page.tsx` — Главная страница
+- `components/glavnaya/` — Компоненты главной
+- `components/glavnaya/glavnaya-input.tsx` — Инпут на главной (использует CompactInput)
+
+**Universal Dialog:**
+- `components/universal-dialog/` — Система диалогов (confirm, prompt, custom)
 
 **Modal Assistants:**
 - `components/modal-assistants/` — UI модальных помощников
@@ -70,19 +89,17 @@
 - `app/(chat)/api/assistant/prompt-agent/route.ts` — API Prompt-агента
 - `app/(chat)/api/assistant/ben/route.ts` — API Бена
 
-**Dashboard:**
-- `app/(dashboard)/` — Route group без sidebar
-- `app/(dashboard)/dashboard/page.tsx` — Главная страница с карточками
-- `components/dashboard/` — Dashboard компоненты (header, greeting, tool-card, tools-grid)
-
-**Sidebar:**
+**Sidebar (контекстный):**
 - `components/sidebar-layout.tsx` — Layout с табами вне Sidebar
-- `components/sidebar-tabs.tsx` — Вертикальные иконки (Search, Chats, Projects)
+- `components/sidebar-history.tsx` — История чатов (контекстная фильтрация)
+- `components/sidebar-history-item.tsx` — Элемент чата (inline-редактирование)
 - `components/app-sidebar.tsx` — Sidebar с историей чатов
 - `components/ui/sidebar.tsx` — CSS variable `--sidebar-left-offset`
 
 **AI/Chat:**
 - `app/(chat)/api/chat/route.ts` — Chat endpoint (streaming)
+- `app/(chat)/api/chat/[id]/route.ts` — Chat management (DELETE/PATCH)
+- `app/(chat)/api/chat/[id]/generate-title/route.ts` — Автонейминг чатов
 - `lib/ai/providers.ts` — Конфигурация AI-моделей
 - `lib/ai/model-tiers.ts` — Уровни моделей для проектов (Haiku/Sonnet/Opus)
 - `lib/ai/professor-pipeline.ts` — Pipeline для режима Профессор
@@ -124,7 +141,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**
@@ -185,6 +202,7 @@ vercel --prod            # Deploy на Vercel
 - [docs/setup.md](docs/setup.md) — Установка
 - [docs/architecture.md](docs/architecture.md) — Архитектура
 - [docs/deployment.md](docs/deployment.md) — Deployment
+- [docs/mcp-tools.md](docs/mcp-tools.md) — MCP инструменты (PostgreSQL, GitHub, Vercel)
 - [docs/decisions/](docs/decisions/) — ADR
 
 **Архив (не читать для новых задач):**
@@ -194,19 +212,94 @@ vercel --prod            # Deploy на Vercel
 
 ---
 
+## MCP-инструменты (ВАЖНО!)
+
+> **Используй MCP-инструменты для ускорения работы!** Не забывай про них.
+
+**Доступные инструменты:**
+
+| Инструмент | Что делает | Когда использовать |
+|------------|------------|-------------------|
+| `mcp__postgres__query` | SQL-запросы к базе | Проверка данных, отладка, анализ |
+| `mcp__github__*` | Работа с GitHub | Коммиты, issues, PRs |
+| Vercel (терминал) | Деплои, логи | Через `claude "..."` в терминале |
+
+**Примеры использования:**
+```sql
+-- Вместо "посмотри в базе" — делай запрос напрямую:
+SELECT * FROM "User" LIMIT 5;
+SELECT COUNT(*) FROM "Chat";
+```
+
+**Документация:** [docs/mcp-tools.md](docs/mcp-tools.md)
+
+---
+
+## UI Guidelines (для редизайна)
+
+**Дизайн-система:**
+- **Компоненты:** shadcn/ui (components/ui/) — 22 базовых компонента
+- **Стили:** Tailwind CSS с CSS variables для темизации
+- **Иконки:** Lucide React
+
+**Принципы:**
+1. **Mobile-first** — responsive через Tailwind breakpoints (sm/md/lg/xl)
+2. **Консистентность** — один паттерн = один компонент (не дублировать логику)
+3. **Accessibility** — семантический HTML, ARIA где нужно
+4. **Apple-подход** — минимализм, качество важнее количества
+
+**Spacing система (Tailwind):**
+- Мелкие элементы: `gap-2` (8px)
+- Между секциями: `gap-4` или `gap-6` (16-24px)
+- Крупные блоки: `gap-8` (32px)
+- Padding контента: `p-4` mobile, `p-6` desktop
+
+**Цвета (CSS variables):**
+- `--background`, `--foreground` — основа
+- `--muted`, `--muted-foreground` — вторичный текст
+- `--primary`, `--primary-foreground` — акцент
+- `--destructive` — ошибки/удаление
+
+**Текущие боли (решаем в редизайне):**
+1. Непоследовательность layout-ов (projects то с sidebar, то без)
+2. Dashboard слишком простой
+3. Search таб не функционален
+4. Навигация между режимами не очевидна
+
+**Карта компонентов:** [BRAINSTORM_UI_ARCHITECTURE.md](BRAINSTORM_UI_ARCHITECTURE.md)
+
+---
+
 ## Workflow
 
-**Моя роль:** Получаю ТЗ → Пишу код → Документирую изменения в STATUS/CHANGELOG
+**Моя роль:** Получаю ТЗ → Анализирую → Пишу код → Документирую
 
-**При работе с новыми задачами:**
+**При работе с новым ТЗ:**
+1. Читай [specs/WORKFLOW.md](specs/WORKFLOW.md) — процесс работы с ТЗ
+2. Создай папку `specs/TZ_XX_Name/`
+3. Следуй фазам: Анализ → Планирование → Разработка → Финализация
+4. Обновляй HANDOFF.md после каждой сессии
+
+**Структура ТЗ:**
+```
+specs/
+├── WORKFLOW.md         # Инструкция (передаётся с каждым ТЗ)
+├── _template/          # Шаблоны файлов
+└── TZ_XX_Name/         # Активное ТЗ
+    ├── SPEC.md         # Само ТЗ
+    ├── ANALYSIS.md     # Анализ, вопросы
+    ├── ROADMAP.md      # План внедрения
+    ├── CHANGELOG.md    # Лог изменений (локальный)
+    └── HANDOFF.md      # Передача между сессиями
+```
+
+**При работе с существующими задачами:**
 1. Читай [SIMPLY_STATUS.md](SIMPLY_STATUS.md) — текущее состояние
 2. Читай [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md) — куда идём
 3. Читай docs/ — техническая документация
-4. Выполняй задачу
-5. Обновляй SIMPLY_STATUS.md и CHANGELOG.md
 
 **Правило:** Не читай `_archive/` — там только история.
 
 ---
 
-**Обновлено:** 2026-02-02
+**Обновлено:** 2026-02-04

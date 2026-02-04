@@ -50,9 +50,6 @@ export function Chat({
   projectId,
   projectName,
   projectModelTier,
-  helperId,
-  helperName,
-  helperEmoji,
 }: {
   id: string;
   initialMessages: ChatMessage[];
@@ -64,10 +61,6 @@ export function Chat({
   projectId?: string;
   projectName?: string;
   projectModelTier?: string;
-  // ТЗ-07A: Helper chat support
-  helperId?: string;
-  helperName?: string;
-  helperEmoji?: string;
 }) {
   const { visibilityType } = useChatVisibility({
     chatId: id,
@@ -97,9 +90,6 @@ export function Chat({
   const isProfessorMode = currentProjectTier === "professor";
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // ТЗ-07A: Автонейминг — флаг чтобы вызвать только один раз
-  const hasTriggeredAutonaming = useRef(false);
 
   useEffect(() => {
     currentModelIdRef.current = currentModelId;
@@ -185,14 +175,12 @@ export function Chat({
               // ТЗ-03: Project chat support
               ...(projectId && { projectId }),
               ...(projectId && { projectModelTier: currentProjectTierRef.current }),
-              // ТЗ-07A: Helper chat support
-              ...(helperId && { helperId }),
               ...request.body,
             },
           };
         },
       }),
-    [retryableFetch, visibilityType, projectId, helperId]
+    [retryableFetch, visibilityType, projectId]
   );
 
   const {
@@ -268,23 +256,6 @@ export function Chat({
           setProfessorComplete(false);
           setProfessorError(undefined);
         }, 3000);
-      }
-
-      // ТЗ-07A: Автонейминг после 2-го ответа AI (4 сообщения = 2 обмена)
-      // API проверяет: >= 4 сообщений И isRenamed === false
-      if (!hasTriggeredAutonaming.current) {
-        fetch(`/api/chat/${id}/generate-title`, { method: "POST" })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.generated) {
-              // Название сгенерировано — больше не вызываем
-              hasTriggeredAutonaming.current = true;
-              // Обновляем sidebar чтобы новое название отобразилось
-              mutate(unstable_serialize(getChatHistoryPaginationKey));
-            }
-            // Если skipped — попробуем ещё раз после следующего ответа AI
-          })
-          .catch((err) => console.warn("[Autonaming] Failed:", err));
       }
     },
     onError: (error) => {
@@ -381,9 +352,6 @@ export function Chat({
           onInsertToChat={setInput}
           projectId={projectId}
           projectName={projectName}
-          helperId={helperId}
-          helperName={helperName}
-          helperEmoji={helperEmoji}
         />
 
         {/* ТЗ-03 Фаза 7: Professor Pipeline Progress */}
