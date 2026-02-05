@@ -256,6 +256,7 @@ export async function getChatsByUserId({
           isRenamed: chat.isRenamed,
           summary: chat.summary,
           isStarred: chat.isStarred,
+          taskStatus: chat.taskStatus,
           visibility: chat.visibility,
           lastContext: sql<null>`NULL`.as("lastContext"),
         })
@@ -1095,6 +1096,36 @@ export async function updateProject({
 }
 
 /**
+ * ТЗ-07C2: Update project summary (AI-generated from task summaries)
+ */
+export async function updateProjectSummary({
+  id,
+  summary,
+}: {
+  id: string;
+  summary: string;
+}) {
+  try {
+    const [updated] = await db
+      .update(project)
+      .set({
+        summary,
+        summaryUpdatedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(project.id, id))
+      .returning();
+
+    return updated;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update project summary"
+    );
+  }
+}
+
+/**
  * Delete a project and all its files and chats (cascade)
  */
 export async function deleteProjectById({ id }: { id: string }) {
@@ -1452,6 +1483,7 @@ export async function getChatsByProjectId({ projectId }: { projectId: string }) 
         isRenamed: chat.isRenamed,
         summary: chat.summary,
         isStarred: chat.isStarred,
+        taskStatus: chat.taskStatus,
         visibility: chat.visibility,
         lastContext: sql<null>`NULL`.as("lastContext"),
       })
@@ -1772,6 +1804,30 @@ export async function updateChatIsStarred({
 }
 
 /**
+ * ТЗ-07C2: Update chat taskStatus
+ * Valid values: 'not_started', 'in_progress', 'done'
+ */
+export async function updateChatTaskStatus({
+  chatId,
+  taskStatus,
+}: {
+  chatId: string;
+  taskStatus: "not_started" | "in_progress" | "done";
+}) {
+  try {
+    return await db
+      .update(chat)
+      .set({ taskStatus })
+      .where(eq(chat.id, chatId));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update chat taskStatus"
+    );
+  }
+}
+
+/**
  * Get count of general chats (not in projects) for a user
  * Used for the chat history card counter on Glavnaya
  */
@@ -1849,6 +1905,7 @@ export async function getProjectChatsWithStats({
         summary: chat.summary,
         isStarred: chat.isStarred,
         isRenamed: chat.isRenamed,
+        taskStatus: chat.taskStatus,
         messageCount: sql<number>`COALESCE(COUNT(${message.id}), 0)::int`,
       })
       .from(chat)

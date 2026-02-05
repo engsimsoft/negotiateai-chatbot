@@ -48,6 +48,7 @@ import {
   saveChat,
   saveMessages,
   updateChatLastContextById,
+  updateChatTaskStatus,
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
@@ -153,6 +154,15 @@ export async function POST(request: Request) {
       if (chat.userId !== session.user.id) {
         return new ChatSDKError("forbidden:chat").toResponse();
       }
+
+      // ТЗ-07C2: Auto-transition taskStatus from not_started to in_progress
+      // when user sends first message to a project task
+      if (chat.projectId && chat.taskStatus === "not_started") {
+        // Fire and forget - don't block the response
+        updateChatTaskStatus({ chatId: id, taskStatus: "in_progress" }).catch(
+          (err) => console.error("[Chat API] Failed to update taskStatus:", err)
+        );
+      }
     } else {
       // Performance: Save chat with temporary title, generate real title in background
       await saveChat({
@@ -163,6 +173,14 @@ export async function POST(request: Request) {
         projectId: projectId || undefined,
         helperId: helperId || undefined,
       });
+
+      // ТЗ-07C2: For new project tasks, immediately set status to in_progress
+      // since user is sending their first message right now
+      if (projectId) {
+        updateChatTaskStatus({ chatId: id, taskStatus: "in_progress" }).catch(
+          (err) => console.error("[Chat API] Failed to set initial taskStatus:", err)
+        );
+      }
 
       // ТЗ-07A: Автонейминг теперь происходит после 2-го ответа AI (см. chat.tsx)
       // ТЗ-4: Greeting НЕ добавляется как сообщение — используем UI с заголовком + suggested actions

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { memo, useState, useRef, useEffect } from "react";
 import type { Chat } from "@/lib/db/schema";
-import { Star } from "lucide-react";
+import { Check, Star } from "lucide-react";
 import {
   MoreHorizontalIcon,
   PencilEditIcon,
@@ -81,6 +81,10 @@ const PureChatItem = ({
       ) : (
         <SidebarMenuButton asChild isActive={isActive}>
           <Link href={`/chat/${chat.id}`} onClick={() => setOpenMobile(false)}>
+            {/* ТЗ-07C2: Show check mark for completed project tasks */}
+            {chat.projectId && chat.taskStatus === "done" && (
+              <Check className="size-3.5 shrink-0 text-green-600" />
+            )}
             <span>{chat.title}</span>
           </Link>
         </SidebarMenuButton>
@@ -135,6 +139,10 @@ export const ChatItem = memo(PureChatItem, (prevProps, nextProps) => {
     return false;
   }
   if (prevProps.chat.isStarred !== nextProps.chat.isStarred) {
+    return false;
+  }
+  // ТЗ-07C2: Re-render if taskStatus changes
+  if (prevProps.chat.taskStatus !== nextProps.chat.taskStatus) {
     return false;
   }
   return true;

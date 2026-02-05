@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { ArrowRight, MessageSquare, Star } from "lucide-react";
+import { ArrowRight, Check, MessageSquare, RotateCcw, Star } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -12,15 +12,18 @@ interface TaskDetailPanelProps {
   task: TaskWithStats | null;
   projectId: string;
   onToggleStar: (taskId: string) => void;
+  onToggleTaskStatus: (taskId: string) => void;
 }
 
 /**
  * ТЗ-07C1: Панель деталей задачи (правая колонка)
+ * ТЗ-07C2: Добавлена кнопка "Готово" для изменения статуса
  */
 export function TaskDetailPanel({
   task,
   projectId,
   onToggleStar,
+  onToggleTaskStatus,
 }: TaskDetailPanelProps) {
   if (!task) {
     return (
@@ -62,13 +65,37 @@ export function TaskDetailPanel({
           </span>
         </div>
 
-        {/* Open task button */}
-        <Button asChild className="mt-4" size="sm">
-          <Link href={`/projects/${projectId}/chat/${task.id}`}>
-            Открыть задачу
-            <ArrowRight className="ml-2 size-4" />
-          </Link>
-        </Button>
+        {/* Action buttons */}
+        <div className="mt-4 flex items-center gap-2">
+          <Button asChild size="sm">
+            <Link href={`/projects/${projectId}/chat/${task.id}`}>
+              Открыть задачу
+              <ArrowRight className="ml-2 size-4" />
+            </Link>
+          </Button>
+
+          {/* ТЗ-07C2: Toggle task status button */}
+          {task.taskStatus === "done" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onToggleTaskStatus(task.id)}
+            >
+              <RotateCcw className="mr-2 size-4" />
+              Вернуть в работу
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-green-600 hover:bg-green-50 hover:text-green-700"
+              onClick={() => onToggleTaskStatus(task.id)}
+            >
+              <Check className="mr-2 size-4" />
+              Отметить готово
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Summary */}

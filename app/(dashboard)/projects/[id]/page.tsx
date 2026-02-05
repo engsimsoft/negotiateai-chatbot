@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Settings, FolderOpen, Sparkles } from "lucide-react";
+import { ChevronLeft, Settings, FolderOpen } from "lucide-react";
 
 import { auth } from "@/app/(auth)/auth";
 import {
@@ -16,6 +16,7 @@ import { ProjectPassport } from "@/components/projects/project-passport";
 import { ProjectFilesCard } from "@/components/projects/project-files-card";
 import { TaskHistoryCard } from "@/components/projects/task-history-card";
 import { ProjectMeta } from "@/components/projects/project-meta";
+import { ProjectPulse } from "@/components/projects/project-pulse";
 
 interface ProjectPageProps {
   params: Promise<{ id: string }>;
@@ -109,20 +110,19 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
             <ProjectFilesCard projectId={id} files={files} folders={folders} />
           </div>
 
-          {/* Right column — Pulse (ТЗ-07C1: placeholder) */}
-          <div className="rounded-xl border bg-background p-6">
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="mb-3 rounded-full bg-muted p-3">
-                <Sparkles className="size-6 text-muted-foreground" />
-              </div>
-              <h3 className="font-medium text-muted-foreground">
-                Пульс проекта
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground/70">
-                Скоро здесь появится аналитика
-              </p>
-            </div>
-          </div>
+          {/* Right column — Pulse (ТЗ-07C2) */}
+          <ProjectPulse
+            projectId={id}
+            tasks={chats.map((chat) => ({
+              id: chat.id,
+              title: chat.title,
+              summary: chat.summary,
+              taskStatus: (chat.taskStatus || "not_started") as "not_started" | "in_progress" | "done",
+              createdAt: chat.createdAt,
+            }))}
+            projectSummary={project.summary}
+            summaryUpdatedAt={project.summaryUpdatedAt}
+          />
         </div>
 
         {/* Project meta */}

@@ -9,6 +9,8 @@ import { TaskList } from "./task-list";
 import { TaskDetailPanel } from "./task-detail-panel";
 import { TasksEmptyState } from "./tasks-empty-state";
 
+export type TaskStatus = "not_started" | "in_progress" | "done";
+
 export type TaskWithStats = {
   id: string;
   createdAt: Date;
@@ -16,6 +18,7 @@ export type TaskWithStats = {
   summary: string | null;
   isStarred: boolean;
   isRenamed: boolean;
+  taskStatus: TaskStatus;
   messageCount: number;
 };
 
@@ -97,6 +100,51 @@ export function TasksPageContent({ projectId, projectName, initialTasks }: Tasks
     }
   };
 
+  // ТЗ-07C2: Toggle task status (done / in_progress)
+  const handleToggleTaskStatus = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    const newStatus: TaskStatus = task.taskStatus === "done" ? "in_progress" : "done";
+
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, taskStatus: newStatus } : t
+      )
+    );
+
+    try {
+      const response = await fetch(`/api/chat/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskStatus: newStatus }),
+      });
+
+      if (!response.ok) {
+        // Revert on error
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === taskId ? { ...t, taskStatus: task.taskStatus } : t
+          )
+        );
+      } else if (newStatus === "done") {
+        // Trigger project summary regeneration in background
+        fetch(`/api/projects/${projectId}/generate-summary`, {
+          method: "POST",
+        }).catch((err) => console.error("Failed to regenerate summary:", err));
+      }
+    } catch (error) {
+      console.error("Failed to toggle task status:", error);
+      // Revert on error
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId ? { ...t, taskStatus: task.taskStatus } : t
+        )
+      );
+    }
+  };
+
   const taskLabel = tasks.length === 1 ? "задача" : tasks.length >= 2 && tasks.length <= 4 ? "задачи" : "задач";
 
   return (
@@ -144,6 +192,7 @@ export function TasksPageContent({ projectId, projectName, initialTasks }: Tasks
               onSelectTask={setSelectedTaskId}
               onDeleteTask={handleDeleteTask}
               onToggleStar={handleToggleStar}
+              onToggleTaskStatus={handleToggleTaskStatus}
             />
           </div>
 
@@ -153,6 +202,7 @@ export function TasksPageContent({ projectId, projectName, initialTasks }: Tasks
               task={selectedTask}
               projectId={projectId}
               onToggleStar={handleToggleStar}
+              onToggleTaskStatus={handleToggleTaskStatus}
             />
           </div>
         </div>

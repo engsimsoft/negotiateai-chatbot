@@ -33,7 +33,13 @@ export default async function TasksPage({ params }: TasksPageProps) {
   }
 
   // Get tasks (chats) with stats
-  const tasks = await getProjectChatsWithStats({ projectId });
+  const rawTasks = await getProjectChatsWithStats({ projectId });
+
+  // ТЗ-07C2: Normalize taskStatus (null → "not_started")
+  const tasks = rawTasks.map((task) => ({
+    ...task,
+    taskStatus: (task.taskStatus || "not_started") as "not_started" | "in_progress" | "done",
+  }));
 
   return (
     <TasksPageContent

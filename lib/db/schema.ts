@@ -64,6 +64,9 @@ export const project = pgTable("Project", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   instruction: text("instruction"),
+  // ТЗ-07C2: Итог проекта (AI-generated из summary задач)
+  summary: text("summary"),
+  summaryUpdatedAt: timestamp("summaryUpdatedAt"),
   createdAt: timestamp("createdAt").notNull(),
   updatedAt: timestamp("updatedAt").notNull(),
 });
@@ -135,6 +138,8 @@ export const chat = pgTable("Chat", {
   summary: text("summary"),
   // ТЗ-07B: Важный чат (для будущей индексации RAG)
   isStarred: boolean("isStarred").notNull().default(false),
+  // ТЗ-07C2: Статус задачи (только для проектных чатов)
+  taskStatus: varchar("taskStatus", { length: 20 }).default("not_started"),
   visibility: varchar("visibility", { enum: ["public", "private"] })
     .notNull()
     .default("private"),

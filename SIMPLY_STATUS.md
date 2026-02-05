@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.6.0
+**Версия:** 3.6.1
 **Дата:** 2026-02-05
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -267,6 +267,24 @@ components/projects/
 
 ## План развития
 
+### ТЗ-07C2: Project Pulse — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Панель "Пульс проекта"** — живая панель состояния на странице проекта
+- **Статусы задач** — not_started / in_progress / done
+- **Автопереход статуса** — not_started → in_progress при первом сообщении
+- **AI-итог проекта** — генерация summary через Gemini 2.5 Flash
+- **UI статусов** — визуальные индикаторы в списке задач, детальной панели, sidebar
+
+**Ключевые файлы:**
+- `components/projects/project-pulse.tsx` — панель Пульс проекта
+- `app/(chat)/api/projects/[id]/generate-summary/route.ts` — API генерации итога
+- `app/(chat)/api/chat/route.ts` — автопереход статуса
+- `components/tasks/` — обновлённые компоненты с кнопками статуса
+- `lib/db/queries.ts` — updateChatTaskStatus, updateProjectSummary
+
+**Детали:** [_archive/TZ_07C2_ProjectPulse/](_archive/TZ_07C2_ProjectPulse/)
+
 ### ТЗ-07B: Chat History — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
@@ -425,7 +443,7 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.5.0 |
+| Версия | 3.6.1 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
@@ -459,6 +477,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_07C2_ProjectPulse/](_archive/TZ_07C2_ProjectPulse/) — ТЗ-07C2 Project Pulse
 - [_archive/TZ_07B_ChatHistory/](_archive/TZ_07B_ChatHistory/) — ТЗ-07B Chat History
 - [_archive/TZ_07A_Glavnaya/](_archive/TZ_07A_Glavnaya/) — ТЗ-07A Glavnaya + Navigation + Sidebar
 - [_archive/TZ_04_ROADMAP.md](_archive/TZ_04_ROADMAP.md) — ТЗ-04 Skills + Agents
@@ -477,4 +496,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-04
+**Обновлено:** 2026-02-05

@@ -2,7 +2,7 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
-import { MoreHorizontal, Star, Trash2, ExternalLink } from "lucide-react";
+import { Check, Circle, MoreHorizontal, RotateCcw, Loader2, Star, Trash2, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -33,10 +33,12 @@ interface TaskListItemProps {
   onSelect: () => void;
   onDelete: () => void;
   onToggleStar: () => void;
+  onToggleTaskStatus: () => void;
 }
 
 /**
  * ТЗ-07C1: Элемент списка задач
+ * ТЗ-07C2: Добавлен визуальный статус задачи
  */
 export function TaskListItem({
   task,
@@ -45,6 +47,7 @@ export function TaskListItem({
   onSelect,
   onDelete,
   onToggleStar,
+  onToggleTaskStatus,
 }: TaskListItemProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -91,6 +94,24 @@ export function TaskListItem({
           </div>
 
           <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+            {/* ТЗ-07C2: Task status indicator */}
+            {task.taskStatus === "done" ? (
+              <span className="flex items-center gap-1 text-green-600">
+                <Check className="size-3" />
+                Готово
+              </span>
+            ) : task.taskStatus === "in_progress" ? (
+              <span className="flex items-center gap-1 text-blue-600">
+                <Loader2 className="size-3" />
+                В работе
+              </span>
+            ) : (
+              <span className="flex items-center gap-1">
+                <Circle className="size-3" />
+                Не начата
+              </span>
+            )}
+            <span>·</span>
             <span>{task.messageCount} сообщ.</span>
           </div>
         </div>
@@ -117,6 +138,20 @@ export function TaskListItem({
             <DropdownMenuItem onClick={onToggleStar}>
               <Star className="mr-2 size-4" />
               {task.isStarred ? "Снять звезду" : "Отметить"}
+            </DropdownMenuItem>
+            {/* ТЗ-07C2: Toggle task status */}
+            <DropdownMenuItem onClick={onToggleTaskStatus}>
+              {task.taskStatus === "done" ? (
+                <>
+                  <RotateCcw className="mr-2 size-4" />
+                  Вернуть в работу
+                </>
+              ) : (
+                <>
+                  <Check className="mr-2 size-4" />
+                  Отметить готово
+                </>
+              )}
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"

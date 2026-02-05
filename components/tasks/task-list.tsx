@@ -10,10 +10,12 @@ interface TaskListProps {
   onSelectTask: (taskId: string) => void;
   onDeleteTask: (taskId: string) => void;
   onToggleStar: (taskId: string) => void;
+  onToggleTaskStatus: (taskId: string) => void;
 }
 
 /**
  * ТЗ-07C1: Список задач проекта (левая колонка)
+ * ТЗ-07C2: Добавлен onToggleTaskStatus
  */
 export function TaskList({
   tasks,
@@ -22,6 +24,7 @@ export function TaskList({
   onSelectTask,
   onDeleteTask,
   onToggleStar,
+  onToggleTaskStatus,
 }: TaskListProps) {
   // Sort: starred first, then by date
   const sortedTasks = [...tasks].sort((a, b) => {
@@ -42,6 +45,7 @@ export function TaskList({
             onSelect={() => onSelectTask(task.id)}
             onDelete={() => onDeleteTask(task.id)}
             onToggleStar={() => onToggleStar(task.id)}
+            onToggleTaskStatus={() => onToggleTaskStatus(task.id)}
           />
         ))}
       </div>
