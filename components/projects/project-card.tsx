@@ -123,7 +123,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <div className="flex-1 min-w-0">
               <div className="font-medium truncate pr-8">{project.name}</div>
               <div className="text-xs text-muted-foreground">
-                {project.chatCount} чатов · {updatedAgo}
+                {project.chatCount} {project.chatCount === 1 ? "задача" : project.chatCount >= 2 && project.chatCount <= 4 ? "задачи" : "задач"} · {updatedAgo}
               </div>
             </div>
           </div>
@@ -173,7 +173,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Удалить проект?</AlertDialogTitle>
             <AlertDialogDescription>
-              Проект «{project.name}» и все его чаты будут удалены безвозвратно.
+              Проект «{project.name}» и все его задачи будут удалены безвозвратно.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

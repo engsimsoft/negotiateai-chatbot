@@ -11,10 +11,9 @@ import {
   getProjectChatsCount,
 } from "@/lib/db/queries";
 import { Button } from "@/components/ui/button";
-import { ProjectInput } from "@/components/projects/project-input";
 import { ProjectPassport } from "@/components/projects/project-passport";
 import { ProjectFilesCard } from "@/components/projects/project-files-card";
-import { TaskHistoryCard } from "@/components/projects/task-history-card";
+import { ProjectActions } from "@/components/projects/project-actions";
 import { ProjectMeta } from "@/components/projects/project-meta";
 import { ProjectPulse } from "@/components/projects/project-pulse";
 
@@ -23,14 +22,14 @@ interface ProjectPageProps {
 }
 
 /**
- * ТЗ-07A: Страница проекта
+ * ТЗ-07A, ТЗ-07C3: Страница проекта
  *
  * Layout:
  * - Header с breadcrumbs и кнопкой Настроить
- * - Поле ввода сверху (как на главной)
+ * - Три карточки действий: История задач + Новая задача + Менеджер
  * - Двухколоночный layout:
  *   - Левая: Паспорт (табы) + Файлы
- *   - Правая: Чаты
+ *   - Правая: Пульс проекта
  * - Project meta внизу
  */
 export default async function ProjectPage({ params }: ProjectPageProps) {
@@ -85,14 +84,9 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
       {/* Content */}
       <main className="mx-auto w-full max-w-[960px] flex-1 px-4 py-8 lg:px-6">
-        {/* Task History Card + Input (ТЗ-07C1) */}
+        {/* Project Actions (ТЗ-07C3) */}
         <section className="mb-8">
-          <div className="flex items-stretch gap-3">
-            {tasksCount > 0 && (
-              <TaskHistoryCard projectId={id} count={tasksCount} />
-            )}
-            <ProjectInput projectId={id} projectName={project.name} />
-          </div>
+          <ProjectActions projectId={id} tasksCount={tasksCount} />
         </section>
 
         {/* Two-column layout */}
