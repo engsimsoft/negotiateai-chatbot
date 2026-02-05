@@ -1,18 +1,20 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Settings, FolderOpen } from "lucide-react";
+import { ChevronLeft, Settings, FolderOpen, Sparkles } from "lucide-react";
 
 import { auth } from "@/app/(auth)/auth";
 import {
   getProjectById,
   getFilesByProjectId,
   getChatsByProjectId,
+  getProjectFolders,
+  getProjectChatsCount,
 } from "@/lib/db/queries";
 import { Button } from "@/components/ui/button";
 import { ProjectInput } from "@/components/projects/project-input";
 import { ProjectPassport } from "@/components/projects/project-passport";
 import { ProjectFilesCard } from "@/components/projects/project-files-card";
-import { ProjectChatsCard } from "@/components/projects/project-chats-card";
+import { TaskHistoryCard } from "@/components/projects/task-history-card";
 import { ProjectMeta } from "@/components/projects/project-meta";
 
 interface ProjectPageProps {
@@ -48,9 +50,11 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     redirect("/dashboard");
   }
 
-  const [files, chats] = await Promise.all([
+  const [files, chats, folders, tasksCount] = await Promise.all([
     getFilesByProjectId({ projectId: id }),
     getChatsByProjectId({ projectId: id }),
+    getProjectFolders({ projectId: id }),
+    getProjectChatsCount({ projectId: id }),
   ]);
 
   return (
@@ -80,9 +84,14 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
       {/* Content */}
       <main className="mx-auto w-full max-w-[960px] flex-1 px-4 py-8 lg:px-6">
-        {/* Chat Input */}
+        {/* Task History Card + Input (ТЗ-07C1) */}
         <section className="mb-8">
-          <ProjectInput projectId={id} projectName={project.name} />
+          <div className="flex items-stretch gap-3">
+            {tasksCount > 0 && (
+              <TaskHistoryCard projectId={id} count={tasksCount} />
+            )}
+            <ProjectInput projectId={id} projectName={project.name} />
+          </div>
         </section>
 
         {/* Two-column layout */}
@@ -97,11 +106,23 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
             />
 
             {/* Files */}
-            <ProjectFilesCard projectId={id} files={files} />
+            <ProjectFilesCard projectId={id} files={files} folders={folders} />
           </div>
 
-          {/* Right column — Chats */}
-          <ProjectChatsCard projectId={id} chats={chats} />
+          {/* Right column — Pulse (ТЗ-07C1: placeholder) */}
+          <div className="rounded-xl border bg-background p-6">
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="mb-3 rounded-full bg-muted p-3">
+                <Sparkles className="size-6 text-muted-foreground" />
+              </div>
+              <h3 className="font-medium text-muted-foreground">
+                Пульс проекта
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground/70">
+                Скоро здесь появится аналитика
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Project meta */}

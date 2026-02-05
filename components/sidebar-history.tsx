@@ -195,6 +195,46 @@ export function SidebarHistory({
     }
   };
 
+  // ТЗ-07B: Toggle star
+  const handleToggleStar = async (chatId: string) => {
+    // Найти текущий чат для определения нового состояния
+    const currentChat = chatHistories
+      ?.flatMap((h) => h?.chats || [])
+      .find((c) => c.id === chatId);
+
+    if (!currentChat) return;
+
+    const newIsStarred = !currentChat.isStarred;
+
+    try {
+      const response = await fetch(`/api/chat?id=${chatId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isStarred: newIsStarred }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to toggle star");
+      }
+
+      // Обновить в локальном кэше
+      chatMutate((histories) => {
+        if (histories) {
+          return histories.map((history) => ({
+            ...history,
+            chats: history.chats.map((chat) =>
+              chat.id === chatId ? { ...chat, isStarred: newIsStarred } : chat
+            ),
+          }));
+        }
+      });
+
+      toast.success(newIsStarred ? "Чат отмечен" : "Отметка снята");
+    } catch {
+      toast.error("Ошибка при изменении отметки");
+    }
+  };
+
   // ТЗ-07A: Переименование чата
   const handleRename = async (chatId: string, newTitle: string) => {
     try {
@@ -309,6 +349,7 @@ export function SidebarHistory({
                               setShowDeleteDialog(true);
                             }}
                             onRename={handleRename}
+                            onToggleStar={handleToggleStar}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -330,6 +371,7 @@ export function SidebarHistory({
                               setShowDeleteDialog(true);
                             }}
                             onRename={handleRename}
+                            onToggleStar={handleToggleStar}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -351,6 +393,7 @@ export function SidebarHistory({
                               setShowDeleteDialog(true);
                             }}
                             onRename={handleRename}
+                            onToggleStar={handleToggleStar}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -372,6 +415,7 @@ export function SidebarHistory({
                               setShowDeleteDialog(true);
                             }}
                             onRename={handleRename}
+                            onToggleStar={handleToggleStar}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -393,6 +437,7 @@ export function SidebarHistory({
                               setShowDeleteDialog(true);
                             }}
                             onRename={handleRename}
+                            onToggleStar={handleToggleStar}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}

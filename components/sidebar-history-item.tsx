@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { memo, useState, useRef, useEffect } from "react";
 import type { Chat } from "@/lib/db/schema";
+import { Star } from "lucide-react";
 import {
   MoreHorizontalIcon,
   PencilEditIcon,
@@ -23,12 +24,14 @@ const PureChatItem = ({
   isActive,
   onDelete,
   onRename,
+  onToggleStar,
   setOpenMobile,
 }: {
   chat: Chat;
   isActive: boolean;
   onDelete: (chatId: string) => void;
   onRename: (chatId: string, newTitle: string) => void;
+  onToggleStar: (chatId: string) => void;
   setOpenMobile: (open: boolean) => void;
 }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -104,6 +107,14 @@ const PureChatItem = ({
           </DropdownMenuItem>
 
           <DropdownMenuItem
+            className="cursor-pointer"
+            onSelect={() => onToggleStar(chat.id)}
+          >
+            <Star className="size-4" fill={chat.isStarred ? "currentColor" : "none"} />
+            <span>{chat.isStarred ? "Снять звезду" : "Отметить"}</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
             className="cursor-pointer text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"
             onSelect={() => onDelete(chat.id)}
           >
@@ -121,6 +132,9 @@ export const ChatItem = memo(PureChatItem, (prevProps, nextProps) => {
     return false;
   }
   if (prevProps.chat.title !== nextProps.chat.title) {
+    return false;
+  }
+  if (prevProps.chat.isStarred !== nextProps.chat.isStarred) {
     return false;
   }
   return true;

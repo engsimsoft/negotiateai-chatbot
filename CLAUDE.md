@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.4.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.5.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -78,6 +78,15 @@
 - `app/(chat)/page.tsx` — Главная страница
 - `components/glavnaya/` — Компоненты главной
 - `components/glavnaya/glavnaya-input.tsx` — Инпут на главной (использует CompactInput)
+- `components/glavnaya/chat-history-card.tsx` — Карточка "💬 История чатов" (v3.5.0)
+
+**Chat History (v3.5.0):**
+- `app/(dashboard)/chats/page.tsx` — Страница истории чатов
+- `components/chats/` — 6 компонентов для /chats
+- `components/chats/chats-page-content.tsx` — Клиентский контейнер с состоянием
+- `components/chats/chat-list.tsx` — Левая колонка (список чатов)
+- `components/chats/chat-list-item.tsx` — Элемент списка (⭐, date, actions)
+- `components/chats/chat-detail-panel.tsx` — Правая колонка (summary, actions)
 
 **Universal Dialog:**
 - `components/universal-dialog/` — Система диалогов (confirm, prompt, custom)
@@ -91,15 +100,15 @@
 
 **Sidebar (контекстный):**
 - `components/sidebar-layout.tsx` — Layout с табами вне Sidebar
-- `components/sidebar-history.tsx` — История чатов (контекстная фильтрация)
-- `components/sidebar-history-item.tsx` — Элемент чата (inline-редактирование)
+- `components/sidebar-history.tsx` — История чатов (контекстная фильтрация, ⭐ toggle)
+- `components/sidebar-history-item.tsx` — Элемент чата (inline-редактирование, ⭐ toggle)
 - `components/app-sidebar.tsx` — Sidebar с историей чатов
 - `components/ui/sidebar.tsx` — CSS variable `--sidebar-left-offset`
 
 **AI/Chat:**
-- `app/(chat)/api/chat/route.ts` — Chat endpoint (streaming)
+- `app/(chat)/api/chat/route.ts` — Chat endpoint (streaming, isStarred PATCH)
 - `app/(chat)/api/chat/[id]/route.ts` — Chat management (DELETE/PATCH)
-- `app/(chat)/api/chat/[id]/generate-title/route.ts` — Автонейминг чатов
+- `app/(chat)/api/chat/[id]/generate-title/route.ts` — Автонейминг + summary (v3.5.0)
 - `lib/ai/providers.ts` — Конфигурация AI-моделей
 - `lib/ai/model-tiers.ts` — Уровни моделей для проектов (Haiku/Sonnet/Opus)
 - `lib/ai/professor-pipeline.ts` — Pipeline для режима Профессор
@@ -141,7 +150,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**

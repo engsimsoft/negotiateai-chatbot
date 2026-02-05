@@ -19,6 +19,7 @@
 | [007](007-projects-claude-integration.md) | Проекты + Claude Integration (v3.2) | 2026-02-02 | Принято |
 | [008](008-skills-agents-architecture.md) | Skills + Agents Architecture (v3.3) | 2026-02-02 | Принято |
 | [009](009-loadskill-progressive-disclosure.md) | loadSkill — Progressive Disclosure (v3.3.2) | 2026-02-03 | Принято |
+| [010](010-performance-optimization.md) | Оптимизация производительности БД (v3.4.1) | 2026-02-04 | Принято |
 
 ---
 
@@ -47,4 +48,4 @@
 
 ---
 
-**Обновлено:** 2026-02-03
+**Обновлено:** 2026-02-04

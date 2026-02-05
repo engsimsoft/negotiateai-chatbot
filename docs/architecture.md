@@ -17,16 +17,16 @@
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  App Router (app/)                                   │  │
 │  │  ├── (auth)/           - Auth routes (NextAuth)      │  │
-│  │  ├── (chat)/           - Chat UI                     │  │
-│  │  ├── agents/           - Каталог агентов (план)      │  │
-│  │  └── api/chat/route.ts - Chat API endpoint           │  │
+│  │  ├── (chat)/           - Chat UI, Projects, Helpers  │  │
+│  │  ├── (dashboard)/      - Dashboard, Chats, Settings  │  │
+│  │  └── api/              - API endpoints               │  │
 │  └──────────────────────────────────────────────────────┘  │
 │                            │                                │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  Business Logic (lib/)                               │  │
 │  │  ├── ai/providers.ts   - AI Provider config          │  │
-│  │  ├── ai/agents/        - AI-агенты (промпты)         │  │
 │  │  ├── ai/tools/         - AI-инструменты              │  │
+│  │  ├── prompts/          - Skills + Agents system      │  │
 │  │  ├── db/queries.ts     - Database queries            │  │
 │  │  └── db/schema.ts      - Database schema             │  │
 │  └──────────────────────────────────────────────────────┘  │
@@ -36,8 +36,9 @@
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  External Services                                          │
-│  ├── AI Providers      - Gemini (текущий), GPT, Claude     │
+│  ├── AI Providers      - Gemini, Claude (OpenRouter)       │
 │  ├── Brave Search API  - Web search                        │
+│  ├── Deepgram          - Voice input (Nova-3)              │
 │  ├── CloudConvert API  - PPTX preview                      │
 │  └── PostgreSQL (Neon) - Database                          │
 └─────────────────────────────────────────────────────────────┘
@@ -76,12 +77,9 @@
 - Защиту routes
 
 **Текущее состояние:**
-- 2 hardcoded пользователя (Владимир, Юлия)
-- Роли: engineer, marketer
-
-**План (ТЗ-1):**
-- Удаление User.role
-- Агенты вместо ролей
+- Регистрация через email/password
+- Профиль пользователя (displayName, bio, occupation)
+- NextAuth 5.0-beta.25
 
 ---
 
@@ -91,13 +89,16 @@
 
 #### providers.ts
 - Конфигурация AI-моделей
-- Текущий: Google Gemini (3 Pro, 2.5 Flash)
-- План: мультипровайдер (GPT, Claude, Gemini)
+- Gemini: 3 Pro, 2.5 Flash
+- Claude: Haiku, Sonnet, Opus (через OpenRouter)
 
-#### agents/
-- Промпты AI-агентов
-- Текущий: 9 агентов в коде
-- План (ТЗ-1): агенты в БД
+#### Prompt System (v3.3 — Skills + Agents)
+- `lib/prompts/` — Файловая система промптов
+- `lib/prompts/skills/` — Атомарные навыки (SKILL.md)
+- `lib/prompts/agents/` — Персонажи-агенты (AGENT.md + config.yaml)
+- `lib/prompts/builder/` — Модульная система сборки
+
+**Детали:** [ai-agents.md](ai-agents.md)
 
 #### tools/
 - `web-search.ts` — Brave Search API
@@ -105,6 +106,9 @@
 - `get-weather.ts` — погода (Open-Meteo)
 - `presentation-reveal.ts` — веб-презентации
 - `presentation-pptx.ts` — PowerPoint
+- `excel/` — Excel tools (create, parse, edit)
+
+**Детали:** [ai-tools.md](ai-tools.md)
 
 ---
 
@@ -112,16 +116,18 @@
 
 **PostgreSQL (Neon) + Drizzle ORM**
 
-**Текущие таблицы:**
-- `User` — пользователи
-- `Chat` — чаты
-- `Message` — сообщения
+**Основные таблицы:**
+- `User` — пользователи (displayName, pronouns, occupation, bio, theme, hasSeenBenIntro)
+- `Chat` — чаты (title, summary, isStarred, projectId, helperId)
+- `Message_v2` — сообщения
 - `Document` — артефакты
-- NextAuth таблицы
+- `Project` — проекты (изолированные рабочие пространства)
+- `ProjectFile` — файлы проектов
+- `Helper` — помощники
+- `Vote_v2` — голосование за сообщения
+- NextAuth таблицы (Account, Session, VerificationToken)
 
-**План (ТЗ-1) — новые таблицы:**
-- `agents` — каталог агентов
-- `user_agents` — персональные агенты пользователей
+**Схема:** `lib/db/schema.ts` (SSOT)
 
 **Vercel Blob Storage:**
 - Загруженные файлы
@@ -129,56 +135,33 @@
 
 ---
 
-## Система AI-агентов
+## Система промптов (v3.3 — Skills + Agents)
 
-### Текущая архитектура
-
-```
-lib/ai/agents/
-├── index.ts         - конфигурация агентов
-├── marketer.md      - промпт Маркетолога
-├── copywriter.md    - промпт Копирайтера
-├── translator.md    - промпт Переводчика
-├── mentor.md        - промпт Наставника
-├── universal.md     - промпт Универсального
-├── presenter.md     - промпт Презентатора
-└── ...
-```
-
-**Недостатки:**
-- Агенты захардкожены в коде
-- Нельзя добавить агента без деплоя
-- Нельзя персонализировать
-
-### Целевая архитектура (ТЗ-1)
+### Архитектура
 
 ```
-База данных:
-┌─────────────────────────────────────────┐
-│ agents (каталог)                        │
-│ ├── id, slug, name, icon                │
-│ ├── description, systemPrompt           │
-│ ├── capabilities (JSON)                 │
-│ └── modelPreference                     │
-└─────────────────────────────────────────┘
-          │
-          │ user добавляет агента
-          ▼
-┌─────────────────────────────────────────┐
-│ user_agents (персональные)              │
-│ ├── userId, agentId                     │
-│ ├── customName, customSettings (JSON)   │
-│ └── createdAt                           │
-└─────────────────────────────────────────┘
+lib/prompts/
+├── server.ts         - Server-only экспорты
+├── index.ts          - Client-safe экспорты
+├── builder/          - Система сборки промптов
+│   ├── registry.ts   - Сканирование skills/agents
+│   ├── skill-loader.ts
+│   ├── agent-loader.ts
+│   └── composer.ts
+├── skills/           - Атомарные навыки (SKILL.md)
+│   ├── document/     - create-presentation, create-spreadsheet, etc.
+│   ├── research/     - web-research
+│   └── utility/      - prompt-helper
+├── agents/           - Персонажи-агенты
+│   └── ben/          - AGENT.md + config.yaml + references/
+└── core/             - Базовые блоки (.md)
+    ├── base.md
+    ├── safety.md
+    ├── formatting.md
+    └── russian-market.md
 ```
 
-**Преимущества:**
-- Агенты в БД, не в коде
-- Каталог агентов с UI
-- Персонализация без деплоя
-- Масштабируемость
-
-**Детали:** [TZ_01_AGENTS_ARCHITECTURE.md](../TZ_01_AGENTS_ARCHITECTURE.md)
+**Детали:** [ai-agents.md](ai-agents.md)
 
 ---
 
@@ -249,12 +232,12 @@ lib/ai/agents/
 
 - [setup.md](setup.md) — Установка
 - [deployment.md](deployment.md) — Деплой
-- [ai-agents.md](ai-agents.md) — AI-агенты
+- [ai-agents.md](ai-agents.md) — Система промптов (Skills + Agents)
 - [ai-artifacts.md](ai-artifacts.md) — Артефакты
 - [ai-tools.md](ai-tools.md) — Инструменты
+- [ai-providers.md](ai-providers.md) — AI провайдеры и модели
 - [ADR](decisions/) — Архитектурные решения
-- [TZ_01_AGENTS_ARCHITECTURE.md](../TZ_01_AGENTS_ARCHITECTURE.md) — ТЗ-1
 
 ---
 
-**Обновлено:** 2026-01-28 (Simply rebrand)
+**Обновлено:** 2026-02-04 (v3.5.0 — Chat History)

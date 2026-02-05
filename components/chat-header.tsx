@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { memo, useState, useEffect } from "react";
+import useSWR from "swr";
 import { useWindowSize } from "usehooks-ts";
 import { ChevronRight, FolderOpen, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,14 @@ import {
   BenDrawer,
   BenIntroBubble,
 } from "@/components/modal-assistants";
+
+// SWR fetcher for JSON endpoints
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+// Type for Ben intro API response
+interface BenIntroResponse {
+  hasSeenBenIntro: boolean;
+}
 
 interface ChatHeaderProps {
   /** Callback to insert text into main chat input */
@@ -52,31 +61,26 @@ function PureChatHeader({
   const [promptAgentOpen, setPromptAgentOpen] = useState(false);
   const [benOpen, setBenOpen] = useState(false);
 
-  // Ben intro bubble state
+  // Ben intro bubble state - using SWR for deduplication and caching
+  const { data: benIntroData, mutate: mutateBenIntro } = useSWR<BenIntroResponse>(
+    "/api/user/ben-intro",
+    fetcher
+  );
   const [showBenIntro, setShowBenIntro] = useState(false);
 
-  // Check if user has seen Ben intro on mount
+  // Show Ben intro bubble after data loads (with delay for UX)
   useEffect(() => {
-    const checkBenIntro = async () => {
-      try {
-        const res = await fetch("/api/user/ben-intro");
-        if (res.ok) {
-          const data = await res.json();
-          if (!data.hasSeenBenIntro) {
-            // Small delay so bubble appears after page loads
-            setTimeout(() => setShowBenIntro(true), 500);
-          }
-        }
-      } catch {
-        // Silently fail - not critical
-      }
-    };
-    checkBenIntro();
-  }, []);
+    if (benIntroData && !benIntroData.hasSeenBenIntro && !showBenIntro) {
+      const timer = setTimeout(() => setShowBenIntro(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [benIntroData, showBenIntro]);
 
   // Dismiss Ben intro and update API
   const dismissBenIntro = async () => {
     setShowBenIntro(false);
+    // Optimistic update
+    mutateBenIntro({ hasSeenBenIntro: true }, false);
     try {
       await fetch("/api/user/ben-intro", {
         method: "PATCH",

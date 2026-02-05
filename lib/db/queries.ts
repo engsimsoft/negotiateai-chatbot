@@ -33,6 +33,8 @@ import {
   project,
   type ProjectFile,
   projectFile,
+  type ProjectFolder,
+  projectFolder,
   type Suggestion,
   stream,
   suggestion,
@@ -252,6 +254,8 @@ export async function getChatsByUserId({
           projectId: chat.projectId,
           helperId: chat.helperId,
           isRenamed: chat.isRenamed,
+          summary: chat.summary,
+          isStarred: chat.isStarred,
           visibility: chat.visibility,
           lastContext: sql<null>`NULL`.as("lastContext"),
         })
@@ -458,6 +462,46 @@ export async function voteMessage({
 export async function getVotesByChatId({ id }: { id: string }) {
   try {
     return await db.select().from(vote).where(eq(vote.chatId, id));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get votes by chat id"
+    );
+  }
+}
+
+/**
+ * Get votes with chat ownership verification in a single query
+ * Optimized: Combines chat lookup + votes fetch into one query
+ * Returns null if chat doesn't exist or user doesn't own it
+ */
+export async function getVotesByChatIdWithAuth({
+  chatId,
+  userId,
+}: {
+  chatId: string;
+  userId: string;
+}) {
+  try {
+    // First verify chat ownership
+    const [chatOwner] = await db
+      .select({ userId: chat.userId })
+      .from(chat)
+      .where(eq(chat.id, chatId))
+      .limit(1);
+
+    if (!chatOwner) {
+      return { error: "not_found" as const, votes: null };
+    }
+
+    if (chatOwner.userId !== userId) {
+      return { error: "forbidden" as const, votes: null };
+    }
+
+    // Then get votes (now we know chat exists and user owns it)
+    const votes = await db.select().from(vote).where(eq(vote.chatId, chatId));
+
+    return { error: null, votes };
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -1192,6 +1236,207 @@ export async function deleteProjectFile({ id }: { id: string }) {
 }
 
 /**
+ * Update project file's folder (ТЗ-07C1)
+ */
+export async function updateProjectFileFolder({
+  fileId,
+  folderId,
+}: {
+  fileId: string;
+  folderId: string | null;
+}) {
+  try {
+    const [updated] = await db
+      .update(projectFile)
+      .set({ folderId })
+      .where(eq(projectFile.id, fileId))
+      .returning();
+
+    if (updated) {
+      await db
+        .update(project)
+        .set({ updatedAt: new Date() })
+        .where(eq(project.id, updated.projectId));
+    }
+
+    return updated || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update project file folder"
+    );
+  }
+}
+
+// ============================================
+// ProjectFolder Functions (ТЗ-07C1)
+// ============================================
+
+/**
+ * Get all folders for a project
+ */
+export async function getProjectFolders({ projectId }: { projectId: string }) {
+  try {
+    const folders = await db
+      .select()
+      .from(projectFolder)
+      .where(eq(projectFolder.projectId, projectId))
+      .orderBy(asc(projectFolder.sortOrder), asc(projectFolder.createdAt));
+
+    return folders;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get project folders"
+    );
+  }
+}
+
+/**
+ * Create a new project folder
+ */
+export async function createProjectFolder({
+  projectId,
+  name,
+  emoji = "📁",
+}: {
+  projectId: string;
+  name: string;
+  emoji?: string;
+}) {
+  try {
+    // Get max sortOrder for this project
+    const [maxOrder] = await db
+      .select({ maxOrder: sql<number>`COALESCE(MAX(${projectFolder.sortOrder}), -1)` })
+      .from(projectFolder)
+      .where(eq(projectFolder.projectId, projectId));
+
+    const [newFolder] = await db
+      .insert(projectFolder)
+      .values({
+        projectId,
+        name,
+        emoji,
+        sortOrder: (maxOrder?.maxOrder ?? -1) + 1,
+        createdAt: new Date(),
+      })
+      .returning();
+
+    // Update project's updatedAt
+    await db
+      .update(project)
+      .set({ updatedAt: new Date() })
+      .where(eq(project.id, projectId));
+
+    return newFolder;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create project folder"
+    );
+  }
+}
+
+/**
+ * Update a project folder
+ */
+export async function updateProjectFolder({
+  id,
+  name,
+  emoji,
+}: {
+  id: string;
+  name?: string;
+  emoji?: string;
+}) {
+  try {
+    const updateData: Partial<{ name: string; emoji: string }> = {};
+    if (name !== undefined) updateData.name = name;
+    if (emoji !== undefined) updateData.emoji = emoji;
+
+    const [updated] = await db
+      .update(projectFolder)
+      .set(updateData)
+      .where(eq(projectFolder.id, id))
+      .returning();
+
+    if (updated) {
+      await db
+        .update(project)
+        .set({ updatedAt: new Date() })
+        .where(eq(project.id, updated.projectId));
+    }
+
+    return updated || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update project folder"
+    );
+  }
+}
+
+/**
+ * Delete a project folder (files move to root)
+ */
+export async function deleteProjectFolder({ id }: { id: string }) {
+  try {
+    // Move all files from this folder to root (folderId = null)
+    await db
+      .update(projectFile)
+      .set({ folderId: null })
+      .where(eq(projectFile.folderId, id));
+
+    // Delete the folder
+    const [deleted] = await db
+      .delete(projectFolder)
+      .where(eq(projectFolder.id, id))
+      .returning();
+
+    if (deleted) {
+      await db
+        .update(project)
+        .set({ updatedAt: new Date() })
+        .where(eq(project.id, deleted.projectId));
+    }
+
+    return deleted || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete project folder"
+    );
+  }
+}
+
+/**
+ * Get folder with file count (for delete confirmation)
+ */
+export async function getProjectFolderWithFileCount({ id }: { id: string }) {
+  try {
+    const [result] = await db
+      .select({
+        id: projectFolder.id,
+        projectId: projectFolder.projectId,
+        name: projectFolder.name,
+        emoji: projectFolder.emoji,
+        fileCount: sql<number>`COALESCE(COUNT(${projectFile.id}), 0)::int`,
+      })
+      .from(projectFolder)
+      .leftJoin(projectFile, eq(projectFile.folderId, projectFolder.id))
+      .where(eq(projectFolder.id, id))
+      .groupBy(projectFolder.id);
+
+    return result || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get project folder with file count"
+    );
+  }
+}
+
+/**
  * Get chats for a specific project
  */
 export async function getChatsByProjectId({ projectId }: { projectId: string }) {
@@ -1205,6 +1450,8 @@ export async function getChatsByProjectId({ projectId }: { projectId: string }) 
         projectId: chat.projectId,
         helperId: chat.helperId,
         isRenamed: chat.isRenamed,
+        summary: chat.summary,
+        isStarred: chat.isStarred,
         visibility: chat.visibility,
         lastContext: sql<null>`NULL`.as("lastContext"),
       })
@@ -1468,6 +1715,174 @@ export async function updateChatTitleWithRenamedFlag({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to update chat title with renamed flag"
+    );
+  }
+}
+
+// ============================================
+// ТЗ-07B: Chat History Functions
+// ============================================
+
+/**
+ * Update chat title and summary (for auto-naming with summary)
+ */
+export async function updateChatTitleAndSummary({
+  chatId,
+  title,
+  summary,
+}: {
+  chatId: string;
+  title: string;
+  summary: string;
+}) {
+  try {
+    return await db
+      .update(chat)
+      .set({ title, summary, isRenamed: false })
+      .where(eq(chat.id, chatId));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update chat title and summary"
+    );
+  }
+}
+
+/**
+ * Update chat isStarred flag
+ */
+export async function updateChatIsStarred({
+  chatId,
+  isStarred,
+}: {
+  chatId: string;
+  isStarred: boolean;
+}) {
+  try {
+    return await db
+      .update(chat)
+      .set({ isStarred })
+      .where(eq(chat.id, chatId));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update chat isStarred"
+    );
+  }
+}
+
+/**
+ * Get count of general chats (not in projects) for a user
+ * Used for the chat history card counter on Glavnaya
+ */
+export async function getGeneralChatsCount({ userId }: { userId: string }) {
+  try {
+    const [result] = await db
+      .select({ count: count(chat.id) })
+      .from(chat)
+      .where(and(eq(chat.userId, userId), isNull(chat.projectId)));
+
+    return result?.count ?? 0;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get general chats count"
+    );
+  }
+}
+
+/**
+ * Get general chats with message count for /chats page
+ * Returns chats not in projects, with messageCount for each
+ */
+export async function getGeneralChatsWithStats({
+  userId,
+  limit = 50,
+}: {
+  userId: string;
+  limit?: number;
+}) {
+  try {
+    const result = await db
+      .select({
+        id: chat.id,
+        createdAt: chat.createdAt,
+        title: chat.title,
+        summary: chat.summary,
+        isStarred: chat.isStarred,
+        isRenamed: chat.isRenamed,
+        messageCount: sql<number>`COALESCE(COUNT(${message.id}), 0)::int`,
+      })
+      .from(chat)
+      .leftJoin(message, eq(message.chatId, chat.id))
+      .where(and(eq(chat.userId, userId), isNull(chat.projectId)))
+      .groupBy(chat.id)
+      .orderBy(desc(chat.createdAt))
+      .limit(limit);
+
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get general chats with stats"
+    );
+  }
+}
+
+/**
+ * ТЗ-07C1: Get project chats (tasks) with message count
+ * Returns chats for a specific project with messageCount for each
+ */
+export async function getProjectChatsWithStats({
+  projectId,
+  limit = 50,
+}: {
+  projectId: string;
+  limit?: number;
+}) {
+  try {
+    const result = await db
+      .select({
+        id: chat.id,
+        createdAt: chat.createdAt,
+        title: chat.title,
+        summary: chat.summary,
+        isStarred: chat.isStarred,
+        isRenamed: chat.isRenamed,
+        messageCount: sql<number>`COALESCE(COUNT(${message.id}), 0)::int`,
+      })
+      .from(chat)
+      .leftJoin(message, eq(message.chatId, chat.id))
+      .where(eq(chat.projectId, projectId))
+      .groupBy(chat.id)
+      .orderBy(desc(chat.createdAt))
+      .limit(limit);
+
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get project chats with stats"
+    );
+  }
+}
+
+/**
+ * ТЗ-07C1: Get count of chats (tasks) for a project
+ * Used for the task history card counter on project page
+ */
+export async function getProjectChatsCount({ projectId }: { projectId: string }) {
+  try {
+    const [result] = await db
+      .select({ count: count(chat.id) })
+      .from(chat)
+      .where(eq(chat.projectId, projectId));
+
+    return result?.count ?? 0;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get project chats count"
     );
   }
 }

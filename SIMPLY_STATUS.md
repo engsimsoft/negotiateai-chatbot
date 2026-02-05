@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.4.0
-**Дата:** 2026-02-04
+**Версия:** 3.6.0
+**Дата:** 2026-02-05
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -267,6 +267,24 @@ components/projects/
 
 ## План развития
 
+### ТЗ-07B: Chat History — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Страница /chats** — двухколоночный layout (список + детали)
+- **Карточка на главной** — "💬 История чатов" со счётчиком, переход на /chats
+- **Автогенерация summary** — AI генерирует краткое описание чата
+- **Звёзды (isStarred)** — отметка важных чатов (toggle в sidebar и на /chats)
+- **Database** — поля `summary`, `isStarred` в Chat
+
+**Ключевые файлы:**
+- `app/(dashboard)/chats/page.tsx` — страница истории чатов
+- `components/chats/` — 6 компонентов для /chats
+- `components/glavnaya/chat-history-card.tsx` — карточка на главной
+- `lib/db/queries.ts` — новые queries (getGeneralChatsCount, getGeneralChatsWithStats)
+- `sidebar-history-item.tsx` — ⭐ toggle в меню
+
+**Детали:** [_archive/TZ_07B_ChatHistory/](_archive/TZ_07B_ChatHistory/)
+
 ### ТЗ-07A: Glavnaya + Navigation + Sidebar — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
@@ -407,7 +425,7 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.4.0 |
+| Версия | 3.5.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
@@ -441,6 +459,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_07B_ChatHistory/](_archive/TZ_07B_ChatHistory/) — ТЗ-07B Chat History
 - [_archive/TZ_07A_Glavnaya/](_archive/TZ_07A_Glavnaya/) — ТЗ-07A Glavnaya + Navigation + Sidebar
 - [_archive/TZ_04_ROADMAP.md](_archive/TZ_04_ROADMAP.md) — ТЗ-04 Skills + Agents
 - [_archive/TZ_03_PROJECTS_ANTHROPIC_PROFESSOR.md](_archive/TZ_03_PROJECTS_ANTHROPIC_PROFESSOR.md) — ТЗ-03 Проекты + Claude

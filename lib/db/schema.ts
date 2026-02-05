@@ -71,7 +71,24 @@ export const project = pgTable("Project", {
 export type Project = InferSelectModel<typeof project>;
 
 // ============================================================================
-// ProjectFile (ТЗ-03)
+// ProjectFolder (ТЗ-07C1) — папки для группировки файлов проекта
+// ============================================================================
+
+export const projectFolder = pgTable("ProjectFolder", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  projectId: uuid("projectId")
+    .notNull()
+    .references(() => project.id),
+  name: varchar("name", { length: 100 }).notNull(),
+  emoji: varchar("emoji", { length: 10 }).notNull().default("📁"),
+  sortOrder: integer("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt").notNull(),
+});
+
+export type ProjectFolder = InferSelectModel<typeof projectFolder>;
+
+// ============================================================================
+// ProjectFile (ТЗ-03, ТЗ-07C1)
 // ============================================================================
 
 export const projectFile = pgTable("ProjectFile", {
@@ -79,6 +96,8 @@ export const projectFile = pgTable("ProjectFile", {
   projectId: uuid("projectId")
     .notNull()
     .references(() => project.id),
+  // ТЗ-07C1: Привязка к папке (null = файл в корне проекта)
+  folderId: uuid("folderId").references(() => projectFolder.id),
   name: varchar("name", { length: 255 }).notNull(),
   type: varchar("type", { length: 50 }).notNull(), // document, audio, image, other
   mimeType: varchar("mimeType", { length: 100 }).notNull(),
@@ -112,6 +131,10 @@ export const chat = pgTable("Chat", {
   helperId: uuid("helperId").references(() => helper.id),
   // ТЗ-07A: Флаг ручного переименования (для автонейминга)
   isRenamed: boolean("isRenamed").notNull().default(false),
+  // ТЗ-07B: Краткое содержание чата (AI-generated)
+  summary: text("summary"),
+  // ТЗ-07B: Важный чат (для будущей индексации RAG)
+  isStarred: boolean("isStarred").notNull().default(false),
   visibility: varchar("visibility", { enum: ["public", "private"] })
     .notNull()
     .default("private"),

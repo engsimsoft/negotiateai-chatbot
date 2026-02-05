@@ -119,7 +119,7 @@ function ChatItem({ chat, projectId, onUpdate }: ChatItemProps) {
           <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
           <div className="flex-1 min-w-0 pr-8">
             <div className="truncate text-sm font-medium">
-              {chat.title || "Новый чат"}
+              {chat.title || "Новая задача"}
             </div>
             <div className="text-xs text-muted-foreground">
               Обновлён {formatChatTime(chat.createdAt)}
@@ -169,9 +169,9 @@ function ChatItem({ chat, projectId, onUpdate }: ChatItemProps) {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Удалить чат?</AlertDialogTitle>
+            <AlertDialogTitle>Удалить задачу?</AlertDialogTitle>
             <AlertDialogDescription>
-              Чат «{chat.title || "Новый чат"}» будет удалён безвозвратно.
+              Задача «{chat.title || "Новая задача"}» будет удалена безвозвратно.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -196,12 +196,12 @@ function ChatItem({ chat, projectId, onUpdate }: ChatItemProps) {
       <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Переименовать чат</DialogTitle>
+            <DialogTitle>Переименовать задачу</DialogTitle>
           </DialogHeader>
           <Input
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="Название чата"
+            placeholder="Название задачи"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 handleRename();
@@ -237,12 +237,12 @@ export function ProjectChatsCard({ projectId, chats }: ProjectChatsCardProps) {
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Чаты ({chats.length})
+          Задачи ({chats.length})
         </h3>
         <Button size="sm" className="h-7 gap-1.5 text-xs" asChild>
           <Link href={`/projects/${projectId}/chat`}>
             <Plus className="size-3.5" />
-            Новый чат
+            Новая задача
           </Link>
         </Button>
       </div>
@@ -263,7 +263,7 @@ export function ProjectChatsCard({ projectId, chats }: ProjectChatsCardProps) {
         <div className="py-8 text-center">
           <MessageSquare className="mx-auto mb-2 size-8 text-muted-foreground/50" />
           <p className="text-sm text-muted-foreground">
-            Нет чатов. Начните общение с AI в контексте проекта.
+            Нет задач. Создайте первую задачу для работы с AI.
           </p>
         </div>
       )}

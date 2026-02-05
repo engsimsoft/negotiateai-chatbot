@@ -16,7 +16,7 @@ export function ProjectMeta({ createdAt, chatsCount, filesCount }: ProjectMetaPr
   return (
     <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 rounded-lg bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
       <span>Создан: {formattedDate}</span>
-      <span>Чатов: {chatsCount}</span>
+      <span>Задач: {chatsCount}</span>
       <span>Файлов: {filesCount}</span>
     </div>
   );

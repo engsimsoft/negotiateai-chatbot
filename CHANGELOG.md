@@ -12,6 +12,172 @@
 
 ---
 
+## [3.6.0] - 2026-02-05 - Project Page Enhancement (ТЗ-07C1)
+
+**MINOR RELEASE**: Папки для файлов, история задач, улучшенная страница проекта.
+
+### Summary
+
+Расширение страницы проекта: папки для группировки файлов, переименование "Чаты" в "Задачи" в контексте проекта, страница истории задач `/projects/[id]/tasks`, карточка "История задач" на странице проекта.
+
+### Added
+
+#### Database Schema
+- **`ProjectFolder`** — таблица для папок проекта (id, projectId, name, emoji, sortOrder)
+- **`folderId`** — поле в ProjectFile для связи с папкой
+- **`0020_natural_victor_mancha.sql`** — миграция
+
+#### New Queries (`lib/db/queries.ts`)
+- **`getProjectFolders()`** — список папок проекта
+- **`createProjectFolder()`** — создание папки
+- **`updateProjectFolder()`** — обновление папки
+- **`deleteProjectFolder()`** — удаление (файлы → корень)
+- **`updateProjectFileFolder()`** — перемещение файла
+- **`getProjectFolderWithFileCount()`** — папка со счётчиком файлов
+- **`getProjectChatsWithStats()`** — задачи с messageCount
+- **`getProjectChatsCount()`** — счётчик задач
+
+#### Folders API (`app/(chat)/api/projects/[id]/folders/`)
+- **`POST /folders`** — создание папки
+- **`PATCH /folders/[folderId]`** — обновление
+- **`DELETE /folders/[folderId]`** — удаление
+
+#### Task History Page (`app/(dashboard)/projects/[id]/tasks/`)
+- **`page.tsx`** — серверный компонент
+- **`components/tasks/`** — 5 компонентов:
+  - `tasks-page-content.tsx` — клиентский контейнер
+  - `task-list.tsx` — левая колонка (список)
+  - `task-list-item.tsx` — элемент списка
+  - `task-detail-panel.tsx` — правая колонка
+  - `tasks-empty-state.tsx` — пустое состояние
+
+#### Project Page Integration
+- **`task-history-card.tsx`** — карточка "История задач"
+- Placeholder "Пульс проекта" в правой колонке
+
+### Changed
+
+#### Files Card (`components/projects/project-files-card.tsx`)
+- Группировка файлов по папкам (Collapsible)
+- Кнопка "+ Папка" с inline-вводом
+- Меню папки: Переименовать, Удалить
+- Меню файла: "Переместить в..." с submenu
+
+#### Terminology (в контексте проекта)
+- "Чаты" → "Задачи"
+- "Новый чат" → "Новая задача"
+- "Чатов:" → "Задач:"
+
+#### Files API Enhancement
+- **`PATCH /files/[fileId]`** — поддержка изменения folderId
+
+---
+
+## [3.5.0] - 2026-02-04 - Chat History (ТЗ-07B)
+
+**MINOR RELEASE**: Страница истории чатов, карточка на главной, автогенерация summary.
+
+### Summary
+
+Полноценное управление историей чатов: новая страница `/chats` с двухколоночным layout, карточка "История чатов" на главной, автогенерация summary для чатов, возможность отмечать важные чаты звездой.
+
+### Added
+
+#### Database Schema
+- **`summary`** — краткое описание чата (генерируется AI)
+- **`isStarred`** — отметка важного чата (⭐)
+- **`0019_rare_thunderbolts.sql`** — миграция для новых полей
+
+#### New Queries (`lib/db/queries.ts`)
+- **`getGeneralChatsCount()`** — количество общих чатов (для карточки)
+- **`getGeneralChatsWithStats()`** — чаты с messageCount (для страницы /chats)
+- **`updateChatIsStarred()`** — toggle звезды
+- **`updateChatTitleAndSummary()`** — обновление title и summary
+
+#### Chat History Page (`app/(dashboard)/chats/`)
+- **`page.tsx`** — серверный компонент страницы
+- **`components/chats/`** — 6 компонентов:
+  - `chats-page-content.tsx` — клиентский контейнер
+  - `chat-list.tsx` — левая колонка (список)
+  - `chat-list-item.tsx` — элемент списка
+  - `chat-detail-panel.tsx` — правая колонка (детали)
+  - `chats-empty-state.tsx` — состояние "нет чатов"
+  - `index.ts` — экспорты
+
+#### Glavnaya Integration
+- **`components/glavnaya/chat-history-card.tsx`** — карточка со счётчиком
+- Интеграция в `dashboard/page.tsx` слева от инпута
+- Условное отображение (скрыта если 0 чатов)
+
+### Changed
+
+#### API Enhancements
+- **`POST /api/chat/[id]/generate-title`** — генерирует title + summary
+- **`PATCH /api/chat`** — поддержка isStarred
+
+#### Sidebar
+- **`sidebar-history-item.tsx`** — добавлен ⭐ toggle в dropdown menu
+
+### UX Improvements
+- Убран summary из карточки в списке чатов (дублирование с правой панелью)
+- Двухколоночный responsive layout на странице /chats
+- Подтверждение при удалении чата
+
+---
+
+## [3.4.1] - 2026-02-04 - Performance Optimization
+
+**PATCH RELEASE**: Критическая оптимизация производительности базы данных.
+
+### Summary
+
+Ускорение запросов к БД в 7-8 раз за счёт индексов, исправления N+1 проблемы и перехода на SWR для кеширования.
+
+### Added
+
+#### Database Indexes
+- **`0018_performance_indexes.sql`** — 12 новых индексов для ускорения запросов
+  - Chat: `userId`, `projectId`, `helperId`, `createdAt`
+  - Project: `userId`, `updatedAt`
+  - Message_v2: `chatId`, `createdAt`, composite `(chatId, createdAt)`
+  - ProjectFile: `projectId`
+  - Helper: `userId`
+  - Vote_v2: `chatId`
+
+#### Optimized Queries
+- **`getProjectsWithStats()`** — переписана с JOIN вместо N+1 (21 запрос → 1)
+- **`getVotesByChatIdWithAuth()`** — новая функция с проверкой прав
+
+### Changed
+
+#### SWR Migration
+- **`chat-header.tsx`** — ben-intro теперь использует useSWR вместо useEffect+fetch
+  - Устранено дублирование запросов в React StrictMode
+  - Добавлен optimistic update при dismiss
+
+#### API Optimization
+- **`/api/vote`** — использует новую оптимизированную функцию
+
+### Performance
+
+| Запрос | До | После | Ускорение |
+|--------|-----|-------|-----------|
+| `/api/projects` | 4266ms | 475ms | **7.6x** |
+| `/api/helpers` | 3702ms | 451ms | **8.2x** |
+| `/api/user/profile` | 3703ms | 464ms | **8x** |
+| `/api/deepgram/token` | 1050ms | 19ms | **55x** |
+
+### Documentation
+
+- **[ADR 010](docs/decisions/010-performance-optimization.md)** — подробное описание решений
+
+### Notes
+
+- Холодный старт Neon (~3-4 сек) остаётся — это особенность serverless БД
+- Индексы совместимы с будущим внедрением RAG
+
+---
+
 ## [3.4.0] - 2026-02-04 - Glavnaya + Navigation + Sidebar (ТЗ-07A)
 
 **MINOR RELEASE**: Новая главная страница, унифицированная система инпутов, контекстный sidebar, автонейминг чатов.

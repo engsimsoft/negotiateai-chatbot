@@ -7,6 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
+import { History } from "lucide-react";
 import { PlusIcon, TrashIcon } from "@/components/icons";
 import { SidebarHistory, getChatHistoryPaginationKey } from "@/components/sidebar-history";
 import { SidebarUserNav } from "@/components/sidebar-user-nav";
@@ -176,9 +177,30 @@ export function AppSidebar({ user }: AppSidebarProps) {
         </SidebarHeader>
 
         <SidebarContent>
-          {/* Заголовок контекста */}
-          <div className="px-4 py-2 text-xs font-medium text-muted-foreground">
-            {getContextTitle()}
+          {/* Заголовок контекста + кнопка истории */}
+          <div className="flex items-center justify-between px-4 py-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              {getContextTitle()}
+            </span>
+            {/* Кнопка "История чатов" — только для общих чатов */}
+            {context.type === "general" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    asChild
+                    className="h-6 px-2 text-xs"
+                    size="sm"
+                    variant="ghost"
+                  >
+                    <Link href="/chats" onClick={() => setOpenMobile(false)}>
+                      <History className="mr-1 size-3" />
+                      История
+                    </Link>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Все чаты с подробностями</TooltipContent>
+              </Tooltip>
+            )}
           </div>
 
           {/* История чатов с контекстом */}

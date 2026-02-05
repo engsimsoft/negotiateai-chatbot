@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
-import { getUserById } from "@/lib/db/queries";
+import { getUserById, getGeneralChatsCount } from "@/lib/db/queries";
 import {
   GlavnayaHeader,
   GlavnayaGreeting,
@@ -9,6 +9,7 @@ import {
   ProjectsSection,
   HelpersSection,
   ToolsSection,
+  ChatHistoryCard,
 } from "@/components/glavnaya";
 
 export default async function DashboardPage() {
@@ -18,8 +19,11 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Get user profile from database
-  const userProfile = await getUserById(session.user.id);
+  // Get user profile and chat count from database
+  const [userProfile, generalChatsCount] = await Promise.all([
+    getUserById(session.user.id),
+    getGeneralChatsCount({ userId: session.user.id }),
+  ]);
   const displayName = userProfile?.displayName || session.user.email?.split("@")[0] || "друг";
 
   return (
@@ -30,7 +34,12 @@ export default async function DashboardPage() {
         {/* Greeting + Input */}
         <section className="mb-12">
           <GlavnayaGreeting displayName={displayName} />
-          <GlavnayaInput />
+          <div className="flex items-stretch gap-3">
+            {generalChatsCount > 0 && (
+              <ChatHistoryCard count={generalChatsCount} />
+            )}
+            <GlavnayaInput />
+          </div>
         </section>
 
         {/* Projects */}

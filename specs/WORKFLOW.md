@@ -212,14 +212,36 @@ specs/TZ_XX_Name/
 
 **Триггер:** Разработка завершена, тесты пройдены
 **Действия:**
-1. Мануальное тестирование (пользователь)
-2. Перенести `CHANGELOG.md` → главный `CHANGELOG.md`
-3. Обновить `SIMPLY_STATUS.md`
-4. Обновить `CLAUDE.md`
-5. Обновить `package.json` (версия)
-6. Переместить папку: `mv specs/TZ_XX/ _archive/`
 
-**Выход:** ТЗ в архиве, документация актуальна
+**1. Проверка БД (Claude делает):**
+```sql
+-- Проверить что все таблицы существуют
+SELECT table_name FROM information_schema.tables
+WHERE table_schema = 'public' ORDER BY table_name;
+
+-- Проверить колонки в изменённых таблицах (адаптировать под конкретное ТЗ)
+SELECT column_name, data_type FROM information_schema.columns
+WHERE table_name = 'ИмяТаблицы' ORDER BY ordinal_position;
+
+-- Проверить foreign keys
+SELECT tc.table_name, kcu.column_name, ccu.table_name AS foreign_table
+FROM information_schema.table_constraints tc
+JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name
+WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = 'ИмяТаблицы';
+```
+
+**2. Мануальные тесты (пользователь делает):**
+- Список конкретных тестов из ROADMAP.md
+
+**3. Документация:**
+- Перенести `CHANGELOG.md` → главный `CHANGELOG.md`
+- Обновить `SIMPLY_STATUS.md`
+- Обновить `CLAUDE.md`
+- Обновить `package.json` (версия)
+- Переместить папку: `mv specs/TZ_XX/ _archive/`
+
+**Выход:** БД проверена, тесты пройдены, ТЗ в архиве, документация актуальна
 
 ---
 
@@ -251,7 +273,8 @@ specs/TZ_XX_Name/
 
 ### Завершение ТЗ
 - [ ] Все этапы ROADMAP выполнены
-- [ ] Мануальное тестирование пройдено
+- [ ] **Claude:** SQL-проверка БД (таблицы, колонки, FK)
+- [ ] **Пользователь:** Мануальное тестирование пройдено
 - [ ] `CHANGELOG.md` → главный CHANGELOG
 - [ ] Обновлён `SIMPLY_STATUS.md`
 - [ ] Обновлён `CLAUDE.md`
@@ -305,5 +328,6 @@ specs/TZ_XX_Name/
 
 ---
 
-**Версия:** 1.0
+**Версия:** 1.1
 **Создано:** 2026-02-04
+**Обновлено:** 2026-02-05 — добавлена обязательная проверка БД в финализации

@@ -1,11 +1,12 @@
-import { generateText } from "ai";
+import { generateObject } from "ai";
+import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
 import { myProvider } from "@/lib/ai/providers";
 import {
   getChatById,
   getMessagesByChatId,
-  updateChatTitleWithRenamedFlag,
+  updateChatTitleAndSummary,
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
 
@@ -74,12 +75,16 @@ export async function POST(
       })
       .join("\n");
 
-    // Generate title using Gemini Flash (fast and cheap)
-    const { text: title } = await generateText({
+    // Generate title and summary using Gemini Flash (fast and cheap)
+    const { object } = await generateObject({
       model: myProvider.languageModel("title-model"),
-      system: `Ты генерируешь короткие названия для чатов на русском языке.
+      schema: z.object({
+        title: z.string().describe("Короткое название чата (2-4 слова)"),
+        summary: z.string().describe("Краткое описание темы разговора (1-2 предложения)"),
+      }),
+      system: `Ты анализируешь чаты и генерируешь для них название и краткое описание на русском языке.
 
-Правила:
+Правила для title (названия):
 - 2-4 слова максимум
 - Используй существительные или именные группы
 - НЕ используй глаголы (не "Написать текст", а "Текст для сайта")
@@ -90,25 +95,32 @@ export async function POST(
 - Маркетинг кофейни
 - Перевод договора
 - Анализ конкурентов
-- Контент для Telegram
-- Карьерные советы`,
-      prompt: `Придумай короткое название (2-4 слова) для этого чата:\n\n${contextSummary}`,
+
+Правила для summary (описания):
+- 1-2 коротких предложения
+- Опиши о чём конкретно шёл разговор
+- Используй нейтральный тон`,
+      prompt: `Проанализируй этот чат и сгенерируй название и краткое описание:\n\n${contextSummary}`,
     });
 
     // Clean up the title (remove quotes, colons, etc.)
-    const cleanTitle = title
+    const cleanTitle = object.title
       .replace(/["«»:]/g, "")
       .replace(/^\s+|\s+$/g, "")
       .slice(0, 80);
 
-    // Update chat title (but keep isRenamed=false since it's auto-generated)
-    await updateChatTitleWithRenamedFlag({
+    const cleanSummary = object.summary
+      .replace(/^\s+|\s+$/g, "")
+      .slice(0, 300);
+
+    // Update chat title and summary (keep isRenamed=false since it's auto-generated)
+    await updateChatTitleAndSummary({
       chatId,
       title: cleanTitle,
-      isRenamed: false,
+      summary: cleanSummary,
     });
 
-    return Response.json({ title: cleanTitle, generated: true });
+    return Response.json({ title: cleanTitle, summary: cleanSummary, generated: true });
   } catch (error) {
     console.error("[generate-title] Error:", error);
     if (error instanceof ChatSDKError) {

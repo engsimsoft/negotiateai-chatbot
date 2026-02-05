@@ -640,6 +640,7 @@ export async function DELETE(request: Request) {
 /**
  * PATCH /api/chat?id=...
  * ТЗ-07A: Переименование чата (устанавливает isRenamed=true)
+ * ТЗ-07B: Toggle isStarred
  */
 export async function PATCH(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -666,13 +667,24 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const { title } = await request.json();
+    const body = await request.json();
 
-    if (!title || typeof title !== "string" || title.trim().length === 0) {
-      return new ChatSDKError("bad_request:api", "Title is required").toResponse();
+    // ТЗ-07B: Handle isStarred update
+    if (typeof body.isStarred === "boolean") {
+      const { updateChatIsStarred } = await import("@/lib/db/queries");
+      await updateChatIsStarred({
+        chatId: id,
+        isStarred: body.isStarred,
+      });
+      return Response.json({ success: true, isStarred: body.isStarred });
     }
 
-    // Импортируем здесь чтобы не добавлять в imports вверху
+    // ТЗ-07A: Handle title update
+    const { title } = body;
+    if (!title || typeof title !== "string" || title.trim().length === 0) {
+      return new ChatSDKError("bad_request:api", "Title or isStarred is required").toResponse();
+    }
+
     const { updateChatTitleWithRenamedFlag } = await import("@/lib/db/queries");
 
     await updateChatTitleWithRenamedFlag({
@@ -686,6 +698,6 @@ export async function PATCH(request: Request) {
     if (error instanceof ChatSDKError) {
       return error.toResponse();
     }
-    return new ChatSDKError("bad_request:api", "Failed to rename chat").toResponse();
+    return new ChatSDKError("bad_request:api", "Failed to update chat").toResponse();
   }
 }

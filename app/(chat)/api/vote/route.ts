@@ -1,5 +1,5 @@
 import { auth } from "@/app/(auth)/auth";
-import { getChatById, getVotesByChatId, voteMessage } from "@/lib/db/queries";
+import { getChatById, getVotesByChatIdWithAuth, voteMessage } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
 
 export async function GET(request: Request) {
@@ -16,24 +16,24 @@ export async function GET(request: Request) {
   const session = await auth();
 
   if (!session?.user) {
-    console.log("[Vote API] Unauthorized - no session");
     return new ChatSDKError("unauthorized:vote").toResponse();
   }
 
-  const chat = await getChatById({ id: chatId });
+  // Optimized: Single function handles auth check and vote retrieval
+  const result = await getVotesByChatIdWithAuth({
+    chatId,
+    userId: session.user.id,
+  });
 
-  if (!chat) {
-    console.log(`[Vote API] Chat not found: ${chatId}`);
+  if (result.error === "not_found") {
     return new ChatSDKError("not_found:chat").toResponse();
   }
 
-  if (chat.userId !== session.user.id) {
+  if (result.error === "forbidden") {
     return new ChatSDKError("forbidden:vote").toResponse();
   }
 
-  const votes = await getVotesByChatId({ id: chatId });
-
-  return Response.json(votes, { status: 200 });
+  return Response.json(result.votes, { status: 200 });
 }
 
 export async function PATCH(request: Request) {
