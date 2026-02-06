@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.5.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.8.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -27,8 +27,8 @@
 
 **Ключевые особенности:**
 - Универсальный AI-чат с инструментами (Gemini)
-- Проекты: изолированные рабочие пространства (Claude)
-- Модальные помощники: Prompt-агент (📝), Бен (❓)
+- Проекты: изолированные рабочие пространства (⚠️ временно Gemini)
+- Сервисные чаты: Бен (❓), создание проекта, менеджер
 - Три уровня персонализации: Профиль + RAG + Chat Memory
 - Мультипровайдер: Gemini + Claude (GPT планируется)
 - Оплата в рублях (ЮKassa, Тинькофф, СБП)
@@ -88,15 +88,16 @@
 - `components/chats/chat-list-item.tsx` — Элемент списка (⭐, date, actions)
 - `components/chats/chat-detail-panel.tsx` — Правая колонка (summary, actions)
 
-**Universal Dialog:**
-- `components/universal-dialog/` — Система диалогов (confirm, prompt, custom)
-
-**Modal Assistants:**
-- `components/modal-assistants/` — UI модальных помощников
-- `components/modal-assistants/prompt-agent/` — Prompt-агент (📝)
-- `components/modal-assistants/ben/` — Бен (❓), intro-bubble.tsx
-- `app/(chat)/api/assistant/prompt-agent/route.ts` — API Prompt-агента
-- `app/(chat)/api/assistant/ben/route.ts` — API Бена
+**ServiceChat (v3.8.0):**
+- `components/service-chat/` — Унифицированная система сервисных чатов
+- `components/service-chat/service-chat-core.tsx` — Ядро (messages, streaming, quickActions)
+- `components/service-chat/service-chat-floating.tsx` — Floating modal (center/bottom-right)
+- `components/service-chat/service-chat-drawer.tsx` — Drawer справа
+- `components/service-chat/service-chat-trigger.tsx` — Универсальная кнопка
+- `components/service-chat/ben-intro-bubble.tsx` — Speech bubble для онбординга
+- `components/service-chat/configs/` — Конфиги (ben, project-creation, project-manager)
+- `app/(chat)/api/service-chat/route.ts` — Унифицированный API
+- `app/(chat)/api/assistant/ben/route.ts` — Legacy API Бена
 
 **Sidebar (контекстный):**
 - `components/sidebar-layout.tsx` — Layout с табами вне Sidebar
@@ -150,7 +151,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**
@@ -202,7 +203,8 @@ vercel --prod            # Deploy на Vercel
 - [CHANGELOG.md](CHANGELOG.md) — История изменений
 
 **Техническая (AI):**
-- [docs/ai-providers.md](docs/ai-providers.md) — Провайдеры, модели, цены (SSOT)
+- [docs/ai-chats-map.md](docs/ai-chats-map.md) — **Карта всех чатов и моделей (SSOT)**
+- [docs/ai-providers.md](docs/ai-providers.md) — Провайдеры, модели, цены
 - [docs/ai-agents.md](docs/ai-agents.md) — Система промптов и помощники
 - [docs/ai-artifacts.md](docs/ai-artifacts.md) — Документы в холсте
 - [docs/ai-tools.md](docs/ai-tools.md) — Инструменты (search, vision)
@@ -318,4 +320,4 @@ specs/
 
 ---
 
-**Обновлено:** 2026-02-04
+**Обновлено:** 2026-02-06

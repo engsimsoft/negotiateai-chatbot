@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronDown, LogOut, Moon, Settings, Sun } from "lucide-react";
+import { ChevronDown, HelpCircle, LogOut, Moon, Settings, Sun } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
 import useSWR from "swr";
@@ -14,7 +14,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BenTrigger, BenDrawer } from "@/components/modal-assistants";
+import {
+  ServiceChatTrigger,
+  ServiceChatFloating,
+  BEN_CONFIG,
+} from "@/components/service-chat";
 import { fetcher } from "@/lib/utils";
 import { toast } from "@/components/toast";
 
@@ -59,7 +63,11 @@ export function GlavnayaHeader() {
       {/* Right side actions */}
       <div className="ml-auto flex items-center gap-2">
         {/* Ben trigger */}
-        <BenTrigger onClick={() => setBenOpen(true)} />
+        <ServiceChatTrigger
+          icon={<HelpCircle className="h-5 w-5" />}
+          tooltip="Бен, help"
+          onClick={() => setBenOpen(true)}
+        />
 
         {/* User menu */}
         <DropdownMenu>
@@ -123,8 +131,12 @@ export function GlavnayaHeader() {
         </DropdownMenu>
       </div>
 
-      {/* Ben drawer */}
-      <BenDrawer open={benOpen} onOpenChange={setBenOpen} />
+      {/* Ben floating modal */}
+      <ServiceChatFloating
+        config={BEN_CONFIG}
+        open={benOpen}
+        onOpenChange={setBenOpen}
+      />
     </header>
   );
 }

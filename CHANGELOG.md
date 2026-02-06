@@ -12,6 +12,57 @@
 
 ---
 
+## [3.8.0] - 2026-02-06 - ServiceChat унификация (ТЗ-09)
+
+**MINOR RELEASE**: Унифицированная система сервисных чатов — единая архитектура для Бен, создания проекта, менеджера.
+
+### Summary
+
+Все сервисные диалоги (Бен, создание проекта, менеджер) переведены на единую систему ServiceChat. Удалён Prompt-Agent, очищены устаревшие компоненты modal-assistants и universal-dialog.
+
+### Added
+
+#### Components
+- **`components/service-chat/`** — новая унифицированная система:
+  - `service-chat-core.tsx` — ядро (messages, streaming, quickActions)
+  - `service-chat-floating.tsx` — floating modal (center/bottom-right)
+  - `service-chat-drawer.tsx` — drawer справа
+  - `service-chat-trigger.tsx` — универсальная кнопка
+  - `ben-intro-bubble.tsx` — перенесено из modal-assistants
+  - `configs/ben.ts` — конфиг Бена
+  - `configs/project-creation.ts` — конфиг создания проекта
+  - `configs/project-manager.ts` — конфиг менеджера
+  - `types.ts` — TypeScript типы
+
+- **`app/(chat)/api/service-chat/route.ts`** — унифицированный API с context-параметром
+- **`app/(dashboard)/projects/new/project-creation-client.tsx`** — клиент создания проекта
+
+### Changed
+
+- **`components/chat-header.tsx`** — использует ServiceChatFloating + ServiceChatTrigger
+- **`components/glavnaya/glavnaya-header.tsx`** — использует ServiceChatFloating
+- **`components/projects/project-actions.tsx`** — использует ServiceChatDrawer
+- **`app/(dashboard)/projects/new/page.tsx`** — использует ProjectCreationClient
+
+### Removed
+
+- **`components/modal-assistants/`** — удалена вся папка:
+  - `ben/` (trigger, drawer, intro-bubble)
+  - `prompt-agent/` (trigger, drawer, panel)
+  - `assistant-chat.tsx`, `assistant-drawer.tsx`
+- **`components/universal-dialog/`** — удалена вся папка
+- **`components/projects/manager-dialog.tsx`** — заменён на ServiceChatDrawer
+- **`app/(chat)/api/universal-dialog/route.ts`** — удалён (функционал в service-chat)
+- **`app/(chat)/api/assistant/prompt-agent/route.ts`** — удалён
+- **`lib/prompts/skills/utility/prompt-helper/`** — архивирован
+
+### Documentation
+
+- **Обновлён:** `SIMPLY_STATUS.md` — версия 3.8.0, раздел ServiceChat
+- **Обновлён:** `CLAUDE.md` — структура service-chat
+
+---
+
 ## [3.7.1] - 2026-02-06 - Временный переход проектов на Gemini
 
 **PATCH RELEASE**: Проекты переведены с Claude (OpenRouter) на Gemini для тестирования.

@@ -46,3 +46,6 @@ export {
   PROJECT_CREATION_CONFIG,
   PROJECT_MANAGER_CONFIG,
 } from "./configs";
+
+// Ben-specific components
+export { BenIntroBubble } from "./ben-intro-bubble";

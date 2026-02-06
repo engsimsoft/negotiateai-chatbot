@@ -1,10 +1,17 @@
 /**
  * Professor Pipeline (ТЗ-03, Фаза 7)
  *
- * Multi-step reasoning pipeline using Claude models:
- * 1. Analyze (Opus): Break down task into 3-7 subtasks
- * 2. Execute (Haiku): Execute each subtask sequentially
- * 3. Synthesize (Opus): Combine results into final response
+ * Multi-step reasoning pipeline:
+ * 1. Analyze (Pro): Break down task into 3-7 subtasks
+ * 2. Execute (Flash): Execute each subtask sequentially
+ * 3. Synthesize (Pro): Combine results into final response
+ *
+ * ⚠️ ВРЕМЕННО (v3.7.1): Используем Gemini вместо Claude
+ * - Analyze: Gemini 3 Pro (вместо Claude Opus)
+ * - Execute: Gemini 2.5 Flash (вместо Claude Haiku)
+ * - Synthesize: Gemini 3 Pro (вместо Claude Opus)
+ *
+ * См. ADR 011: docs/decisions/011-temporary-gemini-for-projects.md
  *
  * Streaming events:
  * - professor-phase: Phase change (analyze, execute, synthesize)
@@ -16,7 +23,12 @@
  */
 
 import { generateText, streamText, type CoreMessage } from "ai";
-import { claudeOpus, claudeHaiku } from "./providers";
+import { myProvider } from "./providers";
+
+// ⚠️ ВРЕМЕННО: Gemini модели вместо Claude
+const analyzeModel = myProvider.languageModel("gemini-3-pro");   // вместо analyzeModel
+const executeModel = myProvider.languageModel("gemini-2.5-flash"); // вместо executeModel
+const synthesizeModel = myProvider.languageModel("gemini-3-pro"); // вместо analyzeModel
 
 /**
  * Pipeline phases
@@ -193,7 +205,7 @@ export async function executeProfessorPipeline(
 
   try {
     const analyzeResult = await generateText({
-      model: claudeOpus,
+      model: analyzeModel,
       system: systemPrompt + "\n\n" + ANALYZE_PROMPT,
       messages: [
         ...messages,
@@ -269,7 +281,7 @@ export async function executeProfessorPipeline(
           .replace("{description}", subtask.description);
 
         const executeResult = await generateText({
-          model: claudeHaiku,
+          model: executeModel,
           system: systemPrompt + "\n\n" + executePrompt,
           messages: [
             ...messages,
@@ -317,7 +329,7 @@ export async function executeProfessorPipeline(
 
     // Use streaming for final response
     const synthesizeStream = streamText({
-      model: claudeOpus,
+      model: synthesizeModel,
       system: systemPrompt + "\n\n" + synthesizePrompt,
       messages: [
         ...messages,

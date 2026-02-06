@@ -9,7 +9,7 @@
  * ТЗ-09: ServiceChat унификация
  */
 
-import { streamText, tool } from "ai";
+import { streamText, tool, stepCountIs } from "ai";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { myProvider } from "@/lib/ai/providers";
@@ -23,12 +23,21 @@ export const maxDuration = 60;
 // Supported service chat contexts
 type ServiceChatContext = "ben" | "project-creation" | "project-manager";
 
-// Request schema
+// Message part schema (from useChat)
+const messagePartSchema = z.object({
+  type: z.string(),
+  text: z.string().optional(),
+});
+
+// Request schema - supports both formats
 const requestSchema = z.object({
   messages: z.array(
     z.object({
+      id: z.string().optional(),
       role: z.enum(["user", "assistant"]),
-      content: z.string(),
+      // Support both content string and parts array
+      content: z.string().optional(),
+      parts: z.array(messagePartSchema).optional(),
     })
   ),
   context: z.enum(["ben", "project-creation", "project-manager"]),
@@ -37,15 +46,36 @@ const requestSchema = z.object({
 });
 
 /**
+ * Extract text content from message (handles both formats)
+ */
+function extractMessageContent(message: {
+  content?: string;
+  parts?: Array<{ type: string; text?: string }>;
+}): string {
+  if (message.content) {
+    return message.content;
+  }
+  if (message.parts) {
+    return message.parts
+      .filter((p) => p.type === "text" && p.text)
+      .map((p) => p.text)
+      .join("");
+  }
+  return "";
+}
+
+/**
  * Get model ID based on context
+ *
+ * ⚠️ ВРЕМЕННО (v3.7.1): Все на Gemini, Claude отключён
+ * См. ADR 011: docs/decisions/011-temporary-gemini-for-projects.md
  */
 function getModelId(context: ServiceChatContext): string {
   switch (context) {
     case "ben":
     case "project-creation":
+    case "project-manager": // ⚠️ Временно Gemini вместо Claude
       return "gemini-2.5-flash";
-    case "project-manager":
-      return "claude-3-7-sonnet";
     default:
       return "gemini-2.5-flash";
   }
@@ -219,12 +249,19 @@ export async function POST(request: Request) {
       });
     }
 
+    // Transform messages to content format for streamText
+    const transformedMessages = messages.map((msg) => ({
+      role: msg.role,
+      content: extractMessageContent(msg),
+    }));
+
     // Stream response
     const result = streamText({
       model: myProvider.languageModel(modelId),
       system: systemPrompt,
-      messages,
+      messages: transformedMessages,
       tools: Object.keys(tools).length > 0 ? tools : undefined,
+      stopWhen: stepCountIs(3), // Allow tool execution and follow-up response
       temperature: 1.0,
     });
 

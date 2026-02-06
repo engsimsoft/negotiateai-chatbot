@@ -59,6 +59,64 @@ import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
 export const maxDuration = 180; // 3 minutes - increased for complex document generation
 
+/**
+ * Convert text/plain file parts to text parts in a single message
+ * Claude API via OpenRouter doesn't support text files as attachments - only images
+ * So we need to fetch the file content and include it as text
+ */
+async function convertTextFilePartsInMessage(
+  message: ChatMessage
+): Promise<ChatMessage> {
+  const processedParts = await Promise.all(
+    message.parts.map(async (part: any) => {
+      // Only process file parts with text/plain mediaType
+      if (part.type === "file" && part.mediaType === "text/plain") {
+        const fileName = part.name || part.url?.split("/").pop() || "unknown";
+        try {
+          // Fetch the file content from the URL
+          const response = await fetch(part.url);
+          if (!response.ok) {
+            console.warn(`[Chat API] Failed to fetch text file: ${part.url}`);
+            return {
+              type: "text" as const,
+              text: `📄 Файл: ${fileName} (не удалось загрузить)`,
+            };
+          }
+          const textContent = await response.text();
+          console.log(`[Chat API] Converted text file to text part: ${fileName} (${textContent.length} chars)`);
+
+          return {
+            type: "text" as const,
+            text: `📄 **Файл: ${fileName}**\n\`\`\`\n${textContent}\n\`\`\``,
+          };
+        } catch (error) {
+          console.warn(`[Chat API] Error processing text file ${fileName}:`, error);
+          return {
+            type: "text" as const,
+            text: `📄 Файл: ${fileName} (ошибка обработки)`,
+          };
+        }
+      }
+      return part;
+    })
+  );
+
+  return {
+    ...message,
+    parts: processedParts,
+  } as ChatMessage;
+}
+
+/**
+ * Convert text/plain file parts to text parts in all messages
+ * This handles both new messages and history from DB
+ */
+async function convertTextFilesInAllMessages(
+  messages: ChatMessage[]
+): Promise<ChatMessage[]> {
+  return Promise.all(messages.map(convertTextFilePartsInMessage));
+}
+
 const getTokenlensCatalog = cache(
   async (): Promise<ModelCatalog | undefined> => {
     try {
@@ -105,14 +163,6 @@ export async function POST(request: Request) {
       projectId,
       projectModelTier,
       helperId,
-    }: {
-      id: string;
-      message: ChatMessage;
-      selectedChatModel: ChatModel["id"];
-      selectedVisibilityType: VisibilityType;
-      projectId?: string;
-      projectModelTier?: ProjectModelTier;
-      helperId?: string;
     } = requestBody;
 
     const session = await auth();
@@ -200,7 +250,10 @@ export async function POST(request: Request) {
       minMessages: 20,
     });
 
-    const uiMessages = [...convertToUIMessages(messagesFromDb), message];
+    // ⚠️ ВРЕМЕННО: Конвертация text/plain отключена (Gemini поддерживает)
+    // Код сохранён для будущего возврата к Claude
+    // const processedMessage = await convertTextFilePartsInMessage(message as ChatMessage);
+    const uiMessages = [...convertToUIMessages(messagesFromDb), message as ChatMessage];
 
     // Подсчитываем общее количество токенов в контексте
     const totalHistoryTokens = messagesFromDb.reduce((sum, msg) => {

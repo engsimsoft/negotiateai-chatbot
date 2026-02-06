@@ -6,15 +6,17 @@ import { memo, useState, useEffect } from "react";
 import useSWR from "swr";
 import { useWindowSize } from "usehooks-ts";
 import { ChevronRight, FolderOpen, Home } from "lucide-react";
+import { HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarToggle } from "@/components/sidebar-toggle";
 import { PlusIcon } from "./icons";
 import { useSidebar } from "./ui/sidebar";
 import {
-  BenTrigger,
-  BenDrawer,
+  ServiceChatTrigger,
+  ServiceChatFloating,
   BenIntroBubble,
-} from "@/components/modal-assistants";
+  BEN_CONFIG,
+} from "@/components/service-chat";
 
 // SWR fetcher for JSON endpoints
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -156,16 +158,21 @@ function PureChatHeader({
       {/* Use mounted check to avoid hydration mismatch with windowWidth */}
       <div className={`flex items-center gap-1${mounted && open && windowWidth >= 768 ? " ml-auto" : ""}`}>
         <div className="relative">
-          <BenTrigger onClick={() => {
-            setBenOpen(true);
-            if (showBenIntro) dismissBenIntro();
-          }} />
+          <ServiceChatTrigger
+            icon={<HelpCircle className="h-5 w-5" />}
+            tooltip="Бен, help"
+            onClick={() => {
+              setBenOpen(true);
+              if (showBenIntro) dismissBenIntro();
+            }}
+          />
           <BenIntroBubble show={showBenIntro} onDismiss={dismissBenIntro} />
         </div>
       </div>
 
       {/* Modal assistant drawers */}
-      <BenDrawer
+      <ServiceChatFloating
+        config={BEN_CONFIG}
         open={benOpen}
         onOpenChange={setBenOpen}
       />

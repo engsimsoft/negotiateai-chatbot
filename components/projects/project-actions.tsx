@@ -4,7 +4,10 @@ import { useState } from "react";
 import { TaskHistoryCard } from "./task-history-card";
 import { NewTaskCard } from "./new-task-card";
 import { ManagerCard } from "./manager-card";
-import { ManagerDialog } from "./manager-dialog";
+import {
+  ServiceChatDrawer,
+  PROJECT_MANAGER_CONFIG,
+} from "@/components/service-chat";
 
 interface ProjectActionsProps {
   projectId: string;
@@ -26,7 +29,12 @@ export function ProjectActions({ projectId, tasksCount }: ProjectActionsProps) {
         <ManagerCard onOpen={() => setManagerOpen(true)} />
       </div>
 
-      <ManagerDialog open={managerOpen} onOpenChange={setManagerOpen} />
+      <ServiceChatDrawer
+        config={PROJECT_MANAGER_CONFIG}
+        open={managerOpen}
+        onOpenChange={setManagerOpen}
+        context={{ projectId }}
+      />
     </>
   );
 }

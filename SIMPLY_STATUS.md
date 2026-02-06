@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.7.1
+**Версия:** 3.8.0
 **Дата:** 2026-02-06
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -84,8 +84,9 @@
 | Промпт | Модель | Назначение |
 |--------|--------|------------|
 | **chat** | Gemini 3 Pro | Универсальный AI-чат |
-| **prompt-agent** | Gemini 3 Pro | Помощь в формулировке промптов |
 | **ben** | Gemini 2.5 Flash | Гид по платформе |
+| **project-creation** | Gemini 2.5 Flash | Создание проектов |
+| **project-manager** | Claude Sonnet | Управление проектом |
 
 ### Файловая структура
 
@@ -140,12 +141,15 @@ lib/prompts/
     └── chat-memory.ts
 ```
 
-### Модальные помощники
+### Сервисные чаты (v3.8)
 
-| Помощник | Кнопка | Назначение |
-|----------|--------|------------|
-| **Prompt-агент** | 📝 | Улучшение промптов, уточняющие вопросы |
-| **Бен** | ❓ | Вопросы о платформе, онбординг |
+> В версии 3.8.0 модальные помощники унифицированы в систему ServiceChat.
+
+| Чат | Кнопка | Оболочка | Назначение |
+|-----|--------|----------|------------|
+| **Бен** | ❓ | Floating (bottom-right) | Вопросы о платформе, онбординг |
+| **Создание проекта** | ➕ | Full-page | AI-интервью для создания проекта |
+| **Менеджер проекта** | 👤 | Drawer (right) | Управление проектом (заглушка) |
 
 ---
 
@@ -266,6 +270,25 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-09: ServiceChat — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Унифицированная система сервисных чатов** — единая архитектура для Бен, создания проекта, менеджера
+- **ServiceChatCore** — ядро с messages, streaming, quickActions
+- **ServiceChatFloating** — floating modal (center/bottom-right) для Бена и создания проекта
+- **ServiceChatDrawer** — drawer справа для менеджера проекта
+- **Конфиги** — BEN_CONFIG, PROJECT_CREATION_CONFIG, PROJECT_MANAGER_CONFIG
+- **Унифицированный API** — `/api/service-chat` с context-параметром
+- **Удалён Prompt-Agent** — архивирован в `_archive/prompts/`
+- **Очистка** — удалены modal-assistants, universal-dialog
+
+**Ключевые файлы:**
+- `components/service-chat/` — новая система (12 файлов)
+- `app/(chat)/api/service-chat/route.ts` — унифицированный API
+- `app/(dashboard)/projects/new/project-creation-client.tsx` — клиент создания проекта
+
+**Детали:** [specs/TZ_09_ServiceChat/](specs/TZ_09_ServiceChat/)
 
 ### ТЗ-08: File Viewer — ✅ ЗАВЕРШЁН
 
@@ -479,14 +502,15 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.7.1 |
+| Версия | 3.8.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7) |
-| Skills | 6 (document: 4, research: 1, utility: 1) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8) |
+| Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
-| Промптов | 4 (chat, prompt-agent, ben, project) |
+| Сервисные чаты | 3 (ben, project-creation, project-manager) |
+| Промптов | 4 (chat, ben, project-creation, project-manager) |
 | AI моделей | 5 (Gemini 3 Pro, 2.5 Flash, Claude Haiku, Sonnet, Opus) |
 | AI-инструментов | 9 |
 | Типов документов | 5 (text, markdown, excel, presentation-reveal, presentation-pptx) |

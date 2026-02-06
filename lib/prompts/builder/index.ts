@@ -118,7 +118,7 @@ export function buildBenPrompt(
  * Build prompt for skill execution
  *
  * @example
- * const result = buildSkillPrompt('utility/prompt-helper', { user });
+ * const result = buildSkillPrompt('content/writing', { user });
  */
 export function buildSkillPrompt(
   skillId: string,
@@ -134,13 +134,11 @@ export function buildSkillPrompt(
 }
 
 /**
- * Build prompt for Prompt-agent (convenience wrapper)
- *
- * @example
- * const result = buildPromptAgentPrompt({ user });
+ * @deprecated Prompt-agent removed in ТЗ-09. Skill archived.
+ * @see _archive/prompts/prompt-agent-skill.md
  */
-export function buildPromptAgentPrompt(context: BuildContext = {}): BuiltPrompt {
-  return buildSkillPrompt('utility/prompt-helper', context);
+export function buildPromptAgentPrompt(_context: BuildContext = {}): BuiltPrompt {
+  throw new Error('Prompt-agent removed in ТЗ-09');
 }
 
 // =============================================================================
@@ -153,7 +151,7 @@ export function buildPromptAgentPrompt(context: BuildContext = {}): BuiltPrompt 
  * @deprecated Use buildChatPrompt instead
  */
 export function buildPrompt(
-  id: 'chat' | 'ben' | 'prompt-agent',
+  id: 'chat' | 'ben',
   context: BuildContext = {}
 ): BuiltPrompt {
   switch (id) {
@@ -162,8 +160,6 @@ export function buildPrompt(
     case 'ben':
       const isFirstTime = context.variables?.isFirstTime === 'true';
       return buildBenPrompt(context, isFirstTime);
-    case 'prompt-agent':
-      return buildPromptAgentPrompt(context);
     default:
       return buildChatPrompt(context);
   }
@@ -172,8 +168,8 @@ export function buildPrompt(
 /**
  * @deprecated Use getSkillsRegistry or getAgentsRegistry instead
  */
-export function getAvailablePrompts(): ('chat' | 'ben' | 'prompt-agent')[] {
-  return ['chat', 'ben', 'prompt-agent'];
+export function getAvailablePrompts(): ('chat' | 'ben')[] {
+  return ['chat', 'ben'];
 }
 
 /**

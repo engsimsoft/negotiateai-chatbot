@@ -26,7 +26,6 @@ export {
   buildChatPrompt,
   buildAgentPrompt,
   buildBenPrompt,
-  buildPromptAgentPrompt,
   buildSkillPrompt,
 
   // Registry

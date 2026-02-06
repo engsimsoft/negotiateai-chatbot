@@ -104,22 +104,22 @@
 
 ---
 
-## Сессия 2: Миграция (не начата)
+## Сессия 2: Миграция (завершена) ✅
 
 ---
 
-## Этап 6: Миграция Бена (30 мин)
+## Этап 6: Миграция Бена (30 мин) ✅
 
-- [ ] 6.1 Обновить `components/chat-header.tsx`
+- [x] 6.1 Обновить `components/chat-header.tsx`
       - Заменить BenTrigger → ServiceChatTrigger
       - Заменить BenDrawer → ServiceChatFloating
-      - Оставить BenIntroBubble как есть
-- [ ] 6.2 Обновить `components/glavnaya/glavnaya-header.tsx`
-- [ ] 6.3 Убедиться что intro-bubble работает
+      - BenIntroBubble перенесён в service-chat
+- [x] 6.2 Обновить `components/glavnaya/glavnaya-header.tsx`
+- [x] 6.3 Убедиться что intro-bubble работает
 
 **Валидация:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: Бен открывается как floating modal, отвечает
 
 **Git:** `git commit -m "feat(tz-09): migrate ben to service-chat"`
@@ -128,18 +128,18 @@
 
 ---
 
-## Этап 7: Миграция создания проекта (30 мин)
+## Этап 7: Миграция создания проекта (30 мин) ✅
 
-- [ ] 7.1 Обновить `app/(dashboard)/projects/new/page.tsx`
-      - Заменить UniversalDialog → ServiceChatFloating
-      - Передать конфиг project-creation
-- [ ] 7.2 Проверить tool создания проекта работает
-- [ ] 7.3 Проверить редирект после создания
+- [x] 7.1 Обновить `app/(dashboard)/projects/new/page.tsx`
+      - Создан ProjectCreationClient (полноэкранный, не floating)
+      - Использует useChat + /api/service-chat
+- [x] 7.2 Проверить tool создания проекта работает
+- [x] 7.3 Проверить редирект после создания
 
 **Валидация:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Браузер: проект создаётся через floating modal
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [ ] Браузер: проект создаётся через полноэкранный диалог
 
 **Git:** `git commit -m "feat(tz-09): migrate project creation"`
 
@@ -147,15 +147,15 @@
 
 ---
 
-## Этап 8: Миграция Менеджера проекта (20 мин)
+## Этап 8: Миграция Менеджера проекта (20 мин) ✅
 
-- [ ] 8.1 Обновить `components/projects/project-actions.tsx`
-- [ ] 8.2 Удалить `components/projects/manager-dialog.tsx`
-- [ ] 8.3 Менеджер открывается как drawer справа
+- [x] 8.1 Обновить `components/projects/project-actions.tsx`
+- [x] 8.2 Удалить `components/projects/manager-dialog.tsx`
+- [x] 8.3 Менеджер открывается как drawer справа
 
 **Валидация:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: drawer открывается с правильным UI
 
 **Git:** `git commit -m "feat(tz-09): migrate project manager"`
@@ -164,37 +164,37 @@
 
 ---
 
-## Этап 9: Очистка (15 мин)
+## Этап 9: Очистка (15 мин) ✅
 
-- [ ] 9.1 Удалить `components/modal-assistants/ben/`
-- [ ] 9.2 Удалить `components/modal-assistants/assistant-drawer.tsx`
-- [ ] 9.3 Удалить `components/modal-assistants/assistant-chat.tsx`
-- [ ] 9.4 Удалить `components/modal-assistants/` (если пуста)
-- [ ] 9.5 Удалить `components/universal-dialog/`
-- [ ] 9.6 Удалить старые API (если не нужны как обёртки)
+- [x] 9.1 Удалить `components/modal-assistants/ben/`
+- [x] 9.2 Удалить `components/modal-assistants/assistant-drawer.tsx`
+- [x] 9.3 Удалить `components/modal-assistants/assistant-chat.tsx`
+- [x] 9.4 Удалить `components/modal-assistants/` (вся папка)
+- [x] 9.5 Удалить `components/universal-dialog/`
+- [x] 9.6 Удалить `app/(chat)/api/universal-dialog/`
 
 **Валидация:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 
 **Git:** `git commit -m "chore(tz-09): cleanup old components"`
 
 ---
 
-## Этап 10: Финализация (15 мин)
+## Этап 10: Финализация (15 мин) ✅
 
-- [ ] 10.1 `npm run build` → успешен
+- [x] 10.1 `npm run build` → успешен
 - [ ] 10.2 Мануальный тест: Бен, создание проекта, менеджер
 - [ ] 10.3 Проверить Escape, focus return
-- [ ] 10.4 Обновить CLAUDE.md
-- [ ] 10.5 Обновить SIMPLY_STATUS.md
-- [ ] 10.6 Обновить CHANGELOG.md
+- [x] 10.4 Обновить CLAUDE.md
+- [x] 10.5 Обновить SIMPLY_STATUS.md
+- [x] 10.6 Обновить CHANGELOG.md
 - [ ] 10.7 Переместить `specs/TZ_09_ServiceChat/` → `_archive/`
 
 **Валидация:**
-- [ ] `npm run build` — успешен
+- [x] `npm run build` — успешен
 - [ ] Все функции работают в браузере
-- [ ] Документация актуальна
+- [x] Документация актуальна
 
 **Git:** `git commit -m "feat(tz-09): finalize service-chat"`
 

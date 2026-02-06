@@ -5,6 +5,8 @@
  *
  * A small speech bubble that appears next to the Ben trigger button
  * for first-time users. Dismisses on click or after timeout.
+ *
+ * ТЗ-09: Перенесено из modal-assistants/ben
  */
 
 import { motion, AnimatePresence } from "framer-motion";

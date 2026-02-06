@@ -18,7 +18,8 @@ export const PROJECT_MANAGER_CONFIG: ServiceChatConfig = {
   // drawer is always right, width ~420px
 
   // AI
-  model: "claude-sonnet",
+  // ⚠️ ВРЕМЕННО (v3.7.1): Gemini вместо Claude — см. ADR 011
+  model: "gemini-flash",
   apiEndpoint: "/api/service-chat", // Will use unified API
 
   // UX

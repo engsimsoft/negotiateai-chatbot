@@ -1,7 +1,7 @@
 # ADR 007: Проекты + Claude Integration (v3.2.0)
 
 **Дата:** 2026-02-02
-**Статус:** Принято
+**Статус:** ⏸️ Приостановлен (см. [ADR 011](011-temporary-gemini-for-projects.md))
 
 ---
 
@@ -166,4 +166,9 @@ ALTER TABLE Chat ADD COLUMN projectId UUID REFERENCES Project(id);
 
 ---
 
-**Обновлено:** 2026-02-03
+---
+
+## История изменений
+
+- **2026-02-02** — Документ создан
+- **2026-02-05** — Статус изменён на "Приостановлен" (временный переход на Gemini, см. [ADR 011](011-temporary-gemini-for-projects.md))
