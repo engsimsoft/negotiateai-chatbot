@@ -14,9 +14,8 @@ import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { myProvider } from "@/lib/ai/providers";
 import { buildBenPrompt } from "@/lib/prompts/server";
-import { getUserById, saveProject } from "@/lib/db/queries";
+import { getUserById } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
-import { generateUUID } from "@/lib/utils";
 
 export const maxDuration = 60;
 
@@ -111,6 +110,8 @@ function buildSystemPrompt(
 
 /**
  * Build project creation prompt
+ *
+ * v3.9.0: Live Preview — AI обновляет черновик, не создаёт проект напрямую
  */
 function buildProjectCreationPrompt(options: {
   userName?: string;
@@ -122,23 +123,25 @@ function buildProjectCreationPrompt(options: {
 
 ## Твои задачи
 
-1. **Понять суть проекта** — задай 1-2 уточняющих вопроса если нужно:
+1. **Собрать информацию** через диалог:
    - Какая цель проекта?
    - Для кого/чего это?
-   - Есть ли дедлайны или особенности?
 
-2. **Сформулировать паспорт проекта:**
-   - Название (2-5 слов, отражает суть)
-   - Описание (1-2 предложения)
-   - Инструкция для AI (контекст для будущей работы)
+2. **Обновлять черновик постепенно:**
+   - Понял название → сразу вызови updateProjectDraft({name: "..."})
+   - Понял цель → добавь description
+   - Есть контекст → добавь instruction
+   - Можно вызывать несколько раз, уточняя поля
 
-3. **Создать проект** — когда у тебя достаточно информации, вызови инструмент createProject.
+3. **НЕ создавай проект** — пользователь сам нажмёт кнопку когда будет готов
 
 ## Правила
 
+- Обновляй черновик по мере разговора, не жди всей информации
+- Поля можно обновлять несколько раз (уточнять)
+- Когда черновик заполнен, скажи что можно создавать проект
 - Будь дружелюбным и кратким
-- Не задавай больше 2-3 вопросов подряд
-- Если пользователь сразу даёт чёткое описание — сразу создавай проект
+- Не задавай больше 2 вопросов подряд
 - Говори на русском языке
 - Обращайся на "ты"`;
 }
@@ -214,36 +217,37 @@ export async function POST(request: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tools: Record<string, any> = {};
 
-    // Add createProject tool for project-creation context
+    // Add updateProjectDraft tool for project-creation context
+    // v3.9.0: Live Preview — обновляет черновик, не создаёт проект
     if (context === "project-creation") {
-      const createProjectSchema = z.object({
+      const updateProjectDraftSchema = z.object({
         name: z
           .string()
+          .optional()
           .describe("Название проекта (2-5 слов, отражает суть)"),
         description: z
           .string()
+          .optional()
           .describe("Краткое описание проекта (1-2 предложения)"),
         instruction: z
           .string()
+          .optional()
           .describe("Системная инструкция для AI при работе с этим проектом"),
       });
 
-      tools.createProject = tool({
+      tools.updateProjectDraft = tool({
         description:
-          "Создать новый проект когда у тебя есть достаточно информации: название и понимание цели проекта.",
-        inputSchema: createProjectSchema,
-        execute: async (input: z.infer<typeof createProjectSchema>) => {
-          const project = await saveProject({
-            id: generateUUID(),
-            userId,
-            name: input.name,
-            description: input.description,
-            instruction: input.instruction,
-          });
+          "Обновить черновик проекта. Вызывай по мере получения информации — не жди всех данных. Можно вызывать несколько раз для уточнения.",
+        inputSchema: updateProjectDraftSchema,
+        execute: async (input: z.infer<typeof updateProjectDraftSchema>) => {
+          // Не создаём проект — просто возвращаем данные для frontend
           return {
             success: true,
-            projectId: project.id,
-            projectName: project.name,
+            draft: {
+              name: input.name || null,
+              description: input.description || null,
+              instruction: input.instruction || null,
+            },
           };
         },
       });

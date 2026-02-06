@@ -3,25 +3,28 @@
 /**
  * Project Creation Client Component
  *
- * Wraps ServiceChatFloating for project creation.
- * Handles tool results and redirects after project creation.
+ * Split layout: Preview (left) + Chat (right)
+ * Preview shows draft state updated by AI in real-time.
  *
- * ТЗ-09: ServiceChat унификация
- * v3.8.1: Unified Input System integration
+ * ТЗ-10: Live Preview
+ * v3.9.0: Split layout + Draft state
  */
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { ServiceChatInput } from "@/components/input";
 import { PROJECT_CREATION_CONFIG, type QuickAction } from "@/components/service-chat";
-import { cn, generateUUID } from "@/lib/utils";
+import { generateUUID } from "@/lib/utils";
+import {
+  ProjectDraftPreview,
+  type ProjectDraft,
+} from "./components/project-draft-preview";
+import { ProjectChatPanel } from "./components/project-chat-panel";
 
 interface UserProfile {
   displayName?: string | null;
@@ -61,24 +64,32 @@ function getMessageText(parts: Array<{ type: string; text?: string }>): string {
 }
 
 /**
- * Check for createProject tool result in message parts
+ * Extract draft updates from updateProjectDraft tool results
+ * Returns partial draft with only the fields that were updated
+ *
+ * Note: Tool results have type "tool-{toolName}" and data in "output" field
  */
-function findProjectResult(
+function extractDraftUpdate(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  parts: Array<{ type: string; toolName?: string; result?: any }>
-): ProjectResult | null {
+  parts: Array<{ type: string; output?: any; state?: string }>
+): Partial<ProjectDraft> | null {
   for (const part of parts) {
+    // Tool results have type "tool-{toolName}" format
     if (
-      part.type === "tool-result" &&
-      part.toolName === "createProject" &&
-      part.result?.success &&
-      part.result?.projectId
+      part.type === "tool-updateProjectDraft" &&
+      part.state === "output-available" &&
+      part.output?.success &&
+      part.output?.draft
     ) {
-      return {
-        id: part.result.projectId,
-        name: part.result.projectName || "Новый проект",
-        description: part.result.projectDescription,
-      };
+      const draft = part.output.draft;
+      const update: Partial<ProjectDraft> = {};
+
+      // Only include non-null fields
+      if (draft.name) update.name = draft.name;
+      if (draft.description) update.description = draft.description;
+      if (draft.instruction) update.instruction = draft.instruction;
+
+      return Object.keys(update).length > 0 ? update : null;
     }
   }
   return null;
@@ -90,6 +101,16 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
   const [error, setError] = useState<Error | null>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [projectResult, setProjectResult] = useState<ProjectResult | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Draft state for live preview
+  const [draft, setDraft] = useState<ProjectDraft>({
+    name: "",
+    description: "",
+    instruction: "",
+  });
+
+  const isComplete = draft.name.trim() !== "" && draft.description.trim() !== "";
 
   const config = PROJECT_CREATION_CONFIG;
 
@@ -128,19 +149,11 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
 
   const isLoading = status === "streaming" || status === "submitted";
 
-  // Convert chat messages to display format and check for project creation
+  // Convert chat messages to display format
   const displayMessages: DisplayMessage[] = useMemo(() => {
     const msgs: DisplayMessage[] = [];
 
     for (const m of chatMessages) {
-      // Check for project result in this message
-      if (!projectResult) {
-        const result = findProjectResult(m.parts);
-        if (result) {
-          setProjectResult(result);
-        }
-      }
-
       const text = getMessageText(m.parts);
       if (text) {
         msgs.push({
@@ -152,9 +165,64 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
     }
 
     return msgs;
-  }, [chatMessages, projectResult]);
+  }, [chatMessages]);
 
-  // Handle send message (for ServiceChatInput)
+  // Parse tool results and update draft in real-time
+  // Track processed message IDs to avoid duplicate updates
+  const processedIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    for (const m of chatMessages) {
+      // Skip already processed messages
+      if (processedIdsRef.current.has(m.id)) continue;
+
+      const draftUpdate = extractDraftUpdate(m.parts);
+      if (draftUpdate) {
+        setDraft((prev) => ({
+          ...prev,
+          ...draftUpdate,
+        }));
+        processedIdsRef.current.add(m.id);
+      }
+    }
+  }, [chatMessages]);
+
+  // Handle create project
+  const handleCreateProject = useCallback(async () => {
+    if (!isComplete || isCreating) return;
+
+    setIsCreating(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: draft.name,
+          description: draft.description,
+          instruction: draft.instruction || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create project");
+      }
+
+      const project = await response.json();
+      setProjectResult({
+        id: project.id,
+        name: project.name,
+        description: project.description,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Unknown error"));
+    } finally {
+      setIsCreating(false);
+    }
+  }, [draft, isComplete, isCreating]);
+
+  // Handle send message
   const handleSend = useCallback(() => {
     if (!input.trim() || isLoading) return;
 
@@ -183,7 +251,8 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
   );
 
   // Show quick actions only before first interaction
-  const showQuickActions = !hasInteracted && config.quickActions && config.quickActions.length > 0;
+  const showQuickActions =
+    !hasInteracted && !!config.quickActions && config.quickActions.length > 0;
 
   // Success card after project creation
   if (projectResult) {
@@ -241,130 +310,49 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-sm">
-        <Link href="/dashboard">
-          <Button size="icon" variant="ghost">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{config.icon}</span>
-          <div>
-            <h1 className="font-semibold">{config.title}</h1>
-            <p className="text-xs text-muted-foreground">
-              {config.subtitle}
-            </p>
+    <div className="flex min-h-dvh bg-background">
+      {/* Left: Preview (desktop only) */}
+      <aside className="hidden w-[400px] flex-shrink-0 border-r p-6 lg:block">
+        <ProjectDraftPreview
+          draft={draft}
+          onDraftChange={setDraft}
+          isComplete={isComplete}
+          onCreateProject={handleCreateProject}
+          isCreating={isCreating}
+        />
+      </aside>
+
+      {/* Right: Chat */}
+      <main className="flex flex-1 flex-col">
+        {/* Header */}
+        <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-sm">
+          <Link href="/dashboard">
+            <Button size="icon" variant="ghost">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">{config.icon}</span>
+            <div>
+              <h1 className="font-semibold">{config.title}</h1>
+              <p className="text-xs text-muted-foreground">{config.subtitle}</p>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Messages area */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="mx-auto max-w-2xl space-y-4">
-          <AnimatePresence mode="popLayout">
-            {displayMessages.map((message) => (
-              <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                className={cn("flex gap-3", message.role === "user" && "flex-row-reverse")}
-              >
-                {message.role === "assistant" && (
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    S
-                  </div>
-                )}
-                <div
-                  className={cn(
-                    "max-w-[80%] rounded-2xl px-4 py-3",
-                    message.role === "user"
-                      ? "rounded-tr-none bg-primary text-primary-foreground"
-                      : "rounded-tl-none bg-muted"
-                  )}
-                >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-
-          {/* Typing indicator */}
-          <AnimatePresence>
-            {isLoading && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="flex gap-3"
-              >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  S
-                </div>
-                <div className="rounded-2xl rounded-tl-none bg-muted px-4 py-3">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </ScrollArea>
-
-      {/* Quick actions */}
-      {showQuickActions && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mx-auto max-w-2xl grid grid-cols-2 sm:grid-cols-4 gap-2 p-4"
-        >
-          {config.quickActions!.map((action) => (
-            <button
-              key={action.label}
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleQuickAction(action)}
-              className={cn(
-                "flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-colors",
-                "hover:bg-muted/50 hover:border-primary/30",
-                "disabled:opacity-50 disabled:cursor-not-allowed"
-              )}
-            >
-              <span className="text-xl">{action.icon}</span>
-              <span className="text-xs font-medium text-center">{action.label}</span>
-            </button>
-          ))}
-        </motion.div>
-      )}
-
-      {/* Error display */}
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="mx-4 mb-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center"
-          >
-            Произошла ошибка. Попробуйте ещё раз.
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Input — Unified Input System */}
-      <div className="sticky bottom-0 bg-background p-4">
-        <div className="mx-auto max-w-2xl">
-          <ServiceChatInput
-            value={input}
-            onChange={setInput}
-            onSubmit={handleSend}
-            isLoading={isLoading}
-            placeholder="Опишите ваш проект..."
-            autoFocus={false}
-          />
-        </div>
-      </div>
+        {/* Chat panel */}
+        <ProjectChatPanel
+          messages={displayMessages}
+          input={input}
+          onInputChange={setInput}
+          onSend={handleSend}
+          isLoading={isLoading}
+          quickActions={config.quickActions}
+          showQuickActions={showQuickActions}
+          onQuickAction={handleQuickAction}
+          error={error}
+        />
+      </main>
     </div>
   );
 }
