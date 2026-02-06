@@ -12,6 +12,99 @@
 
 ---
 
+## [3.7.1] - 2026-02-06 - Временный переход проектов на Gemini
+
+**PATCH RELEASE**: Проекты переведены с Claude (OpenRouter) на Gemini для тестирования.
+
+### Summary
+
+OpenRouter не поддерживает text/plain файлы как attachments, что блокировало тестирование проектов с прикреплёнными документами. Временно переведены все уровни моделей на Google Gemini.
+
+**Документация:** [ADR 011](docs/decisions/011-temporary-gemini-for-projects.md)
+
+### Changed
+
+- **Модели проектов:**
+  - Исполнитель: Claude Haiku → Gemini 2.5 Flash
+  - Эксперт: Claude Sonnet → Gemini 3 Pro
+  - Профессор: Claude Opus → Gemini 3 Pro
+
+- **`lib/ai/model-tiers.ts`** — использует Gemini через myProvider
+- **`lib/ai/professor-pipeline.ts`** — использует Gemini модели
+- **`lib/ai/providers.ts`** — OpenRouter закомментирован
+
+### Removed
+
+- **`app/(chat)/api/test-anthropic/route.ts`** — тестовый endpoint удалён
+
+### Documentation
+
+- **Создан:** `docs/decisions/011-temporary-gemini-for-projects.md`
+- **Обновлён:** `docs/decisions/007-projects-claude-integration.md` (статус: ⏸️ Приостановлен)
+- **Обновлён:** `docs/ai-chats-map.md` — новые модели
+
+### Notes
+
+- Это временное решение для тестирования
+- Код Claude сохранён (закомментирован) для будущего возврата
+- План: при переходе на production подключить Claude напрямую через @ai-sdk/anthropic
+
+---
+
+## [3.7.0] - 2026-02-05 - File Viewer (ТЗ-08)
+
+**MINOR RELEASE**: Просмотр файлов проекта — модалка с поддержкой изображений, PDF, текста, Markdown, CSV, Excel, презентаций.
+
+### Summary
+
+Новый компонент FileViewer позволяет просматривать файлы проекта без скачивания. Поддерживаются все основные форматы: изображения, PDF, текстовые файлы (.txt, .md, .csv), и Office-форматы через extractedContent.
+
+### Added
+
+#### Components
+- **`components/file-viewer/`** — новый модуль просмотра файлов:
+  - `file-viewer.tsx` — главный компонент (Radix Dialog, keyboard nav ← →)
+  - `file-viewer-header.tsx` — header (✕, имя файла, 1/5 индикатор, скачать)
+  - `file-viewer-content.tsx` — switch по типу файла → рендерер
+  - `renderers/image-renderer.tsx` — изображения (object-fit: contain, loading)
+  - `renderers/pdf-renderer.tsx` — PDF в iframe с fallback
+  - `renderers/text-renderer.tsx` — .txt с моношрифтом (500KB лимит)
+  - `renderers/markdown-renderer.tsx` — .md с GFM рендерингом
+  - `renderers/csv-renderer.tsx` — .csv как таблица (1000 строк лимит)
+  - `renderers/extracted-content-renderer.tsx` — Excel/PPTX через extractedContent
+  - `renderers/unsupported-renderer.tsx` — fallback с кнопкой "Скачать"
+  - `types.ts` — типы ViewerFile, FileRendererProps
+  - `utils.ts` — getFileType, getFileIconComponent
+
+- **`components/markdown-viewer.tsx`** — shared компонент (вынесен из artifacts)
+
+### Changed
+
+- **`components/projects/project-files-card.tsx`** — клик по файлу → FileViewer
+- **`artifacts/markdown/client.tsx`** — использует shared MarkdownViewer
+
+### Features
+
+| Формат | Отображение |
+|--------|-------------|
+| Images | object-fit: contain, loading spinner |
+| PDF | iframe с fallback кнопками |
+| .txt | моношрифт, 500KB лимит |
+| .md | GFM (tables, code blocks, lists) |
+| .csv | таблица со sticky header, 1000 строк |
+| .xlsx/.pptx | extractedContent как текст/таблица |
+| Другие | fallback с кнопкой "Скачать" |
+
+### UX
+
+- Навигация стрелками ← → между файлами папки
+- Индикатор позиции (1/5) в header
+- Escape / клик по backdrop → закрывает
+- Анимация появления (fade + zoom)
+- Мобильная адаптация: touch targets 48px, responsive padding
+
+---
+
 ## [3.6.2] - 2026-02-05 - Project Entry Points (ТЗ-07C3)
 
 **PATCH RELEASE**: Точки входа на странице проекта — три карточки действий вместо поля ввода.

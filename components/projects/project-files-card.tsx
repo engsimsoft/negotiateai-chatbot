@@ -46,6 +46,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { FileViewer, toViewerFile } from "@/components/file-viewer";
 import type { ProjectFile, ProjectFolder } from "@/lib/db/schema";
 
 interface ProjectFilesCardProps {
@@ -105,6 +106,19 @@ export function ProjectFilesCard({
 
   // File moving
   const [movingFileId, setMovingFileId] = useState<string | null>(null);
+
+  // File viewer
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerFileIndex, setViewerFileIndex] = useState(0);
+  const [viewerFiles, setViewerFiles] = useState<ProjectFile[]>([]);
+
+  // Open file viewer
+  const openFileViewer = (file: ProjectFile, filesInContext: ProjectFile[]) => {
+    const index = filesInContext.findIndex((f) => f.id === file.id);
+    setViewerFiles(filesInContext);
+    setViewerFileIndex(index >= 0 ? index : 0);
+    setViewerOpen(true);
+  };
 
   // Group files by folder
   const filesByFolder = useMemo(() => {
@@ -369,9 +383,26 @@ export function ProjectFilesCard({
   };
 
   // File item component
-  const FileItem = ({ file, currentFolderId }: { file: ProjectFile; currentFolderId: string | null }) => (
+  const FileItem = ({
+    file,
+    currentFolderId,
+    filesInContext,
+  }: {
+    file: ProjectFile;
+    currentFolderId: string | null;
+    filesInContext: ProjectFile[];
+  }) => (
     <div
-      className="group flex items-center gap-3 rounded-lg bg-muted/50 px-3 py-2 transition-colors hover:bg-muted"
+      className="group flex cursor-pointer items-center gap-3 rounded-lg bg-muted/50 px-3 py-2 transition-colors hover:bg-muted"
+      onClick={() => openFileViewer(file, filesInContext)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openFileViewer(file, filesInContext);
+        }
+      }}
     >
       {getFileIcon(file.mimeType)}
       <span className="flex-1 truncate text-sm">{file.name}</span>
@@ -637,6 +668,7 @@ export function ProjectFilesCard({
                           key={file.id}
                           file={file}
                           currentFolderId={folder.id}
+                          filesInContext={folderFiles}
                         />
                       ))
                     ) : (
@@ -660,7 +692,12 @@ export function ProjectFilesCard({
               </div>
             )}
             {rootFiles.map((file) => (
-              <FileItem key={file.id} file={file} currentFolderId={null} />
+              <FileItem
+                key={file.id}
+                file={file}
+                currentFolderId={null}
+                filesInContext={rootFiles}
+              />
             ))}
           </div>
         )}
@@ -724,6 +761,18 @@ export function ProjectFilesCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* File Viewer */}
+      {viewerFiles.length > 0 && (
+        <FileViewer
+          file={toViewerFile(viewerFiles[viewerFileIndex])}
+          files={viewerFiles.map(toViewerFile)}
+          currentIndex={viewerFileIndex}
+          open={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          onNavigate={(index) => setViewerFileIndex(index)}
+        />
+      )}
     </div>
   );
 }

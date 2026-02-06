@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.6.2
-**Дата:** 2026-02-05
+**Версия:** 3.7.1
+**Дата:** 2026-02-06
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -25,11 +25,11 @@
 | Особенность | Описание | Статус |
 |-------------|----------|--------|
 | **Универсальный AI-чат** | Один мощный чат со всеми инструментами | ✅ |
-| **Проекты** | Изолированные рабочие пространства с Claude | ✅ v3.2.0 |
+| **Проекты** | Изолированные рабочие пространства (⚠️ временно Gemini) | ✅ v3.2.0 |
 | **Модальные помощники** | Prompt-агент (📝), Бен (❓) | ✅ |
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG/Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity, Plus AI, Ideogram, AssemblyAI | 📋 Фаза 1 |
-| **Мультипровайдер** | GPT, Claude, Gemini через единый интерфейс | ✅ v3.2.0 (Claude) |
+| **Мультипровайдер** | GPT, Claude, Gemini через единый интерфейс | ⏸️ v3.7.1 (только Gemini) |
 | **Smart Routing** | Автовыбор модели для экономии без потери качества | 📋 |
 | **Оплата в рублях** | ЮKassa, Тинькофф, СБП | 📋 |
 
@@ -267,6 +267,42 @@ components/projects/
 
 ## План развития
 
+### ТЗ-08: File Viewer — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **FileViewer модалка** — просмотр файлов проекта без скачивания
+- **Поддержка форматов** — изображения, PDF, текст, Markdown, CSV, Excel, PPTX
+- **Навигация** — стрелки ← → между файлами, индикатор позиции (1/5)
+- **UX** — анимация (fade + zoom), мобильная адаптация, touch targets 48px
+- **Shared компонент** — MarkdownViewer вынесен из artifacts
+
+**Ключевые файлы:**
+- `components/file-viewer/` — модуль просмотра файлов (12 файлов)
+- `components/file-viewer/file-viewer.tsx` — главный компонент (Radix Dialog)
+- `components/file-viewer/renderers/` — 7 рендереров по типу файла
+- `components/markdown-viewer.tsx` — shared компонент для Markdown
+- `components/projects/project-files-card.tsx` — интеграция (клик → FileViewer)
+
+**Детали:** [_archive/TZ_08_FileViewer/](_archive/TZ_08_FileViewer/)
+
+### ТЗ-07C3: Project Entry Points — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Карточка "Новая задача"** — быстрое создание задачи (➕), переход в чат
+- **Карточка "Менеджер"** — точка входа в управление проектом (👤)
+- **Модалка Менеджера** — заглушка с превью будущих функций
+- **Секция ProjectActions** — wrapper для 3 карточек (Задачи, Новая задача, Менеджер)
+- **Убран ProjectInput** — поле ввода убрано со страницы проекта
+
+**Ключевые файлы:**
+- `components/projects/new-task-card.tsx` — карточка "Новая задача"
+- `components/projects/manager-card.tsx` — карточка "Менеджер"
+- `components/projects/manager-dialog.tsx` — модалка Менеджера
+- `components/projects/project-actions.tsx` — секция с карточками
+- `app/(dashboard)/projects/[id]/page.tsx` — обновлённая страница проекта
+
+**Детали:** [_archive/TZ_07C3_ProjectEntryPoints/](_archive/TZ_07C3_ProjectEntryPoints/)
+
 ### ТЗ-07C2: Project Pulse — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
@@ -443,11 +479,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.6.1 |
+| Версия | 3.7.1 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7) |
 | Skills | 6 (document: 4, research: 1, utility: 1) |
 | Agents | 1 (ben) |
 | Промптов | 4 (chat, prompt-agent, ben, project) |
@@ -457,6 +493,7 @@ components/projects/
 | Тем презентаций | 5 |
 | Тем Excel | 5 |
 | Шаблонов Excel | 10 |
+| Форматов FileViewer | 8 (image, pdf, text, markdown, csv, excel, pptx, unsupported) |
 | Production build | ✅ Успешен |
 
 ---
@@ -477,6 +514,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_07C3_ProjectEntryPoints/](_archive/TZ_07C3_ProjectEntryPoints/) — ТЗ-07C3 Project Entry Points
 - [_archive/TZ_07C2_ProjectPulse/](_archive/TZ_07C2_ProjectPulse/) — ТЗ-07C2 Project Pulse
 - [_archive/TZ_07B_ChatHistory/](_archive/TZ_07B_ChatHistory/) — ТЗ-07B Chat History
 - [_archive/TZ_07A_Glavnaya/](_archive/TZ_07A_Glavnaya/) — ТЗ-07A Glavnaya + Navigation + Sidebar
@@ -496,4 +534,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-05
+**Обновлено:** 2026-02-06
