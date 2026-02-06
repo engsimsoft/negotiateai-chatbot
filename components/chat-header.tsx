@@ -11,8 +11,6 @@ import { SidebarToggle } from "@/components/sidebar-toggle";
 import { PlusIcon } from "./icons";
 import { useSidebar } from "./ui/sidebar";
 import {
-  PromptAgentTrigger,
-  PromptAgentDrawer,
   BenTrigger,
   BenDrawer,
   BenIntroBubble,
@@ -58,7 +56,6 @@ function PureChatHeader({
   useEffect(() => setMounted(true), []);
 
   // Modal assistants state
-  const [promptAgentOpen, setPromptAgentOpen] = useState(false);
   const [benOpen, setBenOpen] = useState(false);
 
   // Ben intro bubble state - using SWR for deduplication and caching
@@ -158,7 +155,6 @@ function PureChatHeader({
       {/* Modal assistant triggers */}
       {/* Use mounted check to avoid hydration mismatch with windowWidth */}
       <div className={`flex items-center gap-1${mounted && open && windowWidth >= 768 ? " ml-auto" : ""}`}>
-        <PromptAgentTrigger onClick={() => setPromptAgentOpen(true)} />
         <div className="relative">
           <BenTrigger onClick={() => {
             setBenOpen(true);
@@ -169,11 +165,6 @@ function PureChatHeader({
       </div>
 
       {/* Modal assistant drawers */}
-      <PromptAgentDrawer
-        open={promptAgentOpen}
-        onOpenChange={setPromptAgentOpen}
-        onInsertToChat={onInsertToChat}
-      />
       <BenDrawer
         open={benOpen}
         onOpenChange={setBenOpen}
