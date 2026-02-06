@@ -6,6 +6,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
   type ReactNode,
   type Dispatch,
   type SetStateAction,
@@ -114,16 +115,24 @@ export function InputContextProvider({
 
   // Use controlled or internal value
   const value = isControlled ? (controlledValue ?? "") : internalValue;
+
+  // Ref to track current value for functional updates (prevents stale closure in rapid callbacks like voice dictation)
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
   const setValue: Dispatch<SetStateAction<string>> = useCallback(
     (action) => {
       if (isControlled && onValueChange) {
-        const newValue = typeof action === "function" ? action(controlledValue ?? "") : action;
+        // Use ref for functional updates to get fresh value
+        const newValue = typeof action === "function" ? action(valueRef.current) : action;
         onValueChange(newValue);
       } else {
         setInternalValue(action);
       }
     },
-    [isControlled, onValueChange, controlledValue]
+    [isControlled, onValueChange]
   );
 
   // Loading state

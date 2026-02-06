@@ -1,14 +1,14 @@
 # Передача сессии ТЗ-10
 
 **Дата:** 2026-02-06
-**Сессия:** 0 (Подготовка)
+**Сессия:** 1 (После исправления багов)
 
 ---
 
 ## Статус этапов
 
-- [ ] **Этап 0: Исправление багов ServiceChatInput** ← НАЧАТЬ ЗДЕСЬ
-- [ ] Этап 1: Split Layout + Draft State
+- [x] **Этап 0: Исправление багов ServiceChatInput** ✓ DONE
+- [ ] **Этап 1: Split Layout + Draft State** ← НАЧАТЬ ЗДЕСЬ
 - [ ] Этап 2: Tool updateProjectDraft
 - [ ] Этап 3: Парсинг Tool Results
 - [ ] Этап 4: Editable Fields
@@ -18,73 +18,53 @@
 
 ---
 
-## Следующая сессия: начни с
+## Выполнено в Этапе 0
 
-1. **Прочитать ROADMAP.md** — Этап 0
-2. **Исправить баг диктовки:**
-   - Открыть `components/input/input-context.tsx`
-   - Проблема: `controlledValue` в closure устаревает
-   - Решение: использовать ref или изменить логику setValue
-3. **Добавить attachments:**
-   - Открыть `components/input/service-chat-input.tsx`
-   - Добавить `InputAttachments` в `InputToolbarLeft`
-4. **Включить VoiceMode:**
-   - В том же файле: `showVoiceMode={true}` по умолчанию
-5. **Тест:** диктовка, скрепка, voiceMode
+### Баг 1: Диктовка теряет текст ✓
+- **Файл:** `components/input/input-context.tsx`
+- **Решение:** Добавлен `valueRef` для отслеживания актуального значения в callback
+- **Строки:** 118-122, 128
 
----
+### Баг 2: Нет скрепки ✓
+- **Файл:** `components/input/service-chat-input.tsx`
+- **Решение:** Добавлен `InputAttachments` в `InputToolbarLeft`
+- **Строки:** 15, 44-45, 61, 86
 
-## Ключевые файлы
-
-| Файл | Что делать |
-|------|------------|
-| `components/input/input-context.tsx` | Исправить stale closure в setValue |
-| `components/input/service-chat-input.tsx` | Добавить attachments, включить voiceMode |
-| `app/(dashboard)/projects/new/project-creation-client.tsx` | После багов — split layout |
+### Баг 3: Нет VoiceMode ✓
+- **Файл:** `components/input/service-chat-input.tsx` + `project-creation-client.tsx`
+- **Решение:** `showVoiceMode = true` по умолчанию, убрано явное `showVoiceMode={false}`
 
 ---
 
-## Известные баги (Этап 0)
+## Следующая сессия: Этап 1
 
-### Баг 1: Диктовка теряет текст
+**Цель:** Split Layout — левая панель (чат) + правая панель (Live Preview)
 
-**Симптом:** Записываются только последние 1-2 слова
-**Причина:** Stale closure — `controlledValue` не обновляется между вызовами `onTranscript`
-**Где:** `input-context.tsx` строка ~113-122
+**Прочитать:** `specs/TZ_10_ProjectCreationLivePreview/ROADMAP.md` — Этап 1
 
-```typescript
-// ПРОБЛЕМА: controlledValue устаревает
-const setValue = useCallback((action) => {
-  const newValue = typeof action === "function"
-    ? action(controlledValue ?? "")  // ← controlledValue stale!
-    : action;
-  onValueChange(newValue);
-}, [controlledValue]);  // ← зависимость не помогает при быстрых вызовах
-```
+**Ключевые задачи:**
+1. Создать `ProjectDraftContext` для хранения draft state
+2. Создать `ProjectDraftPreview` компонент (правая панель)
+3. Изменить layout в `project-creation-client.tsx` на split view
+4. Responsive: на mobile — только чат, preview в drawer
 
-### Баг 2: Нет скрепки
-
-**Симптом:** В ServiceChatInput нет кнопки attachments
-**Причина:** Не добавлен компонент
-**Где:** `service-chat-input.tsx`
-
-### Баг 3: Нет VoiceMode
-
-**Симптом:** Нет кнопки голосового режима
-**Причина:** `showVoiceMode={false}` по умолчанию
-**Где:** `service-chat-input.tsx`
+**Файлы для изменения:**
+| Файл | Действие |
+|------|----------|
+| `app/(dashboard)/projects/new/project-draft-context.tsx` | Создать — контекст для draft |
+| `components/projects/project-draft-preview.tsx` | Создать — UI превью |
+| `app/(dashboard)/projects/new/project-creation-client.tsx` | Изменить — split layout |
 
 ---
 
 ## Контекст
 
-- Версия: v3.8.1 (после интеграции ServiceChatInput)
-- ServiceChatInput создан, но с багами
-- CompactInput работает корректно (там uncontrolled mode)
-- Разница: controlled vs uncontrolled mode в InputContext
+- Версия: v3.8.1
+- ServiceChatInput работает корректно (диктовка, скрепка, voiceMode)
+- Готово к разработке Live Preview
 
 ---
 
 ## Блокеры / Вопросы
 
-Нет блокеров. Можно начинать работу.
+Нет блокеров.

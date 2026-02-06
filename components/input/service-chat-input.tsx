@@ -12,6 +12,7 @@ import {
 import { InputTextarea } from "./input-textarea";
 import { InputVoiceButton } from "./input-voice-button";
 import { InputVoiceModeButton } from "./input-voice-mode-button";
+import { InputAttachments } from "./input-attachments";
 import { InputSubmitButton } from "./input-submit-button";
 
 /**
@@ -41,6 +42,8 @@ interface ServiceChatInputProps {
   disabled?: boolean;
   /** Placeholder text */
   placeholder?: string;
+  /** Show attachments button */
+  showAttachments?: boolean;
   /** Show dictation button (Deepgram STT) */
   showVoice?: boolean;
   /** Show voice mode button (future: full duplex) */
@@ -58,8 +61,9 @@ export function ServiceChatInput({
   isLoading = false,
   disabled = false,
   placeholder = "Напишите сообщение...",
+  showAttachments = true,
   showVoice = true,
-  showVoiceMode = false,
+  showVoiceMode = true,
   className,
   autoFocus = false,
 }: ServiceChatInputProps) {
@@ -82,7 +86,9 @@ export function ServiceChatInput({
         </InputContent>
 
         <InputToolbar>
-          <InputToolbarLeft>{null}</InputToolbarLeft>
+          <InputToolbarLeft>
+            {showAttachments && <InputAttachments />}
+          </InputToolbarLeft>
 
           <InputToolbarRight>
             {showVoice && <InputVoiceButton />}

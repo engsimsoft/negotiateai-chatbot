@@ -361,8 +361,6 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
             onSubmit={handleSend}
             isLoading={isLoading}
             placeholder="Опишите ваш проект..."
-            showVoice={true}
-            showVoiceMode={false}
             autoFocus={false}
           />
         </div>
