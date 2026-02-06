@@ -7,6 +7,7 @@
  * Handles tool results and redirects after project creation.
  *
  * ТЗ-09: ServiceChat унификация
+ * v3.8.1: Unified Input System integration
  */
 
 import { useState, useCallback, useMemo } from "react";
@@ -14,11 +15,11 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { Send, Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ServiceChatInput } from "@/components/input";
 import { PROJECT_CREATION_CONFIG, type QuickAction } from "@/components/service-chat";
 import { cn, generateUUID } from "@/lib/utils";
 
@@ -153,22 +154,18 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
     return msgs;
   }, [chatMessages, projectResult]);
 
-  // Handle form submit
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!input.trim() || isLoading) return;
+  // Handle send message (for ServiceChatInput)
+  const handleSend = useCallback(() => {
+    if (!input.trim() || isLoading) return;
 
-      setError(null);
-      setHasInteracted(true);
-      sendMessage({
-        role: "user",
-        parts: [{ type: "text", text: input.trim() }],
-      });
-      setInput("");
-    },
-    [input, isLoading, sendMessage]
-  );
+    setError(null);
+    setHasInteracted(true);
+    sendMessage({
+      role: "user",
+      parts: [{ type: "text", text: input.trim() }],
+    });
+    setInput("");
+  }, [input, isLoading, sendMessage]);
 
   // Handle quick action click
   const handleQuickAction = useCallback(
@@ -183,17 +180,6 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
       });
     },
     [isLoading, sendMessage]
-  );
-
-  // Handle Enter key
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit(e);
-      }
-    },
-    [handleSubmit]
   );
 
   // Show quick actions only before first interaction
@@ -366,33 +352,20 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
         )}
       </AnimatePresence>
 
-      {/* Input */}
-      <div className="sticky bottom-0 border-t bg-background p-4">
-        <form
-          className="mx-auto flex max-w-2xl gap-2"
-          onSubmit={handleSubmit}
-        >
-          <Textarea
+      {/* Input — Unified Input System */}
+      <div className="sticky bottom-0 bg-background p-4">
+        <div className="mx-auto max-w-2xl">
+          <ServiceChatInput
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="min-h-[44px] flex-1 resize-none"
-            disabled={isLoading}
+            onChange={setInput}
+            onSubmit={handleSend}
+            isLoading={isLoading}
             placeholder="Опишите ваш проект..."
-            rows={1}
+            showVoice={true}
+            showVoiceMode={false}
+            autoFocus={false}
           />
-          <Button
-            disabled={!input.trim() || isLoading}
-            size="icon"
-            type="submit"
-          >
-            {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Send className="h-5 w-5" />
-            )}
-          </Button>
-        </form>
+        </div>
       </div>
     </div>
   );

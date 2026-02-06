@@ -6,6 +6,7 @@
  *
  * Готовые пресеты:
  * - CompactInput — для главной, проекта, helpers (redirect mode)
+ * - ServiceChatInput — для сервисных чатов (controlled mode)
  *
  * Атомарные компоненты (для кастомных сборок):
  * - InputBase, InputContent, InputToolbar
@@ -44,3 +45,4 @@ export { InputSubmitButton } from "./input-submit-button";
 
 // Ready-to-use presets
 export { CompactInput } from "./compact-input";
+export { ServiceChatInput } from "./service-chat-input";

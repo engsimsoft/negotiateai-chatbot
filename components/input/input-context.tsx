@@ -16,10 +16,14 @@ import type { ProjectModelTier } from "@/lib/ai/model-tiers";
 /**
  * Input Context
  * Связывает все компоненты инпута между собой
+ *
+ * Поддерживает два режима:
+ * - Uncontrolled: контекст управляет своим state (redirect/send mode)
+ * - Controlled: value/onChange передаются извне (streaming mode)
  */
 
 export type InputProvider = "google" | "anthropic";
-export type InputMode = "redirect" | "send";
+export type InputMode = "redirect" | "send" | "controlled";
 
 interface InputContextValue {
   // Text
@@ -73,6 +77,12 @@ interface InputProviderProps {
   disabled?: boolean;
   defaultModelId?: string;
   defaultTier?: ProjectModelTier;
+
+  // Controlled mode props (for streaming chats)
+  value?: string;
+  onValueChange?: (value: string) => void;
+  onControlledSubmit?: () => void;
+  isLoading?: boolean;
 }
 
 export function InputContextProvider({
@@ -84,16 +94,45 @@ export function InputContextProvider({
   disabled = false,
   defaultModelId = "auto",
   defaultTier = "expert",
+  // Controlled mode props
+  value: controlledValue,
+  onValueChange,
+  onControlledSubmit,
+  isLoading: controlledIsLoading,
 }: InputProviderProps) {
   const router = useRouter();
-  const [value, setValue] = useState("");
+
+  // Internal state for uncontrolled mode
+  const [internalValue, setInternalValue] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState(defaultModelId);
   const [selectedTier, setSelectedTier] = useState<ProjectModelTier>(defaultTier);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load saved preferences from cookies
+  // Determine if controlled mode
+  const isControlled = mode === "controlled";
+
+  // Use controlled or internal value
+  const value = isControlled ? (controlledValue ?? "") : internalValue;
+  const setValue: Dispatch<SetStateAction<string>> = useCallback(
+    (action) => {
+      if (isControlled && onValueChange) {
+        const newValue = typeof action === "function" ? action(controlledValue ?? "") : action;
+        onValueChange(newValue);
+      } else {
+        setInternalValue(action);
+      }
+    },
+    [isControlled, onValueChange, controlledValue]
+  );
+
+  // Loading state
+  const isSubmittingState = isControlled ? (controlledIsLoading ?? false) : isSubmitting;
+
+  // Load saved preferences from cookies (only for uncontrolled modes)
   useEffect(() => {
+    if (isControlled) return;
+
     if (provider === "google") {
       const cookie = document.cookie
         .split("; ")
@@ -109,14 +148,21 @@ export function InputContextProvider({
         setSelectedTier(cookie.split("=")[1] as ProjectModelTier);
       }
     }
-  }, [provider]);
+  }, [provider, isControlled]);
 
-  const canSubmit = value.trim().length > 0 && !isSubmitting && !disabled;
+  const canSubmit = value.trim().length > 0 && !isSubmittingState && !disabled;
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
-    if (!trimmed || isSubmitting || disabled) return;
+    if (!trimmed || isSubmittingState || disabled) return;
 
+    // Controlled mode: call external submit handler
+    if (isControlled && onControlledSubmit) {
+      onControlledSubmit();
+      return;
+    }
+
+    // Uncontrolled modes
     setIsSubmitting(true);
 
     const model = provider === "google" ? selectedModelId : selectedTier;
@@ -128,11 +174,11 @@ export function InputContextProvider({
       router.push(redirectPath + "?" + params.toString());
     } else if (onSubmitProp) {
       onSubmitProp(trimmed, model);
-      setValue("");
+      setInternalValue("");
     }
 
     setTimeout(() => setIsSubmitting(false), 300);
-  }, [value, isSubmitting, disabled, mode, redirectPath, provider, selectedModelId, selectedTier, router, onSubmitProp]);
+  }, [value, isSubmittingState, disabled, isControlled, onControlledSubmit, mode, redirectPath, provider, selectedModelId, selectedTier, router, onSubmitProp]);
 
   return (
     <InputContext.Provider
@@ -149,7 +195,7 @@ export function InputContextProvider({
         mode,
         redirectPath,
         handleSubmit,
-        isSubmitting,
+        isSubmitting: isSubmittingState,
         canSubmit,
         disabled,
       }}
