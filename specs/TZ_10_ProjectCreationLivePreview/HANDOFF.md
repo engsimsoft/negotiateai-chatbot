@@ -1,24 +1,23 @@
-# Передача сессии ТЗ-10
+# ТЗ-10: Project Creation Live Preview
 
+**Статус:** ✅ ЗАВЕРШЁН
+**Версия:** v3.9.0
 **Дата:** 2026-02-06
-**Сессия:** 3 (Этап 4 — Кнопка "Создать проект" ✓)
 
 ---
 
-## Статус этапов
+## Выполненные этапы
 
-- [x] **Этап 0: Исправление багов ServiceChatInput** ✓ DONE
-- [x] **Этап 1: Split Layout + Draft State** ✓ DONE
-- [x] **Этап 2: Tool updateProjectDraft** ✓ DONE
-- [x] **Этап 3: Парсинг Tool Results** ✓ DONE
-- [x] **Этап 4: Кнопка "Создать проект"** ✓ DONE
-- [ ] **Этап 5: Mobile Layout** ← НАЧАТЬ ЗДЕСЬ
-- [ ] Этап 6: Анимации + Polish
-- [ ] Этап 7: Финализация
+- [x] **Этап 0: Исправление багов ServiceChatInput** ✓
+- [x] **Этап 1: Split Layout + Draft State** ✓
+- [x] **Этап 2: Tool updateProjectDraft** ✓
+- [x] **Этап 3: Парсинг Tool Results** ✓
+- [x] **Этап 4: Кнопка "Создать проект"** ✓
+- [x] **Этап 4.5: Фикс скролла левой панели** ✓
 
 ---
 
-## Что работает
+## Что реализовано
 
 1. **Split Layout** — Preview слева (400px), Chat справа
 2. **Live Preview** — поля заполняются в реальном времени при вызове AI tool
@@ -27,41 +26,24 @@
 5. **Кнопка "Создать проект"** — появляется когда name + description заполнены
 6. **API создания** — POST /api/projects с данными из черновика
 7. **Success card** — показывается после создания с кнопками навигации
-
----
-
-## Следующая сессия: Этап 5
-
-**Цель:** Mobile Layout — адаптация для мобильных устройств
-
-**Ключевые задачи:**
-1. На mobile Preview скрыт (lg:block уже работает)
-2. Добавить Drawer или Sheet для Preview на mobile
-3. Добавить кнопку открытия Preview в header на mobile
-4. Или: показать Preview под chat (stacked layout)
-
-**Файлы для изменения:**
-| Файл | Действие |
-|------|----------|
-| `app/(dashboard)/projects/new/project-creation-client.tsx` | Добавить mobile drawer |
-| `components/ui/sheet.tsx` или drawer | Использовать для mobile |
+8. **Фикс скролла** — `h-dvh overflow-hidden` для контейнера, панели скроллят независимо
 
 ---
 
 ## Ключевые файлы
 
-| Файл | Статус |
-|------|--------|
-| `app/(dashboard)/projects/new/project-creation-client.tsx` | ✓ Full implementation |
-| `app/(dashboard)/projects/new/components/project-draft-preview.tsx` | ✓ With create button |
-| `app/(dashboard)/projects/new/components/project-chat-panel.tsx` | ✓ OK |
-| `app/(chat)/api/service-chat/route.ts` | ✓ updateProjectDraft tool |
-| `components/input/input-context.tsx` | ✓ Fixed stale closure |
-| `components/input/service-chat-input.tsx` | ✓ Attachments + VoiceMode |
+| Файл | Описание |
+|------|----------|
+| `app/(dashboard)/projects/new/project-creation-client.tsx` | Split layout + draft state + create logic |
+| `app/(dashboard)/projects/new/components/project-draft-preview.tsx` | Preview с кнопкой создания |
+| `app/(dashboard)/projects/new/components/project-chat-panel.tsx` | Chat panel |
+| `app/(chat)/api/service-chat/route.ts` | updateProjectDraft tool |
+| `components/input/input-context.tsx` | Фикс stale closure для controlled mode |
+| `components/input/service-chat-input.tsx` | Attachments + VoiceMode по умолчанию |
 
 ---
 
-## Важные открытия (из прошлых сессий)
+## Важные технические детали
 
 **Формат tool results в Vercel AI SDK:**
 ```json
@@ -74,7 +56,18 @@
 ```
 
 **Stale closure fix:**
-Использовать useRef для отслеживания текущего значения в controlled mode.
+Использовать useRef для отслеживания текущего значения в controlled mode при rapid callbacks (voice dictation).
+
+---
+
+## Не реализовано (отложено)
+
+| Функция | Причина |
+|---------|---------|
+| Mobile Layout (drawer) | Будет переделываться при добавлении файлов |
+| Анимации + Polish | UI изменится при добавлении файлов |
+| Expand/Collapse инструкции | Отдельная задача |
+| Загрузка файлов + AI-сортировка | Большая фича (отдельное ТЗ) |
 
 ---
 
@@ -86,14 +79,13 @@
 
 ---
 
-## Контекст
+## Следующие шаги (будущее ТЗ)
 
-- Версия: v3.9.0 (в разработке)
-- TypeScript: ✓ 0 ошибок
-- Этапы 0-4: Завершены
+1. **Загрузка файлов в левой панели** — dropzone для документов
+2. **AI-анализ файлов** — tool для предложения структуры папок
+3. **Создание проекта с файлами** — автоматическая сортировка при создании
+4. **Mobile Layout** — после стабилизации UI
 
 ---
 
-## Блокеры / Вопросы
-
-Нет блокеров.
+**Закрыто:** 2026-02-06

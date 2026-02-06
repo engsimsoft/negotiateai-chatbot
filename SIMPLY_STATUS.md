@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.8.0
+**Версия:** 3.9.0
 **Дата:** 2026-02-06
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -271,6 +271,27 @@ components/projects/
 
 ## План развития
 
+### ТЗ-10: Project Creation Live Preview — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Split Layout** — Preview слева (400px) + Chat справа
+- **Live Preview** — поля заполняются в реальном времени при вызове AI tool
+- **Tool updateProjectDraft** — AI обновляет черновик постепенно (name, description, instruction)
+- **Кнопка "Создать проект"** — появляется когда name + description заполнены
+- **API создания** — POST /api/projects с данными из черновика
+- **Success card** — показывается после создания с навигацией
+- **Фикс скролла** — левая панель не скроллится вместе с чатом
+- **ServiceChatInput баги** — исправлены stale closure, добавлены attachments и voice mode
+
+**Ключевые файлы:**
+- `app/(dashboard)/projects/new/project-creation-client.tsx` — клиент со split layout
+- `app/(dashboard)/projects/new/components/project-draft-preview.tsx` — preview с кнопкой
+- `app/(dashboard)/projects/new/components/project-chat-panel.tsx` — chat panel
+- `app/(chat)/api/service-chat/route.ts` — updateProjectDraft tool
+- `components/input/input-context.tsx` — фикс stale closure для controlled mode
+
+**Детали:** [specs/TZ_10_ProjectCreationLivePreview/](specs/TZ_10_ProjectCreationLivePreview/)
+
 ### ТЗ-09: ServiceChat — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
@@ -502,11 +523,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.8.0 |
+| Версия | 3.9.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Сервисные чаты | 3 (ben, project-creation, project-manager) |

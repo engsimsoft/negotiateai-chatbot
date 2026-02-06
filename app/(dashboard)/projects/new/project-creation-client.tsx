@@ -310,9 +310,9 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
   }
 
   return (
-    <div className="flex min-h-dvh bg-background">
-      {/* Left: Preview (desktop only) */}
-      <aside className="hidden w-[400px] flex-shrink-0 border-r p-6 lg:block">
+    <div className="flex h-dvh bg-background overflow-hidden">
+      {/* Left: Preview (desktop only) - sticky */}
+      <aside className="hidden w-[400px] flex-shrink-0 border-r p-6 lg:block overflow-auto">
         <ProjectDraftPreview
           draft={draft}
           onDraftChange={setDraft}
@@ -323,7 +323,7 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
       </aside>
 
       {/* Right: Chat */}
-      <main className="flex flex-1 flex-col">
+      <main className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
         <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-sm">
           <Link href="/dashboard">
