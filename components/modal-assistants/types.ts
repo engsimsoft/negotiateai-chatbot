@@ -1,10 +1,11 @@
 /**
  * Modal Assistants - Shared Types
  *
- * Types for Prompt-agent and Ben modal assistants.
+ * Types for Ben modal assistant.
+ * Note: Prompt-agent removed in ТЗ-09.
  */
 
-export type AssistantId = 'prompt-agent' | 'ben';
+export type AssistantId = 'ben';
 
 export interface AssistantMessage {
   id: string;
@@ -23,7 +24,6 @@ export interface AssistantDrawerProps {
 
 export interface AssistantChatProps {
   assistantId: AssistantId;
-  onInsertToChat?: (text: string) => void;
   initialMessage?: string;
   isFirstTime?: boolean;
 }
