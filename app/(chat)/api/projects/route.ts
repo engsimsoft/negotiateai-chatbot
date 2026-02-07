@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { name, description, instruction } = body;
+    const { name, description, context } = body;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return new ChatSDKError(
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       userId: session.user.id,
       name: name.trim(),
       description: description?.trim() || undefined,
-      instruction: instruction?.trim() || undefined,
+      context: context?.trim() || undefined,
     });
 
     return Response.json(project, { status: 201 });

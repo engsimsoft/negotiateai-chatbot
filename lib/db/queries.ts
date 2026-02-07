@@ -1032,12 +1032,14 @@ export async function saveProject({
   name,
   description,
   instruction,
+  context,
 }: {
   id: string;
   userId: string;
   name: string;
   description?: string;
   instruction?: string;
+  context?: string;
 }) {
   try {
     const now = new Date();
@@ -1049,6 +1051,7 @@ export async function saveProject({
         name,
         description: description || null,
         instruction: instruction || null,
+        context: context || null,
         createdAt: now,
         updatedAt: now,
       })

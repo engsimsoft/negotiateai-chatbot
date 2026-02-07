@@ -130,7 +130,7 @@ function buildProjectCreationPrompt(options: {
 2. **Обновлять черновик постепенно:**
    - Понял название → сразу вызови updateProjectDraft({name: "..."})
    - Понял цель → добавь description
-   - Есть контекст → добавь instruction
+   - Есть контекст → добавь context
    - Можно вызывать несколько раз, уточняя поля
 
 3. **НЕ создавай проект** — пользователь сам нажмёт кнопку когда будет готов
@@ -229,10 +229,10 @@ export async function POST(request: Request) {
           .string()
           .optional()
           .describe("Краткое описание проекта (1-2 предложения)"),
-        instruction: z
+        context: z
           .string()
           .optional()
-          .describe("Системная инструкция для AI при работе с этим проектом"),
+          .describe("Контекст проекта — справка о бизнесе, аудитории, целях. Заполняется на основе интервью."),
       });
 
       tools.updateProjectDraft = tool({
@@ -246,7 +246,7 @@ export async function POST(request: Request) {
             draft: {
               name: input.name || null,
               description: input.description || null,
-              instruction: input.instruction || null,
+              context: input.context || null,
             },
           };
         },
