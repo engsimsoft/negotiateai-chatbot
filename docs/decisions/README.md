@@ -20,6 +20,8 @@
 | [008](008-skills-agents-architecture.md) | Skills + Agents Architecture (v3.3) | 2026-02-02 | Принято |
 | [009](009-loadskill-progressive-disclosure.md) | loadSkill — Progressive Disclosure (v3.3.2) | 2026-02-03 | Принято |
 | [010](010-performance-optimization.md) | Оптимизация производительности БД (v3.4.1) | 2026-02-04 | Принято |
+| [011](011-temporary-gemini-for-projects.md) | Временный переход проектов на Gemini | 2026-02-05 | Принято (временное) |
+| [012](012-context-vs-instruction-separation.md) | Разделение Context и Instruction в проектах | 2026-02-07 | Принято |
 
 ---
 
@@ -48,4 +50,4 @@
 
 ---
 
-**Обновлено:** 2026-02-04
+**Обновлено:** 2026-02-07
