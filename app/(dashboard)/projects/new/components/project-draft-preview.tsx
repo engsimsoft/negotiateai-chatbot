@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 export interface ProjectDraft {
   name: string;
   description: string;
-  instruction: string;
+  context: string;
 }
 
 interface ProjectDraftPreviewProps {
@@ -50,11 +50,13 @@ export function ProjectDraftPreview({
             <FileText className="h-4 w-4" />
             <span>Название</span>
           </div>
-          <div className="rounded-lg border bg-muted/30 p-3 min-h-[48px]">
+          <div className="rounded-lg border bg-muted/30 p-3 min-h-[48px] transition-all duration-200">
             {draft.name ? (
-              <p className="font-medium">{draft.name}</p>
+              <p className="font-medium animate-in fade-in duration-200">{draft.name}</p>
             ) : (
-              <p className="text-muted-foreground italic">Ожидание...</p>
+              <p className="text-muted-foreground/60 text-sm">
+                Например: &quot;Маркетинг кофейни&quot;, &quot;Контент для блога&quot;, &quot;Анализ конкурентов&quot;
+              </p>
             )}
           </div>
         </div>
@@ -65,26 +67,30 @@ export function ProjectDraftPreview({
             <MessageSquare className="h-4 w-4" />
             <span>Описание</span>
           </div>
-          <div className="rounded-lg border bg-muted/30 p-3 min-h-[72px]">
+          <div className="rounded-lg border bg-muted/30 p-3 min-h-[72px] transition-all duration-200">
             {draft.description ? (
-              <p className="text-sm">{draft.description}</p>
+              <p className="text-sm animate-in fade-in duration-200">{draft.description}</p>
             ) : (
-              <p className="text-muted-foreground italic text-sm">Ожидание...</p>
+              <p className="text-muted-foreground/60 text-sm">
+                Появится после вашего рассказа о задаче
+              </p>
             )}
           </div>
         </div>
 
-        {/* Instruction */}
+        {/* Context */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <BookOpen className="h-4 w-4" />
-            <span>Инструкция для AI</span>
+            <span>Контекст проекта</span>
           </div>
-          <div className="rounded-lg border bg-muted/30 p-3 min-h-[96px]">
-            {draft.instruction ? (
-              <p className="text-sm whitespace-pre-wrap">{draft.instruction}</p>
+          <div className="rounded-lg border bg-muted/30 p-3 min-h-[96px] transition-all duration-200">
+            {draft.context ? (
+              <p className="text-sm whitespace-pre-wrap animate-in fade-in duration-200">{draft.context}</p>
             ) : (
-              <p className="text-muted-foreground italic text-sm">Опционально</p>
+              <p className="text-muted-foreground/60 text-sm">
+                Секретарь сформулирует на основе интервью — чем подробнее расскажете, тем точнее будет работать AI
+              </p>
             )}
           </div>
         </div>

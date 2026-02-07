@@ -87,7 +87,7 @@ function extractDraftUpdate(
       // Only include non-null fields
       if (draft.name) update.name = draft.name;
       if (draft.description) update.description = draft.description;
-      if (draft.instruction) update.instruction = draft.instruction;
+      if (draft.context) update.context = draft.context;
 
       return Object.keys(update).length > 0 ? update : null;
     }
@@ -107,7 +107,7 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
   const [draft, setDraft] = useState<ProjectDraft>({
     name: "",
     description: "",
-    instruction: "",
+    context: "",
   });
 
   const isComplete = draft.name.trim() !== "" && draft.description.trim() !== "";
@@ -201,7 +201,7 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
         body: JSON.stringify({
           name: draft.name,
           description: draft.description,
-          instruction: draft.instruction || undefined,
+          context: draft.context || undefined,
         }),
       });
 
