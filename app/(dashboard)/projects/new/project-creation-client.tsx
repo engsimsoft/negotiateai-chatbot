@@ -30,6 +30,7 @@ interface UserProfile {
   displayName?: string | null;
   occupation?: string | null;
   bio?: string | null;
+  pronouns?: string | null;
 }
 
 interface ProjectCreationClientProps {
@@ -127,10 +128,13 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
     [userProfile]
   );
 
-  // Initial greeting message
+  // Initial greeting message — respect pronouns (ты/вы)
+  const isInformal = userProfile?.pronouns === "ты";
   const greetingWithName = userProfile?.displayName
-    ? `Привет, ${userProfile.displayName}! 👋 Расскажите о проекте, который хотите создать.`
-    : (config.greeting || "Расскажите о проекте, который хотите создать.");
+    ? isInformal
+      ? `Привет, ${userProfile.displayName}! Расскажи, какой проект хочешь создать?`
+      : `Привет, ${userProfile.displayName}! Расскажите, какой проект хотите создать?`
+    : "Привет! Расскажите, какой проект хотите создать?";
 
   const initialMessages = [
     {

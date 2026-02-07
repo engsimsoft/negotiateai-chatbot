@@ -27,6 +27,7 @@ export default async function NewProjectPage() {
               displayName: userProfile.displayName,
               occupation: userProfile.occupation,
               bio: userProfile.bio,
+              pronouns: userProfile.pronouns,
             }
           : undefined
       }

@@ -54,9 +54,9 @@ export function ProjectChatPanel({
   }, [messages, isLoading]);
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Messages area */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="min-h-0 flex-1 p-4">
         <div className="mx-auto max-w-2xl space-y-4">
           <AnimatePresence mode="popLayout">
             {messages.map((message) => (
