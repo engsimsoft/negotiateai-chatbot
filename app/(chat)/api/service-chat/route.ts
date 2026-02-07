@@ -9,6 +9,8 @@
  * ТЗ-09: ServiceChat унификация
  */
 
+import fs from "fs";
+import path from "path";
 import { streamText, tool, stepCountIs } from "ai";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
@@ -16,6 +18,19 @@ import { myProvider } from "@/lib/ai/providers";
 import { buildBenPrompt } from "@/lib/prompts/server";
 import { getUserById } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
+
+// Load Secretary prompt template from .md file (ТЗ-12)
+const SECRETARY_PROMPT_PATH = path.join(
+  process.cwd(),
+  "lib",
+  "prompts",
+  "service-chats",
+  "project-creation.md"
+);
+const SECRETARY_PROMPT_TEMPLATE = fs.readFileSync(
+  SECRETARY_PROMPT_PATH,
+  "utf-8"
+);
 
 export const maxDuration = 60;
 
@@ -71,9 +86,10 @@ function extractMessageContent(message: {
  */
 function getModelId(context: ServiceChatContext): string {
   switch (context) {
-    case "ben":
     case "project-creation":
-    case "project-manager": // ⚠️ Временно Gemini вместо Claude
+      return "gemini-3-pro"; // ТЗ-12: Секретарь — нужна Pro модель для качественного интервью
+    case "ben":
+    case "project-manager":
       return "gemini-2.5-flash";
     default:
       return "gemini-2.5-flash";
@@ -88,6 +104,8 @@ function buildSystemPrompt(
   options: {
     userName?: string;
     userOccupation?: string;
+    userPronouns?: string;
+    userBio?: string;
     projectName?: string;
   } = {}
 ): string {
@@ -109,41 +127,29 @@ function buildSystemPrompt(
 }
 
 /**
- * Build project creation prompt
+ * Build project creation prompt — Secretary (ТЗ-12)
  *
- * v3.9.0: Live Preview — AI обновляет черновик, не создаёт проект напрямую
+ * Загружает XML-промпт из .md файла, подставляет динамический <user_context>.
+ * Пустые поля профиля не включаются в промпт.
  */
 function buildProjectCreationPrompt(options: {
   userName?: string;
   userOccupation?: string;
+  userPronouns?: string;
+  userBio?: string;
 }): string {
-  const userName = options.userName || "пользователь";
+  // Динамический <user_context> — пустые поля не включать
+  const contextLines: string[] = [];
+  if (options.userName) contextLines.push(`Имя: ${options.userName}`);
+  if (options.userPronouns) contextLines.push(`Обращение: ${options.userPronouns}`);
+  if (options.userOccupation) contextLines.push(`Сфера деятельности: ${options.userOccupation}`);
+  if (options.userBio) contextLines.push(`О пользователе: ${options.userBio}`);
 
-  return `Ты — Simply, AI-ассистент для создания проектов. Твоя задача — помочь ${userName} создать новый проект.
+  const userContextBlock = contextLines.length > 0
+    ? `<user_context>\n${contextLines.join("\n")}\n</user_context>`
+    : "";
 
-## Твои задачи
-
-1. **Собрать информацию** через диалог:
-   - Какая цель проекта?
-   - Для кого/чего это?
-
-2. **Обновлять черновик постепенно:**
-   - Понял название → сразу вызови updateProjectDraft({name: "..."})
-   - Понял цель → добавь description
-   - Есть контекст → добавь context
-   - Можно вызывать несколько раз, уточняя поля
-
-3. **НЕ создавай проект** — пользователь сам нажмёт кнопку когда будет готов
-
-## Правила
-
-- Обновляй черновик по мере разговора, не жди всей информации
-- Поля можно обновлять несколько раз (уточнять)
-- Когда черновик заполнен, скажи что можно создавать проект
-- Будь дружелюбным и кратким
-- Не задавай больше 2 вопросов подряд
-- Говори на русском языке
-- Обращайся на "ты"`;
+  return SECRETARY_PROMPT_TEMPLATE.replace("{{USER_CONTEXT}}", userContextBlock);
 }
 
 /**
@@ -203,11 +209,15 @@ export async function POST(request: Request) {
     const user = await getUserById(userId);
     const userName = user?.displayName || undefined;
     const userOccupation = user?.occupation || undefined;
+    const userPronouns = user?.pronouns || undefined;
+    const userBio = user?.bio || undefined;
 
     // Build system prompt
     const systemPrompt = buildSystemPrompt(context, {
       userName,
       userOccupation,
+      userPronouns,
+      userBio,
     });
 
     // Get model
@@ -228,7 +238,7 @@ export async function POST(request: Request) {
         description: z
           .string()
           .optional()
-          .describe("Краткое описание проекта (1-2 предложения)"),
+          .describe("Краткое описание проекта (2-4 предложения)"),
         context: z
           .string()
           .optional()
