@@ -7,6 +7,7 @@ interface ProjectPassportProps {
   projectId: string;
   description?: string | null;
   instruction?: string | null;
+  context?: string | null;
 }
 
 /**
@@ -18,6 +19,7 @@ export function ProjectPassport({
   projectId,
   description,
   instruction,
+  context,
 }: ProjectPassportProps) {
   const [activeTab, setActiveTab] = useState<"passport" | "instruction">("passport");
 
@@ -69,8 +71,7 @@ export function ProjectPassport({
                 Контекст
               </div>
               <div className="text-sm leading-relaxed text-foreground">
-                {/* TODO: Add context field to project schema */}
-                Контекст проекта не задан
+                {context || "Контекст проекта не задан"}
               </div>
             </div>
 

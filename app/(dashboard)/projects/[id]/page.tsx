@@ -98,6 +98,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               projectId={id}
               description={project.description}
               instruction={project.instruction}
+              context={project.context}
             />
 
             {/* Files */}
