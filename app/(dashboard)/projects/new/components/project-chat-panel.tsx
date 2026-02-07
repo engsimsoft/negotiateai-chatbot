@@ -9,6 +9,7 @@
  * ТЗ-10: Live Preview
  */
 
+import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -45,6 +46,13 @@ export function ProjectChatPanel({
   onQuickAction,
   error,
 }: ProjectChatPanelProps) {
+  const scrollAnchorRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom on new messages or loading state change
+  useEffect(() => {
+    scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
+
   return (
     <div className="flex flex-1 flex-col">
       {/* Messages area */}
@@ -99,6 +107,9 @@ export function ProjectChatPanel({
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Scroll anchor */}
+          <div ref={scrollAnchorRef} />
         </div>
       </ScrollArea>
 
