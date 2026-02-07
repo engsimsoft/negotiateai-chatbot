@@ -64,6 +64,8 @@ export const project = pgTable("Project", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   instruction: text("instruction"),
+  // ТЗ-11: Контекст проекта (справка о бизнесе, заполняется Секретарём)
+  context: text("context"),
   // ТЗ-07C2: Итог проекта (AI-generated из summary задач)
   summary: text("summary"),
   summaryUpdatedAt: timestamp("summaryUpdatedAt"),
