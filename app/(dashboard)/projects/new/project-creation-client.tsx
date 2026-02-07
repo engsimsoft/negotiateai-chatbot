@@ -18,7 +18,7 @@ import { DefaultChatTransport } from "ai";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { PROJECT_CREATION_CONFIG, type QuickAction } from "@/components/service-chat";
+import { PROJECT_CREATION_CONFIG } from "@/components/service-chat";
 import { generateUUID } from "@/lib/utils";
 import {
   ProjectDraftPreview,
@@ -100,7 +100,6 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
   const router = useRouter();
   const [input, setInput] = useState("");
   const [error, setError] = useState<Error | null>(null);
-  const [hasInteracted, setHasInteracted] = useState(false);
   const [projectResult, setProjectResult] = useState<ProjectResult | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -231,32 +230,12 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
     if (!input.trim() || isLoading) return;
 
     setError(null);
-    setHasInteracted(true);
     sendMessage({
       role: "user",
       parts: [{ type: "text", text: input.trim() }],
     });
     setInput("");
   }, [input, isLoading, sendMessage]);
-
-  // Handle quick action click
-  const handleQuickAction = useCallback(
-    (action: QuickAction) => {
-      if (isLoading) return;
-
-      setError(null);
-      setHasInteracted(true);
-      sendMessage({
-        role: "user",
-        parts: [{ type: "text", text: action.prompt }],
-      });
-    },
-    [isLoading, sendMessage]
-  );
-
-  // Show quick actions only before first interaction
-  const showQuickActions =
-    !hasInteracted && !!config.quickActions && config.quickActions.length > 0;
 
   // Success card after project creation
   if (projectResult) {
@@ -351,9 +330,6 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
           onInputChange={setInput}
           onSend={handleSend}
           isLoading={isLoading}
-          quickActions={config.quickActions}
-          showQuickActions={showQuickActions}
-          onQuickAction={handleQuickAction}
           error={error}
         />
       </main>

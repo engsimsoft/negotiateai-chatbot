@@ -14,7 +14,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ServiceChatInput } from "@/components/input";
-import { type QuickAction } from "@/components/service-chat";
 import { cn } from "@/lib/utils";
 
 interface DisplayMessage {
@@ -29,9 +28,6 @@ interface ProjectChatPanelProps {
   onInputChange: (value: string) => void;
   onSend: () => void;
   isLoading: boolean;
-  quickActions?: QuickAction[];
-  showQuickActions: boolean;
-  onQuickAction: (action: QuickAction) => void;
   error?: Error | null;
 }
 
@@ -41,9 +37,6 @@ export function ProjectChatPanel({
   onInputChange,
   onSend,
   isLoading,
-  quickActions,
-  showQuickActions,
-  onQuickAction,
   error,
 }: ProjectChatPanelProps) {
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
@@ -112,34 +105,6 @@ export function ProjectChatPanel({
           <div ref={scrollAnchorRef} />
         </div>
       </ScrollArea>
-
-      {/* Quick actions */}
-      {showQuickActions && quickActions && quickActions.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mx-auto grid max-w-2xl grid-cols-2 gap-2 p-4 sm:grid-cols-4"
-        >
-          {quickActions.map((action) => (
-            <button
-              key={action.label}
-              type="button"
-              disabled={isLoading}
-              onClick={() => onQuickAction(action)}
-              className={cn(
-                "flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-colors",
-                "hover:border-primary/30 hover:bg-muted/50",
-                "disabled:cursor-not-allowed disabled:opacity-50"
-              )}
-            >
-              <span className="text-xl">{action.icon}</span>
-              <span className="text-center text-xs font-medium">
-                {action.label}
-              </span>
-            </button>
-          ))}
-        </motion.div>
-      )}
 
       {/* Error display */}
       <AnimatePresence>

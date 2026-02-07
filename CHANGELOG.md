@@ -12,6 +12,29 @@
 
 ---
 
+## [3.11.0] - 2026-02-07 - Secretary Integration (ТЗ-12)
+
+**MINOR RELEASE**: Качественный XML-промпт Секретаря для создания проектов — адаптивное интервью, pronouns, Gemini 3 Pro.
+
+### Added
+- **XML-промпт Секретаря** — `lib/prompts/service-chats/project-creation.md` (SSOT, отдельный файл)
+- **Динамический `<user_context>`** — pronouns, bio, occupation, displayName передаются в промпт (пустые поля не включаются)
+- **Pronouns в greeting** — клиент учитывает ты/вы при приветствии на странице создания проекта
+
+### Changed
+- **Модель project-creation** — Gemini 2.5 Flash → Gemini 3 Pro (качественное интервью)
+- **Tool description** — "1-2 предложения" → "2-4 предложения" для description
+- **Промпт** — шаблонный промпт заменён на XML-промпт Секретаря с адаптивным интервью (max 4 вопроса)
+
+### Removed
+- **Quick Actions** — кнопки быстрых действий убраны (секретарь сам ведёт диалог)
+- **`hasInteracted` state** — больше не нужен без quick actions
+
+### Fixed
+- **Скролл чата** — `min-h-0` на flex-контейнерах для корректного скролла правой панели
+
+---
+
 ## [3.10.0] - 2026-02-07 - Project Creation Polish (ТЗ-11)
 
 **MINOR RELEASE**: Финализация страницы создания проекта — скролл, подсказки, архитектурное разделение context/instruction.

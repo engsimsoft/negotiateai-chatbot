@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.10.0
+**Версия:** 3.11.0
 **Дата:** 2026-02-07
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -85,7 +85,7 @@
 |--------|--------|------------|
 | **chat** | Gemini 3 Pro | Универсальный AI-чат |
 | **ben** | Gemini 2.5 Flash | Гид по платформе |
-| **project-creation** | Gemini 2.5 Flash | Создание проектов |
+| **project-creation** | Gemini 3 Pro | Секретарь — AI-интервью для создания проектов |
 | **project-manager** | Claude Sonnet | Управление проектом |
 
 ### Файловая структура
@@ -134,6 +134,9 @@ lib/prompts/
 │   ├── safety.md
 │   ├── formatting.md
 │   └── russian-market.md
+│
+├── service-chats/               # Промпты сервисных чатов (v3.11)
+│   └── project-creation.md  # XML-промпт Секретаря
 │
 └── contexts/                # Контексты пользователя
     ├── index.ts
@@ -270,6 +273,27 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-12: Secretary Integration — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **XML-промпт Секретаря** — качественное адаптивное интервью (2-4 вопроса, не допрос)
+- **Промпт в отдельном файле** — `lib/prompts/service-chats/project-creation.md` (SSOT)
+- **Gemini 3 Pro** — модель повышена с Flash для качественного интервью
+- **Динамический user_context** — pronouns, bio, occupation, displayName (пустые поля не включаются)
+- **Pronouns в greeting** — клиент учитывает ты/вы при приветствии
+- **Убраны Quick Actions** — секретарь сам ведёт диалог, кнопки не нужны
+- **Фикс скролла чата** — `min-h-0` на flex-контейнерах
+- **Tool description** — "2-4 предложения" вместо "1-2"
+
+**Ключевые файлы:**
+- `lib/prompts/service-chats/project-creation.md` — XML-промпт Секретаря
+- `app/(chat)/api/service-chat/route.ts` — загрузка промпта, user context, Gemini 3 Pro
+- `app/(dashboard)/projects/new/page.tsx` — передача pronouns
+- `app/(dashboard)/projects/new/project-creation-client.tsx` — greeting с pronouns, без quick actions
+- `app/(dashboard)/projects/new/components/project-chat-panel.tsx` — без quick actions, фикс скролла
+
+**Детали:** [_archive/TZ_12_SecretaryIntegration/](_archive/TZ_12_SecretaryIntegration/)
 
 ### ТЗ-10: Project Creation Live Preview — ✅ ЗАВЕРШЁН
 
@@ -550,11 +574,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.10.0 |
+| Версия | 3.11.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction separation (v3.10) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Сервисные чаты | 3 (ben, project-creation, project-manager) |
@@ -586,6 +610,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_12_SecretaryIntegration/](_archive/TZ_12_SecretaryIntegration/) — ТЗ-12 Secretary Integration
 - [_archive/TZ_07C3_ProjectEntryPoints/](_archive/TZ_07C3_ProjectEntryPoints/) — ТЗ-07C3 Project Entry Points
 - [_archive/TZ_07C2_ProjectPulse/](_archive/TZ_07C2_ProjectPulse/) — ТЗ-07C2 Project Pulse
 - [_archive/TZ_07B_ChatHistory/](_archive/TZ_07B_ChatHistory/) — ТЗ-07B Chat History
