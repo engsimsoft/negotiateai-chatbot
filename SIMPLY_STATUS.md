@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.9.0
-**Дата:** 2026-02-06
+**Версия:** 3.10.0
+**Дата:** 2026-02-07
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -276,7 +276,7 @@ components/projects/
 **Выполнено:**
 - **Split Layout** — Preview слева (400px) + Chat справа
 - **Live Preview** — поля заполняются в реальном времени при вызове AI tool
-- **Tool updateProjectDraft** — AI обновляет черновик постепенно (name, description, instruction)
+- **Tool updateProjectDraft** — AI обновляет черновик постепенно (name, description, context)
 - **Кнопка "Создать проект"** — появляется когда name + description заполнены
 - **API создания** — POST /api/projects с данными из черновика
 - **Success card** — показывается после создания с навигацией
@@ -291,6 +291,33 @@ components/projects/
 - `components/input/input-context.tsx` — фикс stale closure для controlled mode
 
 **Детали:** [specs/TZ_10_ProjectCreationLivePreview/](specs/TZ_10_ProjectCreationLivePreview/)
+
+### ТЗ-11: Project Creation Polish — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Фикс скролла чата** — scroll anchor + auto-scroll к новым сообщениям
+- **Placeholder-подсказки** — «Ожидание...» заменены на полезные примеры
+- **Лейбл «Контекст проекта»** — вместо «Инструкция для AI» в preview создания
+- **Колонка `context` в БД** — отдельное поле для справки о бизнесе (миграция 0022)
+- **Tool updateProjectDraft** — параметр `instruction` → `context`
+- **API POST /api/projects** — сохраняет в колонку `context`
+- **Страница проекта** — вкладка «Паспорт» → КОНТЕКСТ читает реальные данные из БД
+- **ADR 012** — документировано разделение Context vs Instruction
+
+**Архитектурное решение (ADR 012):**
+- Секретарь → `context` (справка о бизнесе, собирается при создании)
+- Менеджер → `instruction` (инструкция для AI, заполняется позже)
+
+**Ключевые файлы:**
+- `app/(dashboard)/projects/new/components/project-chat-panel.tsx` — scroll fix
+- `app/(dashboard)/projects/new/components/project-draft-preview.tsx` — placeholders + label
+- `app/(chat)/api/service-chat/route.ts` — tool parameter context
+- `app/(chat)/api/projects/route.ts` — POST saves context
+- `lib/db/schema.ts` — колонка `context` в Project
+- `lib/db/migrations/0022_flat_adam_destine.sql` — миграция
+- `components/projects/project-passport.tsx` — отображает context из БД
+
+**Детали:** [specs/TZ_11_ProjectCreationPolish/](specs/TZ_11_ProjectCreationPolish/) | [docs/decisions/012-context-vs-instruction-separation.md](docs/decisions/012-context-vs-instruction-separation.md)
 
 ### ТЗ-09: ServiceChat — ✅ ЗАВЕРШЁН
 
@@ -523,11 +550,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.9.0 |
+| Версия | 3.10.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction separation (v3.10) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Сервисные чаты | 3 (ben, project-creation, project-manager) |
@@ -579,4 +606,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-06
+**Обновлено:** 2026-02-07
