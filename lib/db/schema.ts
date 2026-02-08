@@ -82,6 +82,10 @@ export const project = pgTable("Project", {
     }>;
     updatedAt: string;
   } | null>(),
+  // ТЗ-B1: План проекта (structured JSON от Профессора)
+  planJson: jsonb("planJson"),
+  // ТЗ-B1: Подробный отчёт Профессора (Markdown)
+  planReport: text("planReport"),
   // ТЗ-07C2: Итог проекта (AI-generated из summary задач)
   summary: text("summary"),
   summaryUpdatedAt: timestamp("summaryUpdatedAt"),

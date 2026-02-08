@@ -1128,6 +1128,38 @@ export async function updateProjectPhase({
 }
 
 /**
+ * ТЗ-B1: Update project plan (from Professor)
+ */
+export async function updateProjectPlan({
+  id,
+  planJson,
+  planReport,
+}: {
+  id: string;
+  planJson: unknown;
+  planReport: string;
+}) {
+  try {
+    const [updated] = await db
+      .update(project)
+      .set({
+        planJson,
+        planReport,
+        updatedAt: new Date(),
+      })
+      .where(eq(project.id, id))
+      .returning();
+
+    return updated;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update project plan"
+    );
+  }
+}
+
+/**
  * ТЗ-07C2: Update project summary (AI-generated from task summaries)
  */
 export async function updateProjectSummary({

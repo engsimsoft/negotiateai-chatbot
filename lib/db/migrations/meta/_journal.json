@@ -176,6 +176,13 @@
       "when": 1770571952042,
       "tag": "0024_wet_rawhide_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1770585318602,
+      "tag": "0025_add-project-plan-fields",
+      "breakpoints": true
     }
   ]
 }
