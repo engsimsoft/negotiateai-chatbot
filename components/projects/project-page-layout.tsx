@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { LayoutList } from "lucide-react";
+import { LayoutList, User } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,13 +11,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { ManagerDrawer } from "./manager-drawer";
 
 interface ProjectPageLayoutProps {
+  headerLeft: ReactNode;
   pulse: ReactNode;
   workArea: ReactNode;
-  managerDrawer?: ReactNode;
-  header: ReactNode;
-  isDrawerOpen?: boolean;
 }
 
 /**
@@ -25,22 +25,32 @@ interface ProjectPageLayoutProps {
  * - Левая колонка: Пульс (~300px, sticky, независимый скролл)
  * - Правая колонка: Рабочая область (flex-1)
  * - Полноэкранный (без max-w)
- * - Поддержка push-drawer Менеджера (сжимает рабочую область)
- * - Mobile: Пульс в bottom sheet
+ * - Push-drawer Менеджера (сжимает рабочую область на desktop)
+ * - Mobile: Пульс в bottom sheet, Drawer в bottom sheet
  */
 export function ProjectPageLayout({
+  headerLeft,
   pulse,
   workArea,
-  managerDrawer,
-  header,
-  isDrawerOpen = false,
 }: ProjectPageLayoutProps) {
   const [pulseSheetOpen, setPulseSheetOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
     <div className="flex h-svh flex-col overflow-hidden bg-muted/30">
       {/* Header */}
-      {header}
+      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4 lg:px-8">
+        {headerLeft}
+        <Button
+          variant={drawerOpen ? "default" : "outline"}
+          size="sm"
+          className="gap-1.5"
+          onClick={() => setDrawerOpen(!drawerOpen)}
+        >
+          <User className="size-4" />
+          <span className="hidden sm:inline">Менеджер</span>
+        </Button>
+      </header>
 
       {/* Mobile Pulse trigger — fixed bottom-right */}
       <Button
@@ -69,18 +79,18 @@ export function ProjectPageLayout({
           {pulse}
         </aside>
 
-        {/* WorkArea — main content (independent scroll) */}
+        {/* WorkArea — main content (independent scroll, push-margin on desktop when drawer open) */}
         <main
-          className="flex-1 min-w-0 overflow-y-auto overscroll-contain transition-all duration-300"
-          style={{
-            marginRight: isDrawerOpen ? 400 : 0,
-          }}
+          className={cn(
+            "flex-1 min-w-0 overflow-y-auto overscroll-contain transition-[margin] duration-300 ease-in-out",
+            drawerOpen && "lg:mr-[400px]"
+          )}
         >
           {workArea}
         </main>
 
-        {/* Manager Drawer (renders when provided) */}
-        {managerDrawer}
+        {/* Manager Drawer */}
+        <ManagerDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
       </div>
     </div>
   );

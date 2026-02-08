@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, FolderOpen, User } from "lucide-react";
+import { ChevronLeft, FolderOpen } from "lucide-react";
 
 import { auth } from "@/app/(auth)/auth";
 import {
@@ -23,7 +23,7 @@ interface ProjectPageProps {
  * ТЗ-A1: Страница проекта — новый двухколоночный layout
  *
  * Layout:
- * - Header: breadcrumbs слева, кнопка Менеджера справа
+ * - Header: breadcrumbs слева, кнопка Менеджера справа (управляется layout-ом)
  * - Левая колонка: Пульс (план, файлы, паспорт)
  * - Правая колонка: Рабочая область (по фазе проекта)
  */
@@ -71,28 +71,22 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
   return (
     <ProjectPageLayout
-      header={
-        <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4 lg:px-8">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" asChild className="gap-1.5">
-              <Link href="/dashboard">
-                <ChevronLeft className="size-4" />
-                <span className="hidden sm:inline">Главная</span>
-              </Link>
-            </Button>
-            <span className="text-muted-foreground">/</span>
-            <div className="flex items-center gap-2">
-              <FolderOpen className="size-4 text-primary" />
-              <h1 className="font-semibold truncate max-w-[200px] sm:max-w-none">
-                {project.name}
-              </h1>
-            </div>
-          </div>
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <User className="size-4" />
-            <span className="hidden sm:inline">Менеджер</span>
+      headerLeft={
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" asChild className="gap-1.5">
+            <Link href="/dashboard">
+              <ChevronLeft className="size-4" />
+              <span className="hidden sm:inline">Главная</span>
+            </Link>
           </Button>
-        </header>
+          <span className="text-muted-foreground">/</span>
+          <div className="flex items-center gap-2">
+            <FolderOpen className="size-4 text-primary" />
+            <h1 className="font-semibold truncate max-w-[200px] sm:max-w-none">
+              {project.name}
+            </h1>
+          </div>
+        </div>
       }
       pulse={
         <ProjectPulse
