@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Settings, FolderOpen } from "lucide-react";
+import { ChevronLeft, FolderOpen, User } from "lucide-react";
 
 import { auth } from "@/app/(auth)/auth";
 import {
@@ -8,13 +8,9 @@ import {
   getFilesByProjectId,
   getChatsByProjectId,
   getProjectFolders,
-  getProjectChatsCount,
 } from "@/lib/db/queries";
 import { Button } from "@/components/ui/button";
-import { ProjectPassport } from "@/components/projects/project-passport";
-import { ProjectFilesCard } from "@/components/projects/project-files-card";
-import { ProjectActions } from "@/components/projects/project-actions";
-import { ProjectMeta } from "@/components/projects/project-meta";
+import { ProjectPageLayout } from "@/components/projects/project-page-layout";
 import { ProjectPulse } from "@/components/projects/project-pulse";
 
 interface ProjectPageProps {
@@ -22,15 +18,12 @@ interface ProjectPageProps {
 }
 
 /**
- * ТЗ-07A, ТЗ-07C3: Страница проекта
+ * ТЗ-A1: Страница проекта — новый двухколоночный layout
  *
  * Layout:
- * - Header с breadcrumbs и кнопкой Настроить
- * - Три карточки действий: История задач + Новая задача + Менеджер
- * - Двухколоночный layout:
- *   - Левая: Паспорт (табы) + Файлы
- *   - Правая: Пульс проекта
- * - Project meta внизу
+ * - Header: breadcrumbs слева, кнопка Менеджера справа
+ * - Левая колонка: Пульс (план, файлы, паспорт)
+ * - Правая колонка: Рабочая область (по фазе проекта)
  */
 export default async function ProjectPage({ params }: ProjectPageProps) {
   const session = await auth();
@@ -50,83 +43,67 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     redirect("/dashboard");
   }
 
-  const [files, chats, folders, tasksCount] = await Promise.all([
+  const [files, chats, folders] = await Promise.all([
     getFilesByProjectId({ projectId: id }),
     getChatsByProjectId({ projectId: id }),
     getProjectFolders({ projectId: id }),
-    getProjectChatsCount({ projectId: id }),
   ]);
 
+  const tasks = chats.map((chat) => ({
+    id: chat.id,
+    title: chat.title,
+    summary: chat.summary,
+    taskStatus: (chat.taskStatus || "not_started") as
+      | "not_started"
+      | "in_progress"
+      | "done",
+    createdAt: chat.createdAt,
+  }));
+
   return (
-    <div className="flex min-h-svh flex-col bg-muted/30">
-      {/* Header */}
-      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4 lg:px-8">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" asChild className="gap-1.5">
-            <Link href="/dashboard">
-              <ChevronLeft className="size-4" />
-              <span className="hidden sm:inline">Главная</span>
-            </Link>
-          </Button>
-          <span className="text-muted-foreground">/</span>
+    <ProjectPageLayout
+      header={
+        <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4 lg:px-8">
           <div className="flex items-center gap-2">
-            <FolderOpen className="size-4 text-primary" />
-            <h1 className="font-semibold truncate max-w-[200px] sm:max-w-none">
-              {project.name}
-            </h1>
+            <Button variant="ghost" size="sm" asChild className="gap-1.5">
+              <Link href="/dashboard">
+                <ChevronLeft className="size-4" />
+                <span className="hidden sm:inline">Главная</span>
+              </Link>
+            </Button>
+            <span className="text-muted-foreground">/</span>
+            <div className="flex items-center gap-2">
+              <FolderOpen className="size-4 text-primary" />
+              <h1 className="font-semibold truncate max-w-[200px] sm:max-w-none">
+                {project.name}
+              </h1>
+            </div>
           </div>
-        </div>
-        <Button variant="outline" size="sm" className="gap-1.5">
-          <Settings className="size-4" />
-          <span className="hidden sm:inline">Настроить</span>
-        </Button>
-      </header>
-
-      {/* Content */}
-      <main className="mx-auto w-full max-w-[960px] flex-1 px-4 py-8 lg:px-6">
-        {/* Project Actions (ТЗ-07C3) */}
-        <section className="mb-8">
-          <ProjectActions projectId={id} tasksCount={tasksCount} />
-        </section>
-
-        {/* Two-column layout */}
-        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-          {/* Left column — Context */}
-          <div className="flex flex-col gap-6">
-            {/* Passport / Instruction */}
-            <ProjectPassport
-              projectId={id}
-              description={project.description}
-              instruction={project.instruction}
-              context={project.context}
-            />
-
-            {/* Files */}
-            <ProjectFilesCard projectId={id} files={files} folders={folders} />
-          </div>
-
-          {/* Right column — Pulse (ТЗ-07C2) */}
-          <ProjectPulse
-            projectId={id}
-            tasks={chats.map((chat) => ({
-              id: chat.id,
-              title: chat.title,
-              summary: chat.summary,
-              taskStatus: (chat.taskStatus || "not_started") as "not_started" | "in_progress" | "done",
-              createdAt: chat.createdAt,
-            }))}
-            projectSummary={project.summary}
-            summaryUpdatedAt={project.summaryUpdatedAt}
-          />
-        </div>
-
-        {/* Project meta */}
-        <ProjectMeta
-          createdAt={project.createdAt}
-          chatsCount={chats.length}
-          filesCount={files.length}
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <User className="size-4" />
+            <span className="hidden sm:inline">Менеджер</span>
+          </Button>
+        </header>
+      }
+      pulse={
+        <ProjectPulse
+          projectId={id}
+          tasks={tasks}
+          projectSummary={project.summary}
+          summaryUpdatedAt={project.summaryUpdatedAt}
         />
-      </main>
-    </div>
+      }
+      workArea={
+        <div className="flex h-full items-center justify-center p-8">
+          <div className="text-center text-muted-foreground">
+            <FolderOpen className="mx-auto mb-4 size-12 opacity-30" />
+            <p className="text-lg font-medium">Рабочая область</p>
+            <p className="text-sm mt-1">
+              Здесь будет контент по фазе проекта (Этап 4)
+            </p>
+          </div>
+        </div>
+      }
+    />
   );
 }
