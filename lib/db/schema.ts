@@ -66,6 +66,8 @@ export const project = pgTable("Project", {
   instruction: text("instruction"),
   // ТЗ-11: Контекст проекта (справка о бизнесе, заполняется Секретарём)
   context: text("context"),
+  // ТЗ-A1: Фаза проекта (setup → documents → planning → approved → execution → completed)
+  phase: varchar("phase", { length: 20 }).notNull().default("setup"),
   // ТЗ-07C2: Итог проекта (AI-generated из summary задач)
   summary: text("summary"),
   summaryUpdatedAt: timestamp("summaryUpdatedAt"),

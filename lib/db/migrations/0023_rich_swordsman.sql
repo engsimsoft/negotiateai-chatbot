@@ -1,0 +1,1 @@
+ALTER TABLE "Project" ADD COLUMN "phase" varchar(20) DEFAULT 'setup' NOT NULL;
