@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-02-06
+**Обновлено:** 2026-02-08
 
 ---
 
@@ -20,7 +20,8 @@
 | **Проект: Профессор** | Gemini 3 Pro | ✅ Работает | Сложные задачи |
 | **Бен** | Gemini 2.5 Flash | ✅ Работает | Помощник по платформе |
 | **Создание проекта** | Gemini 3 Pro | ✅ Работает | Секретарь — AI-интервью для создания проекта |
-| **Менеджер проекта** | Gemini 2.5 Flash | ✅ Работает | Консультации по организации проекта |
+| **Менеджер проекта** | Gemini 2.5 Flash | ✅ Работает | Живой AI-диалог, управление проектом |
+| **Клерк-анализатор** | Gemini 2.5 Flash | ✅ Работает | Автоматический анализ файлов проекта |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
 | **Preset Помощники** | Gemini 3 Pro / 2.5 Flash | ⚠️ Частично | Маркетолог, Копирайтер и др. |
 
@@ -56,27 +57,66 @@ components/service-chat/configs/project-creation.ts # Конфигурация
 app/(chat)/api/service-chat/route.ts                # API (context: project-creation)
 ```
 
-#### Менеджер проекта
-**Где:** Карточка "👤 Менеджер" на странице проекта `/projects/[id]`
+#### Менеджер проекта (v3.13 — живой AI-диалог)
+**Где:** Кнопка "👤 Менеджер" в header страницы проекта `/projects/[id]`
 
 | Параметр | Значение |
 |----------|----------|
 | **Модель** | Gemini 2.5 Flash |
-| **Оболочка** | Drawer (справа) |
+| **Оболочка** | Push-drawer справа (400px desktop, bottom sheet mobile) |
 | **Инструменты** | — (консультативный режим) |
+| **Персистенция** | Серверная (сообщения в БД, Chat с title `__service:project-manager`) |
 
-**Quick Actions:**
-- 📁 Разобрать файлы
-- 📊 Подвести итог
-- 📝 Обновить инструкцию
-- 📋 Разбить на задачи
+**Как работает:**
+1. При открытии drawer загружаются сохранённые сообщения из БД
+2. System prompt собирается динамически: базовый промпт + mode injection по phase
+3. Контекст включает: passport (name, description, context), manifest, files_status
+4. Streaming ответы через Vercel AI SDK
+5. Сообщения сохраняются на сервере (user — до стриминга, assistant — после)
+
+**Mode injection по phase:**
+- `first_contact` (phase: setup/documents) — полный режим знакомства
+- `plan_presentation` (phase: approved) — stub для будущего ТЗ-B1
+- `navigation` (phase: execution) — stub для будущего ТЗ-C1
 
 **Файлы:**
 ```
-components/projects/project-actions.tsx             # Триггер
-components/service-chat/service-chat-drawer.tsx     # Drawer
-components/service-chat/configs/project-manager.ts  # Конфигурация
-app/(chat)/api/service-chat/route.ts                # API (context: project-manager)
+components/projects/manager-drawer.tsx              # Push-drawer с ServiceChatCore
+components/service-chat/service-chat-core.tsx        # Ядро (loadedMessages)
+components/service-chat/configs/project-manager.ts   # Конфигурация
+lib/prompts/service-chats/project-manager.md         # Промпт Менеджера
+app/(chat)/api/service-chat/route.ts                 # API (context: project-manager)
+lib/db/queries.ts                                    # getOrCreateManagerChat, findManagerChat
+```
+
+#### Клерк-анализатор файлов (v3.13)
+**Где:** Автоматически вызывается после upload файла в проект
+
+| Параметр | Значение |
+|----------|----------|
+| **Модель** | Gemini 2.5 Flash |
+| **Тип** | Backend endpoint (не интерактивный чат) |
+| **Триггер** | Fire-and-forget после upload файла |
+
+**Как работает:**
+1. Frontend загружает файл → сразу вызывает `POST /api/projects/[id]/analyze-file`
+2. Клерк анализирует: description, documentType, suggestedFolder, relevance, keyTopics, language
+3. Создаёт папку если suggestedFolder не существует
+4. Перемещает файл в рекомендованную папку
+5. Сохраняет анализ в `ProjectFile.metadata.analysis`
+6. Перестраивает `Project.manifestJson` (агрегация всех анализов)
+
+**UI обратная связь:**
+- Пульсирующая синяя точка + "Анализ..." во время работы
+- documentType тег под именем файла после завершения
+- Tooltip с полным описанием при наведении
+
+**Файлы:**
+```
+app/(chat)/api/projects/[id]/analyze-file/route.ts  # Endpoint Клерка
+lib/prompts/clerks/file-analyzer.md                  # Промпт Клерка
+components/projects/project-files-card.tsx            # UI (auto-analyze + feedback)
+lib/db/queries.ts                                    # rebuildProjectManifest
 ```
 
 ---
@@ -289,7 +329,7 @@ export const geminiPro = google("gemini-3-pro-preview");
 
 ```
 lib/prompts/
-├── server.ts              # Server-only экспорты
+├── server.ts              # Server-only экспорты (buildChatPrompt, buildBenPrompt, buildFullManagerPrompt)
 ├── index.ts               # Client-safe экспорты
 ├── builder/
 │   ├── index.ts           # buildChatPrompt, buildBenPrompt, etc.
@@ -301,6 +341,11 @@ lib/prompts/
 │   └── ben/AGENT.md       # Конфиг Бена
 ├── skills/
 │   └── document/          # Skills для документов
+├── clerks/                # Промпты клерков (v3.13)
+│   └── file-analyzer.md   # Клерк-анализатор файлов
+├── service-chats/         # Промпты сервисных чатов (v3.11+)
+│   ├── project-creation.md # Промпт Секретаря
+│   └── project-manager.md  # Промпт Менеджера
 ├── core/
 │   ├── base.md            # Базовый промпт
 │   ├── safety.md          # Безопасность

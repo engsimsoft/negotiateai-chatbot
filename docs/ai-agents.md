@@ -1,8 +1,8 @@
 # Simply — Система промптов и помощники
 
-**Версия:** 3.3.1
-**Последнее обновление:** 2026-02-02
-**Статус:** Skills + Agents Architecture
+**Версия:** 3.13.0
+**Последнее обновление:** 2026-02-08
+**Статус:** Skills + Agents + Clerks Architecture
 
 ---
 
@@ -202,6 +202,71 @@ lib/prompts/agents/
 
 ---
 
+## Сервисные чаты (v3.8+)
+
+> В версии 3.8.0 сервисные чаты унифицированы в систему ServiceChat.
+> В версии 3.13.0 Менеджер получил живой AI-диалог с серверной персистенцией.
+
+### Секретарь (`project-creation`)
+
+AI-интервью для создания проектов.
+
+| Параметр | Значение |
+|----------|----------|
+| ID | `project-creation` |
+| Модель | Gemini 3 Pro |
+| Промпт | `lib/prompts/service-chats/project-creation.md` |
+| Оболочка | Full-page (split layout: preview + chat) |
+| Инструменты | `updateProjectDraft` |
+| Сборка | Inline в service-chat route |
+
+### Менеджер проекта (`project-manager`)
+
+Живой AI-диалог для управления проектом.
+
+| Параметр | Значение |
+|----------|----------|
+| ID | `project-manager` |
+| Модель | Gemini 2.5 Flash |
+| Промпт | `lib/prompts/service-chats/project-manager.md` |
+| Оболочка | Push-drawer (400px desktop, bottom sheet mobile) |
+| Инструменты | — (консультативный) |
+| Персистенция | Серверная (Chat в БД) |
+| Сборка | `buildFullManagerPrompt()` |
+
+**Контекст промпта:**
+- passport: name, description, context проекта
+- manifest: агрегированные данные о файлах от Клерка
+- files_status: список файлов с анализом
+- mode injection: conditional по phase (first_contact / plan_presentation / navigation)
+
+---
+
+## Клерки (v3.13)
+
+> Клерки — backend-процессы без UI. Вызываются автоматически, не интерактивные.
+
+### Клерк-анализатор файлов (`file-analyzer`)
+
+Автоматический анализ загруженных файлов проекта.
+
+| Параметр | Значение |
+|----------|----------|
+| ID | `file-analyzer` |
+| Модель | Gemini 2.5 Flash |
+| Промпт | `lib/prompts/clerks/file-analyzer.md` |
+| Триггер | Fire-and-forget после upload файла |
+| Endpoint | `POST /api/projects/[id]/analyze-file` |
+
+**Что делает:**
+1. Анализирует файл: description, documentType, suggestedFolder, relevance, keyTopics, language
+2. Создаёт папку если suggestedFolder не существует (auto-folder)
+3. Перемещает файл в рекомендованную папку (move-to-folder)
+4. Сохраняет анализ в `ProjectFile.metadata.analysis`
+5. Перестраивает `Project.manifestJson` (агрегация всех анализов)
+
+---
+
 ## Builder System
 
 Модульная система сборки промптов с Progressive Disclosure.
@@ -391,4 +456,4 @@ components/modal-assistants/
 
 ---
 
-**Обновлено:** 2026-02-02
+**Обновлено:** 2026-02-08

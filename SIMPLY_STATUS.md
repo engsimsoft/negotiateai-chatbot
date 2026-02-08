@@ -25,8 +25,8 @@
 | Особенность | Описание | Статус |
 |-------------|----------|--------|
 | **Универсальный AI-чат** | Один мощный чат со всеми инструментами | ✅ |
-| **Проекты** | Изолированные рабочие пространства (⚠️ временно Gemini) | ✅ v3.2.0 |
-| **Модальные помощники** | Prompt-агент (📝), Бен (❓) | ✅ |
+| **Проекты** | Изолированные рабочие пространства с Менеджером и автоанализом файлов | ✅ v3.13.0 |
+| **Сервисные помощники** | Бен (❓), Секретарь (➕), Менеджер (👤) | ✅ v3.13.0 |
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG/Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity, Plus AI, Ideogram, AssemblyAI | 📋 Фаза 1 |
 | **Мультипровайдер** | GPT, Claude, Gemini через единый интерфейс | ⏸️ v3.7.1 (только Gemini) |
@@ -86,7 +86,8 @@
 | **chat** | Gemini 3 Pro | Универсальный AI-чат |
 | **ben** | Gemini 2.5 Flash | Гид по платформе |
 | **project-creation** | Gemini 3 Pro | Секретарь — AI-интервью для создания проектов |
-| **project-manager** | Claude Sonnet | Управление проектом |
+| **project-manager** | Gemini 2.5 Flash | Менеджер проекта (живой AI-диалог) |
+| **file-analyzer** (Клерк) | Gemini 2.5 Flash | Автоанализ файлов проекта |
 
 ### Файловая структура
 
@@ -148,15 +149,24 @@ lib/prompts/
     └── chat-memory.ts
 ```
 
-### Сервисные чаты (v3.8)
+### Сервисные чаты (v3.8+)
 
 > В версии 3.8.0 модальные помощники унифицированы в систему ServiceChat.
+> В версии 3.13.0 Менеджер получил живой AI-диалог с серверной персистенцией.
 
 | Чат | Кнопка | Оболочка | Назначение |
 |-----|--------|----------|------------|
 | **Бен** | ❓ | Floating (bottom-right) | Вопросы о платформе, онбординг |
-| **Создание проекта** | ➕ | Full-page | AI-интервью для создания проекта |
-| **Менеджер проекта** | 👤 | Drawer (right) | Управление проектом (живой AI-диалог) |
+| **Создание проекта** | ➕ | Full-page (split layout) | Секретарь — AI-интервью для создания проекта |
+| **Менеджер проекта** | 👤 | Push-drawer (right) | Живой AI-диалог, серверная персистенция сообщений |
+
+### Клерки (v3.13)
+
+> Клерки — автоматические backend-процессы (без UI чата). Вызываются программно.
+
+| Клерк | Модель | Триггер | Назначение |
+|-------|--------|---------|------------|
+| **Анализатор файлов** | Gemini 2.5 Flash | Upload файла в проект | Описание, тип, папка, ключевые темы, manifest |
 
 ---
 
@@ -363,7 +373,7 @@ components/projects/
 - `app/(chat)/api/service-chat/route.ts` — updateProjectDraft tool
 - `components/input/input-context.tsx` — фикс stale closure для controlled mode
 
-**Детали:** [specs/TZ_10_ProjectCreationLivePreview/](specs/TZ_10_ProjectCreationLivePreview/)
+**Детали:** [_archive/TZ_10_ProjectCreationLivePreview/](_archive/TZ_10_ProjectCreationLivePreview/)
 
 ### ТЗ-11: Project Creation Polish — ✅ ЗАВЕРШЁН
 
@@ -390,7 +400,7 @@ components/projects/
 - `lib/db/migrations/0022_flat_adam_destine.sql` — миграция
 - `components/projects/project-passport.tsx` — отображает context из БД
 
-**Детали:** [specs/TZ_11_ProjectCreationPolish/](specs/TZ_11_ProjectCreationPolish/) | [docs/decisions/012-context-vs-instruction-separation.md](docs/decisions/012-context-vs-instruction-separation.md)
+**Детали:** [_archive/TZ_11_ProjectCreationPolish/](_archive/TZ_11_ProjectCreationPolish/) | [docs/decisions/012-context-vs-instruction-separation.md](docs/decisions/012-context-vs-instruction-separation.md)
 
 ### ТЗ-09: ServiceChat — ✅ ЗАВЕРШЁН
 
@@ -409,7 +419,7 @@ components/projects/
 - `app/(chat)/api/service-chat/route.ts` — унифицированный API
 - `app/(dashboard)/projects/new/project-creation-client.tsx` — клиент создания проекта
 
-**Детали:** [specs/TZ_09_ServiceChat/](specs/TZ_09_ServiceChat/)
+**Детали:** [_archive/TZ_09_ServiceChat/](_archive/TZ_09_ServiceChat/)
 
 ### ТЗ-08: File Viewer — ✅ ЗАВЕРШЁН
 
@@ -662,6 +672,10 @@ components/projects/
 - [_archive/TZ_A3_ManagerClerkManifest/](_archive/TZ_A3_ManagerClerkManifest/) — ТЗ-A3 Manager + Clerk + Manifest
 - [_archive/TZ_A1_ProjectPageLayout/](_archive/TZ_A1_ProjectPageLayout/) — ТЗ-A1 Project Page Layout
 - [_archive/TZ_12_SecretaryIntegration/](_archive/TZ_12_SecretaryIntegration/) — ТЗ-12 Secretary Integration
+- [_archive/TZ_11_ProjectCreationPolish/](_archive/TZ_11_ProjectCreationPolish/) — ТЗ-11 Project Creation Polish
+- [_archive/TZ_10_ProjectCreationLivePreview/](_archive/TZ_10_ProjectCreationLivePreview/) — ТЗ-10 Project Creation Live Preview
+- [_archive/TZ_09_ServiceChat/](_archive/TZ_09_ServiceChat/) — ТЗ-09 ServiceChat
+- [_archive/TZ_08_FileViewer/](_archive/TZ_08_FileViewer/) — ТЗ-08 File Viewer
 - [_archive/TZ_07C3_ProjectEntryPoints/](_archive/TZ_07C3_ProjectEntryPoints/) — ТЗ-07C3 Project Entry Points
 - [_archive/TZ_07C2_ProjectPulse/](_archive/TZ_07C2_ProjectPulse/) — ТЗ-07C2 Project Pulse
 - [_archive/TZ_07B_ChatHistory/](_archive/TZ_07B_ChatHistory/) — ТЗ-07B Chat History
