@@ -1500,6 +1500,113 @@ export async function getProjectFolderWithFileCount({ id }: { id: string }) {
 }
 
 /**
+ * ТЗ-A3: Get a single project file by ID
+ */
+export async function getProjectFileById({ id }: { id: string }) {
+  try {
+    const [file] = await db
+      .select()
+      .from(projectFile)
+      .where(eq(projectFile.id, id));
+
+    return file || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get project file by id"
+    );
+  }
+}
+
+/**
+ * ТЗ-A3: Update project file metadata (add analysis results)
+ */
+export async function updateProjectFileMetadata({
+  fileId,
+  metadata,
+}: {
+  fileId: string;
+  metadata: ProjectFile["metadata"];
+}) {
+  try {
+    const [updated] = await db
+      .update(projectFile)
+      .set({ metadata })
+      .where(eq(projectFile.id, fileId))
+      .returning();
+
+    return updated || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update project file metadata"
+    );
+  }
+}
+
+/**
+ * ТЗ-A3: Rebuild project manifest from all analyzed files
+ * Aggregates analysis data from all ProjectFiles into Project.manifestJson
+ */
+export async function rebuildProjectManifest({ projectId }: { projectId: string }) {
+  try {
+    // Get all files for project
+    const files = await db
+      .select()
+      .from(projectFile)
+      .where(eq(projectFile.projectId, projectId))
+      .orderBy(asc(projectFile.createdAt));
+
+    // Get all folders for mapping folderId → name
+    const folders = await db
+      .select()
+      .from(projectFolder)
+      .where(eq(projectFolder.projectId, projectId));
+
+    const folderMap = new Map(folders.map(f => [f.id, f.name]));
+
+    // Build manifest from files that have analysis
+    const manifestFiles = files
+      .filter(f => f.metadata && (f.metadata as any).analysis)
+      .map(f => {
+        const analysis = (f.metadata as any).analysis;
+        return {
+          fileId: f.id,
+          name: f.name,
+          description: analysis.description,
+          documentType: analysis.documentType,
+          folder: f.folderId ? (folderMap.get(f.folderId) || "Без папки") : "Без папки",
+          relevance: analysis.relevance,
+          keyTopics: analysis.keyTopics,
+          language: analysis.language,
+        };
+      });
+
+    const manifest = {
+      files: manifestFiles,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Update project
+    const [updated] = await db
+      .update(project)
+      .set({
+        manifestJson: manifest,
+        updatedAt: new Date(),
+      })
+      .where(eq(project.id, projectId))
+      .returning();
+
+    return updated;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to rebuild project manifest"
+    );
+  }
+}
+
+/**
  * Get chats for a specific project
  */
 export async function getChatsByProjectId({ projectId }: { projectId: string }) {
