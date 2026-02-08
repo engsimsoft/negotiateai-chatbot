@@ -46,6 +46,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { FileViewer, toViewerFile } from "@/components/file-viewer";
 import type { ProjectFile, ProjectFolder } from "@/lib/db/schema";
 
@@ -110,6 +116,9 @@ export function ProjectFilesCard({
   // File moving
   const [movingFileId, setMovingFileId] = useState<string | null>(null);
 
+  // Analyzing state (fire-and-forget)
+  const [analyzingFileIds, setAnalyzingFileIds] = useState<Set<string>>(new Set());
+
   // File viewer
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerFileIndex, setViewerFileIndex] = useState(0);
@@ -162,6 +171,52 @@ export function ProjectFilesCard({
     });
   };
 
+  // Fire-and-forget file analysis via Clerk
+  const triggerAnalyze = async (fileId: string) => {
+    setAnalyzingFileIds((prev) => new Set([...prev, fileId]));
+    try {
+      const res = await fetch(`/api/projects/${projectId}/analyze-file`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileId }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+
+        // Add new folder to local state if created
+        if (data.folder) {
+          setFolders((prev) => {
+            if (prev.some((f) => f.id === data.folder.id)) return prev;
+            return [...prev, data.folder];
+          });
+          setExpandedFolders((prev) => new Set([...prev, data.folder.id]));
+        }
+
+        // Update file in local state (folderId + metadata.analysis)
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileId
+              ? {
+                  ...f,
+                  folderId: data.folderId ?? f.folderId,
+                  metadata: { ...f.metadata, analysis: data.analysis },
+                }
+              : f
+          )
+        );
+      }
+    } catch (error) {
+      console.error("[AnalyzeFile] Failed to analyze file:", error);
+    } finally {
+      setAnalyzingFileIds((prev) => {
+        const next = new Set(prev);
+        next.delete(fileId);
+        return next;
+      });
+    }
+  };
+
   // Upload files
   const uploadFiles = async (filesToUpload: FileList, targetFolderId?: string | null) => {
     setIsUploading(true);
@@ -186,6 +241,9 @@ export function ProjectFilesCard({
 
         const newFile = await response.json();
         setFiles((prev) => [newFile, ...prev]);
+
+        // Fire-and-forget: analyze file via Clerk
+        triggerAnalyze(newFile.id);
       }
 
       router.refresh();
@@ -394,7 +452,11 @@ export function ProjectFilesCard({
     file: ProjectFile;
     currentFolderId: string | null;
     filesInContext: ProjectFile[];
-  }) => (
+  }) => {
+    const isAnalyzing = analyzingFileIds.has(file.id);
+    const analysis = file.metadata?.analysis;
+
+    const fileRow = (
     <div
       className="group flex cursor-pointer items-center gap-3 rounded-lg bg-muted/50 px-3 py-2 transition-colors hover:bg-muted"
       onClick={() => openFileViewer(file, filesInContext)}
@@ -408,8 +470,21 @@ export function ProjectFilesCard({
       }}
     >
       {getFileIcon(file.mimeType)}
-      <span className="flex-1 truncate text-sm">{file.name}</span>
-      <span className="text-xs text-muted-foreground">
+      <div className="flex-1 min-w-0">
+        <span className="block truncate text-sm">{file.name}</span>
+        {isAnalyzing && (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span className="size-1.5 rounded-full bg-blue-500 animate-pulse" />
+            Анализ...
+          </span>
+        )}
+        {!isAnalyzing && analysis?.documentType && (
+          <span className="block truncate text-xs text-muted-foreground/70">
+            {analysis.documentType}
+          </span>
+        )}
+      </div>
+      <span className="text-xs text-muted-foreground shrink-0">
         {formatFileSize(file.size || 0)}
       </span>
 
@@ -469,7 +544,21 @@ export function ProjectFilesCard({
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-  );
+    );
+
+    if (!analysis?.description) return fileRow;
+
+    return (
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>{fileRow}</TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-xs text-xs">
+            {analysis.description}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
 
   return (
     <div className={compact ? "px-4 py-3" : "rounded-xl border bg-background p-4"}>

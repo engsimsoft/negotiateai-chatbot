@@ -165,6 +165,7 @@ ${folderNames.length > 0 ? JSON.stringify(folderNames) : "[]"}
 
     // Auto-folder logic: find or create folder, move file
     let targetFolderId: string | null = null;
+    let newFolderData: { id: string; name: string; emoji: string; projectId: string; sortOrder: number; createdAt: Date } | null = null;
 
     if (analysis.suggestedFolder) {
       // Check if folder already exists (case-insensitive match)
@@ -181,6 +182,7 @@ ${folderNames.length > 0 ? JSON.stringify(folderNames) : "[]"}
           name: analysis.suggestedFolder,
         });
         targetFolderId = newFolder.id;
+        newFolderData = newFolder;
       }
 
       // Move file to folder
@@ -197,6 +199,7 @@ ${folderNames.length > 0 ? JSON.stringify(folderNames) : "[]"}
       success: true,
       analysis,
       folderId: targetFolderId,
+      ...(newFolderData && { folder: newFolderData }),
     });
   } catch (error) {
     console.error("[AnalyzeFile] Error:", error);

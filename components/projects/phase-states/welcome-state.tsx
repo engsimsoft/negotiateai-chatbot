@@ -1,5 +1,8 @@
-import { Upload, ListChecks, Sparkles } from "lucide-react";
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { ListChecks, Sparkles, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -9,10 +12,33 @@ interface WelcomeStateProps {
 }
 
 /**
- * ТЗ-A1: Welcome state (phase: setup/documents)
+ * ТЗ-A3: Welcome state (phase: setup/documents)
  * Показывается при первом открытии проекта
+ * Адаптивная кнопка: «Начать планирование» / «Начать планирование без документов»
  */
 export function WelcomeState({ projectId, hasFiles }: WelcomeStateProps) {
+  const router = useRouter();
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const handleStartPlanning = async () => {
+    setIsTransitioning(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phase: "planning" }),
+      });
+
+      if (res.ok) {
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Failed to update phase:", error);
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
   return (
     <div className="flex h-full items-center justify-center p-8">
       <div className="max-w-md text-center">
@@ -25,23 +51,29 @@ export function WelcomeState({ projectId, hasFiles }: WelcomeStateProps) {
         </h2>
 
         <p className="mt-2 text-muted-foreground">
-          Загрузите файлы проекта или начните планирование задач.
+          {hasFiles
+            ? "Файлы загружены. Начните планирование, чтобы AI составил план работы."
+            : "Загрузите файлы проекта для лучшего результата или начните планирование сразу."}
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-          <Button variant="outline" className="gap-2" asChild>
-            <label className="cursor-pointer">
-              <Upload className="size-4" />
-              Загрузить файлы
-              <input type="file" multiple className="hidden" />
-            </label>
-          </Button>
+          {!hasFiles && (
+            <p className="text-xs text-muted-foreground">
+              Загрузите файлы в панели Пульса слева
+            </p>
+          )}
 
-          <Button className="gap-2" asChild>
-            <Link href={`/projects/${projectId}/chat`}>
+          <Button
+            className="gap-2"
+            onClick={handleStartPlanning}
+            disabled={isTransitioning}
+          >
+            {isTransitioning ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
               <ListChecks className="size-4" />
-              Начать работу
-            </Link>
+            )}
+            {hasFiles ? "Начать планирование" : "Начать планирование без документов"}
           </Button>
         </div>
 

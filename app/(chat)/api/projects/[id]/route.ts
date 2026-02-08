@@ -3,6 +3,7 @@ import {
   deleteProjectById,
   getProjectById,
   updateProject,
+  updateProjectPhase,
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
 
@@ -85,7 +86,13 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { name, description, instruction } = body;
+    const { name, description, instruction, phase } = body;
+
+    // Phase update uses a separate function
+    if (phase !== undefined) {
+      const updated = await updateProjectPhase({ id, phase });
+      return Response.json(updated);
+    }
 
     const updated = await updateProject({
       id,

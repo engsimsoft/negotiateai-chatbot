@@ -67,3 +67,28 @@
 - `getChatsByProjectId` — фильтрация `__service:*` из списка чатов проекта
 - `getProjectChatsWithStats` — аналогичная фильтрация
 - `getProjectChatsCount` — аналогичная фильтрация
+
+---
+
+## Этап 4: Frontend связка (auto-analyze + UI)
+
+**Дата:** 2026-02-08
+
+### Добавлено
+- Fire-and-forget вызов `POST /api/projects/${projectId}/analyze-file` после каждого upload файла
+- `analyzingFileIds` state — отслеживание файлов в процессе анализа
+- UI индикатор анализа: пульсирующая синяя точка + "Анализ..." во время работы Клерка
+- `documentType` под именем файла после анализа (короткий тег: "стратегия", "документ", "таблица данных")
+- Tooltip (shadcn/ui) при наведении на файл — полное `description` от Клерка
+- Автоматическое обновление локального state после анализа (новая папка, перемещение файла, metadata)
+- Адаптивная кнопка в welcome-state:
+  - Есть файлы → «Начать планирование»
+  - Нет файлов → «Начать планирование без документов» + подсказка загрузить файлы
+  - onClick → PATCH `/api/projects/{id}` с `{ phase: "planning" }` → router.refresh()
+- Поддержка `phase` в PATCH `/api/projects/[id]` через `updateProjectPhase()`
+
+### Изменено
+- `project-files-card.tsx` — triggerAnalyze(), FileItem с tooltip, documentType label
+- `welcome-state.tsx` — client component с кнопкой планирования и переходом фазы
+- `analyze-file/route.ts` — возвращает `folder` объект при создании новой папки
+- `projects/[id]/route.ts` — добавлен import и обработка `phase` в PATCH
