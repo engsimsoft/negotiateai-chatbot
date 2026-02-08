@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.12.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.13.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -57,11 +57,13 @@
 
 **Prompt System (v3.3 — Skills + Agents):**
 - `lib/prompts/` — Система промптов (Skills + Agents)
-- `lib/prompts/server.ts` — Server-only экспорты (buildChatPrompt, buildBenPrompt)
+- `lib/prompts/server.ts` — Server-only экспорты (buildChatPrompt, buildBenPrompt, buildFullManagerPrompt)
 - `lib/prompts/index.ts` — Client-safe экспорты (типы, утилиты)
 - `lib/prompts/builder/` — Модульная система сборки (registry, loaders, composer)
 - `lib/prompts/skills/` — Атомарные навыки (SKILL.md)
 - `lib/prompts/agents/` — Персонажи-агенты (AGENT.md + config.yaml)
+- `lib/prompts/clerks/` — Промпты клерков (file-analyzer.md)
+- `lib/prompts/service-chats/` — Промпты сервисных чатов (project-creation.md, project-manager.md)
 - `lib/prompts/core/` — Базовые промпты (.md файлы)
 - `lib/prompts/contexts/` — Контексты (user-profile, chat-memory)
 
@@ -116,17 +118,19 @@
 - `lib/ai/tools/` — Инструменты (search, excel, web scraping)
 - `lib/ai/tools/excel/` — Excel tools (create, parse, edit)
 
-**Projects (v3.12.0 — новый layout):**
+**Projects (v3.13.0 — Manager + Clerk + Manifest):**
 - `app/(dashboard)/projects/[id]/page.tsx` — Страница проекта (Server Component)
 - `components/projects/project-page-layout.tsx` — Двухколоночный layout (Пульс + WorkArea + Drawer)
 - `components/projects/project-pulse.tsx` — Навигационный Пульс (План, Файлы, Паспорт)
 - `components/projects/project-work-area.tsx` — Рабочая область (switch по phase)
-- `components/projects/manager-drawer.tsx` — Push-drawer Менеджера (desktop: 400px, mobile: bottom sheet)
+- `components/projects/manager-drawer.tsx` — Push-drawer Менеджера с живым AI-диалогом (ServiceChatCore)
+- `components/projects/project-files-card.tsx` — Файлы проекта (auto-analyze, documentType, tooltip)
 - `components/projects/phase-states/` — 5 компонентов фаз (welcome, planning, approved, execution, completed)
 - `app/(dashboard)/projects/page.tsx` — Список проектов
 - `app/(dashboard)/projects/new/page.tsx` — Создание проекта
 - `app/(dashboard)/projects/[id]/chat/` — Чаты проекта
 - `app/(chat)/api/projects/` — API проектов (CRUD)
+- `app/(chat)/api/projects/[id]/analyze-file/route.ts` — Клерк-анализатор файлов (Gemini Flash)
 - `components/projects/professor-progress.tsx` — UI прогресса pipeline
 
 **Voice Input (Deepgram):**
@@ -155,7 +159,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**

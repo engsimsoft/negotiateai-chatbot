@@ -12,6 +12,42 @@
 
 ---
 
+## [3.13.0] - 2026-02-08 - Manager + Clerk + Manifest (ТЗ-A3)
+
+**MINOR RELEASE**: Клерк-анализатор файлов, живой Менеджер проекта в drawer, автоматический manifest проекта.
+
+### Added
+- **`Project.manifestJson`** (jsonb) — агрегированные данные о файлах от Клерка-анализатора
+- **`POST /api/projects/[id]/analyze-file`** — endpoint Клерка: Gemini Flash анализирует файл, определяет тип, описание, папку, ключевые темы
+- **Auto-folder** — автоматическое создание папок по рекомендации Клерка (suggestedFolder)
+- **Move-to-folder** — файл перемещается в рекомендованную папку после анализа
+- **Rebuild manifest** — агрегация всех анализов файлов в `Project.manifestJson`
+- **Серверная персистенция Менеджера** — `getOrCreateManagerChat()`, сообщения сохраняются в БД
+- **`GET /api/service-chat`** — загрузка персистированных сообщений Менеджера при открытии drawer
+- **Prompt builder Менеджера** — `buildFullManagerPrompt()` с passport, manifest, files_status, mode injection по phase
+- **Conditional mode injection** — first_contact (полный), plan_presentation (stub), navigation (stub)
+- **Fire-and-forget анализ** — после upload файла автоматический вызов Клерка
+- **UI индикатор анализа** — пульсирующая синяя точка + "Анализ..." во время работы Клерка
+- **documentType** — короткий тег под именем файла после анализа
+- **Tooltip** — полное описание файла при наведении (shadcn/ui)
+- **Адаптивная кнопка планирования** — "Начать планирование" / "Начать планирование без документов"
+- **`lib/prompts/clerks/file-analyzer.md`** — промпт Клерка-архивариуса
+- **`lib/prompts/service-chats/project-manager.md`** — промпт Менеджера с `{{MODE_INJECTION}}`
+
+### Changed
+- **manager-drawer.tsx** — заглушка заменена на живой AI-диалог через `ServiceChatCore`
+- **service-chat-core.tsx** — поддержка `loadedMessages` (greeting + server messages)
+- **service-chat/route.ts** — async `buildSystemPrompt`, temperature 0.5 для manager, серверная персистенция
+- **welcome-state.tsx** — client component с кнопкой планирования и переходом фазы
+- **project-files-card.tsx** — triggerAnalyze(), FileItem с tooltip и documentType
+- **PATCH /api/projects/[id]** — поддержка обновления `phase`
+- Фильтрация `__service:*` чатов из списков проекта (3 функции в queries.ts)
+
+### Database
+- Миграция `0024_wet_rawhide_kid.sql` — ALTER TABLE Project ADD `manifestJson` (jsonb)
+
+---
+
 ## [3.12.0] - 2026-02-08 - Project Page Layout (ТЗ-A1)
 
 **MINOR RELEASE**: Новый двухколоночный layout страницы проекта с фазовой системой, навигационным Пульсом и push-drawer Менеджера.

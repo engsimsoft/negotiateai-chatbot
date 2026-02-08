@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.12.0
+**Версия:** 3.13.0
 **Дата:** 2026-02-08
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -135,8 +135,12 @@ lib/prompts/
 │   ├── formatting.md
 │   └── russian-market.md
 │
-├── service-chats/               # Промпты сервисных чатов (v3.11)
-│   └── project-creation.md  # XML-промпт Секретаря
+├── clerks/                      # Промпты клерков (v3.13)
+│   └── file-analyzer.md     # Клерк-анализатор файлов
+│
+├── service-chats/               # Промпты сервисных чатов (v3.11+)
+│   ├── project-creation.md  # XML-промпт Секретаря
+│   └── project-manager.md   # Промпт Менеджера проекта
 │
 └── contexts/                # Контексты пользователя
     ├── index.ts
@@ -152,7 +156,7 @@ lib/prompts/
 |-----|--------|----------|------------|
 | **Бен** | ❓ | Floating (bottom-right) | Вопросы о платформе, онбординг |
 | **Создание проекта** | ➕ | Full-page | AI-интервью для создания проекта |
-| **Менеджер проекта** | 👤 | Drawer (right) | Управление проектом (заглушка) |
+| **Менеджер проекта** | 👤 | Drawer (right) | Управление проектом (живой AI-диалог) |
 
 ---
 
@@ -273,6 +277,28 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-A3: Manager + Clerk + Manifest — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Клерк-анализатор файлов** — `POST /api/projects/[id]/analyze-file` (Gemini Flash): анализ файла, определение типа, описания, папки, ключевых тем
+- **Auto-folder + move-to-folder** — автоматическое создание папок и перемещение файлов по рекомендации Клерка
+- **Project Manifest** — `Project.manifestJson` (jsonb), автоматическая агрегация всех анализов
+- **Живой Менеджер в drawer** — `ServiceChatCore` вместо заглушки, серверная персистенция сообщений
+- **Prompt builder** — `buildFullManagerPrompt()` с passport, manifest, mode injection по phase
+- **Fire-and-forget анализ** — после upload файла → автоматический вызов Клерка
+- **UI обратная связь** — пульсация "Анализ...", documentType тег, tooltip с описанием
+- **Адаптивная кнопка планирования** — "Начать планирование" / "без документов"
+
+**Ключевые файлы:**
+- `app/(chat)/api/projects/[id]/analyze-file/route.ts` — endpoint Клерка
+- `lib/prompts/clerks/file-analyzer.md` — промпт Клерка
+- `lib/prompts/service-chats/project-manager.md` — промпт Менеджера
+- `components/projects/manager-drawer.tsx` — живой AI-диалог
+- `components/projects/project-files-card.tsx` — auto-analyze + UI
+- `components/projects/phase-states/welcome-state.tsx` — адаптивная кнопка
+
+**Детали:** [_archive/TZ_A3_ManagerClerkManifest/](_archive/TZ_A3_ManagerClerkManifest/)
 
 ### ТЗ-A1: Project Page Layout — ✅ ЗАВЕРШЁН
 
@@ -597,11 +623,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.12.0 |
+| Версия | 3.13.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Сервисные чаты | 3 (ben, project-creation, project-manager) |
@@ -633,6 +659,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_A3_ManagerClerkManifest/](_archive/TZ_A3_ManagerClerkManifest/) — ТЗ-A3 Manager + Clerk + Manifest
 - [_archive/TZ_A1_ProjectPageLayout/](_archive/TZ_A1_ProjectPageLayout/) — ТЗ-A1 Project Page Layout
 - [_archive/TZ_12_SecretaryIntegration/](_archive/TZ_12_SecretaryIntegration/) — ТЗ-12 Secretary Integration
 - [_archive/TZ_07C3_ProjectEntryPoints/](_archive/TZ_07C3_ProjectEntryPoints/) — ТЗ-07C3 Project Entry Points
