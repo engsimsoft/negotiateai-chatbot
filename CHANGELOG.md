@@ -12,6 +12,32 @@
 
 ---
 
+## [3.12.0] - 2026-02-08 - Project Page Layout (ТЗ-A1)
+
+**MINOR RELEASE**: Новый двухколоночный layout страницы проекта с фазовой системой, навигационным Пульсом и push-drawer Менеджера.
+
+### Added
+- **Колонка `phase`** в таблице Project — фазовая система (setup → documents → planning → approved → execution → completed)
+- **ProjectPageLayout** — двухколоночный layout (Пульс 300px + WorkArea flex-1), полноэкранный, с push-drawer
+- **ProjectPulse** — три сворачиваемые секции: План (задачи со статусами), Файлы, Паспорт
+- **ProjectWorkArea** — switch-рендеринг по фазе проекта (5 компонентов фаз)
+- **ManagerDrawer** — push-drawer справа (400px), WorkArea сжимается; мобильный — bottom sheet (vaul)
+- **Авто-переход setup → documents** — server-side при первом открытии проекта
+- **Мобильная адаптация** — bottom sheet для Пульса (кнопка-триггер), bottom sheet для Менеджера
+
+### Changed
+- **Header** — breadcrumbs слева (Главная / Проект), кнопка Менеджера справа (toggle с подсветкой)
+- **Пульс** рефакторинг — из простой панели в навигационный хаб с Collapsible-секциями
+- **ProjectFilesCard** — добавлен `compact` prop для встраивания в Пульс
+
+### Removed
+- **project-actions.tsx** — заменён на WorkArea + Пульс
+- **manager-card.tsx** — заменён на ManagerDrawer
+- **new-task-card.tsx** — функционал в ExecutionState
+- **task-history-card.tsx** — функционал в Пульсе (секция План)
+
+---
+
 ## [3.11.0] - 2026-02-07 - Secretary Integration (ТЗ-12)
 
 **MINOR RELEASE**: Качественный XML-промпт Секретаря для создания проектов — адаптивное интервью, pronouns, Gemini 3 Pro.

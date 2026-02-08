@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.11.0
-**Дата:** 2026-02-07
+**Версия:** 3.12.0
+**Дата:** 2026-02-08
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -273,6 +273,29 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-A1: Project Page Layout — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Колонка `phase`** в таблице Project — фазовая система проектов (setup/documents/planning/approved/execution/completed)
+- **ProjectPageLayout** — двухколоночный layout (Пульс ~300px + WorkArea flex-1), полноэкранный
+- **ProjectPulse** — три сворачиваемые секции: План (задачи со статусами), Файлы (compact), Паспорт (описание, контекст, инструкция, мета)
+- **ProjectWorkArea** — switch-рендеринг по фазе проекта (5 компонентов: welcome, planning, approved, execution, completed)
+- **ManagerDrawer** — push-drawer справа (400px, WorkArea сжимается), мобильный bottom sheet (vaul)
+- **Авто-переход setup → documents** — server-side при первом открытии проекта
+- **Мобильная адаптация** — bottom sheet для Пульса + Менеджера
+- **Удалены** project-actions.tsx, manager-card.tsx, new-task-card.tsx, task-history-card.tsx
+
+**Ключевые файлы:**
+- `components/projects/project-page-layout.tsx` — двухколоночный layout + drawer state
+- `components/projects/project-pulse.tsx` — навигационный Пульс (3 секции)
+- `components/projects/project-work-area.tsx` — рабочая область по фазе
+- `components/projects/manager-drawer.tsx` — push-drawer Менеджера
+- `components/projects/phase-states/` — 5 компонентов фаз
+- `app/(dashboard)/projects/[id]/page.tsx` — обновлённая страница проекта
+- `lib/db/queries.ts` — updateProjectPhase
+
+**Детали:** [_archive/TZ_A1_ProjectPageLayout/](_archive/TZ_A1_ProjectPageLayout/)
 
 ### ТЗ-12: Secretary Integration — ✅ ЗАВЕРШЁН
 
@@ -574,11 +597,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.11.0 |
+| Версия | 3.12.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Сервисные чаты | 3 (ben, project-creation, project-manager) |
@@ -610,6 +633,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_A1_ProjectPageLayout/](_archive/TZ_A1_ProjectPageLayout/) — ТЗ-A1 Project Page Layout
 - [_archive/TZ_12_SecretaryIntegration/](_archive/TZ_12_SecretaryIntegration/) — ТЗ-12 Secretary Integration
 - [_archive/TZ_07C3_ProjectEntryPoints/](_archive/TZ_07C3_ProjectEntryPoints/) — ТЗ-07C3 Project Entry Points
 - [_archive/TZ_07C2_ProjectPulse/](_archive/TZ_07C2_ProjectPulse/) — ТЗ-07C2 Project Pulse
@@ -631,4 +655,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-07
+**Обновлено:** 2026-02-08
