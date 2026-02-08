@@ -143,12 +143,16 @@ export function ServiceChatCore({
   onMessagesChange,
   onQuickAction,
   className,
+  loadedMessages,
 }: ServiceChatCoreProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
   const [error, setError] = useState<Error | null>(null);
-  const [hasInteracted, setHasInteracted] = useState(false);
+
+  // ТЗ-A3: If server messages exist, user has already interacted
+  const hasServerMessages = loadedMessages && loadedMessages.length > 0;
+  const [hasInteracted, setHasInteracted] = useState(!!hasServerMessages);
 
   // Determine API endpoint
   const apiEndpoint = config.apiEndpoint || "/api/service-chat";
@@ -166,16 +170,32 @@ export function ServiceChatCore({
     [apiEndpoint, config.id, context]
   );
 
-  // Initial greeting message
-  const initialMessages = config.greeting
-    ? [
-        {
+  // ТЗ-A3: Build initial messages — greeting + loaded server messages
+  const initialMessages = useMemo(() => {
+    const greeting = config.greeting
+      ? [{
           id: "greeting",
-          role: "assistant" as "user" | "assistant",
+          role: "assistant" as const,
           parts: [{ type: "text" as const, text: config.greeting }],
-        },
-      ]
-    : [];
+        }]
+      : [];
+
+    if (hasServerMessages) {
+      // Prepend greeting, then server messages
+      const serverMsgs = loadedMessages.map((msg) => ({
+        id: msg.id,
+        role: msg.role as "user" | "assistant",
+        // Cast parts to text-only format for useChat compatibility
+        parts: (msg.parts as Array<{ type: string; text?: string }>).map((p) => ({
+          type: "text" as const,
+          text: p.text || "",
+        })),
+      }));
+      return [...greeting, ...serverMsgs];
+    }
+
+    return greeting;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentionally static
 
   const { messages: chatMessages, sendMessage, status } = useChat({
     generateId: generateUUID,

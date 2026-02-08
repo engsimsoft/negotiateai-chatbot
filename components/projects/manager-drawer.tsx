@@ -1,24 +1,74 @@
 "use client";
 
 /**
- * ТЗ-A1, Этап 5: ManagerDrawer
+ * ТЗ-A1 + ТЗ-A3: ManagerDrawer
  *
- * Push-drawer Менеджера проекта (каркас без AI).
+ * Push-drawer Менеджера проекта с живым AI-диалогом.
  * - Desktop (lg+): фиксированная панель справа (400px), WorkArea сжимается
  * - Mobile: bottom sheet через vaul
+ * - ТЗ-A3: ServiceChatCore + серверная персистенция сообщений
  */
 
-import { User, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { User, X, Loader2 } from "lucide-react";
 import { Drawer } from "vaul";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { ServiceChatCore } from "@/components/service-chat/service-chat-core";
+import { PROJECT_MANAGER_CONFIG } from "@/components/service-chat/configs/project-manager";
 
 interface ManagerDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  projectId: string;
 }
 
-function DesktopManagerDrawer({ open, onOpenChange }: ManagerDrawerProps) {
+/**
+ * Chat content with message loading from server
+ */
+function ManagerChatContent({ projectId }: { projectId: string }) {
+  const [loadedMessages, setLoadedMessages] = useState<
+    Array<{ id: string; role: string; parts: unknown }> | null
+  >(null);
+
+  useEffect(() => {
+    fetch(
+      `/api/service-chat?context=project-manager&projectId=${encodeURIComponent(projectId)}`
+    )
+      .then((res) => res.json())
+      .then((data) => setLoadedMessages(data.messages || []))
+      .catch(() => setLoadedMessages([]));
+  }, [projectId]);
+
+  if (loadedMessages === null) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <ServiceChatCore
+      config={PROJECT_MANAGER_CONFIG}
+      context={{ projectId }}
+      loadedMessages={loadedMessages}
+    />
+  );
+}
+
+function DesktopManagerDrawer({
+  open,
+  onOpenChange,
+  projectId,
+}: ManagerDrawerProps) {
+  // Lazy mount: render chat content only after first open, then keep mounted
+  const [hasOpened, setHasOpened] = useState(false);
+
+  useEffect(() => {
+    if (open && !hasOpened) setHasOpened(true);
+  }, [open, hasOpened]);
+
   return (
     <div
       className={cn(
@@ -44,33 +94,17 @@ function DesktopManagerDrawer({ open, onOpenChange }: ManagerDrawerProps) {
         </button>
       </div>
 
-      {/* Messages — stub */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="text-center text-muted-foreground">
-          <div className="mb-3 text-4xl">🤖</div>
-          <p className="font-medium">Менеджер проекта</p>
-          <p className="mt-1 text-sm">
-            Скоро здесь появится ваш AI-помощник для управления проектом
-          </p>
-        </div>
-      </div>
-
-      {/* Actions zone — reserved */}
-      <div className="h-16 border-t bg-muted/30" />
-
-      {/* Input — disabled */}
-      <div className="border-t p-3">
-        <div className="flex items-center rounded-lg border bg-muted/50 px-3 py-2.5 opacity-60 cursor-not-allowed">
-          <span className="text-sm text-muted-foreground">
-            Скоро здесь можно будет общаться с Менеджером
-          </span>
-        </div>
-      </div>
+      {/* Chat content — lazy mounted, persists after first open */}
+      {hasOpened && <ManagerChatContent projectId={projectId} />}
     </div>
   );
 }
 
-function MobileManagerDrawer({ open, onOpenChange }: ManagerDrawerProps) {
+function MobileManagerDrawer({
+  open,
+  onOpenChange,
+  projectId,
+}: ManagerDrawerProps) {
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
@@ -97,28 +131,8 @@ function MobileManagerDrawer({ open, onOpenChange }: ManagerDrawerProps) {
             </Drawer.Close>
           </div>
 
-          {/* Messages — stub */}
-          <div className="flex-1 flex items-center justify-center p-6">
-            <div className="text-center text-muted-foreground">
-              <div className="mb-3 text-4xl">🤖</div>
-              <p className="font-medium">Менеджер проекта</p>
-              <p className="mt-1 text-sm">
-                Скоро здесь появится ваш AI-помощник для управления проектом
-              </p>
-            </div>
-          </div>
-
-          {/* Actions zone — reserved */}
-          <div className="h-16 border-t bg-muted/30" />
-
-          {/* Input — disabled */}
-          <div className="border-t p-3">
-            <div className="flex items-center rounded-lg border bg-muted/50 px-3 py-2.5 opacity-60 cursor-not-allowed">
-              <span className="text-sm text-muted-foreground">
-                Скоро здесь можно будет общаться с Менеджером
-              </span>
-            </div>
-          </div>
+          {/* Chat content — re-mounts each time drawer opens (mobile) */}
+          <ManagerChatContent projectId={projectId} />
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

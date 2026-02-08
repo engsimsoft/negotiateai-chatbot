@@ -1627,7 +1627,10 @@ export async function getChatsByProjectId({ projectId }: { projectId: string }) 
         lastContext: sql<null>`NULL`.as("lastContext"),
       })
       .from(chat)
-      .where(eq(chat.projectId, projectId))
+      .where(and(
+        eq(chat.projectId, projectId),
+        sql`${chat.title} NOT LIKE '__service:%'`
+      ))
       .orderBy(desc(chat.createdAt));
 
     return chats;
@@ -2049,7 +2052,10 @@ export async function getProjectChatsWithStats({
       })
       .from(chat)
       .leftJoin(message, eq(message.chatId, chat.id))
-      .where(eq(chat.projectId, projectId))
+      .where(and(
+        eq(chat.projectId, projectId),
+        sql`${chat.title} NOT LIKE '__service:%'`
+      ))
       .groupBy(chat.id)
       .orderBy(desc(chat.createdAt))
       .limit(limit);
@@ -2072,13 +2078,98 @@ export async function getProjectChatsCount({ projectId }: { projectId: string })
     const [result] = await db
       .select({ count: count(chat.id) })
       .from(chat)
-      .where(eq(chat.projectId, projectId));
+      .where(and(
+        eq(chat.projectId, projectId),
+        sql`${chat.title} NOT LIKE '__service:%'`
+      ));
 
     return result?.count ?? 0;
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get project chats count"
+    );
+  }
+}
+
+// ============================================
+// ТЗ-A3: Service Chat Persistence (Manager)
+// ============================================
+
+/** Service chat title convention: __service:{context} */
+const SERVICE_CHAT_TITLE_PREFIX = "__service:";
+
+/**
+ * ТЗ-A3: Get or create a persistent service chat for a project
+ * Used for Manager drawer — chat persists across sessions
+ */
+export async function getOrCreateManagerChat({
+  projectId,
+  userId,
+}: {
+  projectId: string;
+  userId: string;
+}) {
+  const title = `${SERVICE_CHAT_TITLE_PREFIX}project-manager`;
+
+  try {
+    // Find existing manager chat for this project
+    const [existing] = await db
+      .select()
+      .from(chat)
+      .where(and(
+        eq(chat.projectId, projectId),
+        eq(chat.title, title)
+      ))
+      .limit(1);
+
+    if (existing) return existing;
+
+    // Create new
+    const id = generateUUID();
+    const [newChat] = await db
+      .insert(chat)
+      .values({
+        id,
+        createdAt: new Date(),
+        userId,
+        title,
+        projectId,
+        visibility: "private",
+      })
+      .returning();
+
+    return newChat;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get or create manager chat"
+    );
+  }
+}
+
+/**
+ * ТЗ-A3: Find existing manager chat for a project (without creating)
+ * Used by GET endpoint to check if chat exists
+ */
+export async function findManagerChat({ projectId }: { projectId: string }) {
+  const title = `${SERVICE_CHAT_TITLE_PREFIX}project-manager`;
+
+  try {
+    const [existing] = await db
+      .select()
+      .from(chat)
+      .where(and(
+        eq(chat.projectId, projectId),
+        eq(chat.title, title)
+      ))
+      .limit(1);
+
+    return existing || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to find manager chat"
     );
   }
 }

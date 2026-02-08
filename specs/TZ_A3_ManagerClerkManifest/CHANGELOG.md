@@ -33,3 +33,37 @@
 - `getProjectFileById()` — получение файла по ID
 - `updateProjectFileMetadata()` — обновление metadata файла
 - `rebuildProjectManifest()` — сборка manifest из всех проанализированных файлов
+
+---
+
+## Этап 3: Менеджер в drawer (ServiceChat)
+
+**Дата:** 2026-02-08
+
+### Добавлено
+- Серверная персистенция сообщений Менеджера:
+  - `getOrCreateManagerChat()` — найти/создать Chat с title `__service:project-manager`
+  - `findManagerChat()` — поиск без создания
+  - Сохранение user-сообщений до стриминга, assistant-сообщений после `result.text`
+- `GET /api/service-chat` — загрузка персистированных сообщений при открытии drawer
+- Полный prompt builder для Менеджера:
+  - Загрузка базового промпта из `project-manager.md`
+  - `buildFullManagerPrompt()` — async сборка с данными проекта
+  - Conditional mode injection по `project.phase` (first_contact / stubs для plan_presentation и navigation)
+  - Context injection: passport (name, description, context), manifest, files_status, professor_enabled
+- `ManagerChatContent` — компонент с fetch загрузкой сообщений и `ServiceChatCore`
+- Desktop lazy mount: render на первом открытии, далее keep mounted
+- Mobile: re-mount через vaul при каждом открытии
+
+### Изменено
+- `manager-drawer.tsx` — полная замена заглушки на живой AI-диалог
+- `service-chat-core.tsx` — поддержка `loadedMessages` (greeting + server messages)
+- `types.ts` — добавлен `loadedMessages` prop в `ServiceChatCoreProps`
+- `project-page-layout.tsx` — передача `projectId` в ManagerDrawer
+- `projects/[id]/page.tsx` — передача `projectId` в layout
+- `service-chat/route.ts` — async `buildSystemPrompt`, temperature 0.5 для manager
+
+### Фильтрация service-чатов
+- `getChatsByProjectId` — фильтрация `__service:*` из списка чатов проекта
+- `getProjectChatsWithStats` — аналогичная фильтрация
+- `getProjectChatsCount` — аналогичная фильтрация

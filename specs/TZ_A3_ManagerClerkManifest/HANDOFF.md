@@ -1,7 +1,7 @@
 # Передача сессии ТЗ-A3: Manager + Clerk + Manifest
 
 **Последнее обновление:** 2026-02-08
-**Сессия:** 2 (разработка — Этапы 1-2)
+**Сессия:** 3 (разработка — Этап 3)
 
 ---
 
@@ -9,8 +9,8 @@
 
 - [x] Этап 1: Фундамент (БД + промпты) ✅
 - [x] Этап 2: Клерк-анализатор (backend) ✅ протестирован
-- [ ] Этап 3: Менеджер в drawer (ServiceChat) ← СЛЕДУЮЩИЙ
-- [ ] Этап 4: Frontend связка (auto-analyze + UI)
+- [x] Этап 3: Менеджер в drawer (ServiceChat) ✅ протестирован
+- [ ] Этап 4: Frontend связка (auto-analyze + UI) ← СЛЕДУЮЩИЙ
 - [ ] Этап 5: Финализация
 
 ---
@@ -18,20 +18,45 @@
 ## Следующая сессия: начни с
 
 1. Прочитай этот файл (HANDOFF.md)
-2. Прочитай ROADMAP.md — Этап 3 (подробный план задач и валидации)
-3. Прочитай MANAGER_PROMPT.md — промпт Менеджера (3 режима: first_contact, plan_presentation, navigation)
-4. **Изучи файлы перед изменением:**
-   - `components/projects/manager-drawer.tsx` — заглушка на строках ~47-68 (заменить на ServiceChatCore)
-   - `app/(chat)/api/service-chat/route.ts` — текущий buildProjectManagerPrompt() — inline заглушка, заменить на полноценный
-   - `components/service-chat/service-chat-core.tsx` — как ServiceChatCore принимает конфиг
-   - `components/service-chat/configs/project-manager.ts` — существующий конфиг
-5. **Ключевые задачи Этапа 3:**
-   - Серверная персистенция: Chat запись в БД (type: service-chat, привязка к проекту)
-   - Заменить заглушку в manager-drawer на ServiceChatCore
-   - buildManagerPrompt(): загрузить .md из файла + conditional mode injection по phase
-   - Context injection: passport (name, description, context), manifest, phase, professorEnabled
-   - Загрузить/создать Chat для персистенции сообщений
-6. **ВАЖНО:** Следуй ROADMAP.md пошагово — коммит после этапа, валидация, CHANGELOG, HANDOFF
+2. Прочитай ROADMAP.md — Этап 4 (подробный план задач и валидации)
+3. **Изучи файлы перед изменением:**
+   - `components/projects/project-files-card.tsx` — добавить fire-and-forget вызов analyze-file после upload
+   - `components/projects/phase-states/welcome-state.tsx` — адаптивная кнопка «Начать планирование»
+   - `components/projects/project-pulse.tsx` — показ описаний файлов (опционально)
+   - `app/(chat)/api/projects/[id]/analyze-file/route.ts` — уже готовый endpoint Клерка (Этап 2)
+4. **Ключевые задачи Этапа 4:**
+   - После upload файла: fire-and-forget `POST /api/projects/${projectId}/analyze-file` с `{ fileId }`
+   - UI индикатор анализа (spinner/пульсация → описание)
+   - Обновить файл в локальном state после ответа (новая папка, описание)
+   - Адаптивная кнопка «Начать планирование» / «Начать планирование без документов»
+   - onClick → PATCH phase: `documents → planning`
+5. **ВАЖНО:** Следуй ROADMAP.md пошагово — коммит после этапа, валидация, CHANGELOG, HANDOFF
+
+---
+
+## Что сделано в сессии 3
+
+### Этап 3: Менеджер в drawer (ServiceChat)
+- **Серверная персистенция:** `getOrCreateManagerChat()`, `findManagerChat()` в queries.ts
+- Конвенция title: `__service:project-manager` — фильтрация из обычных чатов проекта
+- **GET /api/service-chat** — загрузка сохранённых сообщений при открытии drawer
+- **POST /api/service-chat** — расширен: загрузка промпта из .md, async `buildSystemPrompt`, сохранение сообщений
+- `buildFullManagerPrompt()` — сборка промпта с passport, manifest, files_status, mode injection по phase
+- 3 mode injection: `buildFirstContactMode()` (полный), `buildPlanPresentationStub()`, `buildNavigationStub()`
+- `manager-drawer.tsx` — полная замена заглушки на `ServiceChatCore`
+  - Desktop: lazy mount (hasOpened), Mobile: re-mount через vaul
+  - `ManagerChatContent` — fetch messages → ServiceChatCore
+- `service-chat-core.tsx` — `loadedMessages` prop, greeting + server messages как initialMessages
+- `types.ts` — `loadedMessages` prop
+- `project-page-layout.tsx` + `projects/[id]/page.tsx` — projectId проброс
+- Фильтрация `__service:*` в 3 функциях: getChatsByProjectId, getProjectChatsWithStats, getProjectChatsCount
+- **Валидация:** tsc 0 ошибок, build успешен
+- **Мануальный тест пройден:**
+  - Менеджер приветствует, знает проект (passport), видит manifest
+  - Streaming ответы работают
+  - Закрытие/открытие drawer — сообщения сохранены
+  - Перезагрузка страницы — сообщения загружаются с сервера
+  - Quick actions работают
 
 ---
 
@@ -97,10 +122,12 @@
 
 ## Что уже есть в коде
 
-- **ManagerDrawer** (`components/projects/manager-drawer.tsx`) — UI каркас, заглушка внутри (заменить на ServiceChatCore)
+- **ManagerDrawer** (`components/projects/manager-drawer.tsx`) — ✅ живой AI-диалог через ServiceChatCore (Этап 3)
 - **ServiceChat система** — полностью работает (core, drawer, floating, configs)
 - **project-manager config** (`components/service-chat/configs/project-manager.ts`) — есть, shell: drawer
-- **ServiceChat API** (`app/(chat)/api/service-chat/route.ts`) — работает, context routing, нужно расширить
+- **ServiceChat API** (`app/(chat)/api/service-chat/route.ts`) — ✅ GET + POST, persistence, full prompt builder (Этап 3)
+- **Серверная персистенция Менеджера** — ✅ `getOrCreateManagerChat`, title convention `__service:*` (Этап 3)
+- **Context injection Менеджера** — ✅ passport, manifest, phase, mode injection (Этап 3)
 - **Загрузка файлов** — работает, content extraction
 - **ProjectFile/Folder** — таблицы в БД, CRUD, UI
 - **project-files-card** — upload handler (после upload добавить trigger analyze-file)
@@ -109,12 +136,10 @@
 - **manifestJson в БД** — ✅ готов (Этап 1)
 - **Промпты Клерка и Менеджера** — ✅ готовы (Этап 1)
 
-## Чего НЕТ в коде (надо создать в Этапе 3+)
+## Чего НЕТ в коде (надо создать в Этапе 4)
 
-- Context injection для Менеджера (passport, manifest, phase) — не реализовано
-- Серверная персистенция для service-chat Менеджера — не реализована
-- buildManagerPrompt() в server.ts — не реализован
 - Frontend trigger analyze-file после upload — не реализован
+- UI индикатор анализа (spinner → описание) — не реализован
 - Адаптивная кнопка «Начать планирование» — не реализована
 
 ---

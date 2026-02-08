@@ -14,6 +14,7 @@ import {
 import { ManagerDrawer } from "./manager-drawer";
 
 interface ProjectPageLayoutProps {
+  projectId: string;
   headerLeft: ReactNode;
   pulse: ReactNode;
   workArea: ReactNode;
@@ -29,6 +30,7 @@ interface ProjectPageLayoutProps {
  * - Mobile: Пульс в bottom sheet, Drawer в bottom sheet
  */
 export function ProjectPageLayout({
+  projectId,
   headerLeft,
   pulse,
   workArea,
@@ -90,7 +92,7 @@ export function ProjectPageLayout({
         </main>
 
         {/* Manager Drawer */}
-        <ManagerDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+        <ManagerDrawer open={drawerOpen} onOpenChange={setDrawerOpen} projectId={projectId} />
       </div>
     </div>
   );

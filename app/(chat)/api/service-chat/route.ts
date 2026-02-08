@@ -4,9 +4,10 @@
  * Unified streaming chat endpoint for all service assistants:
  * - ben: Help assistant
  * - project-creation: AI-assisted project creation
- * - project-manager: Project management tasks
+ * - project-manager: Project management tasks (ТЗ-A3: with persistence + context injection)
  *
  * ТЗ-09: ServiceChat унификация
+ * ТЗ-A3: Manager persistence + prompt from .md + mode injection
  */
 
 import fs from "fs";
@@ -16,19 +17,29 @@ import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { myProvider } from "@/lib/ai/providers";
 import { buildBenPrompt } from "@/lib/prompts/server";
-import { getUserById } from "@/lib/db/queries";
+import {
+  getUserById,
+  getProjectById,
+  getFilesByProjectId,
+  getOrCreateManagerChat,
+  findManagerChat,
+  saveMessages,
+  getMessagesByChatId,
+} from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
+import { generateUUID } from "@/lib/utils";
+import type { Project } from "@/lib/db/schema";
 
-// Load Secretary prompt template from .md file (ТЗ-12)
-const SECRETARY_PROMPT_PATH = path.join(
-  process.cwd(),
-  "lib",
-  "prompts",
-  "service-chats",
-  "project-creation.md"
-);
+// Load prompt templates from .md files
+const PROMPTS_DIR = path.join(process.cwd(), "lib", "prompts", "service-chats");
+
 const SECRETARY_PROMPT_TEMPLATE = fs.readFileSync(
-  SECRETARY_PROMPT_PATH,
+  path.join(PROMPTS_DIR, "project-creation.md"),
+  "utf-8"
+);
+
+const MANAGER_PROMPT_TEMPLATE = fs.readFileSync(
+  path.join(PROMPTS_DIR, "project-manager.md"),
   "utf-8"
 );
 
@@ -99,27 +110,27 @@ function getModelId(context: ServiceChatContext): string {
 /**
  * Build system prompt based on context
  */
-function buildSystemPrompt(
+async function buildSystemPrompt(
   context: ServiceChatContext,
   options: {
     userName?: string;
     userOccupation?: string;
     userPronouns?: string;
     userBio?: string;
-    projectName?: string;
+    projectId?: string;
   } = {}
-): string {
+): Promise<string> {
   switch (context) {
-    case "ben":
-      // Use existing Ben prompt builder
+    case "ben": {
       const benPrompt = buildBenPrompt({}, false);
       return benPrompt.systemPrompt;
+    }
 
     case "project-creation":
       return buildProjectCreationPrompt(options);
 
     case "project-manager":
-      return buildProjectManagerPrompt(options);
+      return await buildFullManagerPrompt(options.projectId);
 
     default:
       return "Ты — AI-помощник Simply.";
@@ -128,9 +139,6 @@ function buildSystemPrompt(
 
 /**
  * Build project creation prompt — Secretary (ТЗ-12)
- *
- * Загружает XML-промпт из .md файла, подставляет динамический <user_context>.
- * Пустые поля профиля не включаются в промпт.
  */
 function buildProjectCreationPrompt(options: {
   userName?: string;
@@ -138,7 +146,6 @@ function buildProjectCreationPrompt(options: {
   userPronouns?: string;
   userBio?: string;
 }): string {
-  // Динамический <user_context> — пустые поля не включать
   const contextLines: string[] = [];
   if (options.userName) contextLines.push(`Имя: ${options.userName}`);
   if (options.userPronouns) contextLines.push(`Обращение: ${options.userPronouns}`);
@@ -152,37 +159,232 @@ function buildProjectCreationPrompt(options: {
   return SECRETARY_PROMPT_TEMPLATE.replace("{{USER_CONTEXT}}", userContextBlock);
 }
 
+// ============================================================================
+// ТЗ-A3: Manager Prompt Builder (from .md template + mode injection)
+// ============================================================================
+
 /**
- * Build project manager prompt
+ * Build full manager prompt: base template + mode injection based on project phase
  */
-function buildProjectManagerPrompt(options: {
-  userName?: string;
-  projectName?: string;
-}): string {
-  const projectName = options.projectName || "этот проект";
+async function buildFullManagerPrompt(projectId?: string): Promise<string> {
+  if (!projectId) {
+    // Fallback if no projectId (shouldn't happen in normal flow)
+    return MANAGER_PROMPT_TEMPLATE.replace("{{MODE_INJECTION}}", "");
+  }
 
-  return `Ты — менеджер проекта "${projectName}" в Simply. Помогаешь пользователю организовать работу.
+  // Load project data
+  const projectData = await getProjectById({ id: projectId });
+  if (!projectData) {
+    return MANAGER_PROMPT_TEMPLATE.replace("{{MODE_INJECTION}}", "");
+  }
 
-## Твои возможности
+  // Count files for context
+  const files = await getFilesByProjectId({ projectId });
+  const fileCount = files.length;
 
-- Разобрать файлы по папкам
-- Подвести итог по проекту
-- Обновить инструкцию проекта
-- Разбить цель на конкретные задачи
-- Ответить на вопросы о проекте
+  // Build mode injection based on phase
+  const modeInjection = buildModeInjection(projectData, fileCount);
 
-## Правила
-
-- Будь конкретным и действенным
-- Предлагай конкретные шаги
-- Говори на русском языке
-- Обращайся на "ты"
-
-## Примечание
-
-В текущей версии у тебя пока нет доступа к инструментам для модификации проекта.
-Ты можешь давать советы и рекомендации, которые пользователь применит вручную.`;
+  return MANAGER_PROMPT_TEMPLATE.replace("{{MODE_INJECTION}}", modeInjection);
 }
+
+/**
+ * Route to correct mode injection based on project phase
+ */
+function buildModeInjection(project: Project, fileCount: number): string {
+  const phase = project.phase;
+
+  if (phase === "setup" || phase === "documents" || phase === "planning") {
+    return buildFirstContactMode(project, fileCount);
+  } else if (phase === "approved") {
+    return buildPlanPresentationStub(project);
+  } else if (phase === "execution" || phase === "completed") {
+    return buildNavigationStub(project);
+  }
+
+  // Default to first_contact
+  return buildFirstContactMode(project, fileCount);
+}
+
+/**
+ * Mode 1: First Contact (phase = setup/documents/planning)
+ * Manager greets user, shows file summary, suggests next steps
+ */
+function buildFirstContactMode(project: Project, fileCount: number): string {
+  // Build passport section
+  const passportParts = [project.name];
+  if (project.description) passportParts.push(project.description);
+  if (project.context) passportParts.push(project.context);
+
+  const passport = `<project_passport>\n${passportParts.join("\n")}\n</project_passport>`;
+
+  // Build files status section
+  let filesStatus: string;
+  const manifest = project.manifestJson;
+  const hasManifestFiles = manifest && manifest.files && manifest.files.length > 0;
+
+  if (fileCount === 0) {
+    filesStatus = `<files_status>\n<no_files>Пользователь ещё не загружал файлы в проект.</no_files>\n</files_status>`;
+  } else if (!hasManifestFiles) {
+    filesStatus = `<files_status>\n<no_files>Файлы загружены (${fileCount}), но ещё не проанализированы.</no_files>\n</files_status>`;
+  } else {
+    const manifestFiles = manifest.files;
+
+    // Count files per folder
+    const folderCounts = new Map<string, number>();
+    const unclearFiles: string[] = [];
+    for (const f of manifestFiles) {
+      folderCounts.set(f.folder, (folderCounts.get(f.folder) || 0) + 1);
+      if (f.relevance === "unclear") {
+        unclearFiles.push(f.name);
+      }
+    }
+
+    const foldersStr = Array.from(folderCounts.entries())
+      .map(([folder, count]) => `  ${folder}: ${count} файл(ов)`)
+      .join("\n");
+
+    const unclearStr = unclearFiles.length > 0
+      ? `  Требуют уточнения: ${unclearFiles.join(", ")}`
+      : "  Требуют уточнения: нет";
+
+    filesStatus = `<files_status>
+<manifest>
+${JSON.stringify(manifestFiles, null, 2)}
+</manifest>
+<file_stats>
+  Всего файлов: ${manifestFiles.length}
+  Папки:
+${foldersStr}
+${unclearStr}
+</file_stats>
+</files_status>`;
+  }
+
+  // Professor: not yet implemented for manager context
+  const professorEnabled = false;
+
+  return `<current_phase>first_contact</current_phase>
+
+${passport}
+
+${filesStatus}
+
+<professor_enabled>${professorEnabled}</professor_enabled>
+
+<mode_instructions>
+Это первый контакт с пользователем в проекте. Твои задачи:
+
+1. ПОКАЖИ ЧТО ПОНЯЛ ПРОЕКТ. Упомяни 1-2 конкретные детали из паспорта. Не пересказывай весь паспорт — покажи что вник. Например: «Вижу, что проект про рекламное агентство с фокусом на SEO и брендинг. Серьёзная задача.»
+
+2. ПОКАЖИ СОСТОЯНИЕ ФАЙЛОВ (если есть).
+   - Если файлов нет: предложи загрузить. «Для серьёзного планирования пригодятся материалы — документы, данные, примеры. Загрузите что есть, я разберу.»
+   - Если файлы разобраны: покажи краткую сводку. Сколько файлов, как разложены по папкам. Если есть файлы с relevance "unclear" — спроси про них конкретно: «Файл "записки.txt" — это рабочий материал или личные заметки?»
+   - НЕ перечисляй каждый файл. Пользователь видит их в панели «Файлы» слева.
+
+3. ОБЪЯСНИ РЕЖИМ ПРОФЕССОРА (если professor_enabled = true).
+
+4. ПРЕДЛОЖИ СЛЕДУЮЩИЙ ШАГ.
+   - Если файлов нет: «Загрузите материалы — или можем начать планирование с тем что есть.»
+   - Если файлы есть и разобраны: «Материалы разобраны. Готовы к планированию?»
+   - Если есть unclear файлы: сначала уточни их, потом предложи планирование.
+
+НЕ перечисляй все четыре пункта как список. Это должно звучать как естественный разговор — приветствие, пара фраз о проекте, предложение.
+</mode_instructions>`;
+}
+
+/**
+ * Mode 2: Plan Presentation (phase = approved) — stub for ТЗ-B1
+ */
+function buildPlanPresentationStub(project: Project): string {
+  return `<current_phase>plan_presentation</current_phase>
+
+<project_passport>
+${project.name}
+${project.description || ""}
+</project_passport>
+
+<mode_instructions>
+Режим представления плана будет реализован в следующем обновлении.
+Пока помогай пользователю с общими вопросами о проекте, объясняй что планирование скоро будет доступно.
+</mode_instructions>`;
+}
+
+/**
+ * Mode 3: Navigation (phase = execution/completed) — stub for ТЗ-C1
+ */
+function buildNavigationStub(project: Project): string {
+  return `<current_phase>navigation</current_phase>
+
+<project_passport>
+${project.name}
+${project.description || ""}
+</project_passport>
+
+<mode_instructions>
+Режим навигации будет реализован в следующем обновлении.
+Пока помогай пользователю с общими вопросами о проекте и его текущем состоянии.
+</mode_instructions>`;
+}
+
+// ============================================================================
+// GET /api/service-chat — Load persisted messages
+// ============================================================================
+
+/**
+ * GET /api/service-chat?context=project-manager&projectId=xxx
+ * Returns saved messages for a persistent service chat
+ */
+export async function GET(request: Request) {
+  try {
+    const session = await auth();
+
+    if (!session?.user) {
+      return new ChatSDKError("unauthorized:chat").toResponse();
+    }
+
+    const url = new URL(request.url);
+    const context = url.searchParams.get("context");
+    const projectId = url.searchParams.get("projectId");
+
+    if (context === "project-manager" && projectId) {
+      const managerChat = await findManagerChat({ projectId });
+
+      if (!managerChat) {
+        return Response.json({ messages: [] });
+      }
+
+      // Load messages (reuse existing function with relaxed limits for service chats)
+      const dbMessages = await getMessagesByChatId({
+        id: managerChat.id,
+        maxTokens: 50000,
+        minMessages: 50,
+        maxMessages: 100,
+      });
+
+      // Convert to useChat-compatible format
+      const messages = dbMessages.map((msg) => ({
+        id: msg.id,
+        role: msg.role,
+        parts: msg.parts,
+      }));
+
+      return Response.json({ chatId: managerChat.id, messages });
+    }
+
+    return Response.json({ messages: [] });
+  } catch (error) {
+    console.error("[ServiceChat GET] Error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to load messages" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}
+
+// ============================================================================
+// POST /api/service-chat — Streaming chat with optional persistence
+// ============================================================================
 
 /**
  * POST /api/service-chat
@@ -202,7 +404,7 @@ export async function POST(request: Request) {
       return new ChatSDKError("bad_request:api").toResponse();
     }
 
-    const { messages, context, projectId, isFirstTime } = parsed.data;
+    const { messages, context, projectId } = parsed.data;
     const userId = session.user.id!;
 
     // Get user profile
@@ -212,12 +414,13 @@ export async function POST(request: Request) {
     const userPronouns = user?.pronouns || undefined;
     const userBio = user?.bio || undefined;
 
-    // Build system prompt
-    const systemPrompt = buildSystemPrompt(context, {
+    // Build system prompt (async for project-manager which loads project data)
+    const systemPrompt = await buildSystemPrompt(context, {
       userName,
       userOccupation,
       userPronouns,
       userBio,
+      projectId,
     });
 
     // Get model
@@ -250,7 +453,6 @@ export async function POST(request: Request) {
           "Обновить черновик проекта. Вызывай по мере получения информации — не жди всех данных. Можно вызывать несколько раз для уточнения.",
         inputSchema: updateProjectDraftSchema,
         execute: async (input: z.infer<typeof updateProjectDraftSchema>) => {
-          // Не создаём проект — просто возвращаем данные для frontend
           return {
             success: true,
             draft: {
@@ -261,6 +463,30 @@ export async function POST(request: Request) {
           };
         },
       });
+    }
+
+    // ТЗ-A3: Server persistence for project-manager
+    let managerChatId: string | null = null;
+    if (context === "project-manager" && projectId) {
+      const managerChat = await getOrCreateManagerChat({ projectId, userId });
+      managerChatId = managerChat.id;
+
+      // Save the new user message (last in the messages array)
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.role === "user") {
+        const userText = extractMessageContent(lastMessage);
+        await saveMessages({
+          messages: [{
+            id: lastMessage.id || generateUUID(),
+            chatId: managerChatId,
+            role: "user",
+            parts: [{ type: "text", text: userText }],
+            attachments: [],
+            createdAt: new Date(),
+            tokenCount: 0,
+          }],
+        });
+      }
     }
 
     // Transform messages to content format for streamText
@@ -275,9 +501,31 @@ export async function POST(request: Request) {
       system: systemPrompt,
       messages: transformedMessages,
       tools: Object.keys(tools).length > 0 ? tools : undefined,
-      stopWhen: stepCountIs(3), // Allow tool execution and follow-up response
-      temperature: 1.0,
+      stopWhen: stepCountIs(3),
+      temperature: context === "project-manager" ? 0.5 : 1.0,
     });
+
+    // ТЗ-A3: Save assistant response after streaming completes
+    if (managerChatId) {
+      const chatId = managerChatId;
+      result.text.then(async (fullText) => {
+        if (fullText) {
+          await saveMessages({
+            messages: [{
+              id: generateUUID(),
+              chatId,
+              role: "assistant",
+              parts: [{ type: "text", text: fullText }],
+              attachments: [],
+              createdAt: new Date(),
+              tokenCount: 0,
+            }],
+          });
+        }
+      }).catch((err) => {
+        console.error("[ServiceChat] Failed to save assistant message:", err);
+      });
+    }
 
     return result.toUIMessageStreamResponse();
   } catch (error) {

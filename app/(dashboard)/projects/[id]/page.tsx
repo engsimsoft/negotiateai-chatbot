@@ -71,6 +71,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
   return (
     <ProjectPageLayout
+      projectId={id}
       headerLeft={
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" asChild className="gap-1.5">

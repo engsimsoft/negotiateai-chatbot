@@ -79,6 +79,16 @@ export interface ServiceChatCoreProps {
   onQuickAction?: (action: QuickAction) => void;
   /** Custom className for the container */
   className?: string;
+  /**
+   * ТЗ-A3: Pre-loaded messages from server (for persistent service chats).
+   * When provided, these are used as initial messages for useChat (after greeting).
+   * Format: useChat-compatible messages with id, role, parts.
+   */
+  loadedMessages?: Array<{
+    id: string;
+    role: string;
+    parts: unknown;
+  }>;
 }
 
 /**
