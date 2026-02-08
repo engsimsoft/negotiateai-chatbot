@@ -10,6 +10,7 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  Brain,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -21,6 +22,8 @@ import {
 import { ProjectFilesCard } from "@/components/projects/project-files-card";
 import { cn } from "@/lib/utils";
 import type { ProjectFile, ProjectFolder } from "@/lib/db/schema";
+import type { ProfessorPlanJson } from "@/lib/ai/professor-types";
+import { isPlanWithTasks } from "@/lib/ai/professor-types";
 
 type TaskStatus = "not_started" | "in_progress" | "done";
 
@@ -34,9 +37,11 @@ interface Task {
 
 interface ProjectPulseProps {
   projectId: string;
+  phase: string;
   tasks: Task[];
   files: ProjectFile[];
   folders: ProjectFolder[];
+  planJson: ProfessorPlanJson | null;
   // Passport data
   projectName: string;
   description: string | null;
@@ -97,9 +102,11 @@ function SectionHeader({
  */
 export function ProjectPulse({
   projectId,
+  phase,
   tasks,
   files,
   folders,
+  planJson,
   projectName,
   description,
   instruction,
@@ -110,7 +117,12 @@ export function ProjectPulse({
   const [filesOpen, setFilesOpen] = useState(true);
   const [passportOpen, setPassportOpen] = useState(false);
 
-  // Status counts for plan section
+  // Plan tasks from Professor (planning phase)
+  const hasPlanTasks = planJson && isPlanWithTasks(planJson);
+  const planTasks = hasPlanTasks ? planJson.tasks : [];
+  const isPlanning = phase === "planning";
+
+  // Status counts for execution-phase tasks
   const statusCounts = tasks.reduce(
     (acc, task) => {
       const status = task.taskStatus || "not_started";
@@ -120,6 +132,9 @@ export function ProjectPulse({
     { done: 0, in_progress: 0, not_started: 0 } as Record<TaskStatus, number>
   );
 
+  // Determine plan section count
+  const planCount = isPlanning ? planTasks.length : tasks.length;
+
   return (
     <div className="flex flex-col">
       {/* ═══════════════ Section 1: План ═══════════════ */}
@@ -128,14 +143,36 @@ export function ProjectPulse({
           <SectionHeader
             icon={ListTodo}
             title="План"
-            count={tasks.length}
+            count={planCount || undefined}
             isOpen={planOpen}
           />
         </div>
 
         <CollapsibleContent>
           <div className="border-b">
-            {tasks.length === 0 ? (
+            {isPlanning ? (
+              /* Planning phase: show professor's planned tasks or analyzing state */
+              hasPlanTasks ? (
+                <div className="py-1">
+                  {planTasks.map((task) => (
+                    <div
+                      key={task.order}
+                      className="flex items-center gap-2.5 px-4 py-2 text-sm"
+                    >
+                      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                        {task.order}
+                      </span>
+                      <span className="flex-1 truncate">{task.title}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 px-4 py-6 justify-center text-sm text-muted-foreground">
+                  <Brain className="size-4 animate-pulse" />
+                  <span>Анализ проекта...</span>
+                </div>
+              )
+            ) : tasks.length === 0 ? (
               <div className="px-4 py-6 text-center text-sm text-muted-foreground">
                 Нет задач. Создайте первую задачу в рабочей области.
               </div>

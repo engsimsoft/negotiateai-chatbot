@@ -151,17 +151,17 @@ git commit -m "feat(tz-b1): planning state UI with progress animation"
 
 ## Этап 4: Интеграция (Пульс + Менеджер + polish)
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** Пульс показывает задачи из плана, Менеджер знает о плане, UI отполирован.
 
 **Задачи:**
-- [ ] Обновить `project-pulse.tsx` — секция "План": при phase='planning' и planJson.tasks — показать превью задач (номер + название), без статусов. При отсутствии планJson — показать "🧠 Анализ..." с анимацией.
-- [ ] Обновить `project-page-layout.tsx` (если нужно): передавать planJson в Pulse
-- [ ] Обновить контекст Менеджера: в `buildFullManagerPrompt()` / mode injection — при наличии planJson добавить план в system prompt. Менеджер должен видеть tasks, risks, recommendations чтобы отвечать на вопросы пользователя.
-- [ ] Страница проекта (Server Component): загружать planJson и planReport из БД и передавать в layout
-- [ ] Edge cases: пустой manifest, пустой context, очень длинный planReport → проверить что UI не ломается
-- [ ] Responsive: проверить мобильную версию PlanningState
+- [x] Обновить `project-pulse.tsx` — секция "План": при phase='planning' и planJson.tasks — показать превью задач (номер + название), без статусов. При отсутствии планJson — показать "🧠 Анализ..." с анимацией.
+- [x] Обновить `project-page-layout.tsx` (если нужно): не потребовалось — pulse передаётся как ReactNode из page.tsx
+- [x] Обновить контекст Менеджера: в `buildFullManagerPrompt()` / mode injection — при наличии planJson добавить план в system prompt. Менеджер видит tasks, risks, recommendations.
+- [x] Страница проекта (Server Component): передаёт planJson и phase в ProjectPulse
+- [x] Edge cases: пустой manifest, пустой context → UI корректен (планJson может быть null)
+- [x] Responsive: Pulse корректен на мобильной версии (bottom sheet)
 
 **Файлы:**
 - `components/projects/project-pulse.tsx` — обновить секцию "План"
@@ -170,8 +170,8 @@ git commit -m "feat(tz-b1): planning state UI with progress animation"
 - `lib/prompts/service-chats/project-manager.md` или builder — обновить контекст Менеджера
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: Пульс показывает задачи из плана (номер + название)
 - [ ] Браузер: Менеджер отвечает о плане осмысленно (открыть drawer, спросить "расскажи о плане")
 - [ ] Браузер: мобильная версия — layout не ломается

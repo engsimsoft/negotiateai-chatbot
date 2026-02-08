@@ -93,9 +93,11 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       pulse={
         <ProjectPulse
           projectId={id}
+          phase={currentPhase}
           tasks={tasks}
           files={files}
           folders={folders}
+          planJson={(project.planJson as ProfessorPlanJson) ?? null}
           projectName={project.name}
           description={project.description}
           instruction={project.instruction}

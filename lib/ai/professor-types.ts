@@ -9,14 +9,14 @@ import { z } from "zod";
 export const professorTaskSchema = z.object({
   order: z.number(),
   title: z.string(),
-  description: z.string(),
-  goal: z.string(),
-  input: z.string(),
-  expectedOutput: z.string(),
-  dependencies: z.array(z.number()),
-  tools: z.array(z.string()),
-  needsReview: z.boolean(),
-  reviewReason: z.string(),
+  description: z.string().optional().default(""),
+  goal: z.string().optional().default(""),
+  input: z.string().optional().default(""),
+  expectedOutput: z.string().optional().default(""),
+  dependencies: z.array(z.number()).optional().default([]),
+  tools: z.array(z.string()).optional().default([]),
+  needsReview: z.boolean().optional().default(false),
+  reviewReason: z.string().optional().default(""),
 });
 
 export type ProfessorTask = z.infer<typeof professorTaskSchema>;
@@ -25,8 +25,11 @@ export type ProfessorTask = z.infer<typeof professorTaskSchema>;
 
 export const professorRiskSchema = z.object({
   description: z.string(),
-  severity: z.enum(["low", "medium", "high"]),
-  mitigation: z.string(),
+  severity: z.string().transform(s => {
+    if (["low", "medium", "high"].includes(s)) return s as "low" | "medium" | "high";
+    return "medium" as const;
+  }),
+  mitigation: z.string().optional().default(""),
 });
 
 export type ProfessorRisk = z.infer<typeof professorRiskSchema>;
@@ -34,9 +37,12 @@ export type ProfessorRisk = z.infer<typeof professorRiskSchema>;
 // --- Recommendation ---
 
 export const professorRecommendationSchema = z.object({
-  type: z.enum(["connect_tool", "upload_data", "clarify"]),
+  type: z.string().transform(s => {
+    if (["connect_tool", "upload_data", "clarify"].includes(s)) return s as "connect_tool" | "upload_data" | "clarify";
+    return "clarify" as const;
+  }),
   description: z.string(),
-  impact: z.string(),
+  impact: z.string().optional().default(""),
 });
 
 export type ProfessorRecommendation = z.infer<typeof professorRecommendationSchema>;
@@ -56,8 +62,8 @@ export type ProfessorCaveat = z.infer<typeof professorCaveatSchema>;
 
 export const professorQuestionSchema = z.object({
   question: z.string(),
-  why: z.string(),
-  blocking: z.boolean(),
+  why: z.string().optional().default(""),
+  blocking: z.boolean().optional().default(true),
 });
 
 export type ProfessorQuestion = z.infer<typeof professorQuestionSchema>;
@@ -72,16 +78,16 @@ export const needsInputPlanSchema = z.object({
 export const completePlanSchema = z.object({
   status: z.literal("complete"),
   tasks: z.array(professorTaskSchema),
-  risks: z.array(professorRiskSchema),
-  recommendations: z.array(professorRecommendationSchema),
+  risks: z.array(professorRiskSchema).optional().default([]),
+  recommendations: z.array(professorRecommendationSchema).optional().default([]),
 });
 
 export const partialPlanSchema = z.object({
   status: z.literal("partial"),
   tasks: z.array(professorTaskSchema),
-  risks: z.array(professorRiskSchema),
-  recommendations: z.array(professorRecommendationSchema),
-  caveats: z.array(professorCaveatSchema),
+  risks: z.array(professorRiskSchema).optional().default([]),
+  recommendations: z.array(professorRecommendationSchema).optional().default([]),
+  caveats: z.array(professorCaveatSchema).optional().default([]),
 });
 
 // --- Union ---

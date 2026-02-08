@@ -1202,26 +1202,39 @@ export async function deleteProjectById({ id }: { id: string }) {
 
     const chatIds = projectChats.map((c) => c.id);
 
-    // Delete messages and votes for project chats
+    // Delete all chat-dependent records
     if (chatIds.length > 0) {
-      // Delete votes first (FK constraint)
+      // Delete streams (FK: Stream.chatId → Chat.id)
+      await db.delete(stream).where(inArray(stream.chatId, chatIds));
+
+      // Delete votes (FK: Vote_v2.chatId → Chat.id)
       await db.delete(vote).where(inArray(vote.chatId, chatIds));
 
-      // Delete messages
+      // Delete messages (FK: Message_v2.chatId → Chat.id)
       await db.delete(message).where(inArray(message.chatId, chatIds));
+
+      // Delete legacy Vote/Message if they exist
+      for (const chatId of chatIds) {
+        await db.execute(sql`DELETE FROM "Vote" WHERE "chatId" = ${chatId}`);
+        await db.execute(sql`DELETE FROM "Message" WHERE "chatId" = ${chatId}`);
+      }
 
       // Delete chats
       await db.delete(chat).where(inArray(chat.id, chatIds));
     }
 
-    // Delete project files
+    // Delete project files (before folders due to FK: projectFile.folderId → projectFolder.id)
     await db.delete(projectFile).where(eq(projectFile.projectId, id));
+
+    // Delete project folders
+    await db.delete(projectFolder).where(eq(projectFolder.projectId, id));
 
     // Delete project
     await db.delete(project).where(eq(project.id, id));
 
     return { success: true };
-  } catch (_error) {
+  } catch (error) {
+    console.error("[deleteProjectById] Error:", error);
     throw new ChatSDKError("bad_request:database", "Failed to delete project");
   }
 }
@@ -1666,7 +1679,8 @@ export async function getChatsByProjectId({ projectId }: { projectId: string }) 
       .orderBy(desc(chat.createdAt));
 
     return chats;
-  } catch (_error) {
+  } catch (error) {
+    console.error("[getChatsByProjectId] Error:", error);
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get chats by project id"

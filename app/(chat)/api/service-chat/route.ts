@@ -261,8 +261,33 @@ ${unclearStr}
 </files_status>`;
   }
 
-  // Professor: not yet implemented for manager context
-  const professorEnabled = false;
+  // Professor plan context
+  const planData = project.planJson as Record<string, unknown> | null;
+  const hasPlan = planData && (planData.status === "complete" || planData.status === "partial");
+
+  let planSection = "";
+  if (hasPlan) {
+    const tasks = (planData.tasks as Array<{ order: number; title: string; goal: string; tools: string[]; needsReview: boolean }>) || [];
+    const risks = (planData.risks as Array<{ description: string; severity: string; mitigation: string }>) || [];
+    const recommendations = (planData.recommendations as Array<{ type: string; description: string; impact: string }>) || [];
+
+    const tasksList = tasks.map(t => `  ${t.order}. ${t.title} — ${t.goal}${t.needsReview ? " [требует проверки]" : ""} (инструменты: ${t.tools.join(", ")})`).join("\n");
+    const risksList = risks.map(r => `  - [${r.severity}] ${r.description} → ${r.mitigation}`).join("\n");
+    const recsList = recommendations.map(r => `  - [${r.type}] ${r.description} (${r.impact})`).join("\n");
+
+    planSection = `<professor_plan>
+<plan_status>${planData.status}</plan_status>
+<tasks>
+${tasksList}
+</tasks>
+<risks>
+${risksList}
+</risks>
+<recommendations>
+${recsList}
+</recommendations>
+</professor_plan>`;
+  }
 
   return `<current_phase>first_contact</current_phase>
 
@@ -270,7 +295,9 @@ ${passport}
 
 ${filesStatus}
 
-<professor_enabled>${professorEnabled}</professor_enabled>
+<professor_enabled>${hasPlan}</professor_enabled>
+
+${planSection}
 
 <mode_instructions>
 Это первый контакт с пользователем в проекте. Твои задачи:
@@ -282,14 +309,19 @@ ${filesStatus}
    - Если файлы разобраны: покажи краткую сводку. Сколько файлов, как разложены по папкам. Если есть файлы с relevance "unclear" — спроси про них конкретно: «Файл "записки.txt" — это рабочий материал или личные заметки?»
    - НЕ перечисляй каждый файл. Пользователь видит их в панели «Файлы» слева.
 
-3. ОБЪЯСНИ РЕЖИМ ПРОФЕССОРА (если professor_enabled = true).
+3. ЕСЛИ ЕСТЬ ПЛАН (professor_enabled = true):
+   - Ты знаешь план проекта — задачи, риски и рекомендации. Используй их при ответах на вопросы пользователя.
+   - Если пользователь спрашивает о плане — ссылайся на конкретные задачи, риски, рекомендации.
+   - Если plan_status = "partial" — предупреди что план составлен с оговорками, некоторые моменты требуют уточнения.
+   - НЕ пересказывай весь план целиком — пользователь видит его в рабочей области справа.
 
 4. ПРЕДЛОЖИ СЛЕДУЮЩИЙ ШАГ.
    - Если файлов нет: «Загрузите материалы — или можем начать планирование с тем что есть.»
-   - Если файлы есть и разобраны: «Материалы разобраны. Готовы к планированию?»
+   - Если файлы есть и план готов: «План составлен. Посмотрите его справа — если есть вопросы, обсудим.»
+   - Если файлы есть но плана нет: «Материалы разобраны. Готовы к планированию?»
    - Если есть unclear файлы: сначала уточни их, потом предложи планирование.
 
-НЕ перечисляй все четыре пункта как список. Это должно звучать как естественный разговор — приветствие, пара фраз о проекте, предложение.
+НЕ перечисляй все пункты как список. Это должно звучать как естественный разговор — приветствие, пара фраз о проекте, предложение.
 </mode_instructions>`;
 }
 
