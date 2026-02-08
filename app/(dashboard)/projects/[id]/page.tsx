@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { ProjectPageLayout } from "@/components/projects/project-page-layout";
 import { ProjectPulse } from "@/components/projects/project-pulse";
 import { ProjectWorkArea } from "@/components/projects/project-work-area";
+import type { ProfessorPlanJson } from "@/lib/ai/professor-types";
 
 interface ProjectPageProps {
   params: Promise<{ id: string }>;
@@ -108,6 +109,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           phase={currentPhase}
           tasks={tasks}
           hasFiles={files.length > 0}
+          planJson={(project.planJson as ProfessorPlanJson) ?? null}
+          planReport={project.planReport ?? null}
         />
       }
     />

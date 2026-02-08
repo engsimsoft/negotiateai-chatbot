@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { LayoutList, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,13 @@ export function ProjectPageLayout({
 }: ProjectPageLayoutProps) {
   const [pulseSheetOpen, setPulseSheetOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Listen for "open-manager-drawer" event from PlanningState
+  const openDrawer = useCallback(() => setDrawerOpen(true), []);
+  useEffect(() => {
+    window.addEventListener("open-manager-drawer", openDrawer);
+    return () => window.removeEventListener("open-manager-drawer", openDrawer);
+  }, [openDrawer]);
 
   return (
     <div className="flex h-svh flex-col overflow-hidden bg-muted/30">
