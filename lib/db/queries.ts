@@ -1099,6 +1099,35 @@ export async function updateProject({
 }
 
 /**
+ * ТЗ-A1: Update project phase
+ */
+export async function updateProjectPhase({
+  id,
+  phase,
+}: {
+  id: string;
+  phase: string;
+}) {
+  try {
+    const [updated] = await db
+      .update(project)
+      .set({
+        phase,
+        updatedAt: new Date(),
+      })
+      .where(eq(project.id, id))
+      .returning();
+
+    return updated;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update project phase"
+    );
+  }
+}
+
+/**
  * ТЗ-07C2: Update project summary (AI-generated from task summaries)
  */
 export async function updateProjectSummary({

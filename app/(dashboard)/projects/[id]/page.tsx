@@ -8,10 +8,12 @@ import {
   getFilesByProjectId,
   getChatsByProjectId,
   getProjectFolders,
+  updateProjectPhase,
 } from "@/lib/db/queries";
 import { Button } from "@/components/ui/button";
 import { ProjectPageLayout } from "@/components/projects/project-page-layout";
 import { ProjectPulse } from "@/components/projects/project-pulse";
+import { ProjectWorkArea } from "@/components/projects/project-work-area";
 
 interface ProjectPageProps {
   params: Promise<{ id: string }>;
@@ -41,6 +43,13 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
   if (project.userId !== session.user.id) {
     redirect("/dashboard");
+  }
+
+  // Auto-transition: setup → documents on first page load
+  let currentPhase = project.phase;
+  if (currentPhase === "setup") {
+    await updateProjectPhase({ id, phase: "documents" });
+    currentPhase = "documents";
   }
 
   const [files, chats, folders] = await Promise.all([
@@ -99,15 +108,12 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         />
       }
       workArea={
-        <div className="flex h-full items-center justify-center p-8">
-          <div className="text-center text-muted-foreground">
-            <FolderOpen className="mx-auto mb-4 size-12 opacity-30" />
-            <p className="text-lg font-medium">Рабочая область</p>
-            <p className="text-sm mt-1">
-              Здесь будет контент по фазе проекта (Этап 4)
-            </p>
-          </div>
-        </div>
+        <ProjectWorkArea
+          projectId={id}
+          phase={currentPhase}
+          tasks={tasks}
+          hasFiles={files.length > 0}
+        />
       }
     />
   );
