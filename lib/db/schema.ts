@@ -68,6 +68,20 @@ export const project = pgTable("Project", {
   context: text("context"),
   // ТЗ-A1: Фаза проекта (setup → documents → planning → approved → execution → completed)
   phase: varchar("phase", { length: 20 }).notNull().default("setup"),
+  // ТЗ-A3: Manifest проекта (агрегированные данные о файлах от Клерка-анализатора)
+  manifestJson: jsonb("manifestJson").$type<{
+    files: Array<{
+      fileId: string;
+      name: string;
+      description: string;
+      documentType: string;
+      folder: string;
+      relevance: "core" | "reference" | "unclear";
+      keyTopics: string[];
+      language: string;
+    }>;
+    updatedAt: string;
+  } | null>(),
   // ТЗ-07C2: Итог проекта (AI-generated из summary задач)
   summary: text("summary"),
   summaryUpdatedAt: timestamp("summaryUpdatedAt"),
@@ -115,6 +129,15 @@ export const projectFile = pgTable("ProjectFile", {
     pageCount?: number;
     duration?: number; // for audio/video
     dimensions?: { width: number; height: number }; // for images
+    // ТЗ-A3: Результат анализа Клерка-анализатора
+    analysis?: {
+      description: string;
+      documentType: string;
+      suggestedFolder: string;
+      relevance: "core" | "reference" | "unclear";
+      keyTopics: string[];
+      language: string;
+    };
   } | null>(),
   createdAt: timestamp("createdAt").notNull(),
 });
