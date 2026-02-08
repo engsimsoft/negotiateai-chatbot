@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-02-08
+**Обновлено:** 2026-02-09
 
 ---
 
@@ -21,6 +21,7 @@
 | **Бен** | Gemini 2.5 Flash | ✅ Работает | Помощник по платформе |
 | **Создание проекта** | Gemini 3 Pro | ✅ Работает | Секретарь — AI-интервью для создания проекта |
 | **Менеджер проекта** | Gemini 2.5 Flash | ✅ Работает | Живой AI-диалог, управление проектом |
+| **Профессор планирования** | Gemini 3 Pro | ✅ Работает | Генерация плана задач проекта (v3.14) |
 | **Клерк-анализатор** | Gemini 2.5 Flash | ✅ Работает | Автоматический анализ файлов проекта |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
 | **Preset Помощники** | Gemini 3 Pro / 2.5 Flash | ⚠️ Частично | Маркетолог, Копирайтер и др. |
@@ -75,8 +76,8 @@ app/(chat)/api/service-chat/route.ts                # API (context: project-crea
 5. Сообщения сохраняются на сервере (user — до стриминга, assistant — после)
 
 **Mode injection по phase:**
-- `first_contact` (phase: setup/documents) — полный режим знакомства
-- `plan_presentation` (phase: approved) — stub для будущего ТЗ-B1
+- `first_contact` (phase: setup/documents) — полный режим знакомства + план Профессора (если есть) через `<professor_plan>` XML-блок
+- `plan_presentation` (phase: approved) — stub для будущего ТЗ-C1
 - `navigation` (phase: execution) — stub для будущего ТЗ-C1
 
 **Файлы:**
@@ -87,6 +88,39 @@ components/service-chat/configs/project-manager.ts   # Конфигурация
 lib/prompts/service-chats/project-manager.md         # Промпт Менеджера
 app/(chat)/api/service-chat/route.ts                 # API (context: project-manager)
 lib/db/queries.ts                                    # getOrCreateManagerChat, findManagerChat
+```
+
+#### Профессор планирования (v3.14)
+**Где:** Автоматически вызывается при нажатии "Начать планирование" на странице проекта
+
+| Параметр | Значение |
+|----------|----------|
+| **Модель** | Gemini 3 Pro |
+| **Тип** | Backend endpoint (не интерактивный чат) |
+| **Триггер** | Кнопка "Начать планирование" → `POST /api/projects/[id]/plan` |
+
+**Как работает:**
+1. Frontend вызывает `POST /api/projects/[id]/plan` с passport, manifest, files
+2. Профессор анализирует проект и генерирует JSON (discriminated union: complete / partial / needs_input)
+3. Complete/Partial: список задач (order, title, description, dependencies, tools), риски (severity), рекомендации
+4. Needs_input: список вопросов к пользователю (blocking/non-blocking)
+5. Результат сохраняется в `Project.planJson` (jsonb), статус в `Project.planStatus`
+
+**UI обратная связь:**
+- PlanningState: анимация прогресса (4 шага с animate-pulse)
+- PlanView: карточки задач, секция рисков, рекомендации, кавеаты (для partial)
+- NeedsInput: карточки вопросов от Профессора
+- Pulse: нумерованные задачи (badge + title) или "Анализ проекта..."
+- Manager: знает о плане через `<professor_plan>` XML в system prompt
+
+**Файлы:**
+```
+app/(chat)/api/projects/[id]/plan/route.ts         # Endpoint Профессора
+lib/ai/professor-types.ts                           # Zod-схемы и типы
+lib/prompts/professors/planning.md                  # Промпт Профессора
+components/projects/phase-states/planning-state.tsx  # UI (3 состояния)
+components/projects/project-pulse.tsx                # Превью плана в Пульсе
+app/(chat)/api/service-chat/route.ts                # Manager с план-контекстом
 ```
 
 #### Клерк-анализатор файлов (v3.13)
@@ -341,6 +375,8 @@ lib/prompts/
 │   └── ben/AGENT.md       # Конфиг Бена
 ├── skills/
 │   └── document/          # Skills для документов
+├── professors/            # Промпты профессоров (v3.14)
+│   └── planning.md        # Профессор планирования
 ├── clerks/                # Промпты клерков (v3.13)
 │   └── file-analyzer.md   # Клерк-анализатор файлов
 ├── service-chats/         # Промпты сервисных чатов (v3.11+)

@@ -12,6 +12,39 @@
 
 ---
 
+## [3.14.0] - 2026-02-09 - Professor Planning (ТЗ-B1)
+
+**MINOR RELEASE**: Профессор планирования — AI-агент, который анализирует проект и генерирует структурированный план задач с рисками и рекомендациями.
+
+### Added
+- **`POST /api/projects/[id]/plan`** — endpoint Профессора: Gemini 3 Pro анализирует проект (passport, manifest, files) и генерирует план
+- **`Project.planJson`** (jsonb) — хранение плана Профессора (discriminated union: complete / partial / needs_input)
+- **`Project.planStatus`** — статус планирования (idle / generating / done / error)
+- **`PlanningState`** — UI-компонент фазы планирования с тремя состояниями:
+  - Loading (анимация прогресса: Анализ → Декомпозиция → Оценка рисков → Формирование плана)
+  - NeedsInput (вопросы от Профессора пользователю)
+  - PlanView (карточки задач, риски, рекомендации, кавеаты)
+- **`lib/ai/professor-types.ts`** — Zod-схемы для плана (tasks, risks, recommendations, caveats, questions)
+- **`lib/prompts/professors/planning.md`** — промпт Профессора планирования
+- **Pulse: превью плана** — в фазе planning показывает нумерованные задачи из planJson (badge + title)
+- **Pulse: "Анализ проекта..."** — анимация Brain + pulse когда план ещё не готов
+- **Manager: план в контексте** — `<professor_plan>` XML-блок с tasks, risks, recommendations в system prompt Менеджера
+
+### Changed
+- **project-pulse.tsx** — новые props `phase` и `planJson`, условный рендеринг по фазе
+- **page.tsx (project)** — передаёт `phase` и `planJson` в ProjectPulse
+- **service-chat/route.ts** — `buildFirstContactMode()` инжектирует план в prompt Менеджера, обновлены mode_instructions
+- **professor-types.ts** — lenient Zod-схемы: `.optional().default()` для полей, `.transform()` вместо `.enum()` для severity/type
+
+### Fixed
+- **Delete project cascade** — корректное удаление всех FK-зависимостей (Stream → Vote_v2 → Message_v2 → legacy Vote → legacy Message → Chat → ProjectFile → ProjectFolder → Project)
+- **Zod validation 502** — схемы сделаны устойчивыми к вариациям ответа AI-модели
+
+### Database
+- Миграция `0025_add-project-plan-fields.sql` — ALTER TABLE Project ADD `planJson` (jsonb), `planStatus` (varchar)
+
+---
+
 ## [3.13.0] - 2026-02-08 - Manager + Clerk + Manifest (ТЗ-A3)
 
 **MINOR RELEASE**: Клерк-анализатор файлов, живой Менеджер проекта в drawer, автоматический manifest проекта.

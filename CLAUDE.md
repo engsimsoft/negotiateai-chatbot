@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.13.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.14.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -62,6 +62,7 @@
 - `lib/prompts/builder/` — Модульная система сборки (registry, loaders, composer)
 - `lib/prompts/skills/` — Атомарные навыки (SKILL.md)
 - `lib/prompts/agents/` — Персонажи-агенты (AGENT.md + config.yaml)
+- `lib/prompts/professors/` — Промпты профессоров (planning.md)
 - `lib/prompts/clerks/` — Промпты клерков (file-analyzer.md)
 - `lib/prompts/service-chats/` — Промпты сервисных чатов (project-creation.md, project-manager.md)
 - `lib/prompts/core/` — Базовые промпты (.md файлы)
@@ -118,7 +119,7 @@
 - `lib/ai/tools/` — Инструменты (search, excel, web scraping)
 - `lib/ai/tools/excel/` — Excel tools (create, parse, edit)
 
-**Projects (v3.13.0 — Manager + Clerk + Manifest):**
+**Projects (v3.14.0 — Professor Planning):**
 - `app/(dashboard)/projects/[id]/page.tsx` — Страница проекта (Server Component)
 - `components/projects/project-page-layout.tsx` — Двухколоночный layout (Пульс + WorkArea + Drawer)
 - `components/projects/project-pulse.tsx` — Навигационный Пульс (План, Файлы, Паспорт)
@@ -130,7 +131,9 @@
 - `app/(dashboard)/projects/new/page.tsx` — Создание проекта
 - `app/(dashboard)/projects/[id]/chat/` — Чаты проекта
 - `app/(chat)/api/projects/` — API проектов (CRUD)
+- `app/(chat)/api/projects/[id]/plan/route.ts` — Профессор планирования (Gemini 3 Pro)
 - `app/(chat)/api/projects/[id]/analyze-file/route.ts` — Клерк-анализатор файлов (Gemini Flash)
+- `lib/ai/professor-types.ts` — Zod-схемы плана (tasks, risks, recommendations, caveats)
 - `components/projects/professor-progress.tsx` — UI прогресса pipeline
 
 **Voice Input (Deepgram):**
@@ -159,7 +162,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**
@@ -300,6 +303,16 @@ SELECT COUNT(*) FROM "Chat";
 ```
 **НЕ делать "скопом"!** Этап → валидация → следующий этап.
 
+**⛔ ROADMAP — ОСНОВНОЙ ЧЕКЛИСТ (НЕ TodoWrite!):**
+```
+НЕ использовать TodoWrite как основной чеклист задач.
+Основной рабочий документ — ROADMAP.md в папке активного ТЗ.
+
+Перед КАЖДОЙ задачей: Read ROADMAP.md → прочитать описание задачи
+После КАЖДОЙ задачи: Edit ROADMAP.md → отметить [x]
+После КАЖДОГО этапа: Edit ROADMAP.md → обновить статус (⬜ → ✅)
+```
+
 **При работе с новым ТЗ:**
 1. Читай [specs/WORKFLOW.md](specs/WORKFLOW.md) — процесс работы с ТЗ
 2. Создай папку `specs/TZ_XX_Name/`
@@ -328,4 +341,4 @@ specs/
 
 ---
 
-**Обновлено:** 2026-02-08
+**Обновлено:** 2026-02-09

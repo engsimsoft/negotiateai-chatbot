@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.13.0
-**Дата:** 2026-02-08
+**Версия:** 3.14.0
+**Дата:** 2026-02-09
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -25,7 +25,7 @@
 | Особенность | Описание | Статус |
 |-------------|----------|--------|
 | **Универсальный AI-чат** | Один мощный чат со всеми инструментами | ✅ |
-| **Проекты** | Изолированные рабочие пространства с Менеджером и автоанализом файлов | ✅ v3.13.0 |
+| **Проекты** | Изолированные рабочие пространства с Профессором, Менеджером и автоанализом файлов | ✅ v3.14.0 |
 | **Сервисные помощники** | Бен (❓), Секретарь (➕), Менеджер (👤) | ✅ v3.13.0 |
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG/Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity, Plus AI, Ideogram, AssemblyAI | 📋 Фаза 1 |
@@ -87,6 +87,7 @@
 | **ben** | Gemini 2.5 Flash | Гид по платформе |
 | **project-creation** | Gemini 3 Pro | Секретарь — AI-интервью для создания проектов |
 | **project-manager** | Gemini 2.5 Flash | Менеджер проекта (живой AI-диалог) |
+| **professor-planning** | Gemini 3 Pro | Профессор планирования — генерация плана задач |
 | **file-analyzer** (Клерк) | Gemini 2.5 Flash | Автоанализ файлов проекта |
 
 ### Файловая структура
@@ -135,6 +136,9 @@ lib/prompts/
 │   ├── safety.md
 │   ├── formatting.md
 │   └── russian-market.md
+│
+├── professors/                  # Промпты профессоров (v3.14)
+│   └── planning.md          # Профессор планирования
 │
 ├── clerks/                      # Промпты клерков (v3.13)
 │   └── file-analyzer.md     # Клерк-анализатор файлов
@@ -287,6 +291,33 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-B1: Professor Planning — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Профессор планирования** — AI-агент (Gemini 3 Pro), анализирует проект и генерирует структурированный план задач
+- **`POST /api/projects/[id]/plan`** — endpoint Профессора: принимает passport, manifest, files, возвращает plan JSON
+- **`Project.planJson`** (jsonb) — хранение плана (discriminated union: complete / partial / needs_input)
+- **`Project.planStatus`** — статус планирования (idle / generating / done / error)
+- **Zod-валидация** — строгие типизированные схемы для tasks, risks, recommendations, caveats, questions с lenient parsing
+- **PlanningState UI** — три состояния:
+  - Loading: анимация прогресса (4 шага: Анализ → Декомпозиция → Оценка рисков → Формирование)
+  - NeedsInput: карточки вопросов от Профессора (blocking/non-blocking)
+  - PlanView: карточки задач (order, title, description, dependencies, tools), секция рисков (severity badge), рекомендации, кавеаты
+- **Pulse: превью плана** — в фазе planning: нумерованные задачи (badge + title), или "Анализ проекта..." с Brain animate-pulse
+- **Manager: контекст плана** — `<professor_plan>` XML-блок инжектируется в system prompt Менеджера (tasks, risks, recommendations)
+- **Delete cascade fix** — корректное удаление проекта с учётом всех FK (Stream, Vote_v2, Message_v2, legacy tables, Chat, ProjectFile, ProjectFolder)
+
+**Ключевые файлы:**
+- `app/(chat)/api/projects/[id]/plan/route.ts` — endpoint Профессора
+- `lib/ai/professor-types.ts` — Zod-схемы и типы плана
+- `lib/prompts/professors/planning.md` — промпт Профессора
+- `components/projects/phase-states/planning-state.tsx` — UI планирования (3 состояния)
+- `components/projects/project-pulse.tsx` — Пульс с превью плана
+- `app/(chat)/api/service-chat/route.ts` — Manager с план-контекстом
+- `app/(dashboard)/projects/[id]/page.tsx` — передача planJson и phase в компоненты
+
+**Детали:** [_archive/TZ_B1_ProfessorPlanning/](_archive/TZ_B1_ProfessorPlanning/)
 
 ### ТЗ-A3: Manager + Clerk + Manifest — ✅ ЗАВЕРШЁН
 
@@ -633,15 +664,16 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.13.0 |
+| Версия | 3.14.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
+| Профессоры | 1 (planning) |
 | Сервисные чаты | 3 (ben, project-creation, project-manager) |
-| Промптов | 4 (chat, ben, project-creation, project-manager) |
+| Промптов | 5 (chat, ben, project-creation, project-manager, professor-planning) |
 | AI моделей | 5 (Gemini 3 Pro, 2.5 Flash, Claude Haiku, Sonnet, Opus) |
 | AI-инструментов | 9 |
 | Типов документов | 5 (text, markdown, excel, presentation-reveal, presentation-pptx) |
@@ -669,6 +701,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_B1_ProfessorPlanning/](_archive/TZ_B1_ProfessorPlanning/) — ТЗ-B1 Professor Planning
 - [_archive/TZ_A3_ManagerClerkManifest/](_archive/TZ_A3_ManagerClerkManifest/) — ТЗ-A3 Manager + Clerk + Manifest
 - [_archive/TZ_A1_ProjectPageLayout/](_archive/TZ_A1_ProjectPageLayout/) — ТЗ-A1 Project Page Layout
 - [_archive/TZ_12_SecretaryIntegration/](_archive/TZ_12_SecretaryIntegration/) — ТЗ-12 Secretary Integration
@@ -696,4 +729,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-08
+**Обновлено:** 2026-02-09
