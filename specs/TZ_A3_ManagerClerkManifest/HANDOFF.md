@@ -8,7 +8,7 @@
 ## Статус этапов
 
 - [x] Этап 1: Фундамент (БД + промпты) ✅
-- [x] Этап 2: Клерк-анализатор (backend) ✅ ожидает мануального теста
+- [x] Этап 2: Клерк-анализатор (backend) ✅ протестирован
 - [ ] Этап 3: Менеджер в drawer (ServiceChat) ← СЛЕДУЮЩИЙ
 - [ ] Этап 4: Frontend связка (auto-analyze + UI)
 - [ ] Этап 5: Финализация
@@ -18,10 +18,20 @@
 ## Следующая сессия: начни с
 
 1. Прочитай этот файл (HANDOFF.md)
-2. Прочитай ROADMAP.md — Этап 3
-3. **Первая задача:** Заменить заглушку в `manager-drawer.tsx` на ServiceChatCore
-4. Расширить service-chat API для context injection (passport, manifest, phase)
-5. Серверная персистенция чата Менеджера
+2. Прочитай ROADMAP.md — Этап 3 (подробный план задач и валидации)
+3. Прочитай MANAGER_PROMPT.md — промпт Менеджера (3 режима: first_contact, plan_presentation, navigation)
+4. **Изучи файлы перед изменением:**
+   - `components/projects/manager-drawer.tsx` — заглушка на строках ~47-68 (заменить на ServiceChatCore)
+   - `app/(chat)/api/service-chat/route.ts` — текущий buildProjectManagerPrompt() — inline заглушка, заменить на полноценный
+   - `components/service-chat/service-chat-core.tsx` — как ServiceChatCore принимает конфиг
+   - `components/service-chat/configs/project-manager.ts` — существующий конфиг
+5. **Ключевые задачи Этапа 3:**
+   - Серверная персистенция: Chat запись в БД (type: service-chat, привязка к проекту)
+   - Заменить заглушку в manager-drawer на ServiceChatCore
+   - buildManagerPrompt(): загрузить .md из файла + conditional mode injection по phase
+   - Context injection: passport (name, description, context), manifest, phase, professorEnabled
+   - Загрузить/создать Chat для персистенции сообщений
+6. **ВАЖНО:** Следуй ROADMAP.md пошагово — коммит после этапа, валидация, CHANGELOG, HANDOFF
 
 ---
 
@@ -40,6 +50,11 @@
 - 3 новые DB-функции в queries.ts: getProjectFileById, updateProjectFileMetadata, rebuildProjectManifest
 - Логика: Gemini Flash → JSON parse → auto-folder → move-to-folder → rebuild manifest
 - Валидация: tsc 0 ошибок, build успешен
+- **Интеграционный тест пройден:**
+  - Excel с контентом (Shortcut_DKRacing_Sponsorship_Data.xlsx) → relevance: core, folder: "DK Racing"
+  - Изображение без preview (Снимок экрана.jpeg) → relevance: unclear, folder: "Скриншоты"
+  - JSON парсинг работает (strip markdown code blocks)
+  - Все required fields present, relevance valid
 
 ---
 
