@@ -89,8 +89,13 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         <ProjectPulse
           projectId={id}
           tasks={tasks}
-          projectSummary={project.summary}
-          summaryUpdatedAt={project.summaryUpdatedAt}
+          files={files}
+          folders={folders}
+          projectName={project.name}
+          description={project.description}
+          instruction={project.instruction}
+          context={project.context}
+          createdAt={project.createdAt}
         />
       }
       workArea={

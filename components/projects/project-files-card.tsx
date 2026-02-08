@@ -53,6 +53,8 @@ interface ProjectFilesCardProps {
   projectId: string;
   files: ProjectFile[];
   folders: ProjectFolder[];
+  /** Compact mode for narrow Pulse panel (~300px) — no outer border/rounded, smaller padding */
+  compact?: boolean;
 }
 
 function getFileIcon(mimeType: string | null) {
@@ -76,6 +78,7 @@ export function ProjectFilesCard({
   projectId,
   files: initialFiles,
   folders: initialFolders,
+  compact = false,
 }: ProjectFilesCardProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -469,13 +472,15 @@ export function ProjectFilesCard({
   );
 
   return (
-    <div className="rounded-xl border bg-background p-4">
+    <div className={compact ? "px-4 py-3" : "rounded-xl border bg-background p-4"}>
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Файлы ({files.length})
-        </h3>
-        <div className="flex gap-2">
+        {!compact && (
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Файлы ({files.length})
+          </h3>
+        )}
+        <div className={compact ? "flex w-full gap-2" : "flex gap-2"}>
           <Button
             variant="ghost"
             size="sm"
