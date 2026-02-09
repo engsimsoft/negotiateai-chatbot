@@ -13,7 +13,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 5 |
-| Текущий этап | 1 |
+| Текущий этап | 2 |
 | Оценка сессий | 3-4 |
 
 **Решения (из ANALYSIS.md):**
@@ -83,42 +83,40 @@ git commit -m "feat(tz-c1): infrastructure — route group, shared tools, prompt
 
 ### Этап 2: API Route + TaskSidebar + Page
 
-**Статус:** ⬜ Не начат
-
-> ⛔ **НЕ НАЧИНАТЬ** без подтверждения валидации Этапа 1
+**Статус:** ✅ Завершён
 
 **Цель:** Рабочий API endpoint для чата задачи (streaming + tools + expert prompt). TaskSidebar с навигацией. Page.tsx с полной загрузкой данных и гардами.
 
 **Задачи:**
 
 1. **API Route:**
-   - [ ] Создать `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — POST endpoint
-   - [ ] Auth check (session), загрузка Project + ProjectTask + Chat
-   - [ ] Гарды: задача принадлежит проекту, чат принадлежит задаче, проект принадлежит юзеру
-   - [ ] Сохранение user message в БД (до streaming)
-   - [ ] Вызов `buildTaskExpertPrompt()` → system prompt
-   - [ ] Модель через env: `process.env.EXPERT_MODEL || 'gemini-3-pro'` → resolveModel()
-   - [ ] `streamText()` с system prompt, messages, shared tools
-   - [ ] Сохранение assistant message в БД (после streaming, с фильтрацией tool results)
-   - [ ] Return SSE response (`JsonToSseTransformStream`)
+   - [x] Создать `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — POST endpoint
+   - [x] Auth check (session), загрузка Project + ProjectTask + Chat
+   - [x] Гарды: задача принадлежит проекту, чат принадлежит задаче, проект принадлежит юзеру
+   - [x] Сохранение user message в БД (до streaming)
+   - [x] Вызов `buildTaskExpertPrompt()` → system prompt
+   - [x] Модель через env: `process.env.EXPERT_MODEL || 'gemini-3-pro'` → resolveModel()
+   - [x] `streamText()` с system prompt, messages, shared tools
+   - [x] Сохранение assistant message в БД (после streaming, с фильтрацией tool results)
+   - [x] Return SSE response (`JsonToSseTransformStream`)
 
 2. **TaskSidebar:**
-   - [ ] Создать `components/projects/task-sidebar.tsx` — client component
-   - [ ] Шапка: название проекта (truncated) + кнопка сворачивания
-   - [ ] Список задач: иконка статуса + номер + title (truncated), активная задача highlighted
-   - [ ] Клик: pending/in_progress/done/review/issues → `router.push()`, locked → tooltip
-   - [ ] Подвал: кнопка «← К проекту» → `/projects/[id]`
-   - [ ] Сворачивание: развёрнут ~240px, свёрнут ~48px (только иконки)
-   - [ ] Иконки статусов: переиспользовать маппинг из ProjectPulse (Circle, Loader2, Brain, AlertTriangle, Check, Lock)
+   - [x] Создать `components/projects/task-sidebar.tsx` — client component
+   - [x] Шапка: название проекта (truncated) + кнопка сворачивания
+   - [x] Список задач: иконка статуса + номер + title (truncated), активная задача highlighted
+   - [x] Клик: pending/in_progress/done/review/issues → `router.push()`, locked → tooltip
+   - [x] Подвал: кнопка «← К проекту» → `/projects/[id]`
+   - [x] Сворачивание: развёрнут ~240px, свёрнут ~48px (только иконки)
+   - [x] Иконки статусов: переиспользовать маппинг из ProjectPulse (Circle, Loader2, Brain, AlertTriangle, Check, Lock)
 
 3. **Page.tsx (полная версия):**
-   - [ ] Заменить заглушку на полную реализацию Server Component
-   - [ ] Auth check + ownership guard
-   - [ ] Загрузка: Project, ProjectTask по taskId, все ProjectTask[] проекта, Chat (если есть), Messages
-   - [ ] Гарды: задача не найдена → redirect, проект не принадлежит → notFound()
-   - [ ] Первый визит (chatId = null): вызов `startTask()` → создание Chat, обновление статуса
-   - [ ] Phase transition: если project.phase === 'approved' → обновить на 'execution'
-   - [ ] Передача props в TaskSidebar + TaskChat (пока заглушка для TaskChat)
+   - [x] Заменить заглушку на полную реализацию Server Component
+   - [x] Auth check + ownership guard
+   - [x] Загрузка: Project, ProjectTask по taskId, все ProjectTask[] проекта, Chat (если есть), Messages
+   - [x] Гарды: задача не найдена → redirect, проект не принадлежит → notFound()
+   - [x] Первый визит (chatId = null): вызов `startTask()` → создание Chat, обновление статуса
+   - [x] Phase transition: если project.phase === 'approved' → обновить на 'execution'
+   - [x] Передача props в TaskSidebar + TaskChat (пока заглушка для TaskChat)
 
 **Файлы:**
 - `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — новый
@@ -126,8 +124,8 @@ git commit -m "feat(tz-c1): infrastructure — route group, shared tools, prompt
 - `app/(task)/projects/[id]/tasks/[taskId]/page.tsx` — обновление (полная версия)
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: `/projects/[id]/tasks/[taskId]` — страница открывается, TaskSidebar видна с задачами
 - [ ] Браузер: TaskSidebar сворачивается/разворачивается
 - [ ] Браузер: клик «← К проекту» → возвращает на страницу проекта
