@@ -1,5 +1,6 @@
 import Script from "next/script";
 import { DataStreamProvider } from "@/components/data-stream-provider";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { SWRProvider } from "@/components/swr-provider";
 
 export const experimental_ppr = true;
@@ -16,7 +17,12 @@ export default async function TaskLayout({
         strategy="beforeInteractive"
       />
       <SWRProvider>
-        <DataStreamProvider>{children}</DataStreamProvider>
+        <DataStreamProvider>
+          {/* SidebarProvider needed for Artifact component (useSidebar context) */}
+          <SidebarProvider defaultOpen={false}>
+            {children}
+          </SidebarProvider>
+        </DataStreamProvider>
       </SWRProvider>
     </>
   );

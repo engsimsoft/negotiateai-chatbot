@@ -10,6 +10,7 @@ import {
   updateProjectPhase,
 } from "@/lib/db/queries";
 import { convertToUIMessages } from "@/lib/utils";
+import { TaskChat } from "@/components/projects/task-chat";
 import { TaskSidebar } from "@/components/projects/task-sidebar";
 
 interface TaskPageProps {
@@ -18,7 +19,7 @@ interface TaskPageProps {
 
 /**
  * ТЗ-C1: Страница задачи — чат с Экспертом
- * Этап 2: Полная реализация (auth + guards + startTask + phase transition + TaskSidebar)
+ * Этап 3: Полная реализация с TaskChat
  */
 export default async function TaskPage({ params }: TaskPageProps) {
   const session = await auth();
@@ -87,22 +88,15 @@ export default async function TaskPage({ params }: TaskPageProps) {
         activeTaskId={taskId}
       />
 
-      {/* TaskChat placeholder — будет заменён на реальный компонент в Этапе 3 */}
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <div className="text-center space-y-2">
-          <h1 className="text-lg font-semibold">
-            {task.orderIndex}. {task.title}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Проект: {project.name}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Chat ID: {chatId} | Messages: {initialMessages.length} | {isReadonly ? "Read-only" : "Active"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            TaskChat placeholder (ТЗ-C1, Этап 2 — TaskChat в Этапе 3)
-          </p>
-        </div>
+      <div className="flex-1 min-w-0">
+        <TaskChat
+          chatId={chatId}
+          projectId={projectId}
+          taskId={taskId}
+          task={task}
+          initialMessages={initialMessages}
+          isReadonly={isReadonly}
+        />
       </div>
     </div>
   );

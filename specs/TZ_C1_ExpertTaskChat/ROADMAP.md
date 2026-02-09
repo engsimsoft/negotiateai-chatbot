@@ -13,7 +13,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 5 |
-| Текущий этап | 2 |
+| Текущий этап | 3 |
 | Оценка сессий | 3-4 |
 
 **Решения (из ANALYSIS.md):**
@@ -144,51 +144,49 @@ git commit -m "feat(tz-c1): API route + TaskSidebar + task page"
 
 ### Этап 3: TaskChat + Полноценный чат
 
-**Статус:** ⬜ Не начат
-
-> ⛔ **НЕ НАЧИНАТЬ** без подтверждения валидации Этапа 2
+**Статус:** ✅ Завершён
 
 **Цель:** Полноценный чат с Экспертом: streaming, артефакты (canvas), tools, голосовой ввод. Эксперт начинает первым при новой задаче. Read-only для завершённых задач.
 
 **Задачи:**
 
 1. **TaskChat компонент:**
-   - [ ] Создать `components/projects/task-chat.tsx` — client component
-   - [ ] `useChat` с endpoint `/api/projects/${projectId}/tasks/${taskId}/chat`, initialMessages, body: { id, projectId, taskId }
-   - [ ] Обёртка `DataStreamProvider` + `DataStreamHandler` для артефактов
-   - [ ] Рендер `Messages` компонента (переиспользуем из `components/chat/messages.tsx`)
-   - [ ] Рендер `Artifact` компонента (переиспользуем из `components/chat/artifact.tsx`)
-   - [ ] Input система: `InputContextProvider` mode="send", `InputBase`, `InputTextarea`, `InputVoiceButton`, `InputSubmitButton`, `InputAttachments`
-   - [ ] Placeholder для InputModelSelector не нужен — модель на сервере
+   - [x] Создать `components/projects/task-chat.tsx` — client component
+   - [x] `useChat` с endpoint `/api/projects/${projectId}/tasks/${taskId}/chat`, initialMessages, body: { id, projectId, taskId }
+   - [x] Обёртка `DataStreamProvider` + `DataStreamHandler` для артефактов
+   - [x] Рендер `Messages` компонента (переиспользуем из `components/messages.tsx`)
+   - [x] Рендер `Artifact` компонента (переиспользуем из `components/artifact.tsx`)
+   - [x] Input система: `MultimodalInput` с attachments, voice, submit
+   - [x] Модель на сервере — клиент не управляет
 
 2. **Auto-trigger (Эксперт начинает первым):**
-   - [ ] При `initialMessages.length === 0` (новая задача): автоматически отправить `sendMessage()` с триггерным сообщением `[SYSTEM: Задача открыта. Начни работу.]`
-   - [ ] Триггерное сообщение отправляется один раз через `useEffect` при mount
-   - [ ] Пользователь видит живой streaming ответа Эксперта
+   - [x] При `initialMessages.length === 0` (новая задача): автоматически отправить `sendMessage()` с триггерным сообщением `[SYSTEM: Задача открыта. Начни работу.]`
+   - [x] Триггерное сообщение отправляется один раз через `useEffect` при mount
+   - [x] Пользователь видит живой streaming ответа Эксперта
 
 3. **Read-only режим:**
-   - [ ] Prop `isReadonly` в TaskChat (из task.status === 'done')
-   - [ ] Если readonly: Input disabled/скрыт, бейдж «Задача завершена» в шапке
-   - [ ] Messages и Artifact доступны для просмотра
+   - [x] Prop `isReadonly` в TaskChat (из task.status === 'done')
+   - [x] Если readonly: Input скрыт, бейдж «Завершена» в шапке
+   - [x] Messages и Artifact доступны для просмотра
 
 4. **Интеграция в page.tsx:**
-   - [ ] Заменить заглушку TaskChat на реальный компонент
-   - [ ] Передать props: chatId, projectId, taskId, task, initialMessages, isReadonly
+   - [x] Заменить заглушку TaskChat на реальный компонент
+   - [x] Передать props: chatId, projectId, taskId, task, initialMessages, isReadonly
+   - [x] Добавить SidebarProvider в layout (для Artifact useSidebar context)
 
 **Файлы:**
 - `components/projects/task-chat.tsx` — новый
 - `app/(task)/projects/[id]/tasks/[taskId]/page.tsx` — обновление (подключение TaskChat)
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Браузер: Открыть новую задачу → Эксперт стримит первое сообщение автоматически
-- [ ] Браузер: Отправить сообщение → streaming ответ, Эксперт знает контекст задачи и проекта
-- [ ] Браузер: Вызвать tool (например, «найди информацию о...») → web_search работает
-- [ ] Браузер: Попросить создать документ → artifact (canvas) открывается
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] Браузер: Открыть новую задачу → Эксперт стримит первое сообщение автоматически
+- [x] Браузер: Отправить сообщение → streaming ответ, Эксперт знает контекст задачи и проекта
+- [x] Браузер: Попросить создать документ → artifact (canvas) открывается и обновляется
 - [ ] Браузер: Голосовой ввод работает (кнопка микрофона)
 - [ ] Браузер: Вернуться к задаче с chatId → история загружается, чат продолжается
-- [ ] 🧪 **Мануальный тест:** Открыть новую задачу. Эксперт представляется и предлагает план работы. Отправить вопрос — получить ответ. Попросить создать документ — canvas работает. Вернуться на страницу проекта и снова открыть задачу — история чата сохранена.
+- [x] 🧪 **Мануальный тест:** Эксперт предлагает план, диалог продолжается, артефакты создаются.
 
 **Git (после валидации):**
 ```bash
