@@ -12,6 +12,26 @@
 
 ---
 
+## [3.15.0] - 2026-02-09 - Approval + ProjectTask (ТЗ-B2)
+
+**MINOR RELEASE**: Утверждение плана, таблица ProjectTask, карта задач в рабочей области и Пульсе, контекст задач для Менеджера.
+
+### Added
+- **Таблица `ProjectTask`** — 18 колонок, pgEnum `project_task_status` (locked/pending/in_progress/review/issues/done)
+- **`POST /api/projects/[id]/approve-plan`** — утверждение плана: planJson.tasks → ProjectTask[], phase → approved, guard дубли (409)
+- **`GET /api/projects/[id]/tasks`** — список задач проекта
+- **`ApprovedState`** — карта задач (номер, title, goal, tools, needsReview badge, status badge)
+- **Кнопка «Утвердить план»** — AlertDialog подтверждения в PlanningState
+- **Pulse: ProjectTask[]** — реальные задачи с 6 иконками статусов при approved+
+- **Manager: taskStatuses XML** — `buildPlanPresentationMode()` инжектирует задачи и статусы в prompt
+
+### Changed
+- **project-pulse.tsx** — новый prop `projectTasks`, `ProjectTaskStatusIcon`, счётчики статусов
+- **service-chat/route.ts** — `buildModeInjection()` стал async, `buildPlanPresentationStub()` → `buildPlanPresentationMode()`
+- **page.tsx (project)** — загрузка и проброс ProjectTask[] в Pulse и WorkArea
+
+---
+
 ## [3.14.0] - 2026-02-09 - Professor Planning (ТЗ-B1)
 
 **MINOR RELEASE**: Профессор планирования — AI-агент, который анализирует проект и генерирует структурированный план задач с рисками и рекомендациями.
