@@ -292,6 +292,64 @@ components/projects/
 
 ## План развития
 
+### ТЗ-B2: Approval + ProjectTask — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Таблица `ProjectTask`** — 18 колонок в БД, pgEnum `project_task_status` (locked / pending / in_progress / review / issues / done)
+- **`POST /api/projects/[id]/approve-plan`** — утверждение плана: парсит planJson.tasks → создаёт ProjectTask[], переводит phase → approved, guard дубликатов (409 Conflict)
+- **`GET /api/projects/[id]/tasks`** — получение списка задач проекта (ORDER BY orderIndex)
+- **Кнопка «Утвердить план»** — в PlanningState, AlertDialog подтверждения с количеством задач
+- **ApprovedState** — полная карта задач в рабочей области: номер, title, goal, tools badge, needsReview badge, status badge (pending/locked)
+- **Pulse: ProjectTask[]** — при phase != planning и наличии projectTasks показывает реальные задачи из БД с 6 иконками статусов (Circle, Lock, Loader2-spin, Brain, AlertTriangle, Check) и счётчиками в шапке
+- **Manager: taskStatuses XML** — `buildPlanPresentationMode()` загружает ProjectTask[] и инжектирует `<task_statuses>` XML в system prompt Менеджера с order, status, title и summary
+- **Логика статусов при создании** — задачи без зависимостей → `pending`, с зависимостями → `locked`
+- **Cascade delete** — ProjectTask удаляется при удалении проекта (перед chats)
+- **Кнопка «Начать первую задачу»** — toast-заглушка (реализация в следующем ТЗ)
+
+**Архитектурные решения:**
+- pgEnum вместо varchar для статусов задач (строгая типизация на уровне БД)
+- `foreignKey` helper для chatId (forward reference на таблицу Chat)
+- Partial планы можно утверждать (поддержка planJson.status = "partial")
+- `buildModeInjection()` стал async (из-за загрузки ProjectTask[] в approved-режиме)
+
+**Схема БД — ProjectTask:**
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | uuid PK | Уникальный ID |
+| `projectId` | uuid FK → Project | Проект-владелец |
+| `orderIndex` | integer | Порядковый номер задачи |
+| `title` | varchar(500) | Заголовок задачи |
+| `description` | text | Описание |
+| `goal` | text | Цель задачи |
+| `input` | text | Входные данные |
+| `expectedOutput` | text | Ожидаемый результат |
+| `status` | enum | locked / pending / in_progress / review / issues / done |
+| `chatId` | uuid FK → Chat | Привязанный чат (nullable) |
+| `inputSummary` | text | Краткое содержание входа |
+| `outputSummary` | text | Краткое содержание результата |
+| `professorVerdict` | jsonb | Вердикт проверки Профессором |
+| `dependsOn` | integer[] | Массив orderIndex зависимостей |
+| `tools` | text[] | Массив инструментов |
+| `needsReview` | boolean | Требует проверки Профессором |
+| `createdAt` | timestamp | Дата создания |
+| `updatedAt` | timestamp | Дата обновления |
+
+**Ключевые файлы:**
+- `lib/db/schema.ts` — pgEnum + таблица projectTask + тип ProjectTask
+- `lib/db/queries.ts` — createProjectTasks(), getProjectTasksByProjectId(), каскад в deleteProjectById()
+- `lib/db/migrations/0026_useful_supernaut.sql` — миграция
+- `app/(chat)/api/projects/[id]/approve-plan/route.ts` — POST endpoint утверждения
+- `app/(chat)/api/projects/[id]/tasks/route.ts` — GET endpoint задач
+- `components/projects/phase-states/planning-state.tsx` — кнопка + AlertDialog
+- `components/projects/phase-states/approved-state.tsx` — карта задач
+- `components/projects/project-pulse.tsx` — ProjectTask[] в Пульсе с 6 статусами
+- `components/projects/project-work-area.tsx` — проброс projectTasks
+- `app/(dashboard)/projects/[id]/page.tsx` — загрузка и проброс ProjectTask[]
+- `app/(chat)/api/service-chat/route.ts` — buildPlanPresentationMode() с taskStatuses XML
+
+**Детали:** [_archive/TZ_B2_ApprovalTasks/](_archive/TZ_B2_ApprovalTasks/)
+
 ### ТЗ-B1: Professor Planning — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
@@ -664,11 +722,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.14.0 |
+| Версия | 3.15.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Профессоры | 1 (planning) |
@@ -701,6 +759,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_B2_ApprovalTasks/](_archive/TZ_B2_ApprovalTasks/) — ТЗ-B2 Approval + ProjectTask
 - [_archive/TZ_B1_ProfessorPlanning/](_archive/TZ_B1_ProfessorPlanning/) — ТЗ-B1 Professor Planning
 - [_archive/TZ_A3_ManagerClerkManifest/](_archive/TZ_A3_ManagerClerkManifest/) — ТЗ-A3 Manager + Clerk + Manifest
 - [_archive/TZ_A1_ProjectPageLayout/](_archive/TZ_A1_ProjectPageLayout/) — ТЗ-A1 Project Page Layout
