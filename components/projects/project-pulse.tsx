@@ -11,6 +11,8 @@ import {
   ChevronDown,
   ChevronRight,
   Brain,
+  Lock,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -21,7 +23,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ProjectFilesCard } from "@/components/projects/project-files-card";
 import { cn } from "@/lib/utils";
-import type { ProjectFile, ProjectFolder } from "@/lib/db/schema";
+import type { ProjectFile, ProjectFolder, ProjectTask } from "@/lib/db/schema";
 import type { ProfessorPlanJson } from "@/lib/ai/professor-types";
 import { isPlanWithTasks } from "@/lib/ai/professor-types";
 
@@ -39,6 +41,7 @@ interface ProjectPulseProps {
   projectId: string;
   phase: string;
   tasks: Task[];
+  projectTasks: ProjectTask[];
   files: ProjectFile[];
   folders: ProjectFolder[];
   planJson: ProfessorPlanJson | null;
@@ -50,13 +53,32 @@ interface ProjectPulseProps {
   createdAt: Date;
 }
 
-// Status icon mapping
+// Status icon mapping for chat-based tasks (legacy)
 function TaskStatusIcon({ status }: { status: TaskStatus }) {
   switch (status) {
     case "done":
       return <Check className="size-3.5 text-green-600 shrink-0" />;
     case "in_progress":
       return <Loader2 className="size-3.5 text-blue-600 shrink-0" />;
+    default:
+      return <Circle className="size-3.5 text-muted-foreground shrink-0" />;
+  }
+}
+
+// Status icon mapping for ProjectTask (ТЗ-B2)
+function ProjectTaskStatusIcon({ status }: { status: ProjectTask["status"] }) {
+  switch (status) {
+    case "done":
+      return <Check className="size-3.5 text-green-600 shrink-0" />;
+    case "in_progress":
+      return <Loader2 className="size-3.5 text-blue-600 animate-spin shrink-0" />;
+    case "review":
+      return <Brain className="size-3.5 text-purple-600 shrink-0" />;
+    case "issues":
+      return <AlertTriangle className="size-3.5 text-amber-600 shrink-0" />;
+    case "locked":
+      return <Lock className="size-3.5 text-muted-foreground/50 shrink-0" />;
+    case "pending":
     default:
       return <Circle className="size-3.5 text-muted-foreground shrink-0" />;
   }
@@ -104,6 +126,7 @@ export function ProjectPulse({
   projectId,
   phase,
   tasks,
+  projectTasks,
   files,
   folders,
   planJson,
@@ -122,7 +145,21 @@ export function ProjectPulse({
   const planTasks = hasPlanTasks ? planJson.tasks : [];
   const isPlanning = phase === "planning";
 
-  // Status counts for execution-phase tasks
+  // ТЗ-B2: Use ProjectTask[] when available (approved+ phases)
+  const hasProjectTasks = phase !== "planning" && projectTasks.length > 0;
+
+  // Status counts for ProjectTask (ТЗ-B2)
+  const projectTaskStatusCounts = hasProjectTasks
+    ? projectTasks.reduce(
+        (acc, task) => {
+          acc[task.status] = (acc[task.status] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      )
+    : {};
+
+  // Status counts for execution-phase tasks (legacy chat-based)
   const statusCounts = tasks.reduce(
     (acc, task) => {
       const status = task.taskStatus || "not_started";
@@ -133,7 +170,11 @@ export function ProjectPulse({
   );
 
   // Determine plan section count
-  const planCount = isPlanning ? planTasks.length : tasks.length;
+  const planCount = isPlanning
+    ? planTasks.length
+    : hasProjectTasks
+      ? projectTasks.length
+      : tasks.length;
 
   return (
     <div className="flex flex-col">
@@ -172,11 +213,79 @@ export function ProjectPulse({
                   <span>Анализ проекта...</span>
                 </div>
               )
+            ) : hasProjectTasks ? (
+              /* ТЗ-B2: Approved+ phases — show real ProjectTask[] with status icons */
+              <>
+                {/* Status counters */}
+                <div className="flex items-center gap-3 px-4 py-2 text-xs border-b bg-muted/30">
+                  {(projectTaskStatusCounts.done || 0) > 0 && (
+                    <span className="flex items-center gap-1 text-green-600">
+                      <Check className="size-3" />
+                      {projectTaskStatusCounts.done}
+                    </span>
+                  )}
+                  {(projectTaskStatusCounts.in_progress || 0) > 0 && (
+                    <span className="flex items-center gap-1 text-blue-600">
+                      <Loader2 className="size-3" />
+                      {projectTaskStatusCounts.in_progress}
+                    </span>
+                  )}
+                  {(projectTaskStatusCounts.review || 0) > 0 && (
+                    <span className="flex items-center gap-1 text-purple-600">
+                      <Brain className="size-3" />
+                      {projectTaskStatusCounts.review}
+                    </span>
+                  )}
+                  {(projectTaskStatusCounts.issues || 0) > 0 && (
+                    <span className="flex items-center gap-1 text-amber-600">
+                      <AlertTriangle className="size-3" />
+                      {projectTaskStatusCounts.issues}
+                    </span>
+                  )}
+                  {(projectTaskStatusCounts.pending || 0) > 0 && (
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <Circle className="size-3" />
+                      {projectTaskStatusCounts.pending}
+                    </span>
+                  )}
+                  {(projectTaskStatusCounts.locked || 0) > 0 && (
+                    <span className="flex items-center gap-1 text-muted-foreground/50">
+                      <Lock className="size-3" />
+                      {projectTaskStatusCounts.locked}
+                    </span>
+                  )}
+                </div>
+
+                {/* ProjectTask list */}
+                <div className="py-1">
+                  {projectTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-2.5 px-4 py-2 text-sm"
+                    >
+                      <ProjectTaskStatusIcon status={task.status} />
+                      <span className="text-xs text-muted-foreground tabular-nums w-4 shrink-0">
+                        {task.orderIndex}
+                      </span>
+                      <span
+                        className={cn(
+                          "flex-1 truncate",
+                          task.status === "done" && "text-muted-foreground line-through",
+                          task.status === "locked" && "text-muted-foreground/50"
+                        )}
+                      >
+                        {task.title}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : tasks.length === 0 ? (
               <div className="px-4 py-6 text-center text-sm text-muted-foreground">
                 Нет задач. Создайте первую задачу в рабочей области.
               </div>
             ) : (
+              /* Legacy: chat-based tasks */
               <>
                 {/* Status counters */}
                 <div className="flex items-center gap-3 px-4 py-2 text-xs border-b bg-muted/30">
@@ -304,7 +413,7 @@ export function ProjectPulse({
                   year: "numeric",
                 })}
               </span>
-              <span>Задач: {tasks.length}</span>
+              <span>Задач: {hasProjectTasks ? projectTasks.length : tasks.length}</span>
               <span>Файлов: {files.length}</span>
             </div>
           </div>

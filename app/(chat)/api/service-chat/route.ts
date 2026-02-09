@@ -21,6 +21,7 @@ import {
   getUserById,
   getProjectById,
   getFilesByProjectId,
+  getProjectTasksByProjectId,
   getOrCreateManagerChat,
   findManagerChat,
   saveMessages,
@@ -183,7 +184,7 @@ async function buildFullManagerPrompt(projectId?: string): Promise<string> {
   const fileCount = files.length;
 
   // Build mode injection based on phase
-  const modeInjection = buildModeInjection(projectData, fileCount);
+  const modeInjection = await buildModeInjection(projectData, fileCount);
 
   return MANAGER_PROMPT_TEMPLATE.replace("{{MODE_INJECTION}}", modeInjection);
 }
@@ -191,13 +192,13 @@ async function buildFullManagerPrompt(projectId?: string): Promise<string> {
 /**
  * Route to correct mode injection based on project phase
  */
-function buildModeInjection(project: Project, fileCount: number): string {
+async function buildModeInjection(project: Project, fileCount: number): Promise<string> {
   const phase = project.phase;
 
   if (phase === "setup" || phase === "documents" || phase === "planning") {
     return buildFirstContactMode(project, fileCount);
   } else if (phase === "approved") {
-    return buildPlanPresentationStub(project);
+    return await buildPlanPresentationMode(project);
   } else if (phase === "execution" || phase === "completed") {
     return buildNavigationStub(project);
   }
@@ -326,9 +327,28 @@ ${planSection}
 }
 
 /**
- * Mode 2: Plan Presentation (phase = approved) — stub for ТЗ-B1
+ * Mode 2: Plan Presentation (phase = approved) — ТЗ-B2
+ * Manager knows the plan is approved and sees task statuses
  */
-function buildPlanPresentationStub(project: Project): string {
+async function buildPlanPresentationMode(project: Project): Promise<string> {
+  // Load ProjectTask[] for task statuses
+  const projectTasks = await getProjectTasksByProjectId({ projectId: project.id });
+
+  const taskStatusesXml = projectTasks.length > 0
+    ? projectTasks.map(t =>
+        `  <task order="${t.orderIndex}" status="${t.status}">${t.title}</task>`
+      ).join("\n")
+    : "  <no_tasks/>";
+
+  const statusCounts = projectTasks.reduce((acc, t) => {
+    acc[t.status] = (acc[t.status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const statsLine = Object.entries(statusCounts)
+    .map(([status, count]) => `${status}: ${count}`)
+    .join(", ");
+
   return `<current_phase>plan_presentation</current_phase>
 
 <project_passport>
@@ -336,9 +356,19 @@ ${project.name}
 ${project.description || ""}
 </project_passport>
 
+<task_statuses total="${projectTasks.length}" summary="${statsLine}">
+${taskStatusesXml}
+</task_statuses>
+
 <mode_instructions>
-Режим представления плана будет реализован в следующем обновлении.
-Пока помогай пользователю с общими вопросами о проекте, объясняй что планирование скоро будет доступно.
+План проекта утверждён. Ты видишь список задач и их статусы выше.
+
+Твои задачи:
+1. Отвечай на вопросы пользователя о плане и задачах — ссылайся на конкретные задачи по номеру.
+2. Если пользователь спрашивает «что дальше» — укажи на первую задачу со статусом pending.
+3. Задачи со статусом locked заблокированы зависимостями — объясняй это при вопросах.
+4. Помогай пользователю понять порядок выполнения и зависимости между задачами.
+5. НЕ пересказывай весь план целиком — пользователь видит его в панели «Пульс» слева и в рабочей области.
 </mode_instructions>`;
 }
 
