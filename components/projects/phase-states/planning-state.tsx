@@ -19,7 +19,6 @@ import {
   Send,
   ChevronDown,
   MessageSquare,
-  Lock,
   Search,
   FileText,
   Eye,
@@ -29,11 +28,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Collapsible,
   CollapsibleContent,
@@ -233,14 +237,37 @@ function QuestionsView({
 function PlanView({
   planJson,
   planReport,
+  projectId,
 }: {
   planJson: ProfessorPlanJson & { status: "complete" | "partial" };
   planReport: string | null;
+  projectId: string;
 }) {
+  const router = useRouter();
   const [reportOpen, setReportOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
 
   const handleOpenManager = () => {
     window.dispatchEvent(new CustomEvent("open-manager-drawer"));
+  };
+
+  const handleApprove = async () => {
+    setIsApproving(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/approve-plan`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Ошибка утверждения");
+      }
+      router.refresh();
+    } catch (err) {
+      console.error("[approve]", err);
+      setIsApproving(false);
+      setConfirmOpen(false);
+    }
   };
 
   return (
@@ -397,21 +424,35 @@ function PlanView({
 
         {/* Action buttons */}
         <div className="flex flex-col gap-3 pb-8 sm:flex-row">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="flex-1">
-                  <Button className="w-full gap-2" disabled>
-                    <Lock className="size-4" />
-                    Утвердить план
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Автоматическое утверждение — в будущих обновлениях</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+            <AlertDialogTrigger asChild>
+              <Button className="flex-1 gap-2" disabled={isApproving}>
+                {isApproving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-4" />
+                )}
+                Утвердить план
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Утвердить план?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Будет создано {planJson.tasks.length} задач. После утверждения начнётся работа над проектом.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isApproving}>Отмена</AlertDialogCancel>
+                <AlertDialogAction onClick={handleApprove} disabled={isApproving}>
+                  {isApproving ? (
+                    <Loader2 className="size-4 animate-spin mr-2" />
+                  ) : null}
+                  Утвердить
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <Button
             variant="outline"
@@ -555,7 +596,7 @@ export function PlanningState({
     localPlanJson &&
     (localPlanJson.status === "complete" || localPlanJson.status === "partial")
   ) {
-    return <PlanView planJson={localPlanJson} planReport={localPlanReport} />;
+    return <PlanView planJson={localPlanJson} planReport={localPlanReport} projectId={projectId} />;
   }
 
   return null;

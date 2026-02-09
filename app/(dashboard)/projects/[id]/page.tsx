@@ -8,6 +8,7 @@ import {
   getFilesByProjectId,
   getChatsByProjectId,
   getProjectFolders,
+  getProjectTasksByProjectId,
   updateProjectPhase,
 } from "@/lib/db/queries";
 import { Button } from "@/components/ui/button";
@@ -53,10 +54,11 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     currentPhase = "documents";
   }
 
-  const [files, chats, folders] = await Promise.all([
+  const [files, chats, folders, projectTasks] = await Promise.all([
     getFilesByProjectId({ projectId: id }),
     getChatsByProjectId({ projectId: id }),
     getProjectFolders({ projectId: id }),
+    getProjectTasksByProjectId({ projectId: id }),
   ]);
 
   const tasks = chats.map((chat) => ({
@@ -113,6 +115,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           hasFiles={files.length > 0}
           planJson={(project.planJson as ProfessorPlanJson) ?? null}
           planReport={project.planReport ?? null}
+          projectTasks={projectTasks}
         />
       }
     />

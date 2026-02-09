@@ -4,6 +4,7 @@ import { ApprovedState } from "./phase-states/approved-state";
 import { ExecutionState } from "./phase-states/execution-state";
 import { CompletedState } from "./phase-states/completed-state";
 import type { ProfessorPlanJson } from "@/lib/ai/professor-types";
+import type { ProjectTask } from "@/lib/db/schema";
 
 type TaskStatus = "not_started" | "in_progress" | "done";
 
@@ -22,6 +23,7 @@ interface ProjectWorkAreaProps {
   hasFiles: boolean;
   planJson: ProfessorPlanJson | null;
   planReport: string | null;
+  projectTasks: ProjectTask[];
 }
 
 /**
@@ -36,6 +38,7 @@ export function ProjectWorkArea({
   hasFiles,
   planJson,
   planReport,
+  projectTasks,
 }: ProjectWorkAreaProps) {
   switch (phase) {
     case "setup":
@@ -52,7 +55,7 @@ export function ProjectWorkArea({
       );
 
     case "approved":
-      return <ApprovedState />;
+      return <ApprovedState projectTasks={projectTasks} />;
 
     case "execution":
       return <ExecutionState projectId={projectId} tasks={tasks} />;
