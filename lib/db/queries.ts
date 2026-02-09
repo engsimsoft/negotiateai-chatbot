@@ -2303,3 +2303,121 @@ export async function findManagerChat({ projectId }: { projectId: string }) {
     );
   }
 }
+
+// ============================================
+// ТЗ-C1: ExpertTaskChat Functions
+// ============================================
+
+/**
+ * ТЗ-C1: Get a single project task by ID with project ownership check
+ */
+export async function getProjectTaskById({
+  taskId,
+  projectId,
+}: {
+  taskId: string;
+  projectId: string;
+}) {
+  try {
+    const [task] = await db
+      .select()
+      .from(projectTask)
+      .where(
+        and(eq(projectTask.id, taskId), eq(projectTask.projectId, projectId))
+      );
+
+    return task || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get project task by id"
+    );
+  }
+}
+
+/**
+ * ТЗ-C1: Get completed task summaries for building expert context
+ * Returns tasks with status='done' and non-null outputSummary
+ */
+export async function getCompletedTaskSummaries({
+  projectId,
+}: {
+  projectId: string;
+}) {
+  try {
+    const tasks = await db
+      .select({
+        orderIndex: projectTask.orderIndex,
+        title: projectTask.title,
+        outputSummary: projectTask.outputSummary,
+      })
+      .from(projectTask)
+      .where(
+        and(
+          eq(projectTask.projectId, projectId),
+          eq(projectTask.status, "done"),
+          sql`${projectTask.outputSummary} IS NOT NULL`
+        )
+      )
+      .orderBy(asc(projectTask.orderIndex));
+
+    return tasks as Array<{
+      orderIndex: number;
+      title: string;
+      outputSummary: string;
+    }>;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get completed task summaries"
+    );
+  }
+}
+
+/**
+ * ТЗ-C1: Start a task — create Chat, link to ProjectTask, set status to in_progress
+ * Returns the created chatId
+ */
+export async function startTask({
+  taskId,
+  userId,
+  projectId,
+  taskTitle,
+}: {
+  taskId: string;
+  userId: string;
+  projectId: string;
+  taskTitle: string;
+}) {
+  try {
+    const chatId = generateUUID();
+    const now = new Date();
+
+    // Create chat for this task
+    await db.insert(chat).values({
+      id: chatId,
+      createdAt: now,
+      userId,
+      title: taskTitle,
+      projectId,
+      visibility: "private",
+    });
+
+    // Link chat to task and set status to in_progress
+    await db
+      .update(projectTask)
+      .set({
+        chatId,
+        status: "in_progress",
+        updatedAt: now,
+      })
+      .where(eq(projectTask.id, taskId));
+
+    return chatId;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to start task"
+    );
+  }
+}

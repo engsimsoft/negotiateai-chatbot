@@ -26,15 +26,7 @@ import {
   type ProjectModelTier,
 } from "@/lib/ai/model-tiers";
 import { executeProfessorPipeline } from "@/lib/ai/professor-pipeline";
-import { createDocument } from "@/lib/ai/tools/create-document";
-import { parseExcel } from "@/lib/ai/tools/excel";
-import { getCurrentDate } from "@/lib/ai/tools/get-current-date";
-import { getWeather } from "@/lib/ai/tools/get-weather";
-import { readDocument } from "@/lib/ai/tools/read-document";
-import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
-import { updateDocument } from "@/lib/ai/tools/update-document";
-import { webSearch } from "@/lib/ai/tools/web-search";
-import { loadSkill } from "@/lib/ai/tools/load-skill";
+import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment } from "@/lib/constants";
 import {
   createStreamId,
@@ -423,46 +415,10 @@ export async function POST(request: Request) {
             },
           },
           stopWhen: stepCountIs(5),
-          // Tools: readDocument excluded from project chats (uses legacy knowledge/ folder)
-          // Project documents are already in context via buildProjectContext
-          experimental_activeTools: isProjectChat
-            ? [
-                "getCurrentDate",
-                "getWeather",
-                "webSearch",
-                "createDocument",
-                "updateDocument",
-                "requestSuggestions",
-                "parseExcel",
-                "loadSkill",
-              ]
-            : [
-                "getCurrentDate",
-                "getWeather",
-                "readDocument",
-                "webSearch",
-                "createDocument",
-                "updateDocument",
-                "requestSuggestions",
-                "parseExcel",
-                "loadSkill",
-              ],
+          // ТЗ-C1: Tools extracted to shared module (lib/ai/tools/chat-tools.ts)
+          experimental_activeTools: getActiveToolNames(isProjectChat),
           experimental_transform: smoothStream({ chunking: "word" }),
-          tools: {
-            getCurrentDate,
-            getWeather,
-            // readDocument only for regular chats (legacy knowledge/ folder)
-            ...(isProjectChat ? {} : { readDocument }),
-            createDocument: createDocument({ session, dataStream }),
-            updateDocument: updateDocument({ session, dataStream }),
-            requestSuggestions: requestSuggestions({
-              session,
-              dataStream,
-            }),
-            webSearch,
-            parseExcel,
-            loadSkill,
-          },
+          tools: getStandardTools({ session, dataStream, isProjectChat }),
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
             functionId: "stream-text",
