@@ -5,6 +5,7 @@ import {
   integer,
   json,
   jsonb,
+  pgEnum,
   pgTable,
   primaryKey,
   text,
@@ -147,6 +148,53 @@ export const projectFile = pgTable("ProjectFile", {
 });
 
 export type ProjectFile = InferSelectModel<typeof projectFile>;
+
+// ============================================================================
+// ProjectTask (ТЗ-B2) — задачи проекта из утверждённого плана Профессора
+// ============================================================================
+
+export const projectTaskStatusEnum = pgEnum("project_task_status", [
+  "locked",
+  "pending",
+  "in_progress",
+  "review",
+  "issues",
+  "done",
+]);
+
+export const projectTask = pgTable(
+  "ProjectTask",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    projectId: uuid("projectId")
+      .notNull()
+      .references(() => project.id),
+    orderIndex: integer("orderIndex").notNull(),
+    title: varchar("title", { length: 500 }).notNull(),
+    description: text("description"),
+    goal: text("goal"),
+    input: text("input"),
+    expectedOutput: text("expectedOutput"),
+    status: projectTaskStatusEnum("status").notNull().default("locked"),
+    chatId: uuid("chatId"),
+    inputSummary: text("inputSummary"),
+    outputSummary: text("outputSummary"),
+    professorVerdict: jsonb("professorVerdict"),
+    dependsOn: integer("dependsOn").array(),
+    tools: text("tools").array(),
+    needsReview: boolean("needsReview").notNull().default(false),
+    createdAt: timestamp("createdAt").notNull(),
+    updatedAt: timestamp("updatedAt").notNull(),
+  },
+  (table) => ({
+    chatRef: foreignKey({
+      columns: [table.chatId],
+      foreignColumns: [chat.id],
+    }),
+  })
+);
+
+export type ProjectTask = InferSelectModel<typeof projectTask>;
 
 // ============================================================================
 // Chat

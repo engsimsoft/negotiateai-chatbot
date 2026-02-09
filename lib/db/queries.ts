@@ -35,6 +35,8 @@ import {
   projectFile,
   type ProjectFolder,
   projectFolder,
+  type ProjectTask,
+  projectTask,
   type Suggestion,
   stream,
   suggestion,
@@ -1194,6 +1196,9 @@ export async function updateProjectSummary({
  */
 export async function deleteProjectById({ id }: { id: string }) {
   try {
+    // Delete project tasks (FK: ProjectTask.chatId → Chat.id, must go before chats)
+    await db.delete(projectTask).where(eq(projectTask.projectId, id));
+
     // Get all chats in this project
     const projectChats = await db
       .select({ id: chat.id })
@@ -1720,6 +1725,85 @@ export async function getProjectsWithStats({ userId }: { userId: string }) {
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get projects with stats"
+    );
+  }
+}
+
+// ============================================
+// ProjectTask Functions (ТЗ-B2)
+// ============================================
+
+/**
+ * Bulk-create project tasks from approved plan
+ */
+export async function createProjectTasks({
+  projectId,
+  tasks,
+}: {
+  projectId: string;
+  tasks: Array<{
+    orderIndex: number;
+    title: string;
+    description?: string | null;
+    goal?: string | null;
+    input?: string | null;
+    expectedOutput?: string | null;
+    status: "locked" | "pending";
+    dependsOn?: number[] | null;
+    tools?: string[] | null;
+    needsReview: boolean;
+  }>;
+}) {
+  try {
+    const now = new Date();
+    const rows = tasks.map((t) => ({
+      projectId,
+      orderIndex: t.orderIndex,
+      title: t.title,
+      description: t.description ?? null,
+      goal: t.goal ?? null,
+      input: t.input ?? null,
+      expectedOutput: t.expectedOutput ?? null,
+      status: t.status as "locked" | "pending",
+      dependsOn: t.dependsOn ?? null,
+      tools: t.tools ?? null,
+      needsReview: t.needsReview,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    const created = await db.insert(projectTask).values(rows).returning();
+    return created;
+  } catch (error) {
+    console.error("[createProjectTasks] Error:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create project tasks"
+    );
+  }
+}
+
+/**
+ * Get all tasks for a project, ordered by orderIndex
+ */
+export async function getProjectTasksByProjectId({
+  projectId,
+}: {
+  projectId: string;
+}) {
+  try {
+    const tasks = await db
+      .select()
+      .from(projectTask)
+      .where(eq(projectTask.projectId, projectId))
+      .orderBy(asc(projectTask.orderIndex));
+
+    return tasks;
+  } catch (error) {
+    console.error("[getProjectTasksByProjectId] Error:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get project tasks"
     );
   }
 }
