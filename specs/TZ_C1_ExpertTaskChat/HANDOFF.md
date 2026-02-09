@@ -1,8 +1,8 @@
 # Передача сессии ТЗ-C1: ExpertTaskChat
 
 **Последнее обновление:** 2026-02-10
-**Сессия:** 2 (Разработка — Этап 1)
-**Фаза:** Разработка (Этап 1 завершён, ожидает мануального теста)
+**Сессия:** 2 (Разработка — Этап 1 завершён)
+**Фаза:** Разработка (Этап 1 ✅ → Этап 2 следующий)
 
 ---
 
@@ -14,21 +14,44 @@
 - [ ] Этап 4: Навигация из страницы проекта + Phase Transitions
 - [ ] Этап 5: Финализация
 
+**Git:** `feat(tz-c1): infrastructure — route group, shared tools, prompt builder, DB queries` (коммит 6140746)
+
 ---
 
 ## Следующая сессия: начни с
 
 1. Прочитай этот файл (HANDOFF.md)
-2. Прочитай ROADMAP.md → Этап 1 (детальные задачи)
-3. Запусти `npm run dev` — убедись что проект запускается
-4. **Первая задача:** Создать `app/(task)/layout.tsx`
+2. Прочитай ROADMAP.md → **Этап 2** (детальные задачи)
+3. **Первая задача:** Создать API route `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`
 
-**Порядок Этапа 1:**
-1. Route group + layout → `app/(task)/layout.tsx` + заглушка page.tsx
-2. Shared tools → `lib/ai/tools/chat-tools.ts` + рефакторинг `chat/route.ts`
-3. Expert prompt → `lib/prompts/experts/task-expert.md` + `build-task-expert-prompt.ts`
-4. DB queries → 3 функции в `lib/db/queries.ts`
-5. Валидация: `npx tsc --noEmit` + `npm run build` + проверить что основной чат НЕ СЛОМАЛСЯ
+**Порядок Этапа 2:**
+1. API Route — POST endpoint для чата задачи (streaming + tools + expert prompt)
+2. TaskSidebar — client component со списком задач и навигацией
+3. Page.tsx — заменить заглушку на полную реализацию (auth + guards + startTask + phase transition)
+4. Валидация: `npx tsc --noEmit` + `npm run build` + мануальный тест
+
+---
+
+## Что сделано в сессии 2
+
+**Этап 1 — полностью завершён:**
+
+Новые файлы (5):
+- `app/(task)/layout.tsx` — Layout без Sidebar (SWRProvider + DataStreamProvider + Pyodide)
+- `app/(task)/projects/[id]/tasks/[taskId]/page.tsx` — Заглушка с auth check + data loading
+- `lib/ai/tools/chat-tools.ts` — Shared tools factory: `getStandardTools()` + `getActiveToolNames()`
+- `lib/prompts/experts/task-expert.md` — Ядро промпта Эксперта (без auto_summary/createTaskSnapshot)
+- `lib/prompts/build-task-expert-prompt.ts` — Builder: passport + manifest + task + summaries → string
+
+Изменённые файлы (2):
+- `app/(chat)/api/chat/route.ts` — 9 tool-импортов заменены на 1 shared import (строка 29, строки 418-421)
+- `lib/db/queries.ts` — 3 новые функции в конце файла (~строки 2310-2410)
+
+**Валидация:**
+- `tsc --noEmit` — 0 ошибок ✅
+- `npm run build` — успешен ✅
+- Мануальный тест — чат работает, Markdown + Excel документы создаются ✅
+- Transient DB error от Neon (не связан с рефакторингом, не воспроизводится) ℹ️
 
 ---
 
@@ -36,7 +59,7 @@
 
 - Создана структура `specs/TZ_C1_ExpertTaskChat/` (8 файлов)
 - Изучены 3 документа ТЗ: SPEC, EXPERT_PROMPT, MVP_ROLES_AND_CONTRACTS
-- Изучена кодовая база: chat route (775 строк, tools импортируются), chat.tsx (503 строк, useChat + transport), schema.ts, queries.ts (2306 строк), project-pulse.tsx (425 строк, нет onClick), approved-state.tsx (187 строк, toast заглушка)
+- Изучена кодовая база: chat route, chat.tsx, schema.ts, queries.ts, project-pulse.tsx, approved-state.tsx
 - ANALYSIS.md: 7 вопросов → все ответы получены
 - ROADMAP.md: 5 этапов детально спланированы
 
@@ -47,48 +70,56 @@
 1. **Route group:** `app/(task)/` — отдельная от `(chat)`, свой layout без AppSidebar
 2. **Эксперт первым:** Auto-trigger `sendMessage()` при `initialMessages.length === 0` (только первый визит)
 3. **createTaskSnapshot:** Пропускаем полностью (C1.5)
-4. **Tools:** Извлечь в `lib/ai/tools/chat-tools.ts` — фабрика `getStandardTools({ session, dataStream, isProjectChat })`
+4. **Tools:** Извлечены в `lib/ai/tools/chat-tools.ts` — фабрика `getStandardTools({ session, dataStream, isProjectChat })`
 5. **Модель:** Env variable `EXPERT_MODEL` с fallback на `gemini-3-pro`
 6. **Input:** InputContext система (mode="send"), без multimodal-input, без ModelSelector
 7. **Locked tasks:** AlertDialog, разблокировка по подтверждению (locked → pending → navigate)
 
 ---
 
-## Критичные детали из анализа кодовой базы
+## Критичные детали для Этапа 2
 
-**Tools в chat/route.ts (строки 29-37, 451-465):**
-- Tools ИМПОРТИРУЮТСЯ из `lib/ai/tools/`, не определяются inline
-- Factory-паттерн: `createDocument({ session, dataStream })` — нужны session и dataStream
-- Простые tools: `webSearch`, `parseExcel`, `getCurrentDate`, `getWeather` — без параметров
-- `readDocument` исключается для project chats (`isProjectChat ? {} : { readDocument }`)
+**Shared tools (уже готовы):**
+- `getStandardTools({ session, dataStream, isProjectChat })` — возвращает объект tools для `streamText()`
+- `getActiveToolNames(isProjectChat)` — возвращает `ToolName[]` для `experimental_activeTools`
+- Для TaskChat: `isProjectChat = true` (readDocument исключается, project docs в context)
 
-**Chat.tsx (строки 169-189):**
-- Использует `DefaultChatTransport` с кастомным `prepareSendMessagesRequest`
-- Отправляет ТОЛЬКО последнее сообщение (`request.messages.at(-1)`)
-- Retry логика через `retryableFetch` (для TaskChat НЕ нужна)
+**Expert prompt builder (уже готов):**
+- `buildTaskExpertPrompt({ project, task, completedTasks, manifest })` из `lib/prompts/build-task-expert-prompt.ts`
+- Возвращает `string` (system prompt)
+- `completedTasks` = `getCompletedTaskSummaries({ projectId })` из queries.ts
 
-**Prompt system:**
-- `buildChatPrompt()` из `lib/prompts/server.ts` → наш `buildTaskExpertPrompt()` будет аналогичный, но проще
-- Возвращает `{ systemPrompt: string }`
+**DB queries (уже готовы):**
+- `getProjectTaskById({ taskId, projectId })` — загрузка задачи с проверкой принадлежности
+- `getCompletedTaskSummaries({ projectId })` — done задачи с outputSummary
+- `startTask({ taskId, userId, projectId, taskTitle })` — создаёт Chat, линкует к task, status → in_progress, возвращает chatId
 
-**DB schema:**
-- `ProjectTask.chatId` — uuid, nullable, ссылка на Chat
-- `ProjectTask.status` — enum: locked/pending/in_progress/review/issues/done
-- `Chat.projectId` — nullable, привязка к проекту
-
-**Streaming response:**
+**Паттерн API route (из chat/route.ts, ~775 строк):**
 - `createUIMessageStream()` + `JsonToSseTransformStream()` → SSE
-- Messages сохраняются ДО (user) и ПОСЛЕ (assistant) streaming
+- User message сохраняется ДО streaming (`saveMessages`)
+- Assistant messages сохраняются ПОСЛЕ streaming (в `onFinish`)
+- Tool results фильтруются при сохранении (кроме createDocument/updateDocument)
+- `createStreamId()` создаётся перед streaming
+
+**Chat.tsx (reference для TaskChat, ~503 строк):**
+- `useChat` с `DefaultChatTransport` + кастомным `prepareSendMessagesRequest`
+- Отправляет ТОЛЬКО последнее сообщение (`request.messages.at(-1)`)
+- Для TaskChat: НЕ нужна retry логика (`retryableFetch`)
+
+**Page.tsx (reference: `app/(dashboard)/projects/[id]/page.tsx`):**
+- Server Component, `auth()`, `getProjectById`, ownership guard
+- `Promise.all` для параллельных DB запросов
+- Phase transition: `updateProjectPhase()` при первом визите
 
 ---
 
-## Файлы в работе
+## Файлы в работе (Этап 2)
 
 | Файл | Статус | Примечание |
 |------|--------|------------|
-| `specs/TZ_C1_ExpertTaskChat/ROADMAP.md` | Готов | Основной рабочий документ |
-| `specs/TZ_C1_ExpertTaskChat/ANALYSIS.md` | Готов | 7 вопросов + ответы |
-| `specs/TZ_C1_ExpertTaskChat/EXPERT_PROMPT.md` | Готов | Промпт от PE (исходник) |
+| `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` | Новый | POST endpoint |
+| `components/projects/task-sidebar.tsx` | Новый | Client component |
+| `app/(task)/projects/[id]/tasks/[taskId]/page.tsx` | Обновить | Заменить заглушку на полную версию |
 
 ---
 
@@ -97,16 +128,17 @@
 | Приоритет | Документ | Зачем |
 |-----------|----------|-------|
 | 1 | Этот HANDOFF.md | Контекст передачи |
-| 2 | ROADMAP.md → текущий этап | Задачи, файлы, валидация |
-| 3 | EXPERT_PROMPT.md | Промпт для task-expert.md (при работе над Этапом 1, задача 3) |
+| 2 | ROADMAP.md → Этап 2 | Задачи, файлы, валидация |
+| 3 | `app/(chat)/api/chat/route.ts` (строки 136-663) | Паттерн для API route |
+| 4 | `components/projects/project-pulse.tsx` | Иконки статусов для TaskSidebar |
 
-**НЕ читать:** _archive/, MVP_ROLES_AND_CONTRACTS.md (уже извлечено что нужно), TZ_C1_ExpertTaskChat.md (= SPEC.md)
+**НЕ читать:** _archive/, MVP_ROLES_AND_CONTRACTS.md, TZ_C1_ExpertTaskChat.md, EXPERT_PROMPT.md (уже в task-expert.md)
 
 ---
 
 ## Блокеры / Вопросы
 
-Нет блокеров. Все вопросы разрешены. Можно приступать к Этапу 1.
+Нет блокеров. Все вопросы разрешены. Можно приступать к Этапу 2.
 
 ---
 
