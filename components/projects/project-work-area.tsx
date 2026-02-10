@@ -55,7 +55,7 @@ export function ProjectWorkArea({
       );
 
     case "approved":
-      return <ApprovedState projectTasks={projectTasks} />;
+      return <ApprovedState projectId={projectId} projectTasks={projectTasks} />;
 
     case "execution":
       return <ExecutionState projectId={projectId} tasks={tasks} />;

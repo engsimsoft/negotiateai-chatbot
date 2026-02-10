@@ -13,7 +13,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 5 |
-| Текущий этап | 3 |
+| Текущий этап | 4 |
 | Оценка сессий | 3-4 |
 
 **Решения (из ANALYSIS.md):**
@@ -200,33 +200,31 @@ git commit -m "feat(tz-c1): TaskChat — full chat with expert, auto-trigger, re
 
 ### Этап 4: Навигация из страницы проекта + Phase Transitions
 
-**Статус:** ⬜ Не начат
-
-> ⛔ **НЕ НАЧИНАТЬ** без подтверждения валидации Этапа 3
+**Статус:** ✅ Завершён
 
 **Цель:** Пользователь кликает задачу в Пульсе → переходит на страницу чата. Кнопка «Начать первую задачу» работает. Locked задачи показывают предупреждение.
 
 **Задачи:**
 
 1. **Клик по задаче в ProjectPulse:**
-   - [ ] Обновить `components/projects/project-pulse.tsx` — добавить onClick на карточки задач
-   - [ ] pending/in_progress/done/review/issues → `router.push(/projects/${projectId}/tasks/${taskId})`
-   - [ ] locked → открыть AlertDialog: «Рекомендуем сначала завершить задачу N. Результаты предыдущих задач используются в следующих. Начать всё равно?»
-   - [ ] При подтверждении locked: вызвать API для разблокировки (status: locked → pending) + navigate
-   - [ ] Cursor pointer на кликабельных задачах, hover эффект
+   - [x] Обновить `components/projects/project-pulse.tsx` — добавить onClick на карточки задач
+   - [x] pending/in_progress/done/review/issues → `router.push(/projects/${projectId}/tasks/${taskId})`
+   - [x] locked → открыть AlertDialog: «Рекомендуем сначала завершить задачу N. Результаты предыдущих задач используются в следующих. Начать всё равно?»
+   - [x] При подтверждении locked: вызвать API для разблокировки (status: locked → pending) + navigate
+   - [x] Cursor pointer на кликабельных задачах, hover эффект
 
 2. **Кнопка «Начать первую задачу»:**
-   - [ ] Обновить `components/projects/phase-states/approved-state.tsx` — заменить toast заглушку
-   - [ ] Найти первую задачу со статусом pending → `router.push(/projects/${projectId}/tasks/${taskId})`
-   - [ ] Если нет pending задач (все locked) → найти первую locked → предложить начать
+   - [x] Обновить `components/projects/phase-states/approved-state.tsx` — заменить toast заглушку
+   - [x] Найти первую задачу со статусом pending → `router.push(/projects/${projectId}/tasks/${taskId})`
+   - [x] Если нет pending задач (все locked) → найти первую locked → предложить начать
 
 3. **API для разблокировки задачи:**
-   - [ ] Добавить PATCH endpoint или использовать существующий для обновления status locked → pending
-   - [ ] Или: добавить в `lib/db/queries.ts` функцию `unlockTask({ taskId })`
+   - [x] POST endpoint `app/(chat)/api/projects/[id]/tasks/[taskId]/unlock/route.ts`
+   - [x] `unlockTask({ taskId })` в `lib/db/queries.ts`
 
 4. **Карточки задач в approved-state — кликабельные:**
-   - [ ] Добавить onClick на карточки задач в `approved-state.tsx`
-   - [ ] Та же логика что в ProjectPulse (pending → navigate, locked → dialog)
+   - [x] Добавить onClick на карточки задач в `approved-state.tsx`
+   - [x] Та же логика что в ProjectPulse (pending → navigate, locked → dialog)
 
 **Файлы:**
 - `components/projects/project-pulse.tsx` — обновление (клик по задачам)
@@ -234,8 +232,8 @@ git commit -m "feat(tz-c1): TaskChat — full chat with expert, auto-trigger, re
 - `lib/db/queries.ts` — добавление `unlockTask()` (если нужно)
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: Страница проекта (approved phase) → клик на pending задачу → переход на чат
 - [ ] Браузер: Кнопка «Начать первую задачу» → переход на первую pending задачу
 - [ ] Браузер: Клик на locked задачу → AlertDialog → подтвердить → переход

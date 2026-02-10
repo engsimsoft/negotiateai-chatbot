@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   Lock,
@@ -9,10 +11,19 @@ import {
   Brain,
   Play,
 } from "lucide-react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { ProjectTask } from "@/lib/db/schema";
 
 // ============================================================================
@@ -77,17 +88,59 @@ function TaskStatusBadge({ status, dependsOn }: { status: string; dependsOn: num
 // ============================================================================
 
 interface ApprovedStateProps {
+  projectId: string;
   projectTasks: ProjectTask[];
 }
 
 /**
- * ТЗ-B2: Approved state — карта задач после утверждения плана
+ * ТЗ-B2 + ТЗ-C1: Approved state — карта задач после утверждения плана
+ * Клик по задаче → переход на страницу чата с Экспертом
  */
-export function ApprovedState({ projectTasks }: ApprovedStateProps) {
-  const handleStartTask = () => {
-    toast("Скоро — в следующем обновлении", {
-      description: "Открытие задач будет доступно совсем скоро.",
-    });
+export function ApprovedState({ projectId, projectTasks }: ApprovedStateProps) {
+  const router = useRouter();
+  const [lockedDialogOpen, setLockedDialogOpen] = useState(false);
+  const [lockedTask, setLockedTask] = useState<ProjectTask | null>(null);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+
+  const handleTaskClick = (task: ProjectTask) => {
+    if (task.status === "locked") {
+      setLockedTask(task);
+      setLockedDialogOpen(true);
+    } else {
+      router.push(`/projects/${projectId}/tasks/${task.id}`);
+    }
+  };
+
+  const handleUnlockAndNavigate = async () => {
+    if (!lockedTask) return;
+    setIsUnlocking(true);
+    try {
+      const res = await fetch(
+        `/api/projects/${projectId}/tasks/${lockedTask.id}/unlock`,
+        { method: "POST" }
+      );
+      if (res.ok) {
+        setLockedDialogOpen(false);
+        router.push(`/projects/${projectId}/tasks/${lockedTask.id}`);
+      }
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  const handleStartFirstTask = () => {
+    // Find first pending task
+    const firstPending = projectTasks.find((t) => t.status === "pending");
+    if (firstPending) {
+      router.push(`/projects/${projectId}/tasks/${firstPending.id}`);
+      return;
+    }
+    // If no pending, find first locked and offer to unlock
+    const firstLocked = projectTasks.find((t) => t.status === "locked");
+    if (firstLocked) {
+      setLockedTask(firstLocked);
+      setLockedDialogOpen(true);
+    }
   };
 
   if (projectTasks.length === 0) {
@@ -120,10 +173,15 @@ export function ApprovedState({ projectTasks }: ApprovedStateProps) {
           </div>
         </div>
 
-        {/* Task cards */}
+        {/* Task cards — clickable (ТЗ-C1) */}
         <div className="space-y-3">
           {projectTasks.map((task) => (
-            <div key={task.id} className="rounded-lg border p-4">
+            <button
+              key={task.id}
+              type="button"
+              onClick={() => handleTaskClick(task)}
+              className="w-full rounded-lg border p-4 text-left transition-colors hover:bg-muted/50 cursor-pointer"
+            >
               <div className="flex items-start gap-3">
                 <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                   {task.orderIndex}
@@ -169,18 +227,46 @@ export function ApprovedState({ projectTasks }: ApprovedStateProps) {
                   </div>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
 
-        {/* Start button (stub) */}
+        {/* Start button */}
         <div className="pb-8">
-          <Button className="w-full gap-2" onClick={handleStartTask}>
+          <Button className="w-full gap-2" onClick={handleStartFirstTask}>
             <Play className="size-4" />
             Начать первую задачу
           </Button>
         </div>
       </div>
+
+      {/* ТЗ-C1: AlertDialog for locked tasks */}
+      <AlertDialog open={lockedDialogOpen} onOpenChange={setLockedDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Задача заблокирована</AlertDialogTitle>
+            <AlertDialogDescription>
+              Рекомендуем сначала завершить{" "}
+              {lockedTask?.dependsOn?.length
+                ? `задач${lockedTask.dependsOn.length > 1 ? "и" : "у"} ${lockedTask.dependsOn.join(", ")}`
+                : "предыдущие задачи"}
+              . Результаты предыдущих задач используются в следующих.
+              <br />
+              <br />
+              Начать всё равно?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUnlocking}>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnlockAndNavigate}
+              disabled={isUnlocking}
+            >
+              {isUnlocking ? "Разблокировка..." : "Начать задачу"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

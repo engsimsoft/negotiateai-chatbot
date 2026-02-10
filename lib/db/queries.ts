@@ -2375,6 +2375,31 @@ export async function getCompletedTaskSummaries({
 }
 
 /**
+ * ТЗ-C1: Unlock a locked task (status: locked → pending)
+ * Used when user confirms they want to start a locked task out of order
+ */
+export async function unlockTask({ taskId }: { taskId: string }) {
+  try {
+    const [updated] = await db
+      .update(projectTask)
+      .set({
+        status: "pending",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(projectTask.id, taskId), eq(projectTask.status, "locked"))
+      );
+
+    return updated || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to unlock task"
+    );
+  }
+}
+
+/**
  * ТЗ-C1: Start a task — create Chat, link to ProjectTask, set status to in_progress
  * Returns the created chatId
  */

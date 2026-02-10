@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Check,
   Circle,
@@ -21,6 +22,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ProjectFilesCard } from "@/components/projects/project-files-card";
 import { cn } from "@/lib/utils";
 import type { ProjectFile, ProjectFolder, ProjectTask } from "@/lib/db/schema";
@@ -136,9 +147,41 @@ export function ProjectPulse({
   context,
   createdAt,
 }: ProjectPulseProps) {
+  const router = useRouter();
   const [planOpen, setPlanOpen] = useState(true);
   const [filesOpen, setFilesOpen] = useState(true);
   const [passportOpen, setPassportOpen] = useState(false);
+
+  // ТЗ-C1: AlertDialog state for locked tasks
+  const [lockedDialogOpen, setLockedDialogOpen] = useState(false);
+  const [lockedTask, setLockedTask] = useState<ProjectTask | null>(null);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+
+  const handleTaskClick = (task: ProjectTask) => {
+    if (task.status === "locked") {
+      setLockedTask(task);
+      setLockedDialogOpen(true);
+    } else {
+      router.push(`/projects/${projectId}/tasks/${task.id}`);
+    }
+  };
+
+  const handleUnlockAndNavigate = async () => {
+    if (!lockedTask) return;
+    setIsUnlocking(true);
+    try {
+      const res = await fetch(
+        `/api/projects/${projectId}/tasks/${lockedTask.id}/unlock`,
+        { method: "POST" }
+      );
+      if (res.ok) {
+        setLockedDialogOpen(false);
+        router.push(`/projects/${projectId}/tasks/${lockedTask.id}`);
+      }
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
 
   // Plan tasks from Professor (planning phase)
   const hasPlanTasks = planJson && isPlanWithTasks(planJson);
@@ -256,12 +299,19 @@ export function ProjectPulse({
                   )}
                 </div>
 
-                {/* ProjectTask list */}
+                {/* ProjectTask list — clickable (ТЗ-C1) */}
                 <div className="py-1">
                   {projectTasks.map((task) => (
-                    <div
+                    <button
                       key={task.id}
-                      className="flex items-center gap-2.5 px-4 py-2 text-sm"
+                      type="button"
+                      onClick={() => handleTaskClick(task)}
+                      className={cn(
+                        "flex w-full items-center gap-2.5 px-4 py-2 text-sm text-left transition-colors",
+                        task.status === "locked"
+                          ? "cursor-pointer hover:bg-muted/30"
+                          : "cursor-pointer hover:bg-muted/50"
+                      )}
                     >
                       <ProjectTaskStatusIcon status={task.status} />
                       <span className="text-xs text-muted-foreground tabular-nums w-4 shrink-0">
@@ -276,7 +326,7 @@ export function ProjectPulse({
                       >
                         {task.title}
                       </span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </>
@@ -419,6 +469,34 @@ export function ProjectPulse({
           </div>
         </CollapsibleContent>
       </Collapsible>
+
+      {/* ТЗ-C1: AlertDialog for locked tasks */}
+      <AlertDialog open={lockedDialogOpen} onOpenChange={setLockedDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Задача заблокирована</AlertDialogTitle>
+            <AlertDialogDescription>
+              Рекомендуем сначала завершить{" "}
+              {lockedTask?.dependsOn?.length
+                ? `задач${lockedTask.dependsOn.length > 1 ? "и" : "у"} ${lockedTask.dependsOn.join(", ")}`
+                : "предыдущие задачи"}
+              . Результаты предыдущих задач используются в следующих.
+              <br />
+              <br />
+              Начать всё равно?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUnlocking}>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnlockAndNavigate}
+              disabled={isUnlocking}
+            >
+              {isUnlocking ? "Разблокировка..." : "Начать задачу"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
