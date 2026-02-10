@@ -63,6 +63,8 @@
 - `lib/prompts/skills/` — Атомарные навыки (SKILL.md)
 - `lib/prompts/agents/` — Персонажи-агенты (AGENT.md + config.yaml)
 - `lib/prompts/professors/` — Промпты профессоров (planning.md)
+- `lib/prompts/experts/` — Промпты экспертов (task-expert.md)
+- `lib/prompts/build-task-expert-prompt.ts` — Prompt builder для Эксперта
 - `lib/prompts/clerks/` — Промпты клерков (file-analyzer.md)
 - `lib/prompts/service-chats/` — Промпты сервисных чатов (project-creation.md, project-manager.md)
 - `lib/prompts/core/` — Базовые промпты (.md файлы)

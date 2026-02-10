@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-02-09
+**Обновлено:** 2026-02-10
 
 ---
 
@@ -22,6 +22,7 @@
 | **Создание проекта** | Gemini 3 Pro | ✅ Работает | Секретарь — AI-интервью для создания проекта |
 | **Менеджер проекта** | Gemini 2.5 Flash | ✅ Работает | Живой AI-диалог, управление проектом |
 | **Профессор планирования** | Gemini 3 Pro | ✅ Работает | Генерация плана задач проекта (v3.14) |
+| **Эксперт по задаче** | Gemini 3 Pro (env) | ✅ Работает | AI-диалог по конкретной задаче проекта (v3.16) |
 | **Клерк-анализатор** | Gemini 2.5 Flash | ✅ Работает | Автоматический анализ файлов проекта |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
 | **Preset Помощники** | Gemini 3 Pro / 2.5 Flash | ⚠️ Частично | Маркетолог, Копирайтер и др. |
@@ -77,8 +78,8 @@ app/(chat)/api/service-chat/route.ts                # API (context: project-crea
 
 **Mode injection по phase:**
 - `first_contact` (phase: setup/documents) — полный режим знакомства + план Профессора (если есть) через `<professor_plan>` XML-блок
-- `plan_presentation` (phase: approved) — stub для будущего ТЗ-C1
-- `navigation` (phase: execution) — stub для будущего ТЗ-C1
+- `plan_presentation` (phase: approved) — taskStatuses XML в system prompt (ТЗ-B2)
+- `navigation` (phase: execution) — taskStatuses XML в system prompt (ТЗ-B2)
 
 **Файлы:**
 ```
@@ -121,6 +122,44 @@ lib/prompts/professors/planning.md                  # Промпт Профес�
 components/projects/phase-states/planning-state.tsx  # UI (3 состояния)
 components/projects/project-pulse.tsx                # Превью плана в Пульсе
 app/(chat)/api/service-chat/route.ts                # Manager с план-контекстом
+```
+
+#### Эксперт по задаче (ExpertTaskChat v3.16)
+**Где:** Клик по задаче в Пульсе или ApprovedState → `/projects/[id]/tasks/[taskId]`
+
+| Параметр | Значение |
+|----------|----------|
+| **Модель** | `process.env.EXPERT_MODEL \|\| 'gemini-3-pro'` |
+| **Оболочка** | Отдельная route group `app/(task)/` — полноэкранный layout без AppSidebar |
+| **Промпт** | `lib/prompts/experts/task-expert.md` + `buildTaskExpertPrompt()` |
+| **Инструменты** | Shared tools (search, documents, excel) — `getStandardTools()` |
+| **Персистенция** | Серверная (Chat в БД, привязан к ProjectTask через chatId) |
+| **Артефакты** | Поддерживаются (SidebarProvider в layout) |
+
+**Как работает:**
+1. Пользователь кликает задачу в Пульсе или ApprovedState
+2. Locked задачи → AlertDialog с предупреждением, разблокировка через `POST /unlock`
+3. При первом визите: `startTask()` создаёт Chat, обновляет ProjectTask.chatId + status → in_progress
+4. Phase transition: если project.phase === 'approved' → автоматически обновляется на 'execution'
+5. Auto-trigger: Эксперт начинает первым — `sendMessage('[SYSTEM: Задача открыта. Начни работу.]')`
+6. System prompt включает: контекст проекта, описание задачи, результаты завершённых задач, manifest
+7. TaskSidebar позволяет переключаться между задачами
+
+**UI компоненты:**
+- **TaskChat** — полноценный чат: Messages, Artifact, MultimodalInput, DataStreamHandler
+- **TaskSidebar** — навигация: список задач с иконками статусов, сворачивание, «← К проекту»
+
+**Файлы:**
+```
+app/(task)/layout.tsx                                    # Layout (SWRProvider + DataStreamProvider + SidebarProvider)
+app/(task)/projects/[id]/tasks/[taskId]/page.tsx          # Server Component (auth + guards + startTask)
+app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts # Streaming endpoint
+app/(chat)/api/projects/[id]/tasks/[taskId]/unlock/route.ts # Unlock locked → pending
+components/projects/task-chat.tsx                         # Клиент чата
+components/projects/task-sidebar.tsx                      # Навигация по задачам
+lib/ai/tools/chat-tools.ts                               # Shared tools (getStandardTools)
+lib/prompts/experts/task-expert.md                        # Промпт Эксперта
+lib/prompts/build-task-expert-prompt.ts                   # Prompt builder
 ```
 
 #### Клерк-анализатор файлов (v3.13)
@@ -377,6 +416,8 @@ lib/prompts/
 │   └── document/          # Skills для документов
 ├── professors/            # Промпты профессоров (v3.14)
 │   └── planning.md        # Профессор планирования
+├── experts/               # Промпты экспертов (v3.16)
+│   └── task-expert.md     # Эксперт по задаче
 ├── clerks/                # Промпты клерков (v3.13)
 │   └── file-analyzer.md   # Клерк-анализатор файлов
 ├── service-chats/         # Промпты сервисных чатов (v3.11+)

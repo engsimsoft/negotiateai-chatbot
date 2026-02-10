@@ -1,8 +1,8 @@
 # Simply — Система промптов и помощники
 
-**Версия:** 3.13.0
-**Последнее обновление:** 2026-02-08
-**Статус:** Skills + Agents + Clerks Architecture
+**Версия:** 3.16.0
+**Последнее обновление:** 2026-02-10
+**Статус:** Skills + Agents + Experts + Clerks Architecture
 
 ---
 
@@ -242,6 +242,49 @@ AI-интервью для создания проектов.
 
 ---
 
+## Эксперты (v3.16)
+
+> Эксперты — AI-агенты для конкретных задач проекта. Полноценный интерактивный чат с инструментами.
+
+### Эксперт по задаче (`task-expert`)
+
+AI-диалог по конкретной ProjectTask. Эксперт получает полный контекст задачи и проекта.
+
+| Параметр | Значение |
+|----------|----------|
+| ID | `task-expert` |
+| Модель | `process.env.EXPERT_MODEL \|\| 'gemini-3-pro'` |
+| Промпт | `lib/prompts/experts/task-expert.md` |
+| Prompt builder | `lib/prompts/build-task-expert-prompt.ts` |
+| Endpoint | `POST /api/projects/[id]/tasks/[taskId]/chat` |
+| Инструменты | Все shared tools (search, documents, weather, excel) |
+| Артефакты | Поддерживаются |
+
+**Контекст промпта (buildTaskExpertPrompt):**
+- `project` — название, описание, контекст, инструкция проекта
+- `task` — title, description, goal, input, expectedOutput, tools
+- `completedTasks[]` — outputSummary завершённых задач (контекст предыдущей работы)
+- `manifest` — структура файлов проекта
+
+**Что делает:**
+1. При открытии задачи auto-trigger отправляет системное сообщение
+2. Эксперт анализирует задачу и предлагает план работы
+3. Ведёт интерактивный диалог с пользователем
+4. Использует инструменты (search, создание документов, excel)
+5. Результаты сохраняются в Chat, привязанном к ProjectTask
+
+**Файлы:**
+```
+lib/prompts/experts/task-expert.md           # Промпт Эксперта
+lib/prompts/build-task-expert-prompt.ts      # Prompt builder
+app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts # Streaming endpoint
+components/projects/task-chat.tsx             # UI чата
+components/projects/task-sidebar.tsx          # Навигация
+lib/ai/tools/chat-tools.ts                   # Shared tools
+```
+
+---
+
 ## Клерки (v3.13)
 
 > Клерки — backend-процессы без UI. Вызываются автоматически, не интерактивные.
@@ -456,4 +499,4 @@ components/modal-assistants/
 
 ---
 
-**Обновлено:** 2026-02-08
+**Обновлено:** 2026-02-10

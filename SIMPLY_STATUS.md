@@ -141,6 +141,9 @@ lib/prompts/
 ├── professors/                  # Промпты профессоров (v3.14)
 │   └── planning.md          # Профессор планирования
 │
+├── experts/                     # Промпты экспертов (v3.16)
+│   └── task-expert.md       # Эксперт по задаче
+│
 ├── clerks/                      # Промпты клерков (v3.13)
 │   └── file-analyzer.md     # Клерк-анализатор файлов
 │
@@ -296,27 +299,57 @@ components/projects/
 ### ТЗ-C1: ExpertTaskChat — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
-- **Route group `app/(task)/`** — отдельная от `(chat)`, layout без AppSidebar но с SidebarProvider
-- **Чат с Экспертом (TaskChat)** — полноценный AI-диалог для каждой ProjectTask: streaming, артефакты (canvas), tools, голосовой ввод
-- **Auto-trigger** — Эксперт начинает первым при открытии новой задачи
-- **TaskSidebar** — навигация между задачами (иконки статусов, сворачивание, «← К проекту»)
-- **Expert Prompt** — `task-expert.md` + `buildTaskExpertPrompt()` с контекстом проекта, задачи и результатов предыдущих задач
-- **Shared Tools** — `chat-tools.ts` — рефакторинг inline tools в shared модуль
-- **Phase transition** — автопереход approved → execution при первом открытии задачи
-- **Навигация из проекта** — клик по карточке задачи в Пульсе и ApprovedState → переход в чат
-- **AlertDialog для locked задач** — предупреждение о зависимостях, разблокировка по подтверждению
-- **Unlock API** — `POST /api/projects/[id]/tasks/[taskId]/unlock` (auth + guards + unlockTask)
+- **Route group `app/(task)/`** — отдельная от `(chat)`, layout без AppSidebar но с SidebarProvider (для артефактов)
+- **Чат с Экспертом (TaskChat)** — полноценный AI-диалог для каждой ProjectTask: streaming, артефакты (canvas), shared tools, голосовой ввод
+- **Auto-trigger** — Эксперт начинает первым при открытии новой задачи (`[SYSTEM: Задача открыта. Начни работу.]`)
+- **TaskSidebar** — навигация между задачами проекта (иконки 6 статусов, сворачивание, «← К проекту»)
+- **Expert Prompt** — `task-expert.md` + `buildTaskExpertPrompt()` с контекстом проекта, задачи и outputSummary завершённых задач
+- **Shared Tools** — `chat-tools.ts` — фабричная функция `getStandardTools({ session, dataStream, isProjectChat })`, рефакторинг inline tools из `chat/route.ts`
+- **Phase transition** — автопереход `approved → execution` при первом открытии задачи (server-side в page.tsx)
+- **Навигация из проекта** — клик по карточке задачи в Пульсе и ApprovedState → `router.push()` к чату
+- **AlertDialog для locked задач** — Controlled state в ProjectPulse и ApprovedState: предупреждение о зависимостях, разблокировка по подтверждению
+- **Unlock API** — `POST /api/projects/[id]/tasks/[taskId]/unlock` (auth + ownership guard + status guard + unlockTask)
+
+**Архитектурные решения:**
+- Route group `(task)` — изолированный layout без AppSidebar, но с SidebarProvider для Artifact useSidebar context
+- `DefaultChatTransport` — custom API path `/api/projects/${projectId}/tasks/${taskId}/chat`
+- Модель через env: `process.env.EXPERT_MODEL || 'gemini-3-pro'` — гибкость без хардкода
+- `startTask()` — атомарная операция: создание Chat + обновление ProjectTask.chatId + status → in_progress
+- `createTaskSnapshot` — пропущен (запланирован в C1.5)
+- Карточки задач `<div>` → `<button>` с hover эффектами и cursor pointer
+
+**User flow:**
+1. Страница проекта → Пульс/ApprovedState → клик по задаче
+2. Locked → AlertDialog → подтверждение → unlock API → navigate
+3. Pending → navigate → `page.tsx` (Server Component) → `startTask()` → создание Chat + phase transition
+4. Auto-trigger → Эксперт стримит первое сообщение
+5. Пользователь ведёт диалог → Эксперт использует tools, создаёт артефакты
+6. TaskSidebar → переключение между задачами
+7. «← К проекту» → возврат, Пульс показывает обновлённые статусы
+
+**DB queries добавлены:**
+- `getProjectTaskById({ taskId, projectId })` — загрузка задачи с проверкой принадлежности
+- `getCompletedTaskSummaries({ projectId })` — задачи со status='done' и outputSummary
+- `startTask({ taskId, userId, projectId, taskTitle })` — создание Chat, обновление ProjectTask
+- `unlockTask({ taskId })` — status: locked → pending
+
+**API endpoints добавлены:**
+- `POST /api/projects/[id]/tasks/[taskId]/chat` — streaming чат с Экспертом
+- `POST /api/projects/[id]/tasks/[taskId]/unlock` — разблокировка задачи
 
 **Ключевые файлы:**
-- `app/(task)/layout.tsx` — layout route group
-- `app/(task)/projects/[id]/tasks/[taskId]/page.tsx` — страница задачи
-- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — streaming endpoint
-- `app/(chat)/api/projects/[id]/tasks/[taskId]/unlock/route.ts` — unlock endpoint
-- `components/projects/task-chat.tsx` — чат с Экспертом
-- `components/projects/task-sidebar.tsx` — навигация по задачам
-- `lib/ai/tools/chat-tools.ts` — shared tools
+- `app/(task)/layout.tsx` — layout route group (SWRProvider + DataStreamProvider + SidebarProvider)
+- `app/(task)/projects/[id]/tasks/[taskId]/page.tsx` — Server Component (auth + guards + startTask + phase transition)
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — streaming endpoint (expert prompt + shared tools)
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/unlock/route.ts` — unlock endpoint (auth + guards)
+- `components/projects/task-chat.tsx` — чат с Экспертом (useChat + Messages + Artifact + MultimodalInput)
+- `components/projects/task-sidebar.tsx` — навигация по задачам (статусы, сворачивание)
+- `lib/ai/tools/chat-tools.ts` — shared tools factory (getStandardTools)
 - `lib/prompts/experts/task-expert.md` — промпт Эксперта
-- `lib/prompts/build-task-expert-prompt.ts` — prompt builder
+- `lib/prompts/build-task-expert-prompt.ts` — prompt builder (project + task + completedTasks + manifest)
+- `components/projects/project-pulse.tsx` — кликабельные карточки задач + AlertDialog
+- `components/projects/phase-states/approved-state.tsx` — кнопка «Начать первую задачу» + навигация + AlertDialog
+- `lib/db/queries.ts` — 4 новые функции (getProjectTaskById, getCompletedTaskSummaries, startTask, unlockTask)
 
 **Детали:** [_archive/TZ_C1_ExpertTaskChat/](_archive/TZ_C1_ExpertTaskChat/)
 
