@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.15.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.16.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -119,10 +119,10 @@
 - `lib/ai/tools/` — Инструменты (search, excel, web scraping)
 - `lib/ai/tools/excel/` — Excel tools (create, parse, edit)
 
-**Projects (v3.15.0 — Approval + ProjectTask):**
+**Projects (v3.16.0 — ExpertTaskChat):**
 - `app/(dashboard)/projects/[id]/page.tsx` — Страница проекта (Server Component)
 - `components/projects/project-page-layout.tsx` — Двухколоночный layout (Пульс + WorkArea + Drawer)
-- `components/projects/project-pulse.tsx` — Навигационный Пульс (План, Файлы, Паспорт) + ProjectTask[] при approved+
+- `components/projects/project-pulse.tsx` — Навигационный Пульс (План, Файлы, Паспорт) + ProjectTask[] кликабельные
 - `components/projects/project-work-area.tsx` — Рабочая область (switch по phase)
 - `components/projects/manager-drawer.tsx` — Push-drawer Менеджера с живым AI-диалогом (ServiceChatCore)
 - `components/projects/project-files-card.tsx` — Файлы проекта (auto-analyze, documentType, tooltip)
@@ -134,9 +134,20 @@
 - `app/(chat)/api/projects/[id]/plan/route.ts` — Профессор планирования (Gemini 3 Pro)
 - `app/(chat)/api/projects/[id]/approve-plan/route.ts` — Утверждение плана → ProjectTask[]
 - `app/(chat)/api/projects/[id]/tasks/route.ts` — GET ProjectTask[]
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — Чат с Экспертом (streaming)
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/unlock/route.ts` — Разблокировка locked задачи
 - `app/(chat)/api/projects/[id]/analyze-file/route.ts` — Клерк-анализатор файлов (Gemini Flash)
 - `lib/ai/professor-types.ts` — Zod-схемы плана (tasks, risks, recommendations, caveats)
+- `lib/ai/tools/chat-tools.ts` — Shared tools (getStandardTools)
 - `components/projects/professor-progress.tsx` — UI прогресса pipeline
+
+**ExpertTaskChat (v3.16.0):**
+- `app/(task)/layout.tsx` — Layout route group (SWRProvider + DataStreamProvider, без AppSidebar)
+- `app/(task)/projects/[id]/tasks/[taskId]/page.tsx` — Страница задачи (Server Component, auth + guards)
+- `components/projects/task-chat.tsx` — Полноценный чат с Экспертом (streaming, артефакты, auto-trigger)
+- `components/projects/task-sidebar.tsx` — Навигация между задачами (статусы, сворачивание, «← К проекту»)
+- `lib/prompts/experts/task-expert.md` — Промпт Эксперта
+- `lib/prompts/build-task-expert-prompt.ts` — Prompt builder (project + task + completedTasks + manifest)
 
 **Voice Input (Deepgram):**
 - `app/(chat)/api/deepgram/token/route.ts` — Token API
@@ -164,7 +175,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**
@@ -343,4 +354,4 @@ specs/
 
 ---
 
-**Обновлено:** 2026-02-09
+**Обновлено:** 2026-02-10

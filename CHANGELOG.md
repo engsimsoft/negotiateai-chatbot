@@ -12,6 +12,31 @@
 
 ---
 
+## [3.16.0] - 2026-02-10 - ExpertTaskChat (ТЗ-C1)
+
+**MINOR RELEASE**: Чат с Экспертом по задачам проекта — полноценный AI-диалог для каждой ProjectTask с auto-trigger, артефактами, навигацией и разблокировкой locked задач.
+
+### Added
+- **Route group `app/(task)/`** — отдельная от `(chat)`, layout без AppSidebar но с SidebarProvider
+- **`POST /api/projects/[id]/tasks/[taskId]/chat`** — streaming endpoint для чата с Экспертом (auth + guards + expert prompt + shared tools)
+- **`POST /api/projects/[id]/tasks/[taskId]/unlock`** — разблокировка locked задач (status: locked → pending)
+- **`TaskChat`** — полноценный чат с Экспертом: streaming, артефакты (canvas), tools, голосовой ввод
+- **`TaskSidebar`** — навигация между задачами проекта (иконки статусов, сворачивание, подвал «← К проекту»)
+- **Auto-trigger** — Эксперт начинает первым при открытии новой задачи (`[SYSTEM: Задача открыта. Начни работу.]`)
+- **Expert Prompt** — `lib/prompts/experts/task-expert.md` + `buildTaskExpertPrompt()` с контекстом проекта и задачи
+- **Shared Tools** — `lib/ai/tools/chat-tools.ts` — фабричная функция `getStandardTools()` (рефакторинг из chat route)
+- **Phase transition** — автопереход approved → execution при первом открытии задачи
+- **AlertDialog** — предупреждение для locked задач в ProjectPulse и ApprovedState с разблокировкой
+
+### Changed
+- **`project-pulse.tsx`** — карточки ProjectTask кликабельные: pending/in_progress/done → navigate, locked → AlertDialog
+- **`approved-state.tsx`** — кнопка «Начать первую задачу» с реальной навигацией, кликабельные карточки задач
+- **`project-work-area.tsx`** — передача `projectId` в ApprovedState
+- **`lib/db/queries.ts`** — добавлены `getProjectTaskById()`, `getCompletedTaskSummaries()`, `startTask()`, `unlockTask()`
+- **`app/(chat)/api/chat/route.ts`** — рефакторинг: inline tools → импорт из shared модуля
+
+---
+
 ## [3.15.0] - 2026-02-09 - Approval + ProjectTask (ТЗ-B2)
 
 **MINOR RELEASE**: Утверждение плана, таблица ProjectTask, карта задач в рабочей области и Пульсе, контекст задач для Менеджера.

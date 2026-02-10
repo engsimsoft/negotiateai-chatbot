@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.15.0
-**Дата:** 2026-02-09
+**Версия:** 3.16.0
+**Дата:** 2026-02-10
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -25,7 +25,7 @@
 | Особенность | Описание | Статус |
 |-------------|----------|--------|
 | **Универсальный AI-чат** | Один мощный чат со всеми инструментами | ✅ |
-| **Проекты** | Изолированные рабочие пространства с Профессором, Менеджером, утверждением плана и картой задач | ✅ v3.15.0 |
+| **Проекты** | Изолированные рабочие пространства с Профессором, Менеджером, утверждением плана, картой задач и чатом с Экспертом | ✅ v3.16.0 |
 | **Сервисные помощники** | Бен (❓), Секретарь (➕), Менеджер (👤) | ✅ v3.13.0 |
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG/Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity, Plus AI, Ideogram, AssemblyAI | 📋 Фаза 1 |
@@ -88,6 +88,7 @@
 | **project-creation** | Gemini 3 Pro | Секретарь — AI-интервью для создания проектов |
 | **project-manager** | Gemini 2.5 Flash | Менеджер проекта (живой AI-диалог) |
 | **professor-planning** | Gemini 3 Pro | Профессор планирования — генерация плана задач |
+| **task-expert** | Gemini 3 Pro (env) | Эксперт — AI-диалог по задаче проекта |
 | **file-analyzer** (Клерк) | Gemini 2.5 Flash | Автоанализ файлов проекта |
 
 ### Файловая структура
@@ -291,6 +292,33 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-C1: ExpertTaskChat — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Route group `app/(task)/`** — отдельная от `(chat)`, layout без AppSidebar но с SidebarProvider
+- **Чат с Экспертом (TaskChat)** — полноценный AI-диалог для каждой ProjectTask: streaming, артефакты (canvas), tools, голосовой ввод
+- **Auto-trigger** — Эксперт начинает первым при открытии новой задачи
+- **TaskSidebar** — навигация между задачами (иконки статусов, сворачивание, «← К проекту»)
+- **Expert Prompt** — `task-expert.md` + `buildTaskExpertPrompt()` с контекстом проекта, задачи и результатов предыдущих задач
+- **Shared Tools** — `chat-tools.ts` — рефакторинг inline tools в shared модуль
+- **Phase transition** — автопереход approved → execution при первом открытии задачи
+- **Навигация из проекта** — клик по карточке задачи в Пульсе и ApprovedState → переход в чат
+- **AlertDialog для locked задач** — предупреждение о зависимостях, разблокировка по подтверждению
+- **Unlock API** — `POST /api/projects/[id]/tasks/[taskId]/unlock` (auth + guards + unlockTask)
+
+**Ключевые файлы:**
+- `app/(task)/layout.tsx` — layout route group
+- `app/(task)/projects/[id]/tasks/[taskId]/page.tsx` — страница задачи
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — streaming endpoint
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/unlock/route.ts` — unlock endpoint
+- `components/projects/task-chat.tsx` — чат с Экспертом
+- `components/projects/task-sidebar.tsx` — навигация по задачам
+- `lib/ai/tools/chat-tools.ts` — shared tools
+- `lib/prompts/experts/task-expert.md` — промпт Эксперта
+- `lib/prompts/build-task-expert-prompt.ts` — prompt builder
+
+**Детали:** [_archive/TZ_C1_ExpertTaskChat/](_archive/TZ_C1_ExpertTaskChat/)
 
 ### ТЗ-B2: Approval + ProjectTask — ✅ ЗАВЕРШЁН
 
@@ -722,16 +750,16 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.15.0 |
+| Версия | 3.16.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Профессоры | 1 (planning) |
 | Сервисные чаты | 3 (ben, project-creation, project-manager) |
-| Промптов | 5 (chat, ben, project-creation, project-manager, professor-planning) |
+| Промптов | 6 (chat, ben, project-creation, project-manager, professor-planning, task-expert) |
 | AI моделей | 5 (Gemini 3 Pro, 2.5 Flash, Claude Haiku, Sonnet, Opus) |
 | AI-инструментов | 9 |
 | Типов документов | 5 (text, markdown, excel, presentation-reveal, presentation-pptx) |
@@ -759,6 +787,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_C1_ExpertTaskChat/](_archive/TZ_C1_ExpertTaskChat/) — ТЗ-C1 ExpertTaskChat
 - [_archive/TZ_B2_ApprovalTasks/](_archive/TZ_B2_ApprovalTasks/) — ТЗ-B2 Approval + ProjectTask
 - [_archive/TZ_B1_ProfessorPlanning/](_archive/TZ_B1_ProfessorPlanning/) — ТЗ-B1 Professor Planning
 - [_archive/TZ_A3_ManagerClerkManifest/](_archive/TZ_A3_ManagerClerkManifest/) — ТЗ-A3 Manager + Clerk + Manifest
@@ -788,4 +817,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-09
+**Обновлено:** 2026-02-10
