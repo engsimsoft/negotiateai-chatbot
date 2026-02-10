@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { useArtifactSelector } from "@/hooks/use-artifact";
 import type { Attachment, ChatMessage } from "@/lib/types";
@@ -46,6 +47,7 @@ export function TaskChat({
   initialMessages,
   isReadonly,
 }: TaskChatProps) {
+  const router = useRouter();
   const { setDataStream } = useDataStream();
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -166,6 +168,9 @@ export function TaskChat({
         outputSummary: result.outputSummary,
         professorVerdict: result.professorVerdict,
       });
+
+      // Refresh server data so TaskSidebar updates
+      router.refresh();
 
       if (result.projectCompleted) {
         toast({ type: "success", description: "Проект завершён!" });

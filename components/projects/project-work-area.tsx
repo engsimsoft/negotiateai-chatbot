@@ -61,7 +61,7 @@ export function ProjectWorkArea({
       return <ExecutionState projectId={projectId} tasks={tasks} projectTasks={projectTasks} />;
 
     case "completed":
-      return <CompletedState />;
+      return <CompletedState projectId={projectId} projectTasks={projectTasks} />;
 
     default:
       return <WelcomeState projectId={projectId} hasFiles={hasFiles} />;
