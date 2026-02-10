@@ -2446,3 +2446,196 @@ export async function startTask({
     );
   }
 }
+
+// ============================================
+// ТЗ-C2: Task Completion Functions
+// ============================================
+
+/**
+ * ТЗ-C2: Internal — unlock dependent tasks and check if project is completed
+ */
+async function unlockDependentsAndCheckCompletion({
+  projectId,
+  completedOrderIndex,
+}: {
+  projectId: string;
+  completedOrderIndex: number;
+}) {
+  const allTasks = await db
+    .select()
+    .from(projectTask)
+    .where(eq(projectTask.projectId, projectId))
+    .orderBy(asc(projectTask.orderIndex));
+
+  // Build set of done task orderIndexes
+  const doneIndexes = new Set(
+    allTasks.filter((t) => t.status === "done").map((t) => t.orderIndex)
+  );
+
+  // Find locked tasks whose dependencies are now all satisfied
+  const unlockedTasks: Array<{ id: string; title: string; orderIndex: number }> = [];
+
+  for (const task of allTasks) {
+    if (task.status !== "locked" || !task.dependsOn?.length) continue;
+    if (!task.dependsOn.includes(completedOrderIndex)) continue;
+
+    const allDepsDone = task.dependsOn.every((idx) => doneIndexes.has(idx));
+    if (!allDepsDone) continue;
+
+    await db
+      .update(projectTask)
+      .set({ status: "pending", updatedAt: new Date() })
+      .where(eq(projectTask.id, task.id));
+
+    unlockedTasks.push({
+      id: task.id,
+      title: task.title,
+      orderIndex: task.orderIndex,
+    });
+  }
+
+  // Check project completion: any non-done tasks left?
+  const [nonDone] = await db
+    .select({ count: count(projectTask.id) })
+    .from(projectTask)
+    .where(
+      and(
+        eq(projectTask.projectId, projectId),
+        sql`${projectTask.status} != 'done'`
+      )
+    );
+
+  const projectCompleted = (nonDone?.count ?? 1) === 0;
+
+  if (projectCompleted) {
+    await db
+      .update(project)
+      .set({ phase: "completed", updatedAt: new Date() })
+      .where(eq(project.id, projectId));
+  }
+
+  return { unlockedTasks, projectCompleted };
+}
+
+/**
+ * ТЗ-C2: Complete a task — save summary + verdict, unlock dependents, check project completion
+ */
+export async function completeTask({
+  taskId,
+  projectId,
+  outputSummary,
+  professorVerdict,
+}: {
+  taskId: string;
+  projectId: string;
+  outputSummary: string;
+  professorVerdict?: unknown;
+}) {
+  try {
+    // Determine final status based on verdict
+    let finalStatus: "done" | "issues" = "done";
+    if (professorVerdict) {
+      const v = professorVerdict as { verdict: string };
+      if (v.verdict === "issues" || v.verdict === "critical") {
+        finalStatus = "issues";
+      }
+    }
+
+    const [updated] = await db
+      .update(projectTask)
+      .set({
+        status: finalStatus,
+        outputSummary,
+        professorVerdict: professorVerdict ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(projectTask.id, taskId))
+      .returning();
+
+    if (!updated) {
+      throw new ChatSDKError("not_found:database", "Task not found");
+    }
+
+    // If done, unlock dependents and check project completion
+    let unlockedTasks: Array<{ id: string; title: string; orderIndex: number }> = [];
+    let projectCompleted = false;
+
+    if (finalStatus === "done") {
+      const result = await unlockDependentsAndCheckCompletion({
+        projectId,
+        completedOrderIndex: updated.orderIndex,
+      });
+      unlockedTasks = result.unlockedTasks;
+      projectCompleted = result.projectCompleted;
+    }
+
+    return { status: finalStatus, unlockedTasks, projectCompleted };
+  } catch (error) {
+    if (error instanceof ChatSDKError) throw error;
+    console.error("[completeTask] Error:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to complete task");
+  }
+}
+
+/**
+ * ТЗ-C2: Reopen a task with issues — status: issues → in_progress
+ */
+export async function reopenTask({ taskId }: { taskId: string }) {
+  try {
+    const [updated] = await db
+      .update(projectTask)
+      .set({
+        status: "in_progress",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(projectTask.id, taskId), eq(projectTask.status, "issues"))
+      )
+      .returning();
+
+    return updated || null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to reopen task");
+  }
+}
+
+/**
+ * ТЗ-C2: Accept a task despite issues — status: issues → done + unlock dependents
+ */
+export async function acceptTask({
+  taskId,
+  projectId,
+}: {
+  taskId: string;
+  projectId: string;
+}) {
+  try {
+    const [updated] = await db
+      .update(projectTask)
+      .set({
+        status: "done",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(projectTask.id, taskId), eq(projectTask.status, "issues"))
+      )
+      .returning();
+
+    if (!updated) {
+      return null;
+    }
+
+    const result = await unlockDependentsAndCheckCompletion({
+      projectId,
+      completedOrderIndex: updated.orderIndex,
+    });
+
+    return {
+      status: "done" as const,
+      unlockedTasks: result.unlockedTasks,
+      projectCompleted: result.projectCompleted,
+    };
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to accept task");
+  }
+}
