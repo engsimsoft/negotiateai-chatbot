@@ -1,8 +1,8 @@
 # Инструменты AI-агентов
 
-**Версия:** 2.10.0
-**Последнее обновление:** 2026-02-03
-**Статус:** 9 инструментов (loadSkill добавлен)
+**Версия:** 3.17.0
+**Последнее обновление:** 2026-02-10
+**Статус:** 10 инструментов (readProjectFile добавлен в v3.17)
 
 ---
 
@@ -29,6 +29,7 @@
 | `requestSuggestions` | Предложения по улучшению | Все агенты |
 | `parseExcel` | Анализ загруженных Excel-файлов | Все агенты |
 | `loadSkill` | Загрузка инструкций из SKILL.md | Все агенты |
+| `readProjectFile` | Чтение файлов проекта по имени из manifest | Только проектные чаты (Эксперт) |
 
 > **Примечание:** Excel создаётся через `createDocument(kind: "excel")`, редактируется через `updateDocument`. Отдельный `parseExcel` используется только для анализа **загруженных** пользователем файлов.
 
@@ -383,6 +384,79 @@ loadSkill({
 
 ---
 
+## Read Project File
+
+Чтение файлов проекта по имени из manifest. Доступен только в проектных чатах (Эксперт).
+
+### Доступность
+
+| Тип чата | Доступен |
+|----------|----------|
+| Обычный чат | Нет |
+| Проектный чат (Эксперт) | Да (при наличии projectId) |
+
+### Возможности
+- Чтение текстовых файлов проекта по имени из manifest
+- Fallback определение типа по расширению (TEXT_EXTENSIONS: `.md`, `.txt`, `.csv`, `.json`, `.xml`, `.html`, `.css`, `.js`, `.ts`, `.yaml`, `.yml`, `.env`, `.log`, `.sql`, `.sh`, `.py`, `.rb`, `.go`, `.java`, `.c`, `.cpp`, `.h`, `.rs`, `.swift`, `.kt`, `.jsx`, `.tsx`, `.vue`, `.svelte`)
+- Бинарные файлы → описание из metadata (analysis description + documentType)
+- Лимит: 30,000 символов на файл
+
+### Параметры
+
+```typescript
+readProjectFile({
+  fileName: string,   // Имя файла из manifest проекта
+})
+```
+
+### Возвращает
+
+```typescript
+{
+  success: boolean,
+  fileName: string,
+  content?: string,      // Содержимое текстового файла
+  description?: string,  // Описание бинарного файла из metadata
+  error?: string,
+}
+```
+
+### Архитектура
+
+Инструмент реализован как **closure-based tool** — фабричная функция принимает `projectId` и возвращает tool с замкнутым контекстом:
+
+```typescript
+// lib/ai/tools/read-project-file.ts
+export const readProjectFile = ({ projectId }: { projectId: string }) =>
+  tool({
+    description: "Read a project file by name...",
+    parameters: z.object({ fileName: z.string() }),
+    execute: async ({ fileName }) => { ... },
+  });
+```
+
+### Регистрация
+
+Включается автоматически через `getStandardTools()` при `isProjectChat && projectId`:
+
+```typescript
+// lib/ai/tools/chat-tools.ts
+...(isProjectChat && projectId
+  ? { readProjectFile: readProjectFile({ projectId }) }
+  : {}),
+```
+
+### Файл
+[lib/ai/tools/read-project-file.ts](../lib/ai/tools/read-project-file.ts)
+
+### Пример использования
+```
+Прочитай файл "brief.md" из проекта
+Покажи содержимое README.md
+```
+
+---
+
 ## Vision / Multimodal
 
 ### Image OCR
@@ -444,21 +518,31 @@ loadSkill({
 
 ## Регистрация инструментов
 
-Инструменты регистрируются в chat route:
+Инструменты регистрируются через shared factory `getStandardTools()`:
 
 ```typescript
-// app/(chat)/api/chat/route.ts
-const tools = {
-  webSearch: webSearch(),
-  getWeather: getWeather(),
-  getCurrentDate: getCurrentDate(),
-  readDocument: readDocument(),
-  createDocument: createDocument({ session, dataStream }),  // создаёт text, markdown, excel, presentations
-  updateDocument: updateDocument({ session, dataStream }),  // редактирует артефакты
-  requestSuggestions: requestSuggestions({ session }),
-  parseExcel,                                               // анализ загруженных файлов
-};
+// lib/ai/tools/chat-tools.ts
+export function getStandardTools({ session, dataStream, isProjectChat, projectId }) {
+  return {
+    getCurrentDate,
+    getWeather,
+    ...(isProjectChat ? {} : { readDocument }),              // только обычные чаты
+    ...(isProjectChat && projectId
+      ? { readProjectFile: readProjectFile({ projectId }) }  // только проектные чаты
+      : {}),
+    createDocument: createDocument({ session, dataStream }),
+    updateDocument: updateDocument({ session, dataStream }),
+    requestSuggestions: requestSuggestions({ session, dataStream }),
+    webSearch,
+    parseExcel,
+    loadSkill,
+  };
+}
 ```
+
+**Используется в:**
+- `app/(chat)/api/chat/route.ts` — основной чат
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — чат Эксперта
 
 ---
 
@@ -538,4 +622,4 @@ const tools = {
 
 ---
 
-**Обновлено:** 2026-02-03 (v2.10.0 — loadSkill, readDocument в проектах)
+**Обновлено:** 2026-02-10 (v3.17.0 — readProjectFile для Эксперта, getStandardTools() shared factory)

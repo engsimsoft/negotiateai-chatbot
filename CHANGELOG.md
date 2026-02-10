@@ -12,6 +12,37 @@
 
 ---
 
+## [3.17.0] - 2026-02-10 - TaskCompletion (ТЗ-C2)
+
+**MINOR RELEASE**: Завершение задач проекта — полный flow: суммаризация → ревью Профессором → карточка результата → доработка/принятие → разблокировка зависимых → project completion.
+
+### Added
+- **`POST /api/projects/[id]/tasks/[taskId]/complete`** — endpoint завершения: суммаризатор (Flash) → ревьюер (Pro) → сохранение → разблокировка зависимых
+- **`POST /api/projects/[id]/tasks/[taskId]/reopen`** — endpoint доработки: issues → in_progress
+- **`POST /api/projects/[id]/tasks/[taskId]/accept`** — endpoint принятия: issues → done + разблокировка зависимых
+- **`TaskCompletionCard`** — три варианта карточки: success (зелёная), issues (жёлтая), critical (красная) с раскрываемыми деталями и кнопками навигации
+- **`readProjectFile` tool** — инструмент Эксперта для чтения файлов проекта по имени из manifest (текст + fallback по расширению, бинарные → описание, лимит 30K)
+- **`lib/ai/task-completion-types.ts`** — Zod-схемы (taskSummarySchema, professorVerdictSchema) + TypeScript типы + хелперы
+- **`lib/ai/clerks/task-summarizer.ts`** — функция `summarizeTask()` (Gemini Flash, generateText + Zod-парсинг)
+- **`lib/ai/professors/task-reviewer.ts`** — функция `reviewTask()` (Gemini Pro, generateText + XML-парсинг + Zod-валидация)
+- **`lib/prompts/clerks/task-summarizer.md`** — system prompt клерка-суммаризатора
+- **`lib/prompts/professors/task-review.md`** — system prompt профессора-ревьюера
+- **`lib/db/queries.ts`** — 4 новые функции: `completeTask()`, `reopenTask()`, `acceptTask()`, `getProjectFileByName()`
+- **`CompletedState`** — полноценная реализация: список завершённых задач с ссылками, счётчик, трофей
+
+### Changed
+- **`task-chat.tsx`** — кнопка «Завершить задачу» в header, AlertDialog подтверждения, spinner, completion card, router.refresh() для TaskSidebar
+- **`chat-tools.ts`** — добавлен `projectId?` в params, `readProjectFile` для project chats, обновлён `getActiveToolNames`
+- **`project-work-area.tsx`** — передача `projectId` и `projectTasks` в CompletedState
+- **Task expert chat route** — передача `projectId` в `getStandardTools`
+- **Main chat route** — передача `projectId` в `getStandardTools` для project chats
+
+### Fixed
+- **ExecutionState** — отображает корректный статус ProjectTask вместо устаревшего Chat status
+- **readProjectFile MIME** — файлы с `application/octet-stream` (например `.md`) определяются как текстовые по расширению
+
+---
+
 ## [3.16.0] - 2026-02-10 - ExpertTaskChat (ТЗ-C1)
 
 **MINOR RELEASE**: Чат с Экспертом по задачам проекта — полноценный AI-диалог для каждой ProjectTask с auto-trigger, артефактами, навигацией и разблокировкой locked задач.

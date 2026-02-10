@@ -23,6 +23,8 @@
 | **Менеджер проекта** | Gemini 2.5 Flash | ✅ Работает | Живой AI-диалог, управление проектом |
 | **Профессор планирования** | Gemini 3 Pro | ✅ Работает | Генерация плана задач проекта (v3.14) |
 | **Эксперт по задаче** | Gemini 3 Pro (env) | ✅ Работает | AI-диалог по конкретной задаче проекта (v3.16) |
+| **Суммаризатор задач** | Gemini 2.5 Flash | ✅ Работает | Клерк — суммаризация результатов задачи (v3.17) |
+| **Ревьюер задач** | Gemini 3 Pro | ✅ Работает | Профессор — ревью завершённой задачи (v3.17) |
 | **Клерк-анализатор** | Gemini 2.5 Flash | ✅ Работает | Автоматический анализ файлов проекта |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
 | **Preset Помощники** | Gemini 3 Pro / 2.5 Flash | ⚠️ Частично | Маркетолог, Копирайтер и др. |
@@ -132,7 +134,7 @@ app/(chat)/api/service-chat/route.ts                # Manager с план-кон
 | **Модель** | `process.env.EXPERT_MODEL \|\| 'gemini-3-pro'` |
 | **Оболочка** | Отдельная route group `app/(task)/` — полноэкранный layout без AppSidebar |
 | **Промпт** | `lib/prompts/experts/task-expert.md` + `buildTaskExpertPrompt()` |
-| **Инструменты** | Shared tools (search, documents, excel) — `getStandardTools()` |
+| **Инструменты** | Shared tools (search, documents, excel, readProjectFile) — `getStandardTools()` |
 | **Персистенция** | Серверная (Chat в БД, привязан к ProjectTask через chatId) |
 | **Артефакты** | Поддерживаются (SidebarProvider в layout) |
 
@@ -145,8 +147,16 @@ app/(chat)/api/service-chat/route.ts                # Manager с план-кон
 6. System prompt включает: контекст проекта, описание задачи, результаты завершённых задач, manifest
 7. TaskSidebar позволяет переключаться между задачами
 
+**Завершение задачи (v3.17):**
+1. Кнопка «Завершить задачу» в header → AlertDialog подтверждения → spinner
+2. `POST .../complete` → суммаризатор (Flash) → ревьюер (Pro, если needsReview) → сохранение
+3. Completion card: success (зелёная), issues (жёлтая), critical (красная)
+4. «Доработать» → `POST .../reopen`, «Принять» → `POST .../accept`
+5. Разблокировка зависимых задач, проверка project completion
+
 **UI компоненты:**
-- **TaskChat** — полноценный чат: Messages, Artifact, MultimodalInput, DataStreamHandler
+- **TaskChat** — полноценный чат: Messages, Artifact, MultimodalInput, DataStreamHandler, кнопка завершения
+- **TaskCompletionCard** — карточка результата с кнопками навигации (v3.17)
 - **TaskSidebar** — навигация: список задач с иконками статусов, сворачивание, «← К проекту»
 
 **Файлы:**
@@ -155,9 +165,14 @@ app/(task)/layout.tsx                                    # Layout (SWRProvider +
 app/(task)/projects/[id]/tasks/[taskId]/page.tsx          # Server Component (auth + guards + startTask)
 app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts # Streaming endpoint
 app/(chat)/api/projects/[id]/tasks/[taskId]/unlock/route.ts # Unlock locked → pending
-components/projects/task-chat.tsx                         # Клиент чата
+app/(chat)/api/projects/[id]/tasks/[taskId]/complete/route.ts # Завершение задачи (v3.17)
+app/(chat)/api/projects/[id]/tasks/[taskId]/reopen/route.ts  # Доработка (v3.17)
+app/(chat)/api/projects/[id]/tasks/[taskId]/accept/route.ts  # Принятие (v3.17)
+components/projects/task-chat.tsx                         # Клиент чата + кнопка завершения
+components/projects/task-completion-card.tsx              # Карточка результата (v3.17)
 components/projects/task-sidebar.tsx                      # Навигация по задачам
 lib/ai/tools/chat-tools.ts                               # Shared tools (getStandardTools)
+lib/ai/tools/read-project-file.ts                        # Чтение файлов проекта (v3.17)
 lib/prompts/experts/task-expert.md                        # Промпт Эксперта
 lib/prompts/build-task-expert-prompt.ts                   # Prompt builder
 ```
@@ -190,6 +205,51 @@ app/(chat)/api/projects/[id]/analyze-file/route.ts  # Endpoint Клерка
 lib/prompts/clerks/file-analyzer.md                  # Промпт Клерка
 components/projects/project-files-card.tsx            # UI (auto-analyze + feedback)
 lib/db/queries.ts                                    # rebuildProjectManifest
+```
+
+#### Суммаризатор задач (Клерк v3.17)
+**Где:** Автоматически вызывается при завершении задачи (`POST .../complete`)
+
+| Параметр | Значение |
+|----------|----------|
+| **Модель** | Gemini 2.5 Flash |
+| **Тип** | Backend (внутренний вызов, не отдельный endpoint) |
+| **Триггер** | Вызов в `complete/route.ts` → `summarizeTask()` |
+
+**Как работает:**
+1. Получает последние 40 сообщений чата (user/assistant, с fallback на snapshots)
+2. `generateText` с промптом суммаризатора → Zod-парсинг `taskSummarySchema`
+3. Возвращает `outputSummary` (title, summary, keyResults, artifacts, status)
+4. Fallback при ошибке → базовый текст
+
+**Файлы:**
+```
+lib/ai/clerks/task-summarizer.ts          # summarizeTask()
+lib/ai/task-completion-types.ts           # taskSummarySchema
+lib/prompts/clerks/task-summarizer.md     # Промпт
+```
+
+#### Ревьюер задач (Профессор v3.17)
+**Где:** Автоматически вызывается при завершении задачи с `needsReview=true`
+
+| Параметр | Значение |
+|----------|----------|
+| **Модель** | Gemini 3 Pro |
+| **Тип** | Backend (внутренний вызов, не отдельный endpoint) |
+| **Триггер** | Вызов в `complete/route.ts` → `reviewTask()` (если needsReview) |
+
+**Как работает:**
+1. Получает outputSummary + описание задачи + goal + expectedOutput
+2. `generateText` с промптом ревьюера → XML-парсинг `<review_analysis>` + `<review_json>`
+3. Zod-валидация `professorVerdictSchema` → verdict (decision, issues, score, overallComment)
+4. `needs_revision` + severity=critical → статус задачи `issues`
+5. Fallback при ошибке → `approved`
+
+**Файлы:**
+```
+lib/ai/professors/task-reviewer.ts        # reviewTask()
+lib/ai/task-completion-types.ts           # professorVerdictSchema
+lib/prompts/professors/task-review.md     # Промпт
 ```
 
 ---
@@ -388,8 +448,8 @@ export const geminiPro = google("gemini-3-pro-preview");
 
 | Модель | Input | Output | Контекст | Используется в |
 |--------|-------|--------|----------|---------------|
-| Gemini 3 Pro | $2 | $12 | 1M | Основной чат, Создание проекта (Секретарь), Проект: Эксперт, Профессор |
-| Gemini 2.5 Flash | $0.075 | $0.30 | 1M | Ben, Менеджер, Проект: Исполнитель |
+| Gemini 3 Pro | $2 | $12 | 1M | Основной чат, Секретарь, Эксперт, Профессор планирования, Ревьюер задач |
+| Gemini 2.5 Flash | $0.075 | $0.30 | 1M | Ben, Менеджер, Исполнитель, Клерк-анализатор, Суммаризатор задач |
 | Gemini 2.5 Pro | $1.25 | $5 | 1M | Suggestions (внутренний) |
 
 *Цены за 1M токенов*
@@ -414,12 +474,14 @@ lib/prompts/
 │   └── ben/AGENT.md       # Конфиг Бена
 ├── skills/
 │   └── document/          # Skills для документов
-├── professors/            # Промпты профессоров (v3.14)
-│   └── planning.md        # Профессор планирования
+├── professors/            # Промпты профессоров (v3.14+)
+│   ├── planning.md        # Профессор планирования
+│   └── task-review.md     # Профессор-ревьюер задач (v3.17)
 ├── experts/               # Промпты экспертов (v3.16)
 │   └── task-expert.md     # Эксперт по задаче
-├── clerks/                # Промпты клерков (v3.13)
-│   └── file-analyzer.md   # Клерк-анализатор файлов
+├── clerks/                # Промпты клерков (v3.13+)
+│   ├── file-analyzer.md   # Клерк-анализатор файлов
+│   └── task-summarizer.md # Клерк-суммаризатор задач (v3.17)
 ├── service-chats/         # Промпты сервисных чатов (v3.11+)
 │   ├── project-creation.md # Промпт Секретаря
 │   └── project-manager.md  # Промпт Менеджера

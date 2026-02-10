@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.16.0
+**Версия:** 3.17.0
 **Дата:** 2026-02-10
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -25,7 +25,7 @@
 | Особенность | Описание | Статус |
 |-------------|----------|--------|
 | **Универсальный AI-чат** | Один мощный чат со всеми инструментами | ✅ |
-| **Проекты** | Изолированные рабочие пространства с Профессором, Менеджером, утверждением плана, картой задач и чатом с Экспертом | ✅ v3.16.0 |
+| **Проекты** | Изолированные рабочие пространства с Профессором, Менеджером, утверждением плана, картой задач, чатом с Экспертом и завершением задач | ✅ v3.17.0 |
 | **Сервисные помощники** | Бен (❓), Секретарь (➕), Менеджер (👤) | ✅ v3.13.0 |
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG/Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity, Plus AI, Ideogram, AssemblyAI | 📋 Фаза 1 |
@@ -89,6 +89,8 @@
 | **project-manager** | Gemini 2.5 Flash | Менеджер проекта (живой AI-диалог) |
 | **professor-planning** | Gemini 3 Pro | Профессор планирования — генерация плана задач |
 | **task-expert** | Gemini 3 Pro (env) | Эксперт — AI-диалог по задаче проекта |
+| **task-summarizer** (Клерк) | Gemini 2.5 Flash | Суммаризация результатов задачи |
+| **task-reviewer** (Профессор) | Gemini 3 Pro | Ревью завершённой задачи |
 | **file-analyzer** (Клерк) | Gemini 2.5 Flash | Автоанализ файлов проекта |
 
 ### Файловая структура
@@ -138,14 +140,16 @@ lib/prompts/
 │   ├── formatting.md
 │   └── russian-market.md
 │
-├── professors/                  # Промпты профессоров (v3.14)
-│   └── planning.md          # Профессор планирования
+├── professors/                  # Промпты профессоров (v3.14+)
+│   ├── planning.md          # Профессор планирования
+│   └── task-review.md       # Профессор-ревьюер задач (v3.17)
 │
 ├── experts/                     # Промпты экспертов (v3.16)
 │   └── task-expert.md       # Эксперт по задаче
 │
-├── clerks/                      # Промпты клерков (v3.13)
-│   └── file-analyzer.md     # Клерк-анализатор файлов
+├── clerks/                      # Промпты клерков (v3.13+)
+│   ├── file-analyzer.md     # Клерк-анализатор файлов
+│   └── task-summarizer.md   # Клерк-суммаризатор задач (v3.17)
 │
 ├── service-chats/               # Промпты сервисных чатов (v3.11+)
 │   ├── project-creation.md  # XML-промпт Секретаря
@@ -175,6 +179,24 @@ lib/prompts/
 | Клерк | Модель | Триггер | Назначение |
 |-------|--------|---------|------------|
 | **Анализатор файлов** | Gemini 2.5 Flash | Upload файла в проект | Описание, тип, папка, ключевые темы, manifest |
+| **Суммаризатор задач** | Gemini 2.5 Flash | Завершение задачи | Краткое описание результатов + статус + артефакты |
+
+### Профессоры (v3.14+)
+
+> Профессоры — AI-агенты для сложных аналитических задач. Backend-процессы без интерактивного чата.
+
+| Профессор | Модель | Триггер | Назначение |
+|-----------|--------|---------|------------|
+| **Планирование** | Gemini 3 Pro | Кнопка «Начать планирование» | Генерация плана задач проекта (tasks, risks, recommendations) |
+| **Ревью задач** | Gemini 3 Pro | Завершение задачи (needsReview) | Проверка качества: decision, issues, score, overallComment |
+
+### Эксперты (v3.16+)
+
+> Эксперты — AI-агенты для конкретных задач проекта. Полноценный интерактивный чат с инструментами.
+
+| Эксперт | Модель | Оболочка | Назначение |
+|---------|--------|----------|------------|
+| **Эксперт по задаче** | Gemini 3 Pro (env) | Full-screen layout (`app/(task)/`) | AI-диалог по задаче, инструменты, артефакты, завершение задачи |
 
 ---
 
@@ -266,12 +288,13 @@ components/projects/
 - Web Search (Brave API)
 - Get Current Date
 - Get Weather (Open-Meteo)
-- Read Document
+- Read Document (только обычные чаты)
 - Create Document (text, markdown, excel, presentations)
 - Update Document (редактирование артефактов)
 - Request Suggestions
 - Parse Excel (анализ загруженных файлов)
 - **Load Skill** (динамическая загрузка инструкций) ← v3.3.2
+- **Read Project File** (чтение файлов проекта по имени из manifest) ← v3.17.0
 
 **Планируемые:**
 - Website Analyzer (fetch, screenshot, SEO)
@@ -295,6 +318,43 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-C2: TaskCompletion — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Завершение задач** — полный flow: кнопка «Завершить задачу» → суммаризация (Gemini Flash) → ревью Профессором (Gemini Pro) → карточка результата
+- **Три типа карточек** — success (задача принята), issues (замечания, можно доработать/принять), critical (замечания, только доработка)
+- **API endpoints** — `POST .../complete` (summarize → review → save), `POST .../reopen` (issues → in_progress), `POST .../accept` (issues → done + unlock)
+- **Разблокировка зависимых** — при завершении задачи автоматически разблокируются все зависимые задачи (locked → pending), если ВСЕ их зависимости done
+- **Project completion** — при завершении последней задачи проект переходит в phase='completed'
+- **CompletedState** — полноценная реализация: список завершённых задач с ссылками, счётчик, трофей
+- **readProjectFile tool** — инструмент Эксперта для чтения файлов проекта по имени из manifest (текст + fallback по расширению, бинарные → описание)
+- **Sidebar revalidation** — `router.refresh()` после завершения задачи обновляет TaskSidebar
+- **AI-суммаризатор** — `summarizeTask()`: загрузка промпта, generateText (Flash), Zod-парсинг, fallback
+- **AI-ревьюер** — `reviewTask()`: загрузка промпта, generateText (Pro), XML-парсинг + Zod-валидация, fallback → approved
+
+**DB queries добавлены:**
+- `completeTask({ taskId, projectId, outputSummary, professorVerdict })` — статус → done/issues, сохранение результатов, разблокировка зависимых, проверка project completion
+- `reopenTask({ taskId })` — status issues → in_progress
+- `acceptTask({ taskId, projectId })` — status issues → done + разблокировка зависимых
+- `getProjectFileByName({ projectId, name })` — поиск файла по имени
+
+**API endpoints добавлены:**
+- `POST /api/projects/[id]/tasks/[taskId]/complete` — завершение задачи
+- `POST /api/projects/[id]/tasks/[taskId]/reopen` — доработка
+- `POST /api/projects/[id]/tasks/[taskId]/accept` — принятие с замечаниями
+
+**Ключевые файлы:**
+- `lib/ai/task-completion-types.ts` — Zod-схемы + TypeScript типы
+- `lib/ai/clerks/task-summarizer.ts` — суммаризатор
+- `lib/ai/professors/task-reviewer.ts` — ревьюер
+- `lib/prompts/clerks/task-summarizer.md` — промпт суммаризатора
+- `lib/prompts/professors/task-review.md` — промпт ревьюера
+- `lib/ai/tools/read-project-file.ts` — tool readProjectFile
+- `components/projects/task-completion-card.tsx` — карточка результата
+- `components/projects/phase-states/completed-state.tsx` — фаза completed
+
+**Детали:** [_archive/TZ_C2_TaskCompletion/](_archive/TZ_C2_TaskCompletion/)
 
 ### ТЗ-C1: ExpertTaskChat — ✅ ЗАВЕРШЁН
 
@@ -783,18 +843,19 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.16.0 |
+| Версия | 3.17.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
-| Профессоры | 1 (planning) |
+| Профессоры | 2 (planning, task-review) |
+| Клерки | 2 (file-analyzer, task-summarizer) |
 | Сервисные чаты | 3 (ben, project-creation, project-manager) |
-| Промптов | 6 (chat, ben, project-creation, project-manager, professor-planning, task-expert) |
+| Промптов | 9 (chat, ben, project-creation, project-manager, professor-planning, task-expert, task-summarizer, task-review, file-analyzer) |
 | AI моделей | 5 (Gemini 3 Pro, 2.5 Flash, Claude Haiku, Sonnet, Opus) |
-| AI-инструментов | 9 |
+| AI-инструментов | 10 |
 | Типов документов | 5 (text, markdown, excel, presentation-reveal, presentation-pptx) |
 | Тем презентаций | 5 |
 | Тем Excel | 5 |
@@ -820,6 +881,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_C2_TaskCompletion/](_archive/TZ_C2_TaskCompletion/) — ТЗ-C2 TaskCompletion
 - [_archive/TZ_C1_ExpertTaskChat/](_archive/TZ_C1_ExpertTaskChat/) — ТЗ-C1 ExpertTaskChat
 - [_archive/TZ_B2_ApprovalTasks/](_archive/TZ_B2_ApprovalTasks/) — ТЗ-B2 Approval + ProjectTask
 - [_archive/TZ_B1_ProfessorPlanning/](_archive/TZ_B1_ProfessorPlanning/) — ТЗ-B1 Professor Planning

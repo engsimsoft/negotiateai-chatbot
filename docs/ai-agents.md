@@ -1,8 +1,8 @@
 # Simply — Система промптов и помощники
 
-**Версия:** 3.16.0
+**Версия:** 3.17.0
 **Последнее обновление:** 2026-02-10
-**Статус:** Skills + Agents + Experts + Clerks Architecture
+**Статус:** Skills + Agents + Experts + Professors + Clerks Architecture
 
 ---
 
@@ -257,7 +257,7 @@ AI-диалог по конкретной ProjectTask. Эксперт получ
 | Промпт | `lib/prompts/experts/task-expert.md` |
 | Prompt builder | `lib/prompts/build-task-expert-prompt.ts` |
 | Endpoint | `POST /api/projects/[id]/tasks/[taskId]/chat` |
-| Инструменты | Все shared tools (search, documents, weather, excel) |
+| Инструменты | Shared tools (search, documents, weather, excel, readProjectFile) |
 | Артефакты | Поддерживаются |
 
 **Контекст промпта (buildTaskExpertPrompt):**
@@ -270,17 +270,29 @@ AI-диалог по конкретной ProjectTask. Эксперт получ
 1. При открытии задачи auto-trigger отправляет системное сообщение
 2. Эксперт анализирует задачу и предлагает план работы
 3. Ведёт интерактивный диалог с пользователем
-4. Использует инструменты (search, создание документов, excel)
+4. Использует инструменты (search, создание документов, excel, readProjectFile)
 5. Результаты сохраняются в Chat, привязанном к ProjectTask
+
+**Завершение задачи (v3.17):**
+1. Кнопка «Завершить задачу» → AlertDialog подтверждения → spinner «Обработка...»
+2. Суммаризатор (Клерк) → `summarizeTask()` создаёт outputSummary
+3. Ревьюер (Профессор) → `reviewTask()` проверяет качество (если `needsReview`)
+4. Completion card — три типа: success (зелёная), issues (жёлтая), critical (красная)
+5. Кнопки: «Доработать» (reopen), «Принять» (accept), «Следующая задача», «К проекту»
 
 **Файлы:**
 ```
 lib/prompts/experts/task-expert.md           # Промпт Эксперта
 lib/prompts/build-task-expert-prompt.ts      # Prompt builder
-app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts # Streaming endpoint
-components/projects/task-chat.tsx             # UI чата
+app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts     # Streaming endpoint
+app/(chat)/api/projects/[id]/tasks/[taskId]/complete/route.ts # Завершение задачи (v3.17)
+app/(chat)/api/projects/[id]/tasks/[taskId]/reopen/route.ts   # Доработка (v3.17)
+app/(chat)/api/projects/[id]/tasks/[taskId]/accept/route.ts   # Принятие (v3.17)
+components/projects/task-chat.tsx             # UI чата + кнопка завершения
+components/projects/task-completion-card.tsx  # Карточка результата (v3.17)
 components/projects/task-sidebar.tsx          # Навигация
 lib/ai/tools/chat-tools.ts                   # Shared tools
+lib/ai/tools/read-project-file.ts            # Чтение файлов проекта (v3.17)
 ```
 
 ---
@@ -307,6 +319,80 @@ lib/ai/tools/chat-tools.ts                   # Shared tools
 3. Перемещает файл в рекомендованную папку (move-to-folder)
 4. Сохраняет анализ в `ProjectFile.metadata.analysis`
 5. Перестраивает `Project.manifestJson` (агрегация всех анализов)
+
+### Клерк-суммаризатор задач (`task-summarizer`) (v3.17)
+
+Автоматическая суммаризация результатов завершённой задачи.
+
+| Параметр | Значение |
+|----------|----------|
+| ID | `task-summarizer` |
+| Модель | Gemini 2.5 Flash |
+| Промпт | `lib/prompts/clerks/task-summarizer.md` |
+| Триггер | Вызов `POST /api/projects/[id]/tasks/[taskId]/complete` |
+| Endpoint | Внутренний вызов в complete endpoint |
+
+**Что делает:**
+1. Получает последние 40 сообщений чата (user/assistant)
+2. Генерирует `outputSummary` через `generateText` + Zod-парсинг
+3. Включает: title, summary, keyResults[], artifacts[], status
+4. Fallback при ошибке → базовый текст "Задача завершена"
+
+**Файлы:**
+```
+lib/ai/clerks/task-summarizer.ts          # Функция summarizeTask()
+lib/ai/task-completion-types.ts           # Zod-схемы (taskSummarySchema)
+lib/prompts/clerks/task-summarizer.md     # Промпт суммаризатора
+```
+
+---
+
+## Профессоры (v3.14+)
+
+> Профессоры — AI-агенты для сложных аналитических задач. Backend-процессы без интерактивного чата.
+
+### Профессор планирования (`professor-planning`) (v3.14)
+
+Генерация структурированного плана задач проекта.
+
+| Параметр | Значение |
+|----------|----------|
+| ID | `professor-planning` |
+| Модель | Gemini 3 Pro |
+| Промпт | `lib/prompts/professors/planning.md` |
+| Триггер | Кнопка «Начать планирование» |
+| Endpoint | `POST /api/projects/[id]/plan` |
+
+**Что делает:**
+1. Анализирует проект (passport, manifest, files)
+2. Генерирует JSON: tasks, risks, recommendations (discriminated union: complete / partial / needs_input)
+3. Результат сохраняется в `Project.planJson`
+
+### Профессор-ревьюер задач (`task-reviewer`) (v3.17)
+
+Автоматическая проверка качества завершённой задачи.
+
+| Параметр | Значение |
+|----------|----------|
+| ID | `task-reviewer` |
+| Модель | Gemini 3 Pro |
+| Промпт | `lib/prompts/professors/task-review.md` |
+| Триггер | Вызов `POST /api/projects/[id]/tasks/[taskId]/complete` (если `needsReview`) |
+| Endpoint | Внутренний вызов в complete endpoint |
+
+**Что делает:**
+1. Получает outputSummary от суммаризатора + описание задачи
+2. Генерирует verdict через `generateText` + XML-парсинг `<review_analysis>` + `<review_json>`
+3. Verdict включает: decision (approved/needs_revision), issues[], score, overallComment
+4. `needs_revision` + severity=critical → статус задачи `issues` (требует доработки)
+5. Fallback при ошибке → `approved` (не блокирует завершение)
+
+**Файлы:**
+```
+lib/ai/professors/task-reviewer.ts        # Функция reviewTask()
+lib/ai/task-completion-types.ts           # Zod-схемы (professorVerdictSchema)
+lib/prompts/professors/task-review.md     # Промпт ревьюера
+```
 
 ---
 
@@ -434,8 +520,12 @@ components/modal-assistants/
 | Промпт | Модель по умолчанию | Причина |
 |--------|---------------------|---------|
 | chat | Gemini 3 Pro | Качество, инструменты |
-| prompt-agent | Gemini 3 Pro | Сложные рассуждения |
 | ben | Gemini 2.5 Flash | Быстрые ответы, экономия |
+| task-expert | Gemini 3 Pro (env) | Качественный диалог по задаче |
+| task-summarizer | Gemini 2.5 Flash | Быстрая суммаризация |
+| task-reviewer | Gemini 3 Pro | Качественное ревью |
+| professor-planning | Gemini 3 Pro | Сложные аналитические задачи |
+| file-analyzer | Gemini 2.5 Flash | Быстрый анализ файлов |
 
 > **Источник правды:** [ai-providers.md](ai-providers.md) — полная информация о моделях и ценах.
 
@@ -443,7 +533,7 @@ components/modal-assistants/
 
 ## Инструменты
 
-### Основной чат (все инструменты)
+### Основной чат (обычные чаты)
 
 - `webSearch` — поиск в интернете
 - `getWeather` — погода
@@ -451,12 +541,20 @@ components/modal-assistants/
 - `readDocument` — чтение из базы знаний
 - `createDocument` — создание артефактов
 - `updateDocument` — редактирование артефактов
+- `requestSuggestions` — предложения по улучшению
 - `parseExcel` — анализ Excel файлов
-- `exportDocument` — экспорт в DOCX
+- `loadSkill` — загрузка инструкций из SKILL.md
+
+### Проектные чаты (Эксперт)
+
+Все инструменты основного чата **кроме** `readDocument`, **плюс:**
+- `readProjectFile` — чтение файлов проекта по имени из manifest (v3.17)
 
 ### Модальные помощники
 
-**Prompt-агент и Бен** не имеют доступа к инструментам — только текстовое общение.
+**Бен** не имеет доступа к инструментам — только текстовое общение.
+
+> **Источник правды:** [ai-tools.md](ai-tools.md) — полная документация по инструментам.
 
 ---
 
@@ -468,9 +566,13 @@ components/modal-assistants/
 | **Server exports** | [lib/prompts/server.ts](../lib/prompts/server.ts) |
 | **Skills** | [lib/prompts/skills/](../lib/prompts/skills/) |
 | **Agents** | [lib/prompts/agents/](../lib/prompts/agents/) |
+| **Experts** | [lib/prompts/experts/](../lib/prompts/experts/) |
+| **Professors** | [lib/prompts/professors/](../lib/prompts/professors/) |
+| **Clerks** | [lib/prompts/clerks/](../lib/prompts/clerks/) |
 | **Core** | [lib/prompts/core/](../lib/prompts/core/) |
-| **Модальные компоненты** | [components/modal-assistants/](../components/modal-assistants/) |
-| **API помощников** | [app/(chat)/api/assistant/](../app/(chat)/api/assistant/) |
+| **Service chats** | [lib/prompts/service-chats/](../lib/prompts/service-chats/) |
+| **AI functions** | [lib/ai/clerks/](../lib/ai/clerks/), [lib/ai/professors/](../lib/ai/professors/) |
+| **Shared tools** | [lib/ai/tools/chat-tools.ts](../lib/ai/tools/chat-tools.ts) |
 | **API чата** | [app/(chat)/api/chat/route.ts](../app/(chat)/api/chat/route.ts) |
 
 ---
