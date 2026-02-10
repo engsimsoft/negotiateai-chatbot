@@ -1569,6 +1569,33 @@ export async function getProjectFileById({ id }: { id: string }) {
 }
 
 /**
+ * ТЗ-C2: Get project file by name (for readProjectFile tool)
+ */
+export async function getProjectFileByName({
+  projectId,
+  name,
+}: {
+  projectId: string;
+  name: string;
+}) {
+  try {
+    const [file] = await db
+      .select()
+      .from(projectFile)
+      .where(
+        and(eq(projectFile.projectId, projectId), eq(projectFile.name, name))
+      );
+
+    return file || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get project file by name"
+    );
+  }
+}
+
+/**
  * ТЗ-A3: Update project file metadata (add analysis results)
  */
 export async function updateProjectFileMetadata({

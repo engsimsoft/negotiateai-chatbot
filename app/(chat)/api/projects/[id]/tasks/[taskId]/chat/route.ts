@@ -147,7 +147,7 @@ export async function POST(
           stopWhen: stepCountIs(5),
           experimental_activeTools: getActiveToolNames(isProjectChat),
           experimental_transform: smoothStream({ chunking: "word" }),
-          tools: getStandardTools({ session, dataStream, isProjectChat }),
+          tools: getStandardTools({ session, dataStream, isProjectChat, projectId }),
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
             functionId: "stream-task-expert",

@@ -11,6 +11,7 @@ import { parseExcel } from "./excel";
 import { getCurrentDate } from "./get-current-date";
 import { getWeather } from "./get-weather";
 import { readDocument } from "./read-document";
+import { readProjectFile } from "./read-project-file";
 import { requestSuggestions } from "./request-suggestions";
 import { updateDocument } from "./update-document";
 import { webSearch } from "./web-search";
@@ -20,23 +21,29 @@ interface GetStandardToolsParams {
   session: Session;
   dataStream: any; // UIMessageStreamWriter
   isProjectChat: boolean;
+  projectId?: string;
 }
 
 /**
  * Build the standard tools object for streamText().
  *
  * - readDocument is excluded for project chats (project documents are in context)
+ * - readProjectFile is included only for project chats (needs projectId)
  * - createDocument/updateDocument/requestSuggestions need session + dataStream
  */
 export function getStandardTools({
   session,
   dataStream,
   isProjectChat,
+  projectId,
 }: GetStandardToolsParams) {
   return {
     getCurrentDate,
     getWeather,
     ...(isProjectChat ? {} : { readDocument }),
+    ...(isProjectChat && projectId
+      ? { readProjectFile: readProjectFile({ projectId }) }
+      : {}),
     createDocument: createDocument({ session, dataStream }),
     updateDocument: updateDocument({ session, dataStream }),
     requestSuggestions: requestSuggestions({ session, dataStream }),
@@ -57,6 +64,7 @@ const ALL_TOOL_NAMES = [
   "parseExcel",
   "loadSkill",
   "readDocument",
+  "readProjectFile",
 ] as const;
 
 type ToolName = (typeof ALL_TOOL_NAMES)[number];
@@ -76,6 +84,7 @@ export function getActiveToolNames(isProjectChat: boolean): ToolName[] {
       "requestSuggestions",
       "parseExcel",
       "loadSkill",
+      "readProjectFile",
     ];
   }
 

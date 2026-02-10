@@ -418,7 +418,7 @@ export async function POST(request: Request) {
           // ТЗ-C1: Tools extracted to shared module (lib/ai/tools/chat-tools.ts)
           experimental_activeTools: getActiveToolNames(isProjectChat),
           experimental_transform: smoothStream({ chunking: "word" }),
-          tools: getStandardTools({ session, dataStream, isProjectChat }),
+          tools: getStandardTools({ session, dataStream, isProjectChat, projectId: projectId || undefined }),
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
             functionId: "stream-text",
