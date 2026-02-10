@@ -16,10 +16,23 @@ const TEXT_MIME_EXACT = [
   "application/yaml",
 ];
 
-function isTextMime(mimeType: string): boolean {
+// Extensions that are always text, even if MIME is application/octet-stream
+const TEXT_EXTENSIONS = new Set([
+  ".md", ".txt", ".csv", ".json", ".xml", ".yaml", ".yml",
+  ".js", ".ts", ".jsx", ".tsx", ".py", ".html", ".css",
+  ".svg", ".env", ".ini", ".toml", ".cfg", ".conf",
+  ".sh", ".bash", ".zsh", ".sql", ".graphql", ".gql",
+  ".log", ".rst", ".tex", ".r", ".rb", ".go", ".java",
+]);
+
+function isTextFile(mimeType: string, fileName: string): boolean {
   if (TEXT_MIME_PREFIXES.some((p) => mimeType.startsWith(p))) return true;
   if (TEXT_MIME_EXACT.includes(mimeType)) return true;
-  return false;
+  // Fallback: check extension (handles application/octet-stream)
+  const ext = fileName.lastIndexOf(".") >= 0
+    ? fileName.slice(fileName.lastIndexOf(".")).toLowerCase()
+    : "";
+  return TEXT_EXTENSIONS.has(ext);
 }
 
 interface ReadProjectFileProps {
@@ -51,7 +64,7 @@ export const readProjectFile = ({ projectId }: ReadProjectFileProps) =>
         }
 
         // Binary files — return description from metadata
-        if (!isTextMime(file.mimeType)) {
+        if (!isTextFile(file.mimeType, file.name)) {
           const analysis = file.metadata?.analysis;
           return {
             fileName: file.name,
