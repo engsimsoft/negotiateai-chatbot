@@ -77,7 +77,7 @@ export default async function TaskPage({ params }: TaskPageProps) {
   }
 
   const initialMessages = convertToUIMessages(messagesFromDb);
-  const isReadonly = task.status === "done";
+  const isReadonly = task.status === "done" || task.status === "issues";
 
   return (
     <div className="flex h-dvh">
@@ -94,6 +94,7 @@ export default async function TaskPage({ params }: TaskPageProps) {
           projectId={projectId}
           taskId={taskId}
           task={task}
+          allTasks={allTasks}
           initialMessages={initialMessages}
           isReadonly={isReadonly}
         />
