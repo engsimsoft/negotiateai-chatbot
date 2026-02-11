@@ -2706,16 +2706,19 @@ export async function addChatSnapshot({
   chatId,
   messageId,
   summary,
+  fullMarkdown,
 }: {
   chatId: string;
   messageId: string;
   summary: string;
+  fullMarkdown?: string;
 }) {
   try {
     const newEntry: SnapshotMeta = {
       messageId,
       createdAt: new Date().toISOString(),
       summary,
+      ...(fullMarkdown && { fullMarkdown }),
     };
 
     await db

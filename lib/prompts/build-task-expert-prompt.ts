@@ -36,6 +36,8 @@ interface BuildTaskExpertPromptParams {
   task: ProjectTask;
   completedTasks: CompletedTaskSummary[];
   manifest: Project["manifestJson"];
+  /** Markdown from last snapshot — injected as <previous_context> */
+  snapshotContext?: string;
 }
 
 export function buildTaskExpertPrompt({
@@ -43,11 +45,19 @@ export function buildTaskExpertPrompt({
   task,
   completedTasks,
   manifest,
+  snapshotContext,
 }: BuildTaskExpertPromptParams): string {
   const blocks: string[] = [];
 
   // 1. Core expert prompt
   blocks.push(getCorePrompt());
+
+  // 1.5. Previous context from snapshot (if any)
+  if (snapshotContext) {
+    blocks.push("<previous_context>");
+    blocks.push(snapshotContext);
+    blocks.push("</previous_context>");
+  }
 
   // 2. Project passport
   blocks.push("<project_passport>");

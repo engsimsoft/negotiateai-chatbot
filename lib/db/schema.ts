@@ -205,6 +205,8 @@ export type SnapshotMeta = {
   messageId: string;
   createdAt: string;
   summary: string;
+  /** Present in fallback (clerk-generated) snapshots */
+  fullMarkdown?: string;
 };
 
 export type ContextState = {
