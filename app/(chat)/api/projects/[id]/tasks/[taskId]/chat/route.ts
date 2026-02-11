@@ -129,6 +129,9 @@ export async function POST(
     const streamId = generateUUID();
     await createStreamId({ streamId, chatId });
 
+    // ТЗ-C1.5: Generate assistant message ID upfront (needed for snapshot tool)
+    const assistantMessageId = generateUUID();
+
     // Model: env variable with fallback
     const expertModelId = process.env.EXPERT_MODEL || "gemini-3-pro";
     const modelToUse = myProvider.languageModel(expertModelId);
@@ -147,7 +150,7 @@ export async function POST(
           stopWhen: stepCountIs(5),
           experimental_activeTools: getActiveToolNames(isProjectChat),
           experimental_transform: smoothStream({ chunking: "word" }),
-          tools: getStandardTools({ session, dataStream, isProjectChat, projectId }),
+          tools: getStandardTools({ session, dataStream, isProjectChat, projectId, chatId, messageId: assistantMessageId }),
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
             functionId: "stream-task-expert",
@@ -216,7 +219,7 @@ export async function POST(
             if (type === "text" || type === "step-start" || type === "step-finish") {
               return true;
             }
-            if (type === "tool-createDocument" || type === "tool-updateDocument") {
+            if (type === "tool-createDocument" || type === "tool-updateDocument" || type === "tool-createSnapshot") {
               return true;
             }
             return false;

@@ -200,6 +200,18 @@ export type ProjectTask = InferSelectModel<typeof projectTask>;
 // Chat
 // ============================================================================
 
+// ТЗ-C1.5: Context snapshot types
+export type SnapshotMeta = {
+  messageId: string;
+  createdAt: string;
+  summary: string;
+};
+
+export type ContextState = {
+  suggestionActive: boolean;
+  messagesSinceSuggestion: number;
+};
+
 export const chat = pgTable("Chat", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   createdAt: timestamp("createdAt").notNull(),
@@ -223,6 +235,9 @@ export const chat = pgTable("Chat", {
     .notNull()
     .default("private"),
   lastContext: jsonb("lastContext").$type<AppUsage | null>(),
+  // ТЗ-C1.5: Context window management (snapshots)
+  snapshots: jsonb("snapshots").default([]).$type<SnapshotMeta[]>(),
+  contextState: jsonb("contextState").$type<ContextState | null>(),
 });
 
 export type Chat = InferSelectModel<typeof chat>;

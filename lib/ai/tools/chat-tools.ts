@@ -7,6 +7,7 @@
 
 import type { Session } from "next-auth";
 import { createDocument } from "./create-document";
+import { createSnapshot } from "./create-snapshot";
 import { parseExcel } from "./excel";
 import { getCurrentDate } from "./get-current-date";
 import { getWeather } from "./get-weather";
@@ -22,6 +23,9 @@ interface GetStandardToolsParams {
   dataStream: any; // UIMessageStreamWriter
   isProjectChat: boolean;
   projectId?: string;
+  chatId?: string;
+  /** Current assistant message ID — needed for snapshot tool */
+  messageId?: string;
 }
 
 /**
@@ -36,6 +40,8 @@ export function getStandardTools({
   dataStream,
   isProjectChat,
   projectId,
+  chatId,
+  messageId,
 }: GetStandardToolsParams) {
   return {
     getCurrentDate,
@@ -43,6 +49,9 @@ export function getStandardTools({
     ...(isProjectChat ? {} : { readDocument }),
     ...(isProjectChat && projectId
       ? { readProjectFile: readProjectFile({ projectId }) }
+      : {}),
+    ...(isProjectChat && chatId && messageId
+      ? { createSnapshot: createSnapshot({ chatId, messageId }) }
       : {}),
     createDocument: createDocument({ session, dataStream }),
     updateDocument: updateDocument({ session, dataStream }),
@@ -65,6 +74,7 @@ const ALL_TOOL_NAMES = [
   "loadSkill",
   "readDocument",
   "readProjectFile",
+  "createSnapshot",
 ] as const;
 
 type ToolName = (typeof ALL_TOOL_NAMES)[number];
@@ -85,6 +95,7 @@ export function getActiveToolNames(isProjectChat: boolean): ToolName[] {
       "parseExcel",
       "loadSkill",
       "readProjectFile",
+      "createSnapshot",
     ];
   }
 

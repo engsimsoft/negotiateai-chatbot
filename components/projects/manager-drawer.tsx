@@ -95,7 +95,11 @@ function DesktopManagerDrawer({
       </div>
 
       {/* Chat content — lazy mounted, persists after first open */}
-      {hasOpened && <ManagerChatContent projectId={projectId} />}
+      {hasOpened && (
+        <div className="flex-1 overflow-hidden">
+          <ManagerChatContent projectId={projectId} />
+        </div>
+      )}
     </div>
   );
 }
@@ -132,7 +136,9 @@ function MobileManagerDrawer({
           </div>
 
           {/* Chat content — re-mounts each time drawer opens (mobile) */}
-          <ManagerChatContent projectId={projectId} />
+          <div className="flex-1 overflow-hidden">
+            <ManagerChatContent projectId={projectId} />
+          </div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
