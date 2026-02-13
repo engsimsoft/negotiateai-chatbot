@@ -28,7 +28,9 @@ export function useAutoResume({
     const mostRecentMessage = initialMessages.at(-1);
 
     if (mostRecentMessage?.role === "user") {
-      resumeStream();
+      resumeStream().catch(() => {
+        // AI SDK may throw if internal Chat state isn't initialized yet
+      });
     }
 
     // we intentionally run this once

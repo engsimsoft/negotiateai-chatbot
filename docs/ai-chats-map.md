@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-02-10
+**Обновлено:** 2026-02-13
 
 ---
 
@@ -26,6 +26,7 @@
 | **Суммаризатор задач** | Gemini 2.5 Flash | ✅ Работает | Клерк — суммаризация результатов задачи (v3.17) |
 | **Ревьюер задач** | Gemini 3 Pro | ✅ Работает | Профессор — ревью завершённой задачи (v3.17) |
 | **Клерк-анализатор** | Gemini 2.5 Flash | ✅ Работает | Автоматический анализ файлов проекта |
+| **Snapshot Creator** | Gemini 2.5 Flash | ✅ Работает | Fallback-клерк создания snapshot при заполнении контекста (v3.18) |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
 | **Preset Помощники** | Gemini 3 Pro / 2.5 Flash | ⚠️ Частично | Маркетолог, Копирайтер и др. |
 
@@ -134,7 +135,7 @@ app/(chat)/api/service-chat/route.ts                # Manager с план-кон
 | **Модель** | `process.env.EXPERT_MODEL \|\| 'gemini-3-pro'` |
 | **Оболочка** | Отдельная route group `app/(task)/` — полноэкранный layout без AppSidebar |
 | **Промпт** | `lib/prompts/experts/task-expert.md` + `buildTaskExpertPrompt()` |
-| **Инструменты** | Shared tools (search, documents, excel, readProjectFile) — `getStandardTools()` |
+| **Инструменты** | Shared tools (search, documents, excel, readProjectFile, createSnapshot) — `getStandardTools()` |
 | **Персистенция** | Серверная (Chat в БД, привязан к ProjectTask через chatId) |
 | **Артефакты** | Поддерживаются (SidebarProvider в layout) |
 
@@ -146,6 +147,14 @@ app/(chat)/api/service-chat/route.ts                # Manager с план-кон
 5. Auto-trigger: Эксперт начинает первым — `sendMessage('[SYSTEM: Задача открыта. Начни работу.]')`
 6. System prompt включает: контекст проекта, описание задачи, результаты завершённых задач, manifest
 7. TaskSidebar позволяет переключаться между задачами
+
+**Context Management (v3.18):**
+1. Route оценивает usage из БД (tokenCount) → отправляет `data-context-usage` annotation
+2. При ≥70% → системный сигнал Эксперту предложить `createSnapshot`
+3. Эксперт вызывает tool → snapshot создаётся → карточка в чате → разделитель
+4. При следующем запросе: модель видит только snapshot context + новые сообщения
+5. Fallback: если 5+ пар без snapshot → клерк создаёт его автоматически
+6. UI: ContextIndicator (progress bar), SnapshotCard (expand/collapse), dimming старых сообщений
 
 **Завершение задачи (v3.17):**
 1. Кнопка «Завершить задачу» в header → AlertDialog подтверждения → spinner
@@ -250,6 +259,32 @@ lib/prompts/clerks/task-summarizer.md     # Промпт
 lib/ai/professors/task-reviewer.ts        # reviewTask()
 lib/ai/task-completion-types.ts           # professorVerdictSchema
 lib/prompts/professors/task-review.md     # Промпт
+```
+
+#### Snapshot Creator (Клерк v3.18)
+**Где:** Автоматически вызывается при заполнении контекстного окна (fallback)
+
+| Параметр | Значение |
+|----------|----------|
+| **Модель** | Gemini 2.5 Flash |
+| **Тип** | Backend (внутренний вызов в task expert chat route) |
+| **Триггер** | Если Эксперт игнорирует 5+ пар сообщений после порога (≥70% контекста) |
+
+**Как работает:**
+1. Task expert route отслеживает `Chat.contextState.messagesSinceSuggestion`
+2. Если `messagesSinceSuggestion >= FALLBACK_MESSAGE_PAIRS` (5) → вызывает fallback-клерка
+3. Клерк анализирует последние сообщения и создаёт структурированный snapshot
+4. Snapshot сохраняется в `Chat.snapshots[]`, contextState сбрасывается
+5. При следующем запросе модель видит только snapshot + новые сообщения
+
+**Также:** Эксперт может самостоятельно вызвать `createSnapshot` tool до fallback'а.
+
+**Файлы:**
+```
+lib/ai/clerks/snapshot-creator.ts          # snapshotCreatorClerk()
+lib/ai/tools/create-snapshot.ts            # createSnapshot tool
+lib/ai/context-limits.ts                   # Конфиг бюджетов
+lib/prompts/clerks/snapshot-creator.md     # Промпт клерка
 ```
 
 ---
@@ -449,7 +484,7 @@ export const geminiPro = google("gemini-3-pro-preview");
 | Модель | Input | Output | Контекст | Используется в |
 |--------|-------|--------|----------|---------------|
 | Gemini 3 Pro | $2 | $12 | 1M | Основной чат, Секретарь, Эксперт, Профессор планирования, Ревьюер задач |
-| Gemini 2.5 Flash | $0.075 | $0.30 | 1M | Ben, Менеджер, Исполнитель, Клерк-анализатор, Суммаризатор задач |
+| Gemini 2.5 Flash | $0.075 | $0.30 | 1M | Ben, Менеджер, Исполнитель, Клерк-анализатор, Суммаризатор задач, Snapshot Creator |
 | Gemini 2.5 Pro | $1.25 | $5 | 1M | Suggestions (внутренний) |
 
 *Цены за 1M токенов*
@@ -481,7 +516,8 @@ lib/prompts/
 │   └── task-expert.md     # Эксперт по задаче
 ├── clerks/                # Промпты клерков (v3.13+)
 │   ├── file-analyzer.md   # Клерк-анализатор файлов
-│   └── task-summarizer.md # Клерк-суммаризатор задач (v3.17)
+│   ├── task-summarizer.md # Клерк-суммаризатор задач (v3.17)
+│   └── snapshot-creator.md # Клерк-создатель snapshot'ов (v3.18)
 ├── service-chats/         # Промпты сервисных чатов (v3.11+)
 │   ├── project-creation.md # Промпт Секретаря
 │   └── project-manager.md  # Промпт Менеджера

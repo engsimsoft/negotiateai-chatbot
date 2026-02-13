@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.17.0
-**Дата:** 2026-02-10
+**Версия:** 3.18.0
+**Дата:** 2026-02-13
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -25,7 +25,7 @@
 | Особенность | Описание | Статус |
 |-------------|----------|--------|
 | **Универсальный AI-чат** | Один мощный чат со всеми инструментами | ✅ |
-| **Проекты** | Изолированные рабочие пространства с Профессором, Менеджером, утверждением плана, картой задач, чатом с Экспертом и завершением задач | ✅ v3.17.0 |
+| **Проекты** | Изолированные рабочие пространства с Профессором, Менеджером, утверждением плана, картой задач, чатом с Экспертом, завершением задач и управлением контекстом | ✅ v3.18.0 |
 | **Сервисные помощники** | Бен (❓), Секретарь (➕), Менеджер (👤) | ✅ v3.13.0 |
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG/Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity, Plus AI, Ideogram, AssemblyAI | 📋 Фаза 1 |
@@ -92,6 +92,7 @@
 | **task-summarizer** (Клерк) | Gemini 2.5 Flash | Суммаризация результатов задачи |
 | **task-reviewer** (Профессор) | Gemini 3 Pro | Ревью завершённой задачи |
 | **file-analyzer** (Клерк) | Gemini 2.5 Flash | Автоанализ файлов проекта |
+| **snapshot-creator** (Клерк) | Gemini 2.5 Flash | Fallback-создание snapshot при заполнении контекста (v3.18) |
 
 ### Файловая структура
 
@@ -149,7 +150,8 @@ lib/prompts/
 │
 ├── clerks/                      # Промпты клерков (v3.13+)
 │   ├── file-analyzer.md     # Клерк-анализатор файлов
-│   └── task-summarizer.md   # Клерк-суммаризатор задач (v3.17)
+│   ├── task-summarizer.md   # Клерк-суммаризатор задач (v3.17)
+│   └── snapshot-creator.md  # Клерк-создатель snapshot'ов (v3.18)
 │
 ├── service-chats/               # Промпты сервисных чатов (v3.11+)
 │   ├── project-creation.md  # XML-промпт Секретаря
@@ -180,6 +182,7 @@ lib/prompts/
 |-------|--------|---------|------------|
 | **Анализатор файлов** | Gemini 2.5 Flash | Upload файла в проект | Описание, тип, папка, ключевые темы, manifest |
 | **Суммаризатор задач** | Gemini 2.5 Flash | Завершение задачи | Краткое описание результатов + статус + артефакты |
+| **Snapshot Creator** | Gemini 2.5 Flash | Fallback при заполнении контекста | Автоматический snapshot диалога (v3.18) |
 
 ### Профессоры (v3.14+)
 
@@ -295,6 +298,7 @@ components/projects/
 - Parse Excel (анализ загруженных файлов)
 - **Load Skill** (динамическая загрузка инструкций) ← v3.3.2
 - **Read Project File** (чтение файлов проекта по имени из manifest) ← v3.17.0
+- **Create Snapshot** (создание итога диалога для управления контекстом) ← v3.18.0
 
 **Планируемые:**
 - Website Analyzer (fetch, screenshot, SEO)
@@ -318,6 +322,37 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-C1.5: Context Window Management — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Автоматическое управление контекстом** — snapshot-система для сжатия истории чата с Экспертом при заполнении контекстного окна
+- **`createSnapshot` tool** — Эксперт создаёт структурированный итог диалога (shortSummary + fullMarkdown из 6 параметров)
+- **Snapshot-aware trimming** — после snapshot модель видит только snapshot + новые сообщения
+- **Usage monitoring** — оценка использования контекста до стриминга, annotation `data-context-usage`
+- **Системный сигнал** — при ≥70% контекста Эксперт получает инструкцию предложить snapshot
+- **Fallback-клерк** — `snapshot-creator.ts` автоматически создаёт snapshot если Эксперт игнорирует 5 пар сообщений после порога
+- **SnapshotCard** — expand/collapse карточка с секциями (Решения, Состояние, Артефакты, Вопросы, Шаги)
+- **SnapshotDivider** — визуальный разделитель "Контекст обновлён" / "Контекст сжат"
+- **Message dimming** — сообщения до snapshot приглушены (opacity-50)
+- **ContextIndicator** — тонкий progress bar над input (3 цвета по уровню заполнения)
+
+**DB поля добавлены:**
+- `Chat.snapshots` (jsonb[]) — метаданные snapshot'ов (messageId, createdAt, summary)
+- `Chat.contextState` (jsonb) — состояние системы (suggestionActive, messagesSinceSuggestion)
+
+**DB queries добавлены:**
+- `addChatSnapshot()`, `getChatWithSnapshotState()`, `updateChatContextState()`, `resetChatContextState()`
+
+**Ключевые файлы:**
+- `lib/ai/context-limits.ts` — конфиг бюджетов
+- `lib/ai/tools/create-snapshot.ts` — tool createSnapshot
+- `lib/ai/clerks/snapshot-creator.ts` — fallback-клерк
+- `lib/prompts/clerks/snapshot-creator.md` — промпт клерка
+- `components/projects/snapshot-card.tsx` — SnapshotCard + SnapshotDivider
+- `components/projects/context-indicator.tsx` — ContextIndicator
+
+**Детали:** [_archive/TZ_C1_5_ContextManagement/](_archive/TZ_C1_5_ContextManagement/)
 
 ### ТЗ-C2: TaskCompletion — ✅ ЗАВЕРШЁН
 
@@ -843,19 +878,19 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.17.0 |
+| Версия | 3.18.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Профессоры | 2 (planning, task-review) |
-| Клерки | 2 (file-analyzer, task-summarizer) |
+| Клерки | 3 (file-analyzer, task-summarizer, snapshot-creator) |
 | Сервисные чаты | 3 (ben, project-creation, project-manager) |
-| Промптов | 9 (chat, ben, project-creation, project-manager, professor-planning, task-expert, task-summarizer, task-review, file-analyzer) |
+| Промптов | 10 (chat, ben, project-creation, project-manager, professor-planning, task-expert, task-summarizer, task-review, file-analyzer, snapshot-creator) |
 | AI моделей | 5 (Gemini 3 Pro, 2.5 Flash, Claude Haiku, Sonnet, Opus) |
-| AI-инструментов | 10 |
+| AI-инструментов | 11 |
 | Типов документов | 5 (text, markdown, excel, presentation-reveal, presentation-pptx) |
 | Тем презентаций | 5 |
 | Тем Excel | 5 |
@@ -881,6 +916,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_C1_5_ContextManagement/](_archive/TZ_C1_5_ContextManagement/) — ТЗ-C1.5 Context Window Management
 - [_archive/TZ_C2_TaskCompletion/](_archive/TZ_C2_TaskCompletion/) — ТЗ-C2 TaskCompletion
 - [_archive/TZ_C1_ExpertTaskChat/](_archive/TZ_C1_ExpertTaskChat/) — ТЗ-C1 ExpertTaskChat
 - [_archive/TZ_B2_ApprovalTasks/](_archive/TZ_B2_ApprovalTasks/) — ТЗ-B2 Approval + ProjectTask
@@ -912,4 +948,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-10
+**Обновлено:** 2026-02-13

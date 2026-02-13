@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.17.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.18.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -65,7 +65,7 @@
 - `lib/prompts/professors/` — Промпты профессоров (planning.md, task-review.md)
 - `lib/prompts/experts/` — Промпты экспертов (task-expert.md)
 - `lib/prompts/build-task-expert-prompt.ts` — Prompt builder для Эксперта
-- `lib/prompts/clerks/` — Промпты клерков (file-analyzer.md, task-summarizer.md)
+- `lib/prompts/clerks/` — Промпты клерков (file-analyzer.md, task-summarizer.md, snapshot-creator.md)
 - `lib/prompts/service-chats/` — Промпты сервисных чатов (project-creation.md, project-manager.md)
 - `lib/prompts/core/` — Базовые промпты (.md файлы)
 - `lib/prompts/contexts/` — Контексты (user-profile, chat-memory)
@@ -159,6 +159,14 @@
 - `lib/prompts/experts/task-expert.md` — Промпт Эксперта
 - `lib/prompts/build-task-expert-prompt.ts` — Prompt builder (project + task + completedTasks + manifest)
 
+**Context Window Management (v3.18.0 — ТЗ-C1.5):**
+- `lib/ai/context-limits.ts` — Конфиг (CONTEXT_BUDGET, SNAPSHOT_THRESHOLD, FALLBACK_MESSAGE_PAIRS)
+- `lib/ai/tools/create-snapshot.ts` — Tool createSnapshot (structured params → fullMarkdown)
+- `lib/ai/clerks/snapshot-creator.ts` — Fallback-клерк (авто-snapshot при игнорировании)
+- `lib/prompts/clerks/snapshot-creator.md` — Промпт fallback-клерка
+- `components/projects/snapshot-card.tsx` — SnapshotCard (expand/collapse) + SnapshotDivider
+- `components/projects/context-indicator.tsx` — Progress bar над input (3 цвета)
+
 **Voice Input (Deepgram):**
 - `app/(chat)/api/deepgram/token/route.ts` — Token API
 - `lib/audio/` — Аудио утилиты (types, constants, utils)
@@ -185,7 +193,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**
@@ -364,4 +372,4 @@ specs/
 
 ---
 
-**Обновлено:** 2026-02-10
+**Обновлено:** 2026-02-13

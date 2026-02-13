@@ -12,6 +12,36 @@
 
 ---
 
+## [3.18.0] - 2026-02-13 - Context Window Management (ТЗ-C1.5)
+
+**MINOR RELEASE**: Автоматическое управление контекстным окном в чате с Экспертом — snapshot-система для сжатия истории, fallback-клерк, UI-индикатор, карточка итога.
+
+### Added
+- **`createSnapshot` tool** — инструмент Эксперта для создания итога диалога (shortSummary, decisions, currentState, artifacts, openQuestions, nextSteps → fullMarkdown)
+- **`lib/ai/context-limits.ts`** — конфиг бюджетов (CONTEXT_BUDGET=140k, SNAPSHOT_THRESHOLD=0.7, FALLBACK_MESSAGE_PAIRS=5)
+- **`Chat.snapshots`** (jsonb[]) — метаданные snapshot'ов (messageId, createdAt, summary)
+- **`Chat.contextState`** (jsonb) — состояние системы snapshot'ов (suggestionActive, messagesSinceSuggestion)
+- **`lib/db/queries.ts`** — 4 функции: `addChatSnapshot`, `getChatWithSnapshotState`, `updateChatContextState`, `resetChatContextState`
+- **`lib/ai/clerks/snapshot-creator.ts`** — fallback-клерк: автоматически создаёт snapshot если Эксперт игнорирует 5 пар сообщений после порога
+- **`lib/prompts/clerks/snapshot-creator.md`** — промпт fallback-клерка
+- **`SnapshotCard`** — UI-компонент: expand/collapse карточка с секциями (Решения, Состояние, Артефакты, Вопросы, Шаги)
+- **`SnapshotDivider`** — визуальный разделитель "Контекст обновлён" / "Контекст сжат"
+- **`ContextIndicator`** — тонкий progress bar (3px) над input: серый <60%, amber 60-80%, orange+pulse 80-100%
+- **Message dimming** — сообщения до последнего snapshot приглушены (opacity-50)
+
+### Changed
+- **`build-task-expert-prompt.ts`** — параметр `snapshotContext` → блок `<previous_context>` в system prompt
+- **Task expert chat route** — snapshot-aware message trimming, usage estimation, системный сигнал при пороге, fallback-клерк
+- **`chat-tools.ts`** — добавлен `chatId` в params, `createSnapshot` для project chats
+- **`task-chat.tsx`** — `contextPercent` state, обработка `data-context-usage` в onData, ContextIndicator над input
+- **`messages.tsx`** — dimming logic, fallback divider, snapshots prop
+- **`message.tsx`** — обнаружение `tool-createSnapshot`, рендер SnapshotCard + SnapshotDivider
+
+### Fixed
+- **`use-auto-resume.ts`** — добавлен catch для `resumeStream()` (AI SDK race condition при инициализации)
+
+---
+
 ## [3.17.0] - 2026-02-10 - TaskCompletion (ТЗ-C2)
 
 **MINOR RELEASE**: Завершение задач проекта — полный flow: суммаризация → ревью Профессором → карточка результата → доработка/принятие → разблокировка зависимых → project completion.
