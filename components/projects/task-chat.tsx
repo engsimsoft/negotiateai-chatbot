@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/toast";
 import { TaskCompletionCard } from "@/components/projects/task-completion-card";
-import type { ProjectTask } from "@/lib/db/schema";
+import type { ProjectTask, SnapshotMeta } from "@/lib/db/schema";
 import type { TaskSummary, ProfessorVerdict } from "@/lib/ai/task-completion-types";
 
 interface TaskChatProps {
@@ -36,6 +36,8 @@ interface TaskChatProps {
   allTasks: ProjectTask[];
   initialMessages: ChatMessage[];
   isReadonly: boolean;
+  /** ТЗ-C1.5: Snapshot metadata for fallback dividers */
+  snapshots?: SnapshotMeta[];
 }
 
 export function TaskChat({
@@ -46,6 +48,7 @@ export function TaskChat({
   allTasks,
   initialMessages,
   isReadonly,
+  snapshots,
 }: TaskChatProps) {
   const router = useRouter();
   const { setDataStream } = useDataStream();
@@ -251,6 +254,7 @@ export function TaskChat({
           setMessages={setMessages}
           status={status}
           votes={undefined}
+          snapshots={snapshots}
         />
 
         {/* Completion card — between messages and input */}

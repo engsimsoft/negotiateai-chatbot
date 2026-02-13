@@ -25,6 +25,8 @@ import { MessageActions } from "./message-actions";
 import { MessageEditor } from "./message-editor";
 import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
+import { SnapshotCard, SnapshotDivider } from "./projects/snapshot-card";
+import type { SnapshotData } from "./projects/snapshot-card";
 import { Weather } from "./weather";
 
 /**
@@ -377,6 +379,32 @@ const PurePreviewMessage = ({
                   </ToolContent>
                 </Tool>
               );
+            }
+
+            // @ts-ignore - tool-createSnapshot is a custom tool not in AI SDK types
+            if (type === "tool-createSnapshot") {
+              const { toolCallId, state } = part as any;
+              const output = (part as any).output as SnapshotData | undefined;
+
+              if (state === "output-available" && output?.fullMarkdown) {
+                return (
+                  <div key={toolCallId}>
+                    <SnapshotCard data={output} />
+                    <SnapshotDivider />
+                  </div>
+                );
+              }
+
+              // While tool is running, show minimal loading state
+              if (state !== "output-available") {
+                return (
+                  <Tool defaultOpen={true} key={toolCallId}>
+                    <ToolHeader state={state} type="tool-createSnapshot" />
+                  </Tool>
+                );
+              }
+
+              return null;
             }
 
             return null;

@@ -97,6 +97,7 @@ export default async function TaskPage({ params }: TaskPageProps) {
           allTasks={allTasks}
           initialMessages={initialMessages}
           isReadonly={isReadonly}
+          snapshots={chat.snapshots ?? []}
         />
       </div>
     </div>

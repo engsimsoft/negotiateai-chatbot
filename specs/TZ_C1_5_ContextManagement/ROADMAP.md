@@ -13,7 +13,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Всего этапов | 4 + Финализация |
-| Текущий этап | 2 ✅ |
+| Текущий этап | 3 ✅ |
 | Оценка сессий | 3-4 |
 
 **Скоуп:** Этапы 1-4 (включая fallback-клерка). Полная production-ready фича.
@@ -171,7 +171,7 @@ git commit -m "feat(tz-c1.5): context reset + usage monitoring + system signal +
 
 ### Этап 3: UI — SnapshotCard + разделитель
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 > ⛔ **НЕ НАЧИНАТЬ** без подтверждения валидации Этапа 2
 
@@ -179,13 +179,13 @@ git commit -m "feat(tz-c1.5): context reset + usage monitoring + system signal +
 
 **Задачи:**
 
-- [ ] **3.1** Создать `components/projects/snapshot-card.tsx`:
+- [x] **3.1** Создать `components/projects/snapshot-card.tsx`:
   - Props: `data: SnapshotData` (parsed из tool call result)
   - Два состояния: свёрнуто (shortSummary + "Подробнее") и развёрнуто (секции: Решения, Создано, Открытые вопросы, Следующие шаги)
   - Стиль: `bg-muted`, иконка `FileText` (lucide), `rounded-lg`
   - Toggle кнопка "Подробнее" / "Свернуть"
 
-- [ ] **3.2** Интегрировать SnapshotCard в систему рендеринга сообщений:
+- [x] **3.2** Интегрировать SnapshotCard в систему рендеринга сообщений:
   - В `components/message.tsx` — обнаруживать part с `type === "tool-createSnapshot"` или tool result содержащий snapshot JSON
   - Если snapshot tool call → рендерить `SnapshotCard` вместо стандартного tool result UI
   - После карточки — визуальный разделитель:
@@ -193,16 +193,16 @@ git commit -m "feat(tz-c1.5): context reset + usage monitoring + system signal +
     ────────── 📋 Контекст обновлён ──────────
     ```
 
-- [ ] **3.3** Приглушение старых сообщений:
+- [x] **3.3** Приглушение старых сообщений:
   - В `components/messages.tsx`: найти индекс последнего сообщения, содержащего snapshot tool call
   - Все messages до него → обернуть в `<div className="opacity-60 transition-opacity">`
   - CSS transition для плавности
 
-- [ ] **3.4** Проверить корректность scroll и memo в Messages:
+- [x] **3.4** Проверить корректность scroll и memo в Messages:
   - `memo` comparator учитывает snapshot-содержащие сообщения
   - Scroll to bottom работает при появлении snapshot
 
-- [ ] **3.5** Рендеринг fallback-snapshot (от клерка):
+- [x] **3.5** Рендеринг fallback-snapshot (от клерка):
   - Клерковский snapshot не имеет tool call — это запись только в `Chat.snapshots[]`
   - При загрузке сообщений: если `Chat.snapshots[]` содержит messageId которого нет в messages (fallback) → рендерить тонкий разделитель без карточки: `────────── 📋 Контекст сжат ──────────`
   - Сообщения до разделителя — приглушены
