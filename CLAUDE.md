@@ -6,12 +6,21 @@
 
 ---
 
+## UI и дизайн
+
+Перед любой работой с UI-компонентами — ПРОЧИТАЙ **[SIMPLY_DESIGN_SYSTEM.md](SIMPLY_DESIGN_SYSTEM.md)**.
+Это обязательный стандарт. Все цвета, шрифты и отступы должны соответствовать этому файлу.
+Хардкоженные цвета и прямые Tailwind палитры (gray-*, slate-*) ЗАПРЕЩЕНЫ.
+
+---
+
 ## Начни здесь
 
 1. **[README.md](README.md)** — О проекте Simply
 2. **[SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md)** — Видение продукта (roadmap, инструменты, концепции)
 3. **[SIMPLY_STATUS.md](SIMPLY_STATUS.md)** — Текущее состояние проекта
-4. **[DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md)** — Правила документации
+4. **[SIMPLY_DESIGN_SYSTEM.md](SIMPLY_DESIGN_SYSTEM.md)** — Дизайн-система (закон для UI)
+5. **[DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md)** — Правила документации
 
 **Главный принцип:** SSOT (Single Source of Truth)
 

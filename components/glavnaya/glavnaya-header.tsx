@@ -56,7 +56,7 @@ export function GlavnayaHeader() {
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6">
       {/* Logo */}
-      <Link href="/dashboard" className="text-xl font-bold tracking-tight">
+      <Link href="/dashboard" className="text-xl font-semibold tracking-tight">
         Simply
       </Link>
 
