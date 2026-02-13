@@ -13,7 +13,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Всего этапов | 4 + Финализация |
-| Текущий этап | 3 ✅ |
+| Текущий этап | 4 ✅ |
 | Оценка сессий | 3-4 |
 
 **Скоуп:** Этапы 1-4 (включая fallback-клерка). Полная production-ready фича.
@@ -231,7 +231,7 @@ git commit -m "feat(tz-c1.5): SnapshotCard UI + divider + dimmed old messages"
 
 ### Этап 4: UI — ContextIndicator + E2E flow
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 > ⛔ **НЕ НАЧИНАТЬ** без подтверждения валидации Этапа 3
 
@@ -239,7 +239,7 @@ git commit -m "feat(tz-c1.5): SnapshotCard UI + divider + dimmed old messages"
 
 **Задачи:**
 
-- [ ] **4.1** Создать `components/projects/context-indicator.tsx`:
+- [x] **4.1** Создать `components/projects/context-indicator.tsx`:
   - Props: `percent: number`
   - Три состояния по цвету:
     - 0-60%: `bg-muted-foreground/20` (почти невидимая, не отвлекает)
@@ -248,7 +248,7 @@ git commit -m "feat(tz-c1.5): SnapshotCard UI + divider + dimmed old messages"
   - Тонкая полоска (2-3px высота), progress bar стиль
   - Hover → Tooltip: "Контекст диалога: {X}%"
 
-- [ ] **4.2** Интегрировать ContextIndicator в `task-chat.tsx`:
+- [x] **4.2** Интегрировать ContextIndicator в `task-chat.tsx`:
   - Хранить `contextPercent` в `useState(0)`
   - Обработать annotation `context-usage` из `onData`:
     ```typescript
@@ -263,14 +263,14 @@ git commit -m "feat(tz-c1.5): SnapshotCard UI + divider + dimmed old messages"
   - Разместить ContextIndicator над `MultimodalInput` (между completionCard и input div)
   - Скрывать если: `isReadonly || isCompleting || currentStatus !== "in_progress"`
 
-- [ ] **4.3** E2E тест полного flow:
+- [x] **4.3** E2E тест полного flow:
   1. Пишем сообщения → индикатор обновляется после каждого ответа
   2. При 70%+ → Эксперт предлагает snapshot
   3. Пользователь соглашается → tool вызывается → карточка в чате
   4. Индикатор сбрасывается (следующий ответ → низкий %)
   5. Модель видит только snapshot + новые сообщения
 
-- [ ] **4.4** Edge cases:
+- [x] **4.4** Edge cases:
   - Множественные snapshots: второй snapshot корректно создаётся поверх первого (модель видит предыдущий snapshot в system prompt)
   - Readonly режим: индикатор скрыт
   - Completed задача: индикатор скрыт

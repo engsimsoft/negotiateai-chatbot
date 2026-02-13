@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/toast";
+import { ContextIndicator } from "@/components/projects/context-indicator";
 import { TaskCompletionCard } from "@/components/projects/task-completion-card";
 import type { ProjectTask, SnapshotMeta } from "@/lib/db/schema";
 import type { TaskSummary, ProfessorVerdict } from "@/lib/ai/task-completion-types";
@@ -55,6 +56,9 @@ export function TaskChat({
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
+
+  // ТЗ-C1.5: Context usage tracking
+  const [contextPercent, setContextPercent] = useState(0);
 
   // Completion state
   const [currentStatus, setCurrentStatus] = useState(task.status);
@@ -124,6 +128,11 @@ export function TaskChat({
     transport,
     onData: (dataPart) => {
       setDataStream((ds) => (ds ? [...ds, dataPart as typeof ds[number]] : []));
+      // ТЗ-C1.5: Handle context usage annotation
+      const part = dataPart as any;
+      if (part.type === "data-context-usage" && part.data?.percent != null) {
+        setContextPercent(part.data.percent);
+      }
     },
     onError: (error) => {
       toast({
@@ -273,7 +282,12 @@ export function TaskChat({
           </div>
         )}
 
-        <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
+        <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl flex-col gap-0 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
+          {/* ТЗ-C1.5: Context usage indicator */}
+          {!isReadonly && !isCompleting && currentStatus === "in_progress" && (
+            <ContextIndicator percent={contextPercent} />
+          )}
+
           {!isReadonly && !isCompleting && currentStatus === "in_progress" && (
             <MultimodalInput
               attachments={attachments}
