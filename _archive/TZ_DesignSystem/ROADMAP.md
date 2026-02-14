@@ -220,3 +220,29 @@ git commit -m "feat(tz-ds): finalize v3.19.0 — Simply Design System"
 ```
 
 **Критерий готовности:** Production build проходит, визуал единый, документация обновлена.
+
+---
+
+## Этап 6: Документация — SIMPLY_DESIGN_SYSTEM.md (Сессия 5)
+
+**Статус:** ✅ Завершён
+
+**Цель:** Обновить SIMPLY_DESIGN_SYSTEM.md до полноценного закона дизайн-системы со структурой UI, hover-паттернами и правилами.
+
+**Задачи:**
+- [x] 6.1 Откатить UserMenu (коммит `286ec1c`) — создавал дубли навигации
+- [x] 6.2 Проанализировать все layouts, pages, навигационные компоненты
+- [x] 6.3 Обновить `SIMPLY_DESIGN_SYSTEM.md`:
+  - Раздел 1: Структура интерфейса (layout groups, карта страниц, компоненты навигации, паттерн header)
+  - Раздел 5: Hover-паттерны (A и B)
+  - Раздел 11: Правила создания новых компонентов
+  - Исключения намеренных цветов, палитра dark mode
+- [x] 6.4 Обновить HANDOFF.md, CHANGELOG.md, ROADMAP.md
+- [x] 6.5 Валидация: `npx tsc --noEmit` + `npm run build`
+- [ ] 6.6 🧪 Мануальный тест: light + dark на всех страницах (пользователь)
+
+**Файлы:**
+- `SIMPLY_DESIGN_SYSTEM.md`
+- `specs/TZ_DesignSystem/HANDOFF.md`
+- `specs/TZ_DesignSystem/CHANGELOG.md`
+- `specs/TZ_DesignSystem/ROADMAP.md`

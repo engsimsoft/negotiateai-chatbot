@@ -3,7 +3,7 @@
 **Дата завершения:** 2026-02-14
 **Версия:** 3.18.0 → 3.19.0
 **Ветка:** `feature/design-system`
-**Сессий:** 4
+**Сессий:** 5
 
 ## Все коммиты
 
@@ -17,6 +17,8 @@
 | `459c2c9` | 4 | Hover animation на task-sidebar |
 | `a5c584a` | 4 | Hover unification: карточки + pulse |
 | `9ec3336` | 4 | Финализация v3.19.0, удаление geist, docs |
+| `18c067e` | 5 | Revert UserMenu (дублирование навигации) |
+| *(pending)* | 5 | docs/design-system.md + ADR-013 + регистрация в DOCUMENTATION_GUIDE |
 
 ## Итог
 
@@ -25,6 +27,7 @@
 - **Пакет geist удалён**, шрифты: Source Sans 3, Lora, JetBrains Mono
 - **Hover паттерны** унифицированы: карточки (border-primary + shadow) и sidebar items (rounded-lg + bg-muted)
 - **Тёплая палитра**: light #FAF9F5, dark #1C1B19, primary терракот
+- **docs/design-system.md** — полноценный закон: структура UI, карта страниц, hover-паттерны, правила (ADR-013)
 
 ## Архив
 
@@ -32,6 +35,6 @@
 
 ## Открытые вопросы (backlog, не блокеры)
 
+- User Menu на страницах без AppSidebar (/settings, /projects, /projects/[id], /chats, task) — переиспользовать паттерн GlavnayaHeader, **отдельное ТЗ**
 - Иконки/бейджи помощников на Glavnaya — тёплые терракотовые акценты
-- Глобальный UserMenu для страниц без AppSidebar (dashboard, task) — **следующая задача**
 - Полный редизайн навигации — отдельное ТЗ в будущем
