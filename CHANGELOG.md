@@ -12,6 +12,32 @@
 
 ---
 
+## [3.19.0] - 2026-02-14 - Simply Design System (ТЗ-DS)
+
+**MINOR RELEASE**: Полная дизайн-система — тёплая терракотовая палитра, новые шрифты, семантические токены, единый hover-паттерн.
+
+### Added
+- **`SIMPLY_DESIGN_SYSTEM.md`** — файл-закон дизайн-системы (цвета, шрифты, отступы, правила)
+- **`app/fonts.ts`** — шрифты Source Sans 3 (sans), Lora (serif), JetBrains Mono (mono) через next/font/google
+- **Тёплая палитра** — light: `#FAF9F5` (крем), dark: `#1C1B19` (тёплый тёмный), primary: терракот
+- **CSS tokens** — success, warning, info цвета; sidebar dark; soft shadows
+- **Hover unification** — карточки: `hover:border-primary hover:shadow-sm`; sidebar items: `rounded-lg hover:bg-muted/60 transition-all duration-150`
+
+### Changed
+- **Все компоненты** — 50+ замен hardcoded цветов (gray/zinc/slate/stone/neutral/blue) → семантические токены
+- **Auth pages** — text-zinc → text-muted-foreground
+- **Sidebar** — bg-zinc → bg-muted, скелетоны на токенах
+- **Artifacts** — dark:hover:bg-zinc → dark:hover:bg-accent, border-zinc → border-border
+- **Console** — полная миграция на семантические токены (6 замен)
+- **Projects** — blue-500/600 → primary (7 файлов), hover унификация (3 файла)
+- **Task sidebar** — rounded-lg + transition-all + font-medium active state
+
+### Removed
+- **Пакет `geist`** — заменён на Source Sans 3 / Lora / JetBrains Mono
+- **Hardcoded цвета** — 0 результатов grep по gray/zinc/slate/stone/neutral
+
+---
+
 ## [3.18.0] - 2026-02-13 - Context Window Management (ТЗ-C1.5)
 
 **MINOR RELEASE**: Автоматическое управление контекстным окном в чате с Экспертом — snapshot-система для сжатия истории, fallback-клерк, UI-индикатор, карточка итога.

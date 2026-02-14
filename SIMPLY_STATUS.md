@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.18.0
-**Дата:** 2026-02-13
+**Версия:** 3.19.0
+**Дата:** 2026-02-14
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -322,6 +322,24 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-DS: Simply Design System — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Дизайн-система** — `SIMPLY_DESIGN_SYSTEM.md` — файл-закон для всех UI-компонентов
+- **Шрифты** — Source Sans 3 (sans), Lora (serif для заголовков), JetBrains Mono (mono) через next/font/google
+- **Тёплая палитра** — light `#FAF9F5`, dark `#1C1B19`, primary терракот, мягкие тени
+- **Семантические токены** — 50+ замен hardcoded цветов (gray/zinc/slate/stone/neutral/blue → muted/foreground/primary/accent/border)
+- **Hover unification** — единый паттерн для карточек (hover:border-primary) и sidebar items (rounded-lg + bg-muted)
+- **Удалён пакет geist** — полностью заменён новыми шрифтами
+
+**Ключевые файлы:**
+- `SIMPLY_DESIGN_SYSTEM.md` — дизайн-система (закон)
+- `app/fonts.ts` — шрифты
+- `app/globals.css` — CSS токены, @theme
+- `app/layout.tsx` — подключение шрифтов
+
+**Детали:** [_archive/TZ_DesignSystem/](_archive/TZ_DesignSystem/)
 
 ### ТЗ-C1.5: Context Window Management — ✅ ЗАВЕРШЁН
 
@@ -878,11 +896,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.18.0 |
+| Версия | 3.19.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Профессоры | 2 (planning, task-review) |
@@ -916,6 +934,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_DesignSystem/](_archive/TZ_DesignSystem/) — ТЗ-DS Simply Design System
 - [_archive/TZ_C1_5_ContextManagement/](_archive/TZ_C1_5_ContextManagement/) — ТЗ-C1.5 Context Window Management
 - [_archive/TZ_C2_TaskCompletion/](_archive/TZ_C2_TaskCompletion/) — ТЗ-C2 TaskCompletion
 - [_archive/TZ_C1_ExpertTaskChat/](_archive/TZ_C1_ExpertTaskChat/) — ТЗ-C1 ExpertTaskChat
