@@ -1,6 +1,6 @@
 # Changelog ТЗ-DS: Simply Design System
 
-## Сессия 4 — 2026-02-14
+## Сессия 4 — 2026-02-14 (финальная)
 
 ### Этап 3 — Sidebar + Glavnaya + Input (коммит `1b0af54`)
 - `sidebar-user-nav.tsx` — bg-zinc-500/30 → bg-muted (2), text-zinc-500 → text-muted-foreground (1)
@@ -23,6 +23,31 @@
 - `components/projects/` — аудит: только статусные цвета (намеренные)
 - `components/service-chat/` — аудит: чисто
 - Финальный grep: 0 хардкодов (gray/zinc/slate/stone/neutral)
+
+### Blue → Primary (коммит `d5853c5`)
+- `task-sidebar.tsx` — text-blue-600 → text-primary, text-purple-600 → text-primary/70
+- `planning-state.tsx` — 5 замен blue → primary
+- `execution-state.tsx` — 2 замены blue → primary
+- `project-pulse.tsx` — 4 замены blue → primary
+- `task-completion-card.tsx` — bg-blue-500/15 → bg-primary/15
+- `professor-progress.tsx` — 5 замен blue → primary
+- `project-files-card.tsx` — bg-blue-500 → bg-primary
+
+### Hover animation (коммит `459c2c9`)
+- `task-sidebar.tsx` — rounded-lg, transition-all duration-150, mx-1.5, font-medium active
+
+### Hover unification (коммит `a5c584a`)
+- `execution-state.tsx` — hover:bg-muted/50 → hover:border-primary hover:shadow-sm
+- `approved-state.tsx` — hover:bg-muted/50 → hover:border-primary hover:shadow-sm, rounded-lg → rounded-xl
+- `project-pulse.tsx` — rounded-lg + mx-1 + transition-all duration-150
+
+### Этап 5 — Финализация (коммит `9ec3336`)
+- Удалён пакет `geist` из package.json
+- package.json версия → 3.19.0
+- CHANGELOG.md — добавлена запись v3.19.0
+- SIMPLY_STATUS.md — обновлён: версия, ТЗ-DS секция, статистика
+- CLAUDE.md — обновлён: версия, список завершённых ТЗ
+- Папка скопирована в _archive/TZ_DesignSystem/
 
 ### Files
 - components/markdown-viewer.tsx
