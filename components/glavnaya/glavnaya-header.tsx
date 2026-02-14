@@ -74,7 +74,7 @@ export function GlavnayaHeader() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-9 gap-2 px-2">
               {status === "loading" ? (
-                <div className="size-8 animate-pulse rounded-full bg-zinc-500/30" />
+                <div className="size-8 animate-pulse rounded-full bg-muted" />
               ) : (
                 <div className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
                   {initial}

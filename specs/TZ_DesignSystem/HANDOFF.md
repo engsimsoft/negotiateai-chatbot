@@ -1,80 +1,81 @@
 # Передача сессии ТЗ-DS: Simply Design System
 
 **Дата:** 2026-02-14
-**Сессия:** 2 → 3
+**Сессия:** 3 → 4
 
 ## Статус этапов
 - [x] Этап 1: Фундамент темы ✅ (коммит `67f9f41`)
-- [x] Этап 2: Auth + Toast + мелкие утилиты ✅ (tsc + build ОК, ожидает коммит)
-- [ ] Этап 3: Sidebar + Glavnaya + Input ← СЛЕДУЮЩИЙ
+- [x] Этап 2: Auth + Toast + мелкие утилиты ✅ (коммит `76c0695`)
+- [ ] Этап 3: Sidebar + Glavnaya + Input ← ТЕКУЩИЙ (аудит завершён, замены не начаты)
 - [ ] Этап 4: Chat + Projects + Артефакты + Модалки
 - [ ] Этап 5: Финализация
 
 ## Следующая сессия: начни с
-1. Сделать коммит Этапа 2 + auth-fix (все изменения в uncommitted state)
-2. Прочитать ROADMAP.md → Этап 3
-3. Sidebar: `sidebar-user-nav.tsx` (2 замены), `sidebar-layout.tsx` (аудит)
-4. Glavnaya: `glavnaya-header.tsx` (1 замена), все карточки (аудит)
-5. Input: `components/input/*.tsx` (аудит)
-6. Применить `font-serif` к h1 заголовкам страниц где уместно
+1. Прочитать ROADMAP.md → Этап 3
+2. Сделать замены по результатам аудита (см. ниже)
+3. Применить `font-serif` к h1 заголовкам страниц где уместно
+4. `npx tsc --noEmit` + `npm run build` → коммит Этапа 3
+5. Запросить мануальный тест
 
-## Что сделано в сессии 2
+## Что сделано в сессии 3
 
-### Этап 2 — Замена хардкодов (11 замен в 5 файлах)
-- `app/(auth)/login/page.tsx` — text-gray/dark:text-zinc → text-muted-foreground, text-foreground (3)
-- `app/(auth)/register/page.tsx` — аналогично (3)
-- `components/toast.tsx` — bg-zinc-100 → bg-muted, text-red/green → text-destructive/success, text-zinc-950 → text-foreground (3)
-- `components/weather.tsx` — to-slate-900 → to-indigo-950 (1)
-- `components/file-viewer/utils.ts` — text-gray-500 → text-muted-foreground (1)
+### Коммит Этапа 2 + Auth Fix
+- Закоммичены все изменения Сессии 2: коммит `76c0695`
+- 16 файлов: токены auth/toast/weather/file-viewer, hover карточек, auth fix (UNIQUE + toLowerCase + ghost session), миграция, docs
 
-### Унификация hover карточек на Glavnaya
-- `components/projects/project-card.tsx` — hover:bg-muted/50 → hover:border-primary hover:shadow-sm (как у помощников)
+### Аудит файлов Этапа 3 (15 файлов прочитаны)
+Полный аудит всех файлов Этапа 3. Код НЕ менялся, только чтение и анализ.
 
-### Фикс Auth — дубликаты пользователей (критический баг)
-**Проблема:** регистрация создавала дубликаты с тем же email (нет UNIQUE constraint).
-**Решение (3 уровня защиты):**
-- `lib/db/schema.ts` — `.unique()` на email + миграция `0028_parallel_the_spike.sql`
-- `lib/db/queries.ts` — `email.toLowerCase()` в getUser и createUser
-- `app/(auth)/auth.ts` — `String(email).toLowerCase()` в authorize
-- Очистка: 2 дубликата удалены, данные мерджнуты в основные аккаунты
-- `app/(dashboard)/dashboard/page.tsx` — защита от «призрачной сессии» (удалённый user → сброс cookie → /login)
+**Найдены хардкоды (4 шт в 2 файлах):**
 
-### Валидация
-- `npx tsc --noEmit` — 0 ошибок ✅
-- `npm run build` — успешен ✅
-- Мануальный тест: логин/регистрация работает, главная загружается ✅
+| Файл | Строка | Было | Нужно | Контекст |
+|------|--------|------|-------|----------|
+| `sidebar-user-nav.tsx` | 63 | `bg-zinc-500/30` | `bg-muted` | Loading skeleton — круг аватара |
+| `sidebar-user-nav.tsx` | 65 | `bg-zinc-500/30` | `bg-muted` | Loading skeleton — текст "Загрузка..." |
+| `sidebar-user-nav.tsx` | 70 | `text-zinc-500` | `text-muted-foreground` | Loading spinner |
+| `glavnaya-header.tsx` | 77 | `bg-zinc-500/30` | `bg-muted` | Loading skeleton — круг аватара |
 
-## Ключевые решения
+**Чистые файлы (хардкодов нет):**
+- `sidebar-layout.tsx` ✅ — только обёртки SidebarProvider/AppSidebar
+- `glavnaya-greeting.tsx` ✅ — уже text-muted-foreground
+- `section-title.tsx` ✅ — уже text-muted-foreground, bg-muted
+- `tools-section.tsx` ✅ — уже bg-muted, hover:border-primary
+- `projects-section.tsx` ✅ — уже bg-muted, hover:border-primary
+- `glavnaya-input.tsx` ✅ — обёртка над CompactInput
+- `chat-history-card.tsx` ✅ — уже text-foreground, text-muted-foreground
+- `input-base.tsx` ✅ — уже bg-muted, border-border
+- `input-textarea.tsx` ✅ — уже text-muted-foreground
+- `compact-input.tsx` ✅ — обёртка
+- `input-model-selector.tsx` ✅ — уже text-muted-foreground, bg-accent
+- `input-voice-button.tsx` ✅ — text-red-500 для записи (НАМЕРЕННЫЙ семантический цвет)
+- `input-attachments.tsx` ✅ — уже text-muted-foreground, hover:bg-accent
+- `input-submit-button.tsx` ✅ — уже bg-foreground, bg-muted
+
+**Тематические цвета (оставить как есть):**
+- `helpers-section.tsx` — amber для кастомных помощников, sky для Конструктора (намеренные тематические)
+- `input-voice-button.tsx` — red для индикатора записи (намеренный семантический)
+
+### Задача 3.6: font-serif для h1
+- `glavnaya-greeting.tsx:15` — `<h1>` приветствие, сейчас без font-serif → добавить
+- Другие h1/h2 — проверить при работе
+
+## Ключевые решения (из предыдущих сессий)
 - **Tailwind v4:** тема в `@theme` блоках globals.css, НЕТ tailwind.config.ts
-- **Шрифты:** next/font переменные `--font-source-sans`, `--font-lora`, `--font-jetbrains` → маппинг в @theme на `--font-sans`, `--font-serif`, `--font-mono`
+- **Шрифты:** `--font-source-sans`, `--font-lora`, `--font-jetbrains` → маппинг в @theme на `--font-sans`, `--font-serif`, `--font-mono`
 - **Geist** → удалить пакет из package.json в Этапе 5
 - **Lora** — только h1/h2 (страницы и секции), НЕ для логотипа "Simply"
-- **"Simply" логотип** — чистый sans-serif без цвета (как "Claude" у Anthropic). Сдержанность = элегантность
+- **"Simply" логотип** — чистый sans-serif без цвета (как "Claude" у Anthropic)
 - **shadcn/ui** тоже переводим на токены, исключений нет
 - **Hover карточек** — единый стиль: `hover:border-primary hover:shadow-sm transition-all`
 - **Ветка:** `feature/design-system`
 
 ## Замечания / Баги (backlog)
-- Иконки/бейджи помощников на Glavnaya — хочет тёплые терракотовые акценты (как спаркл у Anthropic). Учесть в Этапе 3.
+- Иконки/бейджи помощников на Glavnaya — хочет тёплые терракотовые акценты (как спаркл у Anthropic). Учесть в Этапе 3 или 4.
 - **Артефакт боковой панели** при загрузке (sidebar видна до рендера основного контента) — исправить после завершения дорожной карты.
 
-## Аудит хардкодов (28 шт в 15 файлах)
-Полный список — см. ANALYSIS.md → "Файлы с хардкодами"
-Этап 2 закрыл 5 файлов. Осталось ~10 файлов (Этапы 3 + 4).
-
-## Uncommitted файлы (нужен коммит в начале след. сессии)
-- `app/(auth)/login/page.tsx` — токены
-- `app/(auth)/register/page.tsx` — токены
-- `app/(auth)/auth.ts` — email.toLowerCase()
-- `app/(dashboard)/dashboard/page.tsx` — защита от призрачной сессии
-- `components/toast.tsx` — токены
-- `components/weather.tsx` — to-indigo-950
-- `components/file-viewer/utils.ts` — text-muted-foreground
-- `components/projects/project-card.tsx` — hover:border-primary
-- `lib/db/schema.ts` — email .unique()
-- `lib/db/queries.ts` — email.toLowerCase()
-- `lib/db/migrations/0028_parallel_the_spike.sql` — UNIQUE constraint
-- `specs/TZ_DesignSystem/` — ROADMAP, CHANGELOG, HANDOFF
+## Uncommitted файлы
+- `specs/TZ_DesignSystem/HANDOFF.md` — этот файл
+- `specs/TZ_DesignSystem/CHANGELOG.md` — обновлён для Сессии 3
 
 ## Блокеры / Вопросы
 - Нет

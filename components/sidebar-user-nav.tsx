@@ -60,14 +60,14 @@ export function SidebarUserNav({ user }: { user: User }) {
             {status === "loading" ? (
               <SidebarMenuButton className="h-12 justify-between bg-background data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
                 <div className="flex flex-row gap-2">
-                  <div className="size-8 animate-pulse rounded-full bg-zinc-500/30" />
+                  <div className="size-8 animate-pulse rounded-full bg-muted" />
                   <div className="flex flex-col gap-1">
-                    <span className="animate-pulse rounded-md bg-zinc-500/30 text-transparent text-sm">
+                    <span className="animate-pulse rounded-md bg-muted text-transparent text-sm">
                       Загрузка...
                     </span>
                   </div>
                 </div>
-                <div className="animate-spin text-zinc-500">
+                <div className="animate-spin text-muted-foreground">
                   <LoaderIcon />
                 </div>
               </SidebarMenuButton>

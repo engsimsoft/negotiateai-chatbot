@@ -1,5 +1,22 @@
 # Changelog ТЗ-DS: Simply Design System
 
+## Сессия 3 — 2026-02-14
+
+### Changed
+- Коммит `76c0695` — все изменения Сессии 2 закоммичены (16 файлов: токены, auth fix, миграция, docs)
+
+### Аудит Этапа 3 (чтение, без изменений кода)
+- Прочитаны 15 файлов: sidebar (2), glavnaya (7), input (6)
+- Найдены 4 хардкода в 2 файлах (`sidebar-user-nav.tsx`, `glavnaya-header.tsx`)
+- 13 файлов чистые — уже на семантических токенах
+- Тематические цвета (amber, sky, red) — намеренные, оставить
+
+### Files
+- specs/TZ_DesignSystem/HANDOFF.md
+- specs/TZ_DesignSystem/CHANGELOG.md
+
+---
+
 ## Сессия 2 — 2026-02-14
 
 ### Changed (Design Tokens — Этап 2)

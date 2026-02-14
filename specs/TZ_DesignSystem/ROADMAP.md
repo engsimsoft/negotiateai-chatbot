@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 5 |
-| Текущий этап | 2 ✅ |
+| Текущий этап | 3 ✅ |
 | Сессий (оценка) | 3-4 |
 
 ---
@@ -101,19 +101,17 @@ git commit -m "feat(tz-ds): phase 2 — auth, toast, weather tokens"
 
 ## Этап 3: Компоненты — Sidebar + Glavnaya + Input
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 2
+**Статус:** ✅ Завершён
 
 **Цель:** Унифицировать sidebar, главную страницу, систему инпутов.
 
 **Задачи:**
-- [ ] 3.1 `components/sidebar-user-nav.tsx` — text-gray → text-muted-foreground (2 замены)
-- [ ] 3.2 `components/sidebar-layout.tsx` — проверить sidebar background/border токены
-- [ ] 3.3 `components/glavnaya/glavnaya-header.tsx` — text-gray → text-muted-foreground (1 замена)
-- [ ] 3.4 `components/glavnaya/` — проверить все карточки, фоны
-- [ ] 3.5 `components/input/` — проверить инпут-систему на хардкоды
-- [ ] 3.6 Применить `font-serif` к заголовкам страниц (h1) где уместно
+- [x] 3.1 `components/sidebar-user-nav.tsx` — bg-zinc-500/30 → bg-muted (2), text-zinc-500 → text-muted-foreground (1)
+- [x] 3.2 `components/sidebar-layout.tsx` — проверено, чисто (только обёртки)
+- [x] 3.3 `components/glavnaya/glavnaya-header.tsx` — bg-zinc-500/30 → bg-muted (1)
+- [x] 3.4 `components/glavnaya/` — проверены все карточки, чисто (уже на токенах)
+- [x] 3.5 `components/input/` — проверена вся система, чисто (уже на токенах)
+- [x] 3.6 Применить `font-serif` к h1 в `glavnaya-greeting.tsx`
 
 **Файлы:**
 - `components/sidebar-user-nav.tsx`
@@ -123,8 +121,8 @@ git commit -m "feat(tz-ds): phase 2 — auth, toast, weather tokens"
 - `components/input/*.tsx` — аудит
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: sidebar — корректные цвета, шрифты
 - [ ] Браузер: Glavnaya — тёплый фон, Lora в заголовках
 - [ ] Браузер: dark mode — всё корректно

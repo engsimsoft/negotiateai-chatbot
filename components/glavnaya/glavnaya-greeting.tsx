@@ -12,7 +12,7 @@ export function GlavnayaGreeting({ displayName }: GlavnayaGreetingProps) {
 
   return (
     <div className="mb-5">
-      <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+      <h1 className="font-serif text-2xl font-bold tracking-tight md:text-3xl">
         {greeting}, {displayName}
       </h1>
       <p className="mt-1 text-muted-foreground">
