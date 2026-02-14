@@ -1,6 +1,40 @@
 # Changelog ТЗ-DS: Simply Design System
 
-## Сессия 4 — 2026-02-14 (финальная)
+## Сессия 5 — 2026-02-14 (финализация документации)
+
+### Revert UserMenu (коммит `18c067e`)
+- Откачен коммит `286ec1c` (feat: add global UserMenu) — создавал дубли навигации
+- Удалён `components/user-menu.tsx`
+- `app/(dashboard)/layout.tsx` — убран UserMenu
+- `app/(task)/layout.tsx` — убран UserMenu
+
+### docs/design-system.md — полное обновление + перемещение
+- Перемещён из корня (`SIMPLY_DESIGN_SYSTEM.md`) в `docs/design-system.md` (SSOT, правила DOCUMENTATION_GUIDE.md)
+- Добавлен раздел 1: Структура интерфейса (layout groups, карта страниц, компоненты навигации)
+- Добавлен раздел 5: Hover-паттерны (A: карточки с border, B: inline-элементы)
+- Добавлен раздел 11: Правила создания новых компонентов
+- Добавлены исключения намеренных цветов (green-600, amber-600, overlays)
+- Нумерация разделов: 1-12
+
+### Документация по правилам DOCUMENTATION_GUIDE.md
+- Создан ADR-013: `docs/decisions/013-design-system-root-file.md`
+- Зарегистрирован в DOCUMENTATION_GUIDE.md (секция docs/, таблица, чек-лист)
+- Обновлён CLAUDE.md (секция "UI и дизайн" → docs/design-system.md)
+- Обновлён SIMPLY_STATUS.md (ссылки)
+
+### Files
+- docs/design-system.md (перемещён из SIMPLY_DESIGN_SYSTEM.md)
+- docs/decisions/013-design-system-root-file.md (новый)
+- CLAUDE.md
+- DOCUMENTATION_GUIDE.md
+- SIMPLY_STATUS.md
+- specs/TZ_DesignSystem/HANDOFF.md
+- specs/TZ_DesignSystem/CHANGELOG.md
+- specs/TZ_DesignSystem/ROADMAP.md
+
+---
+
+## Сессия 4 — 2026-02-14
 
 ### Этап 3 — Sidebar + Glavnaya + Input (коммит `1b0af54`)
 - `sidebar-user-nav.tsx` — bg-zinc-500/30 → bg-muted (2), text-zinc-500 → text-muted-foreground (1)

@@ -8,9 +8,15 @@
 
 ## UI и дизайн
 
-Перед любой работой с UI-компонентами — ПРОЧИТАЙ **[SIMPLY_DESIGN_SYSTEM.md](SIMPLY_DESIGN_SYSTEM.md)**.
-Это обязательный стандарт. Все цвета, шрифты и отступы должны соответствовать этому файлу.
-Хардкоженные цвета и прямые Tailwind палитры (gray-*, slate-*) ЗАПРЕЩЕНЫ.
+⛔ **ОБЯЗАТЕЛЬНО:** Перед ЛЮБОЙ работой с UI — прочитай **[docs/design-system.md](docs/design-system.md)**.
+
+Этот файл содержит:
+- **Структуру интерфейса** — layout groups, карта страниц, существующие компоненты навигации
+- **Цвета** — ТОЛЬКО семантические токены. Хардкоженные цвета ЗАПРЕЩЕНЫ
+- **Hover-паттерны** — два паттерна (карточки с border / inline-элементы)
+- **Правила создания компонентов** — не создавать дубли, проверять все layout-ы
+
+**Ключевое:** Перед созданием нового UI-компонента — проверь раздел 1.3 (существующие компоненты навигации).
 
 ---
 
@@ -19,7 +25,7 @@
 1. **[README.md](README.md)** — О проекте Simply
 2. **[SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md)** — Видение продукта (roadmap, инструменты, концепции)
 3. **[SIMPLY_STATUS.md](SIMPLY_STATUS.md)** — Текущее состояние проекта
-4. **[SIMPLY_DESIGN_SYSTEM.md](SIMPLY_DESIGN_SYSTEM.md)** — Дизайн-система (закон для UI)
+4. **[docs/design-system.md](docs/design-system.md)** — Дизайн-система (закон для UI)
 5. **[DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md)** — Правила документации
 
 **Главный принцип:** SSOT (Single Source of Truth)
@@ -297,38 +303,20 @@ SELECT COUNT(*) FROM "Chat";
 
 ---
 
-## UI Guidelines (для редизайна)
+## UI Guidelines
 
-**Дизайн-система:**
-- **Компоненты:** shadcn/ui (components/ui/) — 22 базовых компонента
-- **Стили:** Tailwind CSS с CSS variables для темизации
-- **Иконки:** Lucide React
+**Полные правила:** [docs/design-system.md](docs/design-system.md) — SSOT для всего UI.
 
-**Принципы:**
-1. **Mobile-first** — responsive через Tailwind breakpoints (sm/md/lg/xl)
-2. **Консистентность** — один паттерн = один компонент (не дублировать логику)
-3. **Accessibility** — семантический HTML, ARIA где нужно
-4. **Apple-подход** — минимализм, качество важнее количества
+**Кратко (не заменяет чтение docs/design-system.md):**
+- **Компоненты:** shadcn/ui (components/ui/) + Lucide React
+- **Цвета:** ТОЛЬКО семантические токены (bg-muted, text-foreground, border-border...)
+- **Шрифты:** Source Sans 3 (sans), Lora (serif), JetBrains Mono (mono)
+- **Hover:** Два паттерна — карточки (border-primary + shadow) и inline (bg-muted/60)
+- **Принципы:** Mobile-first, SSOT компонентов, Apple-подход
 
-**Spacing система (Tailwind):**
-- Мелкие элементы: `gap-2` (8px)
-- Между секциями: `gap-4` или `gap-6` (16-24px)
-- Крупные блоки: `gap-8` (32px)
-- Padding контента: `p-4` mobile, `p-6` desktop
-
-**Цвета (CSS variables):**
-- `--background`, `--foreground` — основа
-- `--muted`, `--muted-foreground` — вторичный текст
-- `--primary`, `--primary-foreground` — акцент
-- `--destructive` — ошибки/удаление
-
-**Текущие боли (решаем в редизайне):**
-1. Непоследовательность layout-ов (projects то с sidebar, то без)
-2. Dashboard слишком простой
-3. Search таб не функционален
-4. Навигация между режимами не очевидна
-
-**Карта компонентов:** [BRAINSTORM_UI_ARCHITECTURE.md](BRAINSTORM_UI_ARCHITECTURE.md)
+**Текущие боли (backlog):**
+1. User Menu отсутствует на /settings, /projects, /chats, /task — **отдельное ТЗ**
+2. Навигация между режимами не очевидна
 
 ---
 
@@ -381,4 +369,4 @@ specs/
 
 ---
 
-**Обновлено:** 2026-02-13
+**Обновлено:** 2026-02-14

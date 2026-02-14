@@ -326,7 +326,7 @@ components/projects/
 ### ТЗ-DS: Simply Design System — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
-- **Дизайн-система** — `SIMPLY_DESIGN_SYSTEM.md` — файл-закон для всех UI-компонентов
+- **Дизайн-система** — `docs/design-system.md` — файл-закон для всех UI-компонентов (ADR-013)
 - **Шрифты** — Source Sans 3 (sans), Lora (serif для заголовков), JetBrains Mono (mono) через next/font/google
 - **Тёплая палитра** — light `#FAF9F5`, dark `#1C1B19`, primary терракот, мягкие тени
 - **Семантические токены** — 50+ замен hardcoded цветов (gray/zinc/slate/stone/neutral/blue → muted/foreground/primary/accent/border)
@@ -334,7 +334,7 @@ components/projects/
 - **Удалён пакет geist** — полностью заменён новыми шрифтами
 
 **Ключевые файлы:**
-- `SIMPLY_DESIGN_SYSTEM.md` — дизайн-система (закон)
+- `docs/design-system.md` — дизайн-система (закон)
 - `app/fonts.ts` — шрифты
 - `app/globals.css` — CSS токены, @theme
 - `app/layout.tsx` — подключение шрифтов
