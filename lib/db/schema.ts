@@ -21,7 +21,7 @@ import type { AppUsage } from "../usage";
 
 export const user = pgTable("User", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
-  email: varchar("email", { length: 64 }).notNull(),
+  email: varchar("email", { length: 64 }).notNull().unique(),
   password: varchar("password", { length: 64 }),
   // ТЗ-3A: User profile fields
   displayName: varchar("display_name", { length: 100 }),

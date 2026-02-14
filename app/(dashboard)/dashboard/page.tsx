@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
@@ -24,7 +25,15 @@ export default async function DashboardPage() {
     getUserById(session.user.id),
     getGeneralChatsCount({ userId: session.user.id }),
   ]);
-  const displayName = userProfile?.displayName || session.user.email?.split("@")[0] || "друг";
+  // User was deleted from DB but JWT still valid — force re-auth
+  if (!userProfile) {
+    const cookieStore = await cookies();
+    cookieStore.delete("authjs.session-token");
+    cookieStore.delete("__Secure-authjs.session-token");
+    redirect("/login");
+  }
+
+  const displayName = userProfile.displayName || session.user.email?.split("@")[0] || "друг";
 
   return (
     <div className="flex min-h-svh flex-col bg-muted/30">

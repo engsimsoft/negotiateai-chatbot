@@ -37,7 +37,7 @@ export const {
     Credentials({
       credentials: {},
       async authorize({ email, password }: any) {
-        const users = await getUser(email);
+        const users = await getUser(String(email).toLowerCase());
 
         if (users.length === 0) {
           await compare(password, DUMMY_PASSWORD);

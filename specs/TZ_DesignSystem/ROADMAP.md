@@ -11,14 +11,14 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 5 |
-| Текущий этап | 1 |
+| Текущий этап | 2 ✅ |
 | Сессий (оценка) | 3-4 |
 
 ---
 
 ## Этап 1: Фундамент темы (шрифты + токены + SIMPLY_DESIGN_SYSTEM.md)
 
-**Статус:** 🔄 В работе
+**Статус:** ✅ Завершён
 
 **Цель:** Подключить новые шрифты, заменить все цветовые токены, создать файл-закон дизайн-системы.
 
@@ -64,18 +64,16 @@ git commit -m "feat(tz-ds): phase 1 — design tokens, fonts, design system law"
 
 ## Этап 2: Компоненты — globals.css стили + Auth + Toast
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 1
+**Статус:** ✅ Завершён
 
 **Цель:** Заменить хардкоженные цвета в CodeMirror-зависимых стилях globals.css (уже в Э1), auth страницах, toast, и мелких утилитах.
 
 **Задачи:**
-- [ ] 2.1 `app/(auth)/login/page.tsx` — bg-white → bg-card, text-gray → text-muted-foreground (3 замены)
-- [ ] 2.2 `app/(auth)/register/page.tsx` — bg-white → bg-card, text-gray → text-muted-foreground (3 замены)
-- [ ] 2.3 `components/toast.tsx` — bg-white → bg-card (1 замена)
-- [ ] 2.4 `components/weather.tsx` — text-gray → text-muted-foreground, bg-white → bg-card (3 замены)
-- [ ] 2.5 `file-viewer/utils.ts` — hex color → токен (1 замена)
+- [x] 2.1 `app/(auth)/login/page.tsx` — text-gray/dark:text-zinc → text-muted-foreground, text-foreground (3 замены)
+- [x] 2.2 `app/(auth)/register/page.tsx` — text-gray/dark:text-zinc → text-muted-foreground, text-foreground (3 замены)
+- [x] 2.3 `components/toast.tsx` — bg-zinc-100 → bg-muted, text-red/green → text-destructive/success, text-zinc-950 → text-foreground (3 замены)
+- [x] 2.4 `components/weather.tsx` — to-slate-900 → to-indigo-950 (1 замена; остальные — тематические градиенты виджета погоды)
+- [x] 2.5 `components/file-viewer/utils.ts` — text-gray-500 → text-muted-foreground (1 замена)
 
 **Файлы:**
 - `app/(auth)/login/page.tsx`
@@ -85,8 +83,8 @@ git commit -m "feat(tz-ds): phase 1 — design tokens, fonts, design system law"
 - `file-viewer/utils.ts` (или `components/file-viewer/utils.ts`)
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: страница логина — корректные цвета light/dark
 - [ ] Браузер: страница регистрации — корректные цвета light/dark
 - [ ] 🧪 Мануальный тест пользователем

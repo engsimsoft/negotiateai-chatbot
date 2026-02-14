@@ -104,7 +104,7 @@ export function getFileIconColor(fileType: FileType): string {
       return "text-red-500";
     case "text":
     case "markdown":
-      return "text-gray-500";
+      return "text-muted-foreground";
     case "csv":
     case "excel":
       return "text-green-500";

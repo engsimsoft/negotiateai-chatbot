@@ -284,7 +284,7 @@ export function Weather({
           "bg-gradient-to-br from-sky-400 via-blue-500 to-blue-600": isDay,
         },
         {
-          "bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900": !isDay,
+          "bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-950": !isDay,
         }
       )}
     >
