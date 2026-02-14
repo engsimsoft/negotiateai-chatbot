@@ -96,7 +96,7 @@ export function TaskSidebar({
       </div>
 
       {/* Task list */}
-      <div className="flex-1 overflow-y-auto py-1">
+      <div className="flex-1 overflow-y-auto py-1.5">
         <TooltipProvider delayDuration={300}>
           {tasks.map((task) => {
             const active = task.id === activeTaskId;
@@ -108,10 +108,10 @@ export function TaskSidebar({
                 onClick={() => handleTaskClick(task)}
                 disabled={!clickable}
                 className={cn(
-                  "flex items-center gap-2 w-full text-left text-sm transition-colors",
-                  collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2",
-                  active && "bg-muted",
-                  clickable && !active && "hover:bg-muted/50 cursor-pointer",
+                  "group relative flex items-center gap-2 w-full text-left text-sm rounded-lg transition-all duration-150",
+                  collapsed ? "justify-center px-2 py-2.5 mx-1" : "px-3 py-2 mx-1.5",
+                  active && "bg-muted font-medium",
+                  clickable && !active && "hover:bg-muted/60 cursor-pointer",
                   !clickable && "opacity-50 cursor-not-allowed"
                 )}
               >
