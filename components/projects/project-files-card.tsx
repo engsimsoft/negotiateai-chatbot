@@ -474,7 +474,7 @@ export function ProjectFilesCard({
         <span className="block truncate text-sm">{file.name}</span>
         {isAnalyzing && (
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <span className="size-1.5 rounded-full bg-blue-500 animate-pulse" />
+            <span className="size-1.5 rounded-full bg-primary animate-pulse" />
             Анализ...
           </span>
         )}

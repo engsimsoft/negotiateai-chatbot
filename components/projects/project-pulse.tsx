@@ -70,7 +70,7 @@ function TaskStatusIcon({ status }: { status: TaskStatus }) {
     case "done":
       return <Check className="size-3.5 text-green-600 shrink-0" />;
     case "in_progress":
-      return <Loader2 className="size-3.5 text-blue-600 shrink-0" />;
+      return <Loader2 className="size-3.5 text-primary shrink-0" />;
     default:
       return <Circle className="size-3.5 text-muted-foreground shrink-0" />;
   }
@@ -82,7 +82,7 @@ function ProjectTaskStatusIcon({ status }: { status: ProjectTask["status"] }) {
     case "done":
       return <Check className="size-3.5 text-green-600 shrink-0" />;
     case "in_progress":
-      return <Loader2 className="size-3.5 text-blue-600 animate-spin shrink-0" />;
+      return <Loader2 className="size-3.5 text-primary animate-spin shrink-0" />;
     case "review":
       return <Brain className="size-3.5 text-purple-600 shrink-0" />;
     case "issues":
@@ -268,7 +268,7 @@ export function ProjectPulse({
                     </span>
                   )}
                   {(projectTaskStatusCounts.in_progress || 0) > 0 && (
-                    <span className="flex items-center gap-1 text-blue-600">
+                    <span className="flex items-center gap-1 text-primary">
                       <Loader2 className="size-3" />
                       {projectTaskStatusCounts.in_progress}
                     </span>
@@ -346,7 +346,7 @@ export function ProjectPulse({
                     </span>
                   )}
                   {statusCounts.in_progress > 0 && (
-                    <span className="flex items-center gap-1 text-blue-600">
+                    <span className="flex items-center gap-1 text-primary">
                       <Loader2 className="size-3" />
                       {statusCounts.in_progress}
                     </span>

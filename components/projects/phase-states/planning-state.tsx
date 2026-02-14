@@ -109,8 +109,8 @@ function ProgressView({ completedSteps }: { completedSteps: number }) {
     <div className="flex h-full items-center justify-center p-8">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950">
-            <Loader2 className="size-8 text-blue-600 animate-spin" />
+          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
+            <Loader2 className="size-8 text-primary animate-spin" />
           </div>
           <h2 className="text-xl font-semibold">Профессор анализирует проект</h2>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -131,19 +131,19 @@ function ProgressView({ completedSteps }: { completedSteps: number }) {
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-4 py-3 transition-all duration-500 animate-in fade-in slide-in-from-bottom-2",
                   isCompleted && "bg-green-50 dark:bg-green-950/30",
-                  isActive && "bg-blue-50 dark:bg-blue-950/30"
+                  isActive && "bg-primary/10 dark:bg-primary/15"
                 )}
               >
                 {isCompleted ? (
                   <CheckCircle2 className="size-5 shrink-0 text-green-600" />
                 ) : (
-                  <Loader2 className="size-5 shrink-0 text-blue-600 animate-spin" />
+                  <Loader2 className="size-5 shrink-0 text-primary animate-spin" />
                 )}
                 <span
                   className={cn(
                     "text-sm",
                     isCompleted && "text-green-700 dark:text-green-400",
-                    isActive && "text-blue-700 dark:text-blue-400 font-medium"
+                    isActive && "text-primary font-medium"
                   )}
                 >
                   {label}

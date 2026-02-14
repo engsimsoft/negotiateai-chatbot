@@ -30,7 +30,7 @@ function statusIcon(status: TaskStatus) {
     case "done":
       return <Check className="size-4 text-green-600" />;
     case "in_progress":
-      return <Loader2 className="size-4 text-blue-600 animate-spin" />;
+      return <Loader2 className="size-4 text-primary animate-spin" />;
     default:
       return <Circle className="size-4 text-muted-foreground" />;
   }
@@ -54,7 +54,7 @@ function projectTaskStatusIcon(status: ProjectTask["status"]) {
     case "done":
       return <Check className="size-4 text-green-600" />;
     case "in_progress":
-      return <Loader2 className="size-4 text-blue-600 animate-spin" />;
+      return <Loader2 className="size-4 text-primary animate-spin" />;
     case "review":
       return <Eye className="size-4 text-purple-600 animate-pulse" />;
     case "issues":

@@ -32,7 +32,7 @@ const PHASE_CONFIG: Record<PipelinePhase, { icon: typeof Brain; label: string; c
   execute: {
     icon: Zap,
     label: "Выполнение подзадач",
-    color: "text-blue-500",
+    color: "text-primary",
   },
   synthesize: {
     icon: Sparkles,
@@ -55,7 +55,7 @@ function SubtaskStatusIcon({ status }: { status: Subtask["status"] }) {
     case "in_progress":
       return (
         <div className="flex size-5 items-center justify-center">
-          <Loader2 className="size-4 text-blue-500 animate-spin" />
+          <Loader2 className="size-4 text-primary animate-spin" />
         </div>
       );
     case "error":
@@ -95,7 +95,7 @@ export function ProfessorProgress({
     >
       {/* Header with phase */}
       <div className="flex items-center gap-3 mb-3">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500/20 to-blue-500/20">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/15">
           <span className="text-lg">🎓</span>
         </div>
         <div className="flex-1">
@@ -140,7 +140,7 @@ export function ProfessorProgress({
                 transition={{ delay: index * 0.05 }}
                 className={`
                   flex items-start gap-3 rounded-lg p-2.5 transition-colors
-                  ${subtask.status === "in_progress" ? "bg-blue-500/5" : ""}
+                  ${subtask.status === "in_progress" ? "bg-primary/5" : ""}
                   ${subtask.status === "error" ? "bg-red-500/5" : ""}
                 `}
               >
@@ -180,7 +180,7 @@ export function ProfessorProgress({
         <div className="mt-3 pt-3 border-t">
           <div className="h-1.5 rounded-full bg-muted overflow-hidden">
             <motion.div
-              className="h-full bg-gradient-to-r from-purple-500 to-blue-500"
+              className="h-full bg-primary"
               initial={{ width: "0%" }}
               animate={{
                 width: `${(subtasks.filter(s => s.status === "completed").length / subtasks.length) * 100}%`,

@@ -216,7 +216,7 @@ export function TaskCompletionCard({
                                 ? "bg-red-500/15 text-red-600"
                                 : issue.severity === "major"
                                   ? "bg-amber-500/15 text-amber-600"
-                                  : "bg-blue-500/15 text-blue-600"
+                                  : "bg-primary/15 text-primary"
                             }`}
                           >
                             {issue.severity}

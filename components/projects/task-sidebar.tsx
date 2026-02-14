@@ -35,9 +35,9 @@ function StatusIcon({ status }: { status: ProjectTask["status"] }) {
     case "done":
       return <Check className="size-4 text-green-600 shrink-0" />;
     case "in_progress":
-      return <Loader2 className="size-4 text-blue-600 animate-spin shrink-0" />;
+      return <Loader2 className="size-4 text-primary animate-spin shrink-0" />;
     case "review":
-      return <Brain className="size-4 text-purple-600 shrink-0" />;
+      return <Brain className="size-4 text-primary/70 shrink-0" />;
     case "issues":
       return <AlertTriangle className="size-4 text-amber-600 shrink-0" />;
     case "locked":
