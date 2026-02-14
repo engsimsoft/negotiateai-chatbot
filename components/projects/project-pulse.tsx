@@ -307,10 +307,10 @@ export function ProjectPulse({
                       type="button"
                       onClick={() => handleTaskClick(task)}
                       className={cn(
-                        "flex w-full items-center gap-2.5 px-4 py-2 text-sm text-left transition-colors",
+                        "flex w-full items-center gap-2.5 px-3 py-2 mx-1 rounded-lg text-sm text-left transition-all duration-150",
                         task.status === "locked"
-                          ? "cursor-pointer hover:bg-muted/30"
-                          : "cursor-pointer hover:bg-muted/50"
+                          ? "cursor-pointer hover:bg-muted/40"
+                          : "cursor-pointer hover:bg-muted/60"
                       )}
                     >
                       <ProjectTaskStatusIcon status={task.status} />

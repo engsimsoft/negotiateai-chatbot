@@ -167,7 +167,7 @@ export function ExecutionState({ projectId, tasks, projectTasks }: ExecutionStat
                   <Link
                     key={task.id}
                     href={href}
-                    className="group rounded-xl border bg-background p-4 transition-colors hover:bg-muted/50"
+                    className="group rounded-xl border bg-background p-4 transition-all hover:border-primary hover:shadow-sm"
                   >
                     {content}
                   </Link>

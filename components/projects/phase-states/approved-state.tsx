@@ -180,7 +180,7 @@ export function ApprovedState({ projectId, projectTasks }: ApprovedStateProps) {
               key={task.id}
               type="button"
               onClick={() => handleTaskClick(task)}
-              className="w-full rounded-lg border p-4 text-left transition-colors hover:bg-muted/50 cursor-pointer"
+              className="w-full rounded-xl border p-4 text-left transition-all hover:border-primary hover:shadow-sm cursor-pointer"
             >
               <div className="flex items-start gap-3">
                 <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
