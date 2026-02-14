@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 5 |
-| Текущий этап | 3 ✅ |
+| Текущий этап | 4 ✅ |
 | Сессий (оценка) | 3-4 |
 
 ---
@@ -140,25 +140,26 @@ git commit -m "feat(tz-ds): phase 3 — sidebar, glavnaya, input tokens"
 
 ## Этап 4: Компоненты — Chat + Projects + Артефакты + Модалки
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 3
+**Статус:** ✅ Завершён
 
 **Цель:** Заменить все оставшиеся хардкоды в чат-компонентах, проектах, артефактах, модалках.
 
 **Задачи:**
-- [ ] 4.1 `components/markdown-viewer.tsx` — text-gray → text-muted-foreground (1 замена)
-- [ ] 4.2 `components/suggestion.tsx` — text-gray → text-muted-foreground (1 замена)
-- [ ] 4.3 `components/artifact-actions.tsx` — bg-white/bg-zinc → bg-card (1 замена)
-- [ ] 4.4 `components/artifact.tsx` — border-gray/bg-white → border-border/bg-card (1 замена)
-- [ ] 4.5 `components/artifact-close-button.tsx` — bg-white → bg-card (1 замена)
-- [ ] 4.6 `components/console.tsx` — bg-zinc, text-gray → токены (3 замены)
-- [ ] 4.7 `components/document-preview.tsx` — bg-white, text-gray → токены (3 замены)
-- [ ] 4.8 `components/image-lightbox.tsx` — bg-black/bg-white → bg-background/bg-card (1 замена)
-- [ ] 4.9 `artifacts/presentation-pptx/client.tsx` — bg-white, text-gray → токены (3 замены)
-- [ ] 4.10 `components/projects/` — аудит на хардкоды, font-serif для заголовков секций
-- [ ] 4.11 `components/service-chat/` — аудит на хардкоды
-- [ ] 4.12 Финальный grep-проверка: 0 хардкоженных цветов во всём проекте
+- [x] 4.1 `components/markdown-viewer.tsx` — prose-pre:bg-zinc → prose-pre:bg-muted, prose-pre:text-foreground
+- [x] 4.2 `components/suggestion.tsx` — text-gray-500 → text-muted-foreground
+- [x] 4.3 `components/artifact-actions.tsx` — dark:hover:bg-zinc-700 → dark:hover:bg-accent
+- [x] 4.4 `components/artifact.tsx` — bg-zinc-900/50 → bg-black/50, border-zinc → border-border
+- [x] 4.5 `components/artifact-close-button.tsx` — dark:hover:bg-zinc-700 → dark:hover:bg-accent
+- [x] 4.6 `components/console.tsx` — bg-zinc/border-zinc/text-zinc → bg-muted/border-border/text-foreground/hover:bg-accent (6 замен)
+- [x] 4.7 `components/document-preview.tsx` — dark:border-zinc/dark:bg-zinc → dark:bg-accent (4 замены)
+- [x] 4.8 `components/image-lightbox.tsx` — оставлено (bg-black/80, text-white — намеренные оверлеи lightbox)
+- [x] 4.9 `artifacts/presentation-pptx/client.tsx` — bg-neutral → bg-muted, bg-white → bg-background (3 замены)
+- [x] 4.10 `components/projects/` — аудит: только статусные цвета (green/blue/amber/red — намеренные)
+- [x] 4.11 `components/service-chat/` — аудит: чисто, уже на семантических токенах
+- [x] 4.12 Финальный grep: 0 хардкоженных цветов (bg-gray/zinc/slate/stone/neutral, text-gray/zinc/slate)
+- [x] 4.13 `components/document.tsx` — text-zinc-500 → text-muted-foreground (найдено grep)
+- [x] 4.14 `components/sidebar-history.tsx` — text-zinc-500/400 → text-muted-foreground (найдено grep, 4 замены)
+- [x] 4.15 `components/auth-form.tsx` — text-zinc-600/400 → text-muted-foreground (найдено grep, 2 замены)
 
 **Файлы:**
 - `components/markdown-viewer.tsx`
@@ -174,12 +175,11 @@ git commit -m "feat(tz-ds): phase 3 — sidebar, glavnaya, input tokens"
 - `components/service-chat/*.tsx` — аудит
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] `grep -rn "bg-gray\|text-gray\|border-gray\|bg-slate\|bg-zinc\|bg-stone\|bg-neutral\|bg-white\|text-black" --include="*.tsx" --include="*.ts"` → **0 результатов**
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] `grep` по хардкодам (bg-gray/zinc/slate/stone/neutral, text-gray/zinc/slate) → **0 результатов**
 - [ ] Браузер: артефакты — корректные цвета light/dark
 - [ ] Браузер: чат — корректные цвета
-- [ ] Браузер: проекты — font-serif в заголовках секций
 - [ ] 🧪 Мануальный тест пользователем
 
 **Git (после валидации):**

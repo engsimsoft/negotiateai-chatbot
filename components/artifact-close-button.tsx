@@ -8,7 +8,7 @@ function PureArtifactCloseButton() {
 
   return (
     <Button
-      className="h-fit p-2 dark:hover:bg-zinc-700"
+      className="h-fit p-2 dark:hover:bg-accent"
       data-testid="artifact-close-button"
       onClick={() => {
         setArtifact((currentArtifact) =>

@@ -136,8 +136,8 @@ export function DocumentPreview({
 
 // Compact loading skeleton (Anthropic style)
 const LoadingSkeleton = ({ artifactKind }: { artifactKind: ArtifactKind }) => (
-  <div className="flex w-fit items-center gap-3 rounded-xl border bg-background px-4 py-3 dark:border-zinc-700 dark:bg-muted">
-    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted dark:bg-zinc-700">
+  <div className="flex w-fit items-center gap-3 rounded-xl border bg-background px-4 py-3 dark:bg-muted">
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted dark:bg-accent">
       <div className="size-5 animate-pulse rounded bg-muted-foreground/30" />
     </div>
     <div className="flex flex-col gap-1">
@@ -157,9 +157,9 @@ const PureCompactDocumentCard = ({
   kind: ArtifactKind;
   isStreaming: boolean;
 }) => (
-  <div className="flex w-fit items-center gap-3 rounded-xl border bg-background px-4 py-3 transition-colors hover:bg-muted/50 dark:border-zinc-700 dark:bg-muted dark:hover:bg-zinc-800">
+  <div className="flex w-fit items-center gap-3 rounded-xl border bg-background px-4 py-3 transition-colors hover:bg-muted/50 dark:bg-muted dark:hover:bg-accent">
     {/* Document icon */}
-    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted dark:bg-zinc-700">
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted dark:bg-accent">
       {isStreaming ? (
         <div className="animate-spin text-muted-foreground">
           <LoaderIcon size={20} />

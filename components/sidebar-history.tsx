@@ -270,7 +270,7 @@ export function SidebarHistory({
     return (
       <SidebarGroup>
         <SidebarGroupContent>
-          <div className="flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-zinc-500">
+          <div className="flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-muted-foreground">
             Войдите, чтобы сохранять историю чатов
           </div>
         </SidebarGroupContent>
@@ -311,7 +311,7 @@ export function SidebarHistory({
     return (
       <SidebarGroup>
         <SidebarGroupContent>
-          <div className="flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-zinc-500">
+          <div className="flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-muted-foreground">
             Ваши чаты появятся здесь
           </div>
         </SidebarGroupContent>
@@ -462,11 +462,11 @@ export function SidebarHistory({
           {/* Индикатор загрузки/конца — только для общих чатов */}
           {!isContextual && (
             hasReachedEnd ? (
-              <div className="mt-8 flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-zinc-500">
+              <div className="mt-8 flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-muted-foreground">
                 Вы достигли конца истории чатов.
               </div>
             ) : (
-              <div className="mt-8 flex flex-row items-center gap-2 p-2 text-zinc-500 dark:text-zinc-400">
+              <div className="mt-8 flex flex-row items-center gap-2 p-2 text-muted-foreground dark:text-muted-foreground">
                 <div className="animate-spin">
                   <LoaderIcon />
                 </div>

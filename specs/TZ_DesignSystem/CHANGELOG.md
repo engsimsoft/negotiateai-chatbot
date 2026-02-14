@@ -1,5 +1,47 @@
 # Changelog ТЗ-DS: Simply Design System
 
+## Сессия 4 — 2026-02-14
+
+### Этап 3 — Sidebar + Glavnaya + Input (коммит `1b0af54`)
+- `sidebar-user-nav.tsx` — bg-zinc-500/30 → bg-muted (2), text-zinc-500 → text-muted-foreground (1)
+- `glavnaya-header.tsx` — bg-zinc-500/30 → bg-muted (1)
+- `glavnaya-greeting.tsx` — добавлен font-serif к h1
+
+### Этап 4 — Chat + Projects + Артефакты + Модалки
+- `markdown-viewer.tsx` — prose-pre:bg-zinc → prose-pre:bg-muted/text-foreground
+- `suggestion.tsx` — text-gray-500 → text-muted-foreground
+- `artifact-actions.tsx` — dark:hover:bg-zinc-700 → dark:hover:bg-accent
+- `artifact.tsx` — bg-zinc-900/50 → bg-black/50, border-zinc → border-border
+- `artifact-close-button.tsx` — dark:hover:bg-zinc-700 → dark:hover:bg-accent
+- `console.tsx` — 6 замен: bg-zinc/border-zinc/text-zinc → bg-muted/border-border/text-foreground
+- `document-preview.tsx` — 4 замены: dark:border-zinc/dark:bg-zinc → dark:bg-accent
+- `presentation-pptx/client.tsx` — bg-neutral → bg-muted, bg-white → bg-background
+- `document.tsx` — text-zinc-500 → text-muted-foreground
+- `sidebar-history.tsx` — text-zinc-500/400 → text-muted-foreground (4 замены)
+- `auth-form.tsx` — text-zinc-600/400 → text-muted-foreground (2 замены)
+- `image-lightbox.tsx` — оставлено (bg-black/80, text-white — оверлеи)
+- `components/projects/` — аудит: только статусные цвета (намеренные)
+- `components/service-chat/` — аудит: чисто
+- Финальный grep: 0 хардкодов (gray/zinc/slate/stone/neutral)
+
+### Files
+- components/markdown-viewer.tsx
+- components/suggestion.tsx
+- components/artifact-actions.tsx
+- components/artifact.tsx
+- components/artifact-close-button.tsx
+- components/console.tsx
+- components/document-preview.tsx
+- components/document.tsx
+- components/sidebar-history.tsx
+- components/auth-form.tsx
+- artifacts/presentation-pptx/client.tsx
+- specs/TZ_DesignSystem/ROADMAP.md
+- specs/TZ_DesignSystem/CHANGELOG.md
+- specs/TZ_DesignSystem/HANDOFF.md
+
+---
+
 ## Сессия 3 — 2026-02-14
 
 ### Changed

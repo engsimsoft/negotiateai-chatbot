@@ -116,7 +116,7 @@ export const presentationPptxArtifact = new Artifact<
 
     return (
       <div className="flex flex-col h-full">
-        <div className="flex-1 relative bg-neutral-100 dark:bg-neutral-900 rounded-lg overflow-hidden min-h-[300px]">
+        <div className="flex-1 relative bg-muted rounded-lg overflow-hidden min-h-[300px]">
           <div className="absolute inset-0 flex items-center justify-center p-4">
             {previewUrls[currentSlide] && (
               <img
@@ -130,13 +130,13 @@ export const presentationPptxArtifact = new Artifact<
             <>
               <button
                 onClick={handlePrevSlide}
-                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/80 dark:bg-black/50 hover:bg-white shadow-md"
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-background/80 dark:bg-background/50 hover:bg-background shadow-md"
               >
                 ←
               </button>
               <button
                 onClick={handleNextSlide}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/80 dark:bg-black/50 hover:bg-white shadow-md"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-background/80 dark:bg-background/50 hover:bg-background shadow-md"
               >
                 →
               </button>
