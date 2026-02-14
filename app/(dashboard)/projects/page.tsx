@@ -7,6 +7,7 @@ import { getProjectsWithStats } from "@/lib/db/queries";
 import { Button } from "@/components/ui/button";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { ProjectCard } from "@/components/projects/project-card";
+import { UserMenu } from "@/components/user-menu";
 
 export default async function ProjectsPage() {
   const session = await auth();
@@ -31,12 +32,15 @@ export default async function ProjectsPage() {
           <span className="text-muted-foreground">/</span>
           <h1 className="font-semibold">Проекты</h1>
         </div>
-        <CreateProjectDialog>
-          <Button size="sm">
-            <Plus className="size-4 mr-1" />
-            Создать
-          </Button>
-        </CreateProjectDialog>
+        <div className="flex items-center gap-2">
+          <CreateProjectDialog>
+            <Button size="sm">
+              <Plus className="size-4 mr-1" />
+              Создать
+            </Button>
+          </CreateProjectDialog>
+          <UserMenu />
+        </div>
       </header>
 
       {/* Content */}

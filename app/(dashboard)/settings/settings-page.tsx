@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/toast";
+import { UserMenu } from "@/components/user-menu";
 import { fetcher } from "@/lib/utils";
 
 interface UserProfile {
@@ -141,6 +142,9 @@ export function SettingsPage() {
           Dashboard
         </button>
         <h1 className="text-lg font-semibold">Настройки</h1>
+        <div className="ml-auto">
+          <UserMenu />
+        </div>
       </header>
 
       {/* Content */}

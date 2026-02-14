@@ -18,6 +18,7 @@ import { DefaultChatTransport } from "ai";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { UserMenu } from "@/components/user-menu";
 import { PROJECT_CREATION_CONFIG } from "@/components/service-chat";
 import { generateUUID } from "@/lib/utils";
 import {
@@ -308,19 +309,22 @@ export function ProjectCreationClient({ userProfile }: ProjectCreationClientProp
       {/* Right: Chat */}
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-sm">
-          <Link href="/dashboard">
-            <Button size="icon" variant="ghost">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">{config.icon}</span>
-            <div>
-              <h1 className="font-semibold">{config.title}</h1>
-              <p className="text-xs text-muted-foreground">{config.subtitle}</p>
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard">
+              <Button size="icon" variant="ghost">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{config.icon}</span>
+              <div>
+                <h1 className="font-semibold">{config.title}</h1>
+                <p className="text-xs text-muted-foreground">{config.subtitle}</p>
+              </div>
             </div>
           </div>
+          <UserMenu />
         </header>
 
         {/* Chat panel */}

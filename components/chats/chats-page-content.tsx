@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { UserMenu } from "@/components/user-menu";
 import { ChatList } from "./chat-list";
 import { ChatDetailPanel } from "./chat-detail-panel";
 import { ChatsEmptyState } from "./chats-empty-state";
@@ -94,18 +95,21 @@ export function ChatsPageContent({ initialChats }: ChatsPageContentProps) {
   return (
     <div className="flex min-h-svh flex-col bg-muted/30">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-sm">
-        <Link href="/dashboard">
-          <Button size="icon" variant="ghost">
-            <ArrowLeft className="size-5" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="font-semibold">История чатов</h1>
-          <p className="text-xs text-muted-foreground">
-            {chats.length} {chats.length === 1 ? "чат" : chats.length < 5 ? "чата" : "чатов"}
-          </p>
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-sm">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard">
+            <Button size="icon" variant="ghost">
+              <ArrowLeft className="size-5" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="font-semibold">История чатов</h1>
+            <p className="text-xs text-muted-foreground">
+              {chats.length} {chats.length === 1 ? "чат" : chats.length < 5 ? "чата" : "чатов"}
+            </p>
+          </div>
         </div>
+        <UserMenu />
       </header>
 
       {/* Content */}

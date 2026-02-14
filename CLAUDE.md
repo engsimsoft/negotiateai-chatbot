@@ -119,6 +119,9 @@
 - `app/(chat)/api/service-chat/route.ts` — Унифицированный API
 - `app/(chat)/api/assistant/ben/route.ts` — Legacy API Бена
 
+**UserMenu (глобальный):**
+- `components/user-menu.tsx` — Автономный dropdown (avatar + Настройки, Тема, Выйти). Prop `align`
+
 **Sidebar (контекстный):**
 - `components/sidebar-layout.tsx` — Layout с табами вне Sidebar
 - `components/sidebar-history.tsx` — История чатов (контекстная фильтрация, ⭐ toggle)
@@ -315,8 +318,7 @@ SELECT COUNT(*) FROM "Chat";
 - **Принципы:** Mobile-first, SSOT компонентов, Apple-подход
 
 **Текущие боли (backlog):**
-1. User Menu отсутствует на /settings, /projects, /chats, /task — **отдельное ТЗ**
-2. Навигация между режимами не очевидна
+1. Навигация между режимами не очевидна
 
 ---
 

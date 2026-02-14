@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/toast";
+import { UserMenu } from "@/components/user-menu";
 import { ContextIndicator } from "@/components/projects/context-indicator";
 import { TaskCompletionCard } from "@/components/projects/task-completion-card";
 import type { ProjectTask, SnapshotMeta } from "@/lib/db/schema";
@@ -250,6 +251,8 @@ export function TaskChat({
                 Замечания
               </span>
             )}
+
+            <UserMenu />
           </div>
         </div>
 

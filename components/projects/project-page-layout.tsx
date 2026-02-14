@@ -11,6 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { UserMenu } from "@/components/user-menu";
 import { ManagerDrawer } from "./manager-drawer";
 
 interface ProjectPageLayoutProps {
@@ -50,15 +51,18 @@ export function ProjectPageLayout({
       {/* Header */}
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4 lg:px-8">
         {headerLeft}
-        <Button
-          variant={drawerOpen ? "default" : "outline"}
-          size="sm"
-          className="gap-1.5"
-          onClick={() => setDrawerOpen(!drawerOpen)}
-        >
-          <User className="size-4" />
-          <span className="hidden sm:inline">Менеджер</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={drawerOpen ? "default" : "outline"}
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setDrawerOpen(!drawerOpen)}
+          >
+            <User className="size-4" />
+            <span className="hidden sm:inline">Менеджер</span>
+          </Button>
+          <UserMenu />
+        </div>
       </header>
 
       {/* Mobile Pulse trigger — fixed bottom-right */}

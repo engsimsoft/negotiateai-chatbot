@@ -45,29 +45,29 @@ Root Layout (app/layout.tsx)
 │   │   Каждая страница сама отвечает за свой header
 │   │
 │   ├── /dashboard → GlavnayaHeader
-│   │   User Menu: ✅ (GlavnayaHeader — avatar + dropdown + Ben)
-│   │   Theme Toggle: ✅ (в dropdown GlavnayaHeader)
+│   │   User Menu: ✅ (GlavnayaHeader → UserMenu + Ben)
+│   │   Theme Toggle: ✅ (в dropdown UserMenu)
 │   │
-│   ├── /settings → свой header (← Dashboard + "Настройки")
-│   │   User Menu: ❌   Theme Toggle: ❌ (есть секция "Внешний вид")
+│   ├── /settings → свой header (← Dashboard + "Настройки" + UserMenu)
+│   │   User Menu: ✅   Theme Toggle: ✅ (+ секция "Внешний вид")
 │   │
-│   ├── /projects → свой header (← Dashboard + "Проекты" + кнопка "Создать")
-│   │   User Menu: ❌   Theme Toggle: ❌
+│   ├── /projects → свой header (← Dashboard + "Проекты" + "Создать" + UserMenu)
+│   │   User Menu: ✅   Theme Toggle: ✅
 │   │
-│   ├── /projects/[id] → ProjectPageLayout (breadcrumbs + кнопка "Менеджер")
-│   │   User Menu: ❌   Theme Toggle: ❌
+│   ├── /projects/[id] → ProjectPageLayout (breadcrumbs + "Менеджер" + UserMenu)
+│   │   User Menu: ✅   Theme Toggle: ✅
 │   │
-│   ├── /chats → свой header
-│   │   User Menu: ❌   Theme Toggle: ❌
+│   ├── /chats → свой header (← Dashboard + "История чатов" + UserMenu)
+│   │   User Menu: ✅   Theme Toggle: ✅
 │   │
-│   └── /projects/new → создание проекта
-│       User Menu: ❌   Theme Toggle: ❌
+│   └── /projects/new → создание проекта (header + UserMenu)
+│       User Menu: ✅   Theme Toggle: ✅
 │
 └── (task) — БЕЗ глобального sidebar
     │   SidebarProvider только для контекста Artifact
     │
-    └── /projects/[id]/tasks/[taskId] → TaskSidebar + TaskChat
-        User Menu: ❌   Theme Toggle: ❌
+    └── /projects/[id]/tasks/[taskId] → TaskSidebar (UserMenu в header) + TaskChat
+        User Menu: ✅   Theme Toggle: ✅
 ```
 
 ### 1.3 Существующие компоненты навигации
@@ -76,17 +76,18 @@ Root Layout (app/layout.tsx)
 
 | Компонент | Где используется | Что содержит |
 |-----------|-----------------|--------------|
-| `GlavnayaHeader` | `/dashboard` | Logo, Ben (?), User avatar + dropdown (Настройки, Тема, Выйти) |
+| `UserMenu` | Все страницы (dashboard), TaskSidebar | Avatar-круг + dropdown (Настройки, Тема, Выйти). Prop `align` |
+| `GlavnayaHeader` | `/dashboard` | Logo, Ben (?), UserMenu |
 | `SidebarUserNav` | `(chat)` sidebar footer | Avatar + dropdown (Настройки, Тема, Помощь, Выйти) |
 | `AppSidebar` | `(chat)` layout | Logo, чат-история, SidebarUserNav |
-| `TaskSidebar` | `(task)` страницы | Список задач проекта, навигация между задачами |
-| `ProjectPageLayout` | `/projects/[id]` | Header (breadcrumbs + Менеджер), Pulse + WorkArea |
+| `TaskSidebar` | `(task)` страницы | Список задач проекта, навигация между задачами, UserMenu |
+| `ProjectPageLayout` | `/projects/[id]` | Header (breadcrumbs + Менеджер + UserMenu), Pulse + WorkArea |
 
-**Важно:** User dropdown с темой переключения уже реализован в двух компонентах:
-1. `GlavnayaHeader` — для страницы /dashboard
-2. `SidebarUserNav` — для чат-страниц с sidebar
+**Важно:** User dropdown реализован в двух компонентах:
+1. `UserMenu` (`components/user-menu.tsx`) — автономный компонент для всех страниц без sidebar
+2. `SidebarUserNav` — для чат-страниц с AppSidebar (использует Sidebar UI wrappers)
 
-При добавлении user menu на новые страницы — переиспользовать существующие компоненты или их паттерн.
+При добавлении user menu на новые страницы — использовать `<UserMenu />` в header.
 
 ### 1.4 Паттерн Header
 
