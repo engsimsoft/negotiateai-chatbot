@@ -12,6 +12,25 @@
 
 ---
 
+## [3.21.0] - 2026-02-15 - Chat Sidebar + RightSidebar (ТЗ-08CS)
+
+**MINOR RELEASE**: Правая боковая панель материалов чата (артефакты + вложения) + унифицированный переиспользуемый RightSidebar shell.
+
+### Added
+- **`components/right-sidebar.tsx`** — унифицированный правый сайдбар-shell. Desktop: fixed push-panel (bg-sidebar, border-sidebar-border, inset-y-0). Mobile: Sheet overlay. Переиспользуемый для chat/projects/helpers
+- **`components/chat-sidebar.tsx`** — панель материалов чата: секции "Артефакты" и "Вложения", scroll-to-message навигация, скачивание файлов
+- **Scroll-to-message** — клик по элементу → `scrollIntoView({ behavior: "smooth" })` + CSS `sidebar-highlight` анимация (2s fade-out)
+- **Push-layout** — правый сайдбар сдвигает контент (`md:mr-[380px]`), авто-закрытие: правый↔левый сайдбары
+- **`app/globals.css`** — `sidebar-highlight` keyframes для анимации подсветки сообщения
+
+### Changed
+- **`components/chat-header.tsx`** — кнопка PanelRight (toggle правого сайдбара) + `Button` компонент вместо сырого `<button>`
+- **`components/chat.tsx`** — state правого сайдбара, push-layout с `transition-[margin] duration-200 ease-linear`, авто-закрытие через useEffect
+- **`components/message.tsx`** — `id="message-${message.id}"` для scroll targeting
+- **`docs/design-system.md`** — зарегистрированы RightSidebar, ChatSidebar, sidebar-токены (bg-sidebar, bg-sidebar-accent и др.)
+
+---
+
 ## [3.20.0] - 2026-02-15 - Tool Activity UX + Sidebar Icon Mode (ТЗ-07)
 
 **MINOR RELEASE**: Компактные индикаторы активности инструментов (webSearch, parseExcel, readProjectFile) + редизайн sidebar по паттерну Claude (icon mode).

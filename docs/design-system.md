@@ -81,6 +81,8 @@ Root Layout (app/layout.tsx)
 | `GlavnayaHeader` | `/dashboard` | Logo, Ben (?), UserMenu |
 | `SidebarUserNav` | `(chat)` sidebar footer | Avatar + dropdown (Настройки, Тема, Помощь, Выйти) |
 | `AppSidebar` | `(chat)` layout | Logo, навигация (Главная, Новый чат, Все чаты), чат-история (скрыта в icon mode), SidebarUserNav. `collapsible="icon"` — паттерн Claude |
+| `RightSidebar` | `(chat)`, будущее: projects, helpers | Унифицированный правый сайдбар-shell (bg-sidebar, Sheet на мобильных). Переиспользуемый контейнер |
+| `ChatSidebar` | `(chat)` страницы | Материалы чата (артефакты + вложения). Использует RightSidebar |
 | `TaskSidebar` | `(task)` страницы | Список задач проекта, навигация между задачами, UserMenu |
 | `ProjectPageLayout` | `/projects/[id]` | Header (breadcrumbs + Менеджер + UserMenu), Pulse + WorkArea |
 
@@ -117,6 +119,7 @@ sticky top-0 z-10|z-50  h-14  items-center  border-b  bg-background  px-4 lg:px-
 - Границы: border-border, border-input
 - Фокус: ring-ring
 - Статусы: text-success, text-warning, text-info, bg-success/10, bg-warning/10, bg-info/10
+- Sidebar: bg-sidebar, text-sidebar-foreground, bg-sidebar-accent, text-sidebar-accent-foreground, border-sidebar-border, ring-sidebar-ring (только внутри AppSidebar и RightSidebar)
 
 ### Исключения (намеренные цвета)
 

@@ -5,6 +5,7 @@ import { memo, useState, useEffect } from "react";
 import useSWR from "swr";
 import { ChevronRight, FolderOpen, HelpCircle, PanelRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { SidebarToggle } from "@/components/sidebar-toggle";
 import {
   ServiceChatTrigger,
@@ -121,17 +122,16 @@ function PureChatHeader({
       <div className="ml-auto flex items-center gap-1">
         {/* ТЗ-08: Chat sidebar toggle */}
         {onToggleSidebar && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={onToggleSidebar}
-            className={cn(
-              "rounded-lg p-2 transition-colors hover:bg-muted/60",
-              isSidebarOpen && "bg-muted"
-            )}
+            className={cn("size-7", isSidebarOpen && "bg-muted")}
             title="Материалы чата"
           >
-            <PanelRight className="h-5 w-5" />
+            <PanelRight className="size-4" />
             <span className="sr-only">Материалы чата</span>
-          </button>
+          </Button>
         )}
 
         <div className="relative">

@@ -3,7 +3,7 @@
 /**
  * ТЗ-08: Chat Sidebar — панель материалов чата
  *
- * Push-drawer справа (паттерн manager-drawer):
+ * Использует RightSidebar (унифицированный shell):
  * - Секция "Артефакты": документы, созданные AI (createDocument/updateDocument)
  * - Секция "Вложения": файлы, прикреплённые пользователем
  * - Empty state когда списки пусты
@@ -13,17 +13,15 @@
 
 import { type MouseEvent, useCallback, useMemo } from "react";
 import {
-  X,
   FileText,
   Image,
   Table,
   Presentation,
-  Paperclip,
   FileIcon,
   Inbox,
   Download,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { RightSidebar } from "@/components/right-sidebar";
 import type { ArtifactKind } from "@/components/artifact";
 import type { ChatMessage } from "@/lib/types";
 
@@ -55,16 +53,16 @@ function getArtifactIcon(kind: ArtifactKind) {
   switch (kind) {
     case "markdown":
     case "text":
-      return <FileText className="size-4 text-muted-foreground" />;
+      return <FileText className="size-4 text-sidebar-foreground/70" />;
     case "image":
-      return <Image className="size-4 text-muted-foreground" />;
+      return <Image className="size-4 text-sidebar-foreground/70" />;
     case "excel":
-      return <Table className="size-4 text-muted-foreground" />;
+      return <Table className="size-4 text-sidebar-foreground/70" />;
     case "presentation-reveal":
     case "presentation-pptx":
-      return <Presentation className="size-4 text-muted-foreground" />;
+      return <Presentation className="size-4 text-sidebar-foreground/70" />;
     default:
-      return <FileText className="size-4 text-muted-foreground" />;
+      return <FileText className="size-4 text-sidebar-foreground/70" />;
   }
 }
 
@@ -229,134 +227,115 @@ export function ChatSidebar({ open, onClose, messages }: ChatSidebarProps) {
   }, []);
 
   return (
-    <div
-      className={cn(
-        "fixed right-0 top-14 bottom-0 z-30 w-full md:w-[380px] flex flex-col border-l bg-background shadow-xl",
-        "transition-transform duration-300 ease-in-out",
-        open ? "translate-x-0" : "translate-x-full"
+    <RightSidebar open={open} onClose={onClose} title="Материалы чата">
+      {isEmpty ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-16 text-sidebar-foreground/50">
+          <Inbox className="size-10" />
+          <p className="text-sm">Пока нет материалов</p>
+          <p className="text-xs text-center max-w-60">
+            Артефакты и вложения чата появятся здесь
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4 p-2">
+          {/* Artifacts section */}
+          {artifacts.length > 0 && (
+            <section>
+              <div className="flex h-8 items-center px-2 text-xs font-medium text-sidebar-foreground/70">
+                Артефакты · {artifacts.length}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {artifacts.map((artifact) => (
+                  <button
+                    key={artifact.id}
+                    type="button"
+                    onClick={() => handleArtifactClick(artifact)}
+                    className="group flex w-full items-center gap-2 rounded-md p-2 text-left transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  >
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-accent">
+                      {getArtifactIcon(artifact.kind)}
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-sm font-medium">
+                        {artifact.title}
+                      </span>
+                      <span className="text-xs text-sidebar-foreground/50">
+                        {getArtifactFormatLabel(artifact.kind)}
+                      </span>
+                    </div>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => handleArtifactDownload(e, artifact)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleArtifactDownload(e as unknown as MouseEvent, artifact);
+                        }
+                      }}
+                      className="shrink-0 rounded-md p-1.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-sidebar-accent"
+                      title="Скачать"
+                    >
+                      <Download className="size-3.5 text-sidebar-foreground/70" />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Attachments section */}
+          {attachments.length > 0 && (
+            <section>
+              <div className="flex h-8 items-center px-2 text-xs font-medium text-sidebar-foreground/70">
+                Вложения · {attachments.length}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {attachments.map((attachment, index) => (
+                  <button
+                    key={`${attachment.url}-${index}`}
+                    type="button"
+                    onClick={() => handleAttachmentClick(attachment)}
+                    className="group flex w-full items-center gap-2 rounded-md p-2 text-left transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  >
+                    {isImageContentType(attachment.contentType) ? (
+                      <div className="size-8 shrink-0 overflow-hidden rounded-md bg-sidebar-accent">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={attachment.url}
+                          alt={attachment.name}
+                          className="size-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-accent">
+                        <FileIcon className="size-4 text-sidebar-foreground/70" />
+                      </div>
+                    )}
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-sm font-medium">
+                        {attachment.name}
+                      </span>
+                      <span className="text-xs text-sidebar-foreground/50">
+                        {attachment.contentType}
+                      </span>
+                    </div>
+                    <a
+                      href={attachment.url}
+                      download={attachment.name}
+                      onClick={handleAttachmentDownload}
+                      className="shrink-0 rounded-md p-1.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-sidebar-accent"
+                      title="Скачать"
+                    >
+                      <Download className="size-3.5 text-sidebar-foreground/70" />
+                    </a>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       )}
-    >
-      {/* Header */}
-      <div className="flex h-14 items-center justify-between border-b px-4">
-        <span className="font-semibold">Материалы чата</span>
-        <button
-          onClick={onClose}
-          className="rounded-full p-2 hover:bg-muted transition-colors"
-        >
-          <X className="size-4" />
-          <span className="sr-only">Закрыть</span>
-        </button>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        {isEmpty ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
-            <Inbox className="size-10" />
-            <p className="text-sm">Пока нет материалов</p>
-            <p className="text-xs text-center max-w-60">
-              Артефакты и вложения чата появятся здесь
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-6">
-            {/* Artifacts section */}
-            {artifacts.length > 0 && (
-              <section>
-                <h3 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  <FileText className="size-3.5" />
-                  Артефакты
-                  <span className="ml-auto text-xs tabular-nums">
-                    {artifacts.length}
-                  </span>
-                </h3>
-                <div className="flex flex-col gap-1">
-                  {artifacts.map((artifact) => (
-                    <div
-                      key={artifact.id}
-                      onClick={() => handleArtifactClick(artifact)}
-                      className="group flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/60 transition-all duration-150 cursor-pointer"
-                    >
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-                        {getArtifactIcon(artifact.kind)}
-                      </div>
-                      <div className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-sm font-medium text-foreground">
-                          {artifact.title}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {getArtifactFormatLabel(artifact.kind)}
-                        </span>
-                      </div>
-                      <button
-                        onClick={(e) => handleArtifactDownload(e, artifact)}
-                        className="shrink-0 rounded-md p-1.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted"
-                        title="Скачать"
-                      >
-                        <Download className="size-3.5 text-muted-foreground" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Attachments section */}
-            {attachments.length > 0 && (
-              <section>
-                <h3 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  <Paperclip className="size-3.5" />
-                  Вложения
-                  <span className="ml-auto text-xs tabular-nums">
-                    {attachments.length}
-                  </span>
-                </h3>
-                <div className="flex flex-col gap-1">
-                  {attachments.map((attachment, index) => (
-                    <div
-                      key={`${attachment.url}-${index}`}
-                      onClick={() => handleAttachmentClick(attachment)}
-                      className="group flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/60 transition-all duration-150 cursor-pointer"
-                    >
-                      {isImageContentType(attachment.contentType) ? (
-                        <div className="size-8 shrink-0 overflow-hidden rounded-md bg-muted">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={attachment.url}
-                            alt={attachment.name}
-                            className="size-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-                          <FileIcon className="size-4 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-sm font-medium text-foreground">
-                          {attachment.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {attachment.contentType}
-                        </span>
-                      </div>
-                      <a
-                        href={attachment.url}
-                        download={attachment.name}
-                        onClick={handleAttachmentDownload}
-                        className="shrink-0 rounded-md p-1.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted"
-                        title="Скачать"
-                      >
-                        <Download className="size-3.5 text-muted-foreground" />
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+    </RightSidebar>
   );
 }

@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useArtifactSelector } from "@/hooks/use-artifact";
+import { useSidebar } from "@/components/ui/sidebar";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import type { Vote } from "@/lib/db/schema";
@@ -28,7 +29,7 @@ import {
 } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
-import { fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
+import { cn, fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
 import { Artifact } from "./artifact";
 import { ChatSidebar } from "./chat-sidebar";
 import { useDataStream } from "./data-stream-provider";
@@ -374,8 +375,28 @@ export function Chat({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
 
-  // ТЗ-08: Chat sidebar state
+  // ТЗ-08: Chat sidebar state + push-layout
   const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false);
+  const { setOpen: setLeftSidebarOpen, open: leftSidebarOpen } = useSidebar();
+
+  // Toggle right sidebar
+  const handleToggleChatSidebar = useCallback(() => {
+    setIsChatSidebarOpen((prev) => !prev);
+  }, []);
+
+  // Auto-close: right opens → left closes
+  useEffect(() => {
+    if (isChatSidebarOpen) {
+      setLeftSidebarOpen(false);
+    }
+  }, [isChatSidebarOpen, setLeftSidebarOpen]);
+
+  // Auto-close: left opens → right closes
+  useEffect(() => {
+    if (leftSidebarOpen && isChatSidebarOpen) {
+      setIsChatSidebarOpen(false);
+    }
+  }, [leftSidebarOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle action button clicks (send payload as user message)
   const handleActionButton = useCallback(
@@ -397,12 +418,16 @@ export function Chat({
 
   return (
     <>
-      <div className="overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-background">
+      <div className={cn(
+        "overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-background",
+        "transition-[margin] duration-200 ease-linear",
+        isChatSidebarOpen && "md:mr-[380px]"
+      )}>
         <ChatHeader
           onInsertToChat={setInput}
           projectId={projectId}
           projectName={projectName}
-          onToggleSidebar={() => setIsChatSidebarOpen((prev) => !prev)}
+          onToggleSidebar={handleToggleChatSidebar}
           isSidebarOpen={isChatSidebarOpen}
         />
 

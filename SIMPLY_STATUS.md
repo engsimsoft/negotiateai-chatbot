@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.20.0
+**Версия:** 3.21.0
 **Дата:** 2026-02-15
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -322,6 +322,25 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-08CS: Chat Sidebar + RightSidebar — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **RightSidebar** (`components/right-sidebar.tsx`) — унифицированный правый сайдбар-shell. Desktop: fixed push-panel (bg-sidebar, inset-y-0, duration-200). Mobile: Sheet overlay. Готов к переиспользованию в проектах/помощниках
+- **ChatSidebar** (`components/chat-sidebar.tsx`) — панель материалов чата (артефакты + вложения), scroll-to-message навигация, скачивание
+- **Push-layout** — правый сайдбар сдвигает контент (`md:mr-[380px]`), авто-закрытие: открытие одного закрывает другой
+- **Визуальная унификация** — оба сайдбара (левый + правый) используют единые sidebar-токены: bg-sidebar, bg-sidebar-accent, text-sidebar-foreground, border-sidebar-border
+- **Design System обновлён** — `docs/design-system.md`: зарегистрированы RightSidebar, ChatSidebar, sidebar-токены
+
+**Ключевые файлы:**
+- `components/right-sidebar.tsx` — переиспользуемый shell (Sheet mobile + fixed desktop)
+- `components/chat-sidebar.tsx` — материалы чата (артефакты + вложения)
+- `components/chat-header.tsx` — кнопка PanelRight (toggle)
+- `components/chat.tsx` — state + push-layout + авто-закрытие
+- `components/message.tsx` — id для scroll targeting
+- `app/globals.css` — sidebar-highlight анимация
+
+**Детали:** [_archive/TZ_08_ChatSidebar/](_archive/TZ_08_ChatSidebar/)
 
 ### ТЗ-07: Tool Activity UX + Sidebar Icon Mode — ✅ ЗАВЕРШЁН
 
@@ -919,11 +938,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.20.0 |
+| Версия | 3.21.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Профессоры | 2 (planning, task-review) |
@@ -957,6 +976,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_08_ChatSidebar/](_archive/TZ_08_ChatSidebar/) — ТЗ-08CS Chat Sidebar + RightSidebar
 - [_archive/TZ_07_ToolActivity/](_archive/TZ_07_ToolActivity/) — ТЗ-07 Tool Activity UX + Sidebar Icon Mode
 - [_archive/TZ_DesignSystem/](_archive/TZ_DesignSystem/) — ТЗ-DS Simply Design System
 - [_archive/TZ_C1_5_ContextManagement/](_archive/TZ_C1_5_ContextManagement/) — ТЗ-C1.5 Context Window Management
