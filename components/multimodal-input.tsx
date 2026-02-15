@@ -225,11 +225,11 @@ function PureMultimodalInput({
 
       if (response.ok) {
         const data = await response.json();
-        const { url, pathname, contentType } = data;
+        const { url, pathname, contentType, originalFilename } = data;
 
         return {
           url,
-          name: pathname,
+          name: originalFilename ?? pathname,
           contentType,
         };
       }
@@ -360,7 +360,7 @@ function PureMultimodalInput({
         ref={fileInputRef}
         tabIndex={-1}
         type="file"
-        accept="image/jpeg,image/png,application/pdf,.docx,.xlsx,.xls,.txt,.md"
+        accept="image/jpeg,image/png,application/pdf,.docx,.xlsx,.xls,.xlsm,.csv,.txt,.md"
       />
 
       <PromptInput

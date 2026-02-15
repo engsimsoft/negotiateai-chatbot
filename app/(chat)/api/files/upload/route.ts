@@ -20,14 +20,16 @@ const FileSchema = z.object({
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // DOCX
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // XLSX
           "application/vnd.ms-excel", // XLS
+          "application/vnd.ms-excel.sheet.macroEnabled.12", // XLSM
           "text/plain",
+          "text/csv", // CSV
           "text/markdown",
           "text/x-markdown", // Alternative MD MIME type
           "application/octet-stream", // Generic binary (browsers may use this for .md or .xlsx)
         ].includes(file.type),
       {
         message:
-          "File type should be JPEG, PNG, PDF, DOCX, XLSX, XLS, TXT, or MD",
+          "File type should be JPEG, PNG, PDF, DOCX, XLSX, XLS, XLSM, CSV, TXT, or MD",
       }
     ),
 });
@@ -79,25 +81,29 @@ export async function POST(request: Request) {
     const fileType = file.type;
 
     // Get file extension for better type detection
-    const fileExt = originalFilename.toLowerCase().match(/\.(docx|txt|md|xlsx|xls)$/)?.[1];
+    const fileExt = originalFilename.toLowerCase().match(/\.(docx|txt|md|csv|xlsx|xls|xlsm)$/)?.[1];
 
     try {
       // Check if it's an Excel file
       const isExcelFile =
         fileType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
         fileType === "application/vnd.ms-excel" ||
+        fileType === "application/vnd.ms-excel.sheet.macroEnabled.12" ||
         fileExt === "xlsx" ||
-        fileExt === "xls";
+        fileExt === "xls" ||
+        fileExt === "xlsm";
 
       // Process document files (DOCX, TXT, MD) and extract text
       // These will be uploaded as text/plain to work with Claude multimodal API
       const isDocumentFile =
         fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
         fileType === "text/plain" ||
+        fileType === "text/csv" ||
         fileType === "text/markdown" ||
         fileType === "text/x-markdown" ||
         (fileType === "application/octet-stream" && (fileExt === "md" || fileExt === "txt")) ||
         fileExt === "docx" ||
+        fileExt === "csv" ||
         fileExt === "txt" ||
         fileExt === "md";
 
@@ -116,7 +122,7 @@ export async function POST(request: Request) {
         });
 
         // Upload extracted text as .txt file
-        const textFilename = originalFilename.replace(/\.(xlsx|xls)$/i, ".txt");
+        const textFilename = originalFilename.replace(/\.(xlsx|xls|xlsm)$/i, ".txt");
         const textBuffer = Buffer.from(extractedText, "utf-8");
 
         const data = await put(textFilename, textBuffer, {
@@ -148,7 +154,7 @@ export async function POST(request: Request) {
         }
 
         // Upload extracted text as .txt file
-        const textFilename = originalFilename.replace(/\.(docx|txt|md)$/i, ".txt");
+        const textFilename = originalFilename.replace(/\.(docx|csv|txt|md)$/i, ".txt");
         const textBuffer = Buffer.from(extractedText, 'utf-8');
 
         const data = await put(textFilename, textBuffer, {
