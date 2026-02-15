@@ -12,6 +12,32 @@
 
 ---
 
+## [3.22.0] - 2026-02-15 - Chat Context Management (ТЗ-C3)
+
+**MINOR RELEASE**: Портирование snapshot-системы управления контекстом из проектного чата в универсальный чат + множественные UX-фиксы.
+
+### Added
+- **Context Management для обычного чата** — snapshot-aware message trimming, context injection, fallback clerk для авто-создания snapshot
+- **ContextIndicator** в универсальном чате — прогресс-бар заполненности контекста (3 цвета) над инпутом
+- **ChatSidebar секция "Итоги"** — список snapshots в правом сайдбаре с иконкой Bookmark, scroll-to-message навигация
+- **Tool Activity для createDocument/updateDocument** — спиннер "Создаю документ..." из dataStream (устраняет 10-30 сек пустоту)
+- **Inline loading states** — промежуточные индикаторы в message.tsx до появления DocumentPreview
+- **XLSM upload** — поддержка Excel с макросами (.xlsm)
+- **CSV upload** — поддержка CSV-файлов (.csv)
+
+### Fixed
+- **Имена файлов** — загруженные файлы показывают оригинальное имя (не "file") в чате и правом сайдбаре
+- **Имена конвертированных файлов** — Excel/DOCX файлы показывают оригинальное расширение (.xlsx), а не конвертированное (.txt)
+- **Auto-scroll при артефакте** — убрана агрессивная memo-оптимизация, блокировавшая обновление чата при открытом документе
+- **customRendered exclusion** — createDocument/updateDocument не дублируются в completed tool activity list
+
+### Changed
+- **`lib/ai/clerks/snapshot-creator.ts`** — универсализация: taskTitle/taskGoal optional, добавлен chatTitle
+- **`lib/ai/tools/chat-tools.ts`** — createSnapshot доступен для обычного чата (убран isProjectChat guard)
+- **`app/(chat)/api/chat/route.ts`** — полная интеграция snapshot management (loading, trimming, injection, fallback, data-context-usage)
+
+---
+
 ## [3.21.0] - 2026-02-15 - Chat Sidebar + RightSidebar (ТЗ-08CS)
 
 **MINOR RELEASE**: Правая боковая панель материалов чата (артефакты + вложения) + унифицированный переиспользуемый RightSidebar shell.

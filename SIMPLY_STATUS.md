@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.21.0
+**Версия:** 3.22.0
 **Дата:** 2026-02-15
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -322,6 +322,28 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-C3: Chat Context Management — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Context Management для обычного чата** — портирование snapshot-системы из проектного чата (ТЗ-C1.5) в универсальный чат
+- **Snapshot-aware message trimming** — автоматическая обрезка старых сообщений при наличии snapshot
+- **ContextIndicator** — индикатор заполненности контекста над инпутом (3 цвета: зелёный/жёлтый/красный)
+- **ChatSidebar "Итоги"** — секция snapshots в правом сайдбаре с навигацией к сообщению
+- **Fallback clerk** — автоматическое создание snapshot при игнорировании предложения AI
+- **Tool Activity для createDocument/updateDocument** — устранение 10-30 сек пустоты при создании документов
+- **Файловые имена** — корректное отображение оригинальных имён файлов вместо "file"
+- **XLSM/CSV upload** — поддержка загрузки Excel с макросами и CSV
+- **Auto-scroll fix** — чат корректно скроллится при открытом артефакте
+
+**Ключевые файлы:**
+- `app/(chat)/api/chat/route.ts` — snapshot loading, trimming, context injection, fallback
+- `components/chat.tsx` — ContextIndicator + context percent state
+- `components/chat-sidebar.tsx` — секция "Итоги" (snapshots)
+- `lib/ai/tool-activity-config.ts` — createDocument/updateDocument configs
+- `components/message.tsx` — loading states для document tools + file naming fix
+
+**Детали:** [_archive/TZ_C3_ChatContext/](_archive/TZ_C3_ChatContext/)
 
 ### ТЗ-08CS: Chat Sidebar + RightSidebar — ✅ ЗАВЕРШЁН
 
@@ -938,11 +960,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.21.0 |
+| Версия | 3.22.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21), ChatContextManagement (v3.22) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Профессоры | 2 (planning, task-review) |
@@ -976,6 +998,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_C3_ChatContext/](_archive/TZ_C3_ChatContext/) — ТЗ-C3 Chat Context Management
 - [_archive/TZ_08_ChatSidebar/](_archive/TZ_08_ChatSidebar/) — ТЗ-08CS Chat Sidebar + RightSidebar
 - [_archive/TZ_07_ToolActivity/](_archive/TZ_07_ToolActivity/) — ТЗ-07 Tool Activity UX + Sidebar Icon Mode
 - [_archive/TZ_DesignSystem/](_archive/TZ_DesignSystem/) — ТЗ-DS Simply Design System
