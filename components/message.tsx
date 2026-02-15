@@ -221,6 +221,7 @@ const PurePreviewMessage = ({
       className="group/message w-full"
       data-role={message.role}
       data-testid={`message-${message.role}`}
+      id={`message-${message.id}`}
       initial={{ opacity: 0 }}
     >
       <div

@@ -265,6 +265,27 @@
   @apply rounded-l-sm!;
 }
 
+/* ТЗ-08: Chat sidebar — scroll-to-message highlight */
+.sidebar-highlight {
+  animation: sidebar-highlight-fade 2s ease-out;
+}
+
+@keyframes sidebar-highlight-fade {
+  0% {
+    background-color: var(--primary);
+    opacity: 0.85;
+    border-radius: 0.5rem;
+  }
+  30% {
+    background-color: var(--primary);
+    opacity: 0.12;
+  }
+  100% {
+    background-color: transparent;
+    opacity: 1;
+  }
+}
+
 /* Suggestion highlight — semantic tokens */
 .suggestion-highlight {
   @apply bg-primary/20 hover:bg-primary/30 dark:hover:bg-primary/40 dark:text-primary-foreground dark:bg-primary/30;
