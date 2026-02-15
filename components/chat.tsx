@@ -255,6 +255,8 @@ export function Chat({
       mutate(unstable_serialize(getChatHistoryPaginationKey));
       setRetryState({ count: 0, maxRetries: retryState.maxRetries });
       setDelayState("normal");
+      // ТЗ-07: Clear tool-activity events from data stream to prevent stale indicators
+      setDataStream((prev) => prev.filter((p) => p.type !== "data-tool-activity"));
       // Reset professor state after completion (with delay to show completion)
       if (isProfessorMode) {
         setTimeout(() => {

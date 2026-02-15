@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.19.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.20.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -122,11 +122,11 @@
 **UserMenu (глобальный):**
 - `components/user-menu.tsx` — Автономный dropdown (avatar + Настройки, Тема, Выйти). Prop `align`
 
-**Sidebar (контекстный):**
-- `components/sidebar-layout.tsx` — Layout с табами вне Sidebar
+**Sidebar (контекстный, icon mode):**
+- `components/sidebar-layout.tsx` — Layout с SidebarProvider
 - `components/sidebar-history.tsx` — История чатов (контекстная фильтрация, ⭐ toggle)
-- `components/sidebar-history-item.tsx` — Элемент чата (inline-редактирование, ⭐ toggle)
-- `components/app-sidebar.tsx` — Sidebar с историей чатов
+- `components/sidebar-history-item.tsx` — Элемент чата (inline-редактирование, ⭐ toggle, tooltip)
+- `components/app-sidebar.tsx` — Sidebar `collapsible="icon"` (паттерн Claude): навигация (Главная, Новый чат, Все чаты) + история (скрыта в icon mode)
 - `components/ui/sidebar.tsx` — CSS variable `--sidebar-left-offset`
 
 **AI/Chat:**
@@ -142,6 +142,10 @@
 - `lib/ai/tools/` — Инструменты (search, excel, web scraping)
 - `lib/ai/tools/excel/` — Excel tools (create, parse, edit)
 - `lib/ai/tools/read-project-file.ts` — Tool чтения файлов проекта по имени
+
+**Tool Activity UX (v3.20.0):**
+- `lib/ai/tool-activity-config.ts` — Конфиг инструментов (icon, activeLabel, doneLabel, argsFormatter, resultFormatter, resultCounter)
+- `components/tool-activity-indicator.tsx` — Индикатор активности (спиннер/галочка, ×N бейдж, раскрываемые детали)
 
 **Projects (v3.16.0 — ExpertTaskChat):**
 - `app/(dashboard)/projects/[id]/page.tsx` — Страница проекта (Server Component)
@@ -211,13 +215,12 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**
 | Этап | Описание | Приоритет |
 |------|----------|-----------|
-| 7 | Tool Activity UX | Высокий |
 | 8 | Инструменты Фаза 1 (Perplexity, Plus AI, Ideogram) | Высокий |
 | 9 | RAG (База знаний) | Средний |
 | 10 | Chat Memory | Средний |
@@ -371,4 +374,4 @@ specs/
 
 ---
 
-**Обновлено:** 2026-02-14
+**Обновлено:** 2026-02-15

@@ -320,6 +320,21 @@ export async function POST(
                 );
               }
 
+              // ТЗ-07: Notify client when tool execution starts (AI SDK v5 event type)
+              if (
+                value &&
+                typeof value === "object" &&
+                "type" in value &&
+                (value as any).type === "tool-input-start"
+              ) {
+                const toolName = (value as any).toolName || "unknown";
+                const toolCallId = (value as any).toolCallId || "unknown";
+                dataStream.write({
+                  type: "data-tool-activity",
+                  data: { toolName, toolCallId },
+                });
+              }
+
               controller.enqueue(value);
             }
           },

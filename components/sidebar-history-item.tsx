@@ -79,7 +79,7 @@ const PureChatItem = ({
           />
         </div>
       ) : (
-        <SidebarMenuButton asChild isActive={isActive}>
+        <SidebarMenuButton asChild isActive={isActive} tooltip={chat.title}>
           <Link href={`/chat/${chat.id}`} onClick={() => setOpenMobile(false)}>
             {/* ТЗ-07C2: Show check mark for completed project tasks */}
             {chat.projectId && chat.taskStatus === "done" && (

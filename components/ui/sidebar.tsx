@@ -30,8 +30,8 @@ const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
-// Offset for sidebar when tabs are visible (w-12 = 3rem)
-const SIDEBAR_LEFT_OFFSET = "3rem";
+// Offset for sidebar (0 = no tabs bar)
+const SIDEBAR_LEFT_OFFSET = "0";
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed";

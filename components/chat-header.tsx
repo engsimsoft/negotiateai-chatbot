@@ -1,16 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { memo, useState, useEffect } from "react";
 import useSWR from "swr";
-import { useWindowSize } from "usehooks-ts";
-import { ChevronRight, FolderOpen, Home } from "lucide-react";
-import { HelpCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronRight, FolderOpen, HelpCircle } from "lucide-react";
 import { SidebarToggle } from "@/components/sidebar-toggle";
-import { PlusIcon } from "./icons";
-import { useSidebar } from "./ui/sidebar";
 import {
   ServiceChatTrigger,
   ServiceChatFloating,
@@ -49,14 +43,6 @@ function PureChatHeader({
   helperName,
   helperEmoji,
 }: ChatHeaderProps) {
-  const router = useRouter();
-  const { open } = useSidebar();
-  const { width: windowWidth } = useWindowSize();
-
-  // Track if component has mounted (for hydration-safe client-only rendering)
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
   // Modal assistants state
   const [benOpen, setBenOpen] = useState(false);
 
@@ -92,71 +78,40 @@ function PureChatHeader({
   };
 
   return (
-    <header className="sticky top-0 flex items-center gap-2 bg-background px-2 py-1.5 md:px-2">
+    <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-background px-4">
       <SidebarToggle />
 
-      {/* Breadcrumb navigation */}
-      <div className="flex items-center gap-1 text-sm">
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Home className="size-4" />
-          <span className="hidden sm:inline">Home</span>
-        </Link>
-
-        {/* Project breadcrumb */}
-        {projectId && projectName && (
-          <>
-            <ChevronRight className="size-3.5 text-muted-foreground/50" />
-            <Link
-              href={`/projects/${projectId}`}
-              className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <FolderOpen className="size-3.5" />
-              <span className="max-w-[120px] truncate sm:max-w-[200px]">{projectName}</span>
-            </Link>
-            <ChevronRight className="size-3.5 text-muted-foreground/50" />
-            <span className="font-medium text-foreground">Чат</span>
-          </>
-        )}
-
-        {/* Helper breadcrumb (ТЗ-07A) */}
-        {helperId && helperName && (
-          <>
-            <ChevronRight className="size-3.5 text-muted-foreground/50" />
-            <Link
-              href={`/helpers/${helperId}`}
-              className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <span>{helperEmoji || "🤖"}</span>
-              <span className="max-w-[120px] truncate sm:max-w-[200px]">{helperName}</span>
-            </Link>
-            <ChevronRight className="size-3.5 text-muted-foreground/50" />
-            <span className="font-medium text-foreground">Чат</span>
-          </>
-        )}
-      </div>
-
-      {/* New Chat button - always visible when sidebar closed or on mobile */}
-      {/* Use mounted check to avoid hydration mismatch with windowWidth */}
-      {mounted && (!open || windowWidth < 768) && (
-        <Button
-          className="ml-auto h-8 px-2 md:h-fit md:px-2"
-          onClick={() => {
-            router.push("/chat");
-            router.refresh();
-          }}
-          variant="outline"
-        >
-          <PlusIcon />
-          <span className="md:sr-only">Новый чат</span>
-        </Button>
+      {/* Контекстные breadcrumbs — только для проектов/помощников */}
+      {projectId && projectName && (
+        <div className="flex items-center gap-1 text-sm">
+          <Link
+            href={`/projects/${projectId}`}
+            className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <FolderOpen className="size-3.5" />
+            <span className="max-w-[120px] truncate sm:max-w-[200px]">{projectName}</span>
+          </Link>
+          <ChevronRight className="size-3.5 text-muted-foreground/50" />
+          <span className="font-medium text-foreground">Чат</span>
+        </div>
       )}
 
-      {/* Modal assistant triggers */}
-      {/* Use mounted check to avoid hydration mismatch with windowWidth */}
-      <div className={`flex items-center gap-1${mounted && open && windowWidth >= 768 ? " ml-auto" : ""}`}>
+      {helperId && helperName && (
+        <div className="flex items-center gap-1 text-sm">
+          <Link
+            href={`/helpers/${helperId}`}
+            className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span>{helperEmoji || "🤖"}</span>
+            <span className="max-w-[120px] truncate sm:max-w-[200px]">{helperName}</span>
+          </Link>
+          <ChevronRight className="size-3.5 text-muted-foreground/50" />
+          <span className="font-medium text-foreground">Чат</span>
+        </div>
+      )}
+
+      {/* Ben help — always right-aligned */}
+      <div className="ml-auto flex items-center gap-1">
         <div className="relative">
           <ServiceChatTrigger
             icon={<HelpCircle className="h-5 w-5" />}

@@ -143,6 +143,13 @@ export function TaskChat({
     },
   });
 
+  // ТЗ-07: Clear tool-activity events when streaming ends
+  useEffect(() => {
+    if (status === "ready") {
+      setDataStream((prev) => prev.filter((p) => p.type !== "data-tool-activity"));
+    }
+  }, [status, setDataStream]);
+
   // Auto-trigger: Expert starts first on new task (no messages)
   const hasTriggeredRef = useRef(false);
   useEffect(() => {

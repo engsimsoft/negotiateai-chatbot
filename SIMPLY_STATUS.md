@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.19.0
-**Дата:** 2026-02-14
+**Версия:** 3.20.0
+**Дата:** 2026-02-15
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -322,6 +322,30 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-07: Tool Activity UX + Sidebar Icon Mode — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **ToolActivityIndicator** — компактные индикаторы активности инструментов (webSearch, parseExcel, readProjectFile) с группировкой параллельных вызовов
+- **Backend data-tool-activity** — перехват `tool-input-start` в chat + task expert routes, отправка через dataStream
+- **Группировка** — параллельные вызовы одного инструмента объединяются: бейдж ×N, агрегированный summary, раскрываемые детали
+- **Sidebar Icon Mode** — `collapsible="icon"` вместо `collapsible="offcanvas"` (паттерн Claude/Anthropic)
+- **Sidebar навигация** — SidebarMenuButton с tooltip: Главная, Новый чат, Все чаты (иконки видны в свёрнутом режиме)
+- **Chat history скрыта в icon mode** — при свёртке видны только иконки навигации + avatar (как у Claude)
+- **Sidebar offset fix** — `SIDEBAR_LEFT_OFFSET = "0"` (убран offset для удалённой tab-панели)
+- **Chat header упрощён** — убраны breadcrumbs "Главная" (навигация в sidebar), оставлены контекстные breadcrumbs проектов/помощников
+
+**Ключевые файлы:**
+- `lib/ai/tool-activity-config.ts` — конфиг инструментов (icon, labels, formatters, resultCounter)
+- `components/tool-activity-indicator.tsx` — UI компонент (спиннер/галочка, ×N бейдж, детали)
+- `components/message.tsx` — `groupedToolActivities` useMemo (единый источник данных)
+- `components/app-sidebar.tsx` — icon mode, навигация, скрытие истории
+- `components/chat-header.tsx` — упрощённый header
+- `components/sidebar-history-item.tsx` — tooltip для чатов в icon mode
+- `app/(chat)/api/chat/route.ts` — backend data-tool-activity events
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — аналогично для task expert
+
+**Детали:** [_archive/TZ_07_ToolActivity/](_archive/TZ_07_ToolActivity/)
 
 ### ТЗ-DS: Simply Design System — ✅ ЗАВЕРШЁН
 
@@ -877,7 +901,6 @@ components/projects/
 
 | Этап | Описание | Приоритет |
 |------|----------|-----------|
-| **7** | Tool Activity UX | 🔴 Высокий |
 | **8** | Инструменты Фаза 1 (Perplexity, Plus AI, Ideogram) | 🔴 Высокий |
 | **9** | RAG (База знаний) | 🟡 Средний |
 | **10** | Chat Memory | 🟡 Средний |
@@ -896,11 +919,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.19.0 |
+| Версия | 3.20.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Профессоры | 2 (planning, task-review) |
@@ -934,6 +957,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_07_ToolActivity/](_archive/TZ_07_ToolActivity/) — ТЗ-07 Tool Activity UX + Sidebar Icon Mode
 - [_archive/TZ_DesignSystem/](_archive/TZ_DesignSystem/) — ТЗ-DS Simply Design System
 - [_archive/TZ_C1_5_ContextManagement/](_archive/TZ_C1_5_ContextManagement/) — ТЗ-C1.5 Context Window Management
 - [_archive/TZ_C2_TaskCompletion/](_archive/TZ_C2_TaskCompletion/) — ТЗ-C2 TaskCompletion
@@ -967,4 +991,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-13
+**Обновлено:** 2026-02-15

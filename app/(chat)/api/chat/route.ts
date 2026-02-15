@@ -492,45 +492,37 @@ export async function POST(request: Request) {
                 break;
               }
 
-              // Diagnostic logging for tool events
+              // Diagnostic logging for tool events (AI SDK v5 event types)
               if (value && typeof value === "object" && "type" in value) {
                 const eventType = (value as any).type;
 
-                if (eventType === "tool-call") {
+                // AI SDK v5: tool-input-start = tool call begins (has toolName, toolCallId)
+                if (eventType === "tool-input-start") {
                   const toolName = (value as any).toolName || "unknown";
                   const toolCallId = (value as any).toolCallId || "unknown";
                   toolCallTimes[toolCallId] = Date.now();
                   console.log(`[Tool:${modelName}] 🔧 CALL started:`, {
                     toolName,
                     toolCallId,
-                    args: JSON.stringify((value as any).args || {}).substring(0, 300),
                     timestamp: new Date().toISOString(),
+                  });
+
+                  // ТЗ-07: Notify client that tool execution started
+                  dataStream.write({
+                    type: "data-tool-activity",
+                    data: { toolName, toolCallId },
                   });
                 }
 
-                if (eventType === "tool-result") {
-                  const toolName = (value as any).toolName || "unknown";
+                // AI SDK v5: tool-output-available = tool result ready
+                if (eventType === "tool-output-available") {
                   const toolCallId = (value as any).toolCallId || "unknown";
                   const duration = toolCallTimes[toolCallId]
                     ? Date.now() - toolCallTimes[toolCallId]
                     : -1;
-                  const resultPreview = JSON.stringify((value as any).result || {}).substring(0, 300);
                   console.log(`[Tool:${modelName}] ✅ RESULT received:`, {
-                    toolName,
                     toolCallId,
                     durationMs: duration,
-                    resultPreview,
-                    timestamp: new Date().toISOString(),
-                  });
-                }
-
-                if (eventType === "tool-error") {
-                  const toolName = (value as any).toolName || "unknown";
-                  const toolCallId = (value as any).toolCallId || "unknown";
-                  console.error(`[Tool:${modelName}] ❌ ERROR:`, {
-                    toolName,
-                    toolCallId,
-                    error: (value as any).error,
                     timestamp: new Date().toISOString(),
                   });
                 }

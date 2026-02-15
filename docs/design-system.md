@@ -29,8 +29,9 @@ Root Layout (app/layout.tsx)
 │   ├── /login
 │   └── /register
 │
-├── (chat) — AppSidebar (SidebarLayout)
-│   │   Sidebar: SidebarHistory + SidebarUserNav (footer)
+├── (chat) — AppSidebar (SidebarLayout, collapsible="icon")
+│   │   Sidebar expanded: навигация (🏠+📋) + SidebarHistory + SidebarUserNav
+│   │   Sidebar collapsed (icon mode): только иконки навигации + avatar
 │   │   User Menu: ✅ (SidebarUserNav — avatar + dropdown)
 │   │   Theme Toggle: ✅ (в dropdown SidebarUserNav)
 │   │
@@ -79,7 +80,7 @@ Root Layout (app/layout.tsx)
 | `UserMenu` | Все страницы (dashboard), TaskSidebar | Avatar-круг + dropdown (Настройки, Тема, Выйти). Prop `align` |
 | `GlavnayaHeader` | `/dashboard` | Logo, Ben (?), UserMenu |
 | `SidebarUserNav` | `(chat)` sidebar footer | Avatar + dropdown (Настройки, Тема, Помощь, Выйти) |
-| `AppSidebar` | `(chat)` layout | Logo, чат-история, SidebarUserNav |
+| `AppSidebar` | `(chat)` layout | Logo, навигация (Главная, Новый чат, Все чаты), чат-история (скрыта в icon mode), SidebarUserNav. `collapsible="icon"` — паттерн Claude |
 | `TaskSidebar` | `(task)` страницы | Список задач проекта, навигация между задачами, UserMenu |
 | `ProjectPageLayout` | `/projects/[id]` | Header (breadcrumbs + Менеджер + UserMenu), Pulse + WorkArea |
 

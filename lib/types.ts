@@ -64,6 +64,12 @@ export type CustomUIDataTypes = {
   clear: null;
   finish: null;
   usage: AppUsage;
+  // ТЗ-07: Tool activity started event (sent from instrumentedStream)
+  "tool-activity": {
+    toolName: string;
+    toolCallId: string;
+    args?: any;
+  };
 };
 
 export type ChatMessage = UIMessage<

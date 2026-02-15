@@ -58,7 +58,7 @@ function PureMessages({
     status,
   });
 
-  useDataStream();
+  const { dataStream } = useDataStream();
 
   useEffect(() => {
     if (status === "submitted") {
@@ -165,7 +165,9 @@ function PureMessages({
               (status === "streaming" &&
                messages.length > 0 &&
                messages[messages.length - 1].role === "assistant" &&
-               messages[messages.length - 1].parts.every(p => p.type !== "text" || !p.text?.trim())
+               messages[messages.length - 1].parts.every(p => p.type !== "text" || !p.text?.trim()) &&
+               // ТЗ-07: Don't show ThinkingMessage when tool activity indicator is already visible
+               !dataStream.some(p => p.type === "data-tool-activity")
               )
             ) && <ThinkingMessage key="thinking" />}
           </AnimatePresence>

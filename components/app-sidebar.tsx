@@ -3,35 +3,24 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { User } from "next-auth";
-import { useState } from "react";
-import { toast } from "sonner";
-import { useSWRConfig } from "swr";
-import { unstable_serialize } from "swr/infinite";
-import { History } from "lucide-react";
-import { PlusIcon, TrashIcon } from "@/components/icons";
-import { SidebarHistory, getChatHistoryPaginationKey } from "@/components/sidebar-history";
+import { Home, MessageSquarePlus, History } from "lucide-react";
+import { SidebarHistory } from "@/components/sidebar-history";
 import { SidebarUserNav } from "@/components/sidebar-user-nav";
-import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useThemeSync } from "@/hooks/use-theme-sync";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "./ui/alert-dialog";
 
 // Типы контекста sidebar (ТЗ-07A)
 export type SidebarContext =
@@ -67,31 +56,12 @@ export function AppSidebar({ user }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { setOpenMobile } = useSidebar();
-  const { mutate } = useSWRConfig();
-  const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
 
   // ТЗ-07A: Определить контекст на основе URL
   const context = getSidebarContext(pathname);
 
   // ТЗ-3A: Sync theme preference from DB
   useThemeSync();
-
-  const handleDeleteAll = () => {
-    const deletePromise = fetch("/api/history", {
-      method: "DELETE",
-    });
-
-    toast.promise(deletePromise, {
-      loading: "Удаление чатов...",
-      success: () => {
-        mutate(unstable_serialize(getChatHistoryPaginationKey));
-        router.push("/chat");
-        setShowDeleteAllDialog(false);
-        return "Все чаты удалены";
-      },
-      error: "Ошибка при удалении чатов",
-    });
-  };
 
   // Определить URL для кнопки "Новый чат" в зависимости от контекста
   const getNewChatUrl = () => {
@@ -118,114 +88,76 @@ export function AppSidebar({ user }: AppSidebarProps) {
   };
 
   return (
-    <>
-      <Sidebar className="group-data-[side=left]:border-r-0">
-        <SidebarHeader>
-          <SidebarMenu>
-            <div className="flex flex-row items-center justify-between">
-              <Link
-                className="flex flex-row items-center gap-3"
-                href="/dashboard"
-                onClick={() => setOpenMobile(false)}
-              >
-                <span className="cursor-pointer rounded-md px-2 font-semibold text-lg hover:bg-muted">
-                  Simply
-                </span>
+    <Sidebar collapsible="icon" className="group-data-[side=left]:border-r-0">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild size="lg" tooltip="Simply — Главная">
+              <Link href="/dashboard" onClick={() => setOpenMobile(false)}>
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground font-semibold text-sm">
+                  S
+                </div>
+                <span className="font-semibold text-lg">Simply</span>
               </Link>
-              <div className="flex flex-row gap-1">
-                {/* Удалить все — только для общих чатов */}
-                {user && context.type === "general" && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        className="h-8 p-1 md:h-fit md:p-2"
-                        onClick={() => setShowDeleteAllDialog(true)}
-                        type="button"
-                        variant="ghost"
-                      >
-                        <TrashIcon />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent align="end" className="hidden md:block">
-                      Удалить все чаты
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-                {/* Новый чат */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      className="h-8 p-1 md:h-fit md:p-2"
-                      onClick={() => {
-                        setOpenMobile(false);
-                        router.push(getNewChatUrl());
-                        router.refresh();
-                      }}
-                      type="button"
-                      variant="ghost"
-                    >
-                      <PlusIcon />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent align="end" className="hidden md:block">
-                    Новый чат
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
-          </SidebarMenu>
-        </SidebarHeader>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
 
-        <SidebarContent>
-          {/* Заголовок контекста + кнопка истории */}
-          <div className="flex items-center justify-between px-4 py-2">
-            <span className="text-xs font-medium text-muted-foreground">
-              {getContextTitle()}
-            </span>
-            {/* Кнопка "История чатов" — только для общих чатов */}
-            {context.type === "general" && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    asChild
-                    className="h-6 px-2 text-xs"
-                    size="sm"
-                    variant="ghost"
-                  >
+      <SidebarContent>
+        {/* Навигация */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Главная">
+                  <Link href="/dashboard" onClick={() => setOpenMobile(false)}>
+                    <Home className="size-4" />
+                    <span>Главная</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Новый чат"
+                  onClick={() => {
+                    setOpenMobile(false);
+                    router.push(getNewChatUrl());
+                    router.refresh();
+                  }}
+                >
+                  <MessageSquarePlus className="size-4" />
+                  <span>Новый чат</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {context.type === "general" && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Все чаты">
                     <Link href="/chats" onClick={() => setOpenMobile(false)}>
-                      <History className="mr-1 size-3" />
-                      История
+                      <History className="size-4" />
+                      <span>Все чаты</span>
                     </Link>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Все чаты с подробностями</TooltipContent>
-              </Tooltip>
-            )}
-          </div>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-          {/* История чатов с контекстом */}
-          <SidebarHistory user={user} context={context} />
-        </SidebarContent>
+        <SidebarSeparator className="group-data-[collapsible=icon]:hidden" />
 
-        <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>
-      </Sidebar>
+        {/* История чатов — скрыта в icon mode (паттерн Claude) */}
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+          <SidebarGroupLabel>{getContextTitle()}</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarHistory user={user} context={context} />
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
 
-      <AlertDialog onOpenChange={setShowDeleteAllDialog} open={showDeleteAllDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Удалить все чаты?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Это действие нельзя отменить. Все ваши общие чаты будут удалены.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Отмена</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteAll}>
-              Удалить все
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+      <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>
+    </Sidebar>
   );
 }

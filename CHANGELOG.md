@@ -8,7 +8,36 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- Этап 7+: Tool Activity UX, RAG, Chat Memory, биллинг
+- Этап 8+: Инструменты Фаза 1, RAG, Chat Memory, биллинг
+
+---
+
+## [3.20.0] - 2026-02-15 - Tool Activity UX + Sidebar Icon Mode (ТЗ-07)
+
+**MINOR RELEASE**: Компактные индикаторы активности инструментов (webSearch, parseExcel, readProjectFile) + редизайн sidebar по паттерну Claude (icon mode).
+
+### Added
+- **`lib/ai/tool-activity-config.ts`** — конфиг 3 инструментов: иконка, label (active/done), argsFormatter, resultFormatter, resultCounter
+- **`components/tool-activity-indicator.tsx`** — презентационный компонент: спиннер при active, галочка + summary при done, бейдж ×N для параллельных вызовов, раскрываемый список деталей
+- **Backend `data-tool-activity` events** — перехват `tool-input-start` в обоих chat route (universal + task expert), отправка через `dataStream.write()`
+- **`"tool-activity"` в `CustomUIDataTypes`** — новый тип data stream событий
+- **Sidebar навигация** — SidebarMenuButton с tooltip для Главная (Home), Новый чат (MessageSquarePlus), Все чаты (History)
+- **Sidebar tooltip для чатов** — `tooltip={chat.title}` на SidebarMenuButton в sidebar-history-item
+
+### Changed
+- **`components/app-sidebar.tsx`** — `collapsible="icon"` вместо `collapsible="offcanvas"` (паттерн Claude), навигация через SidebarMenuButton с tooltip
+- **Sidebar icon mode** — при свёртке видны только иконки навигации + avatar; история чатов скрыта (`group-data-[collapsible=icon]:hidden`)
+- **`components/ui/sidebar.tsx`** — `SIDEBAR_LEFT_OFFSET = "0"` (убран offset для удалённой tab-панели)
+- **`components/chat-header.tsx`** — упрощён: убраны breadcrumbs "Главная" (навигация теперь в sidebar), оставлены только контекстные breadcrumbs для проектов/помощников
+- **`components/message.tsx`** — единый `groupedToolActivities` useMemo: объединение active (dataStream) + completed (message.parts), группировка по toolName, агрегация результатов
+- **`components/messages.tsx`** — подавление ThinkingMessage при наличии tool activity
+- **`components/chat.tsx`** — очистка stale `data-tool-activity` событий в `onFinish`
+- **`components/projects/task-chat.tsx`** — аналогичная очистка stale events
+
+### Fixed
+- **Double avatar bug** — скрытие пустого assistant message при streaming (SDK создаёт пустой message до контента)
+- **384px пустое пространство** — `min-h-96` отключен при `isLoading`
+- **Sidebar offset** — фрагменты sidebar видны при закрытой панели (SIDEBAR_LEFT_OFFSET "3rem" → "0")
 
 ---
 

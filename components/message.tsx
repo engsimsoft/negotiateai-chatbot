@@ -27,6 +27,8 @@ import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
 import { SnapshotCard, SnapshotDivider } from "./projects/snapshot-card";
 import type { SnapshotData } from "./projects/snapshot-card";
+import { ToolActivityIndicator } from "./tool-activity-indicator";
+import { TOOL_ACTIVITY_CONFIG, type ToolActivityConfig } from "@/lib/ai/tool-activity-config";
 import { Weather } from "./weather";
 
 /**
@@ -76,7 +78,7 @@ const PurePreviewMessage = ({
     (part) => part.type === "file"
   );
 
-  useDataStream();
+  const { dataStream } = useDataStream();
 
   // Deduplicate document tool parts by result.id to prevent duplicate cards
   // (AI sometimes calls createDocument twice for the same document)
@@ -98,6 +100,120 @@ const PurePreviewMessage = ({
       return true;
     });
   }, [message.parts]);
+
+  // ТЗ-07: Set of toolCallIds that already have a tool-* part in message.parts
+  // Used to hide data-tool-activity "started" indicators once the real part appears
+  const resolvedToolCallIds = useMemo(() => {
+    if (!message.parts) return new Set<string>();
+    const ids = new Set<string>();
+    for (const part of message.parts) {
+      const p = part as any;
+      if (
+        typeof p.type === "string" &&
+        p.type.startsWith("tool-") &&
+        p.toolCallId
+      ) {
+        ids.add(p.toolCallId);
+      }
+    }
+    return ids;
+  }, [message.parts]);
+
+  // ТЗ-07: Unified tool activity groups
+  // Merges active (data stream) + completed (message.parts) indicators,
+  // groups by toolName, computes aggregated summary and details.
+  // Single source of truth for all tool activity rendering.
+  const groupedToolActivities = useMemo(() => {
+    const groups = new Map<string, {
+      config: ToolActivityConfig;
+      activeCount: number;
+      items: Array<{ args?: any; result?: any }>;
+    }>();
+
+    // 1. Active tools from dataStream (not yet resolved in message.parts)
+    if (isLoading) {
+      const seen = new Set<string>();
+      for (const part of dataStream) {
+        if (part.type === "data-tool-activity") {
+          const data = part.data as { toolName: string; toolCallId: string; args?: any } | undefined;
+          if (data && !resolvedToolCallIds.has(data.toolCallId) && !seen.has(data.toolCallId)) {
+            seen.add(data.toolCallId);
+            const config = TOOL_ACTIVITY_CONFIG[data.toolName];
+            if (!config) continue;
+            const group = groups.get(data.toolName) ?? { config, activeCount: 0, items: [] };
+            group.activeCount++;
+            group.items.push({ args: data.args });
+            groups.set(data.toolName, group);
+          }
+        }
+      }
+    }
+
+    // 2. Completed tools from message.parts (only TOOL_ACTIVITY_CONFIG tools)
+    for (const part of deduplicatedParts) {
+      const type = (part as any).type as string;
+      if (typeof type !== "string" || !type.startsWith("tool-")) continue;
+      const toolName = type.replace("tool-", "");
+      const config = TOOL_ACTIVITY_CONFIG[toolName];
+      if (!config) continue;
+      const { input, output } = part as any;
+      const group = groups.get(toolName) ?? { config, activeCount: 0, items: [] };
+      group.items.push({ args: input, result: output });
+      groups.set(toolName, group);
+    }
+
+    // 3. Build render props for each group
+    return Array.from(groups.entries()).map(([toolName, { config, activeCount, items }]) => {
+      const isActive = activeCount > 0;
+      const completedResults = items.filter(i => i.result !== undefined).map(i => i.result);
+
+      // Aggregated summary
+      let summary: string | null = null;
+      if (!isActive && completedResults.length > 0) {
+        if (completedResults.length === 1) {
+          summary = config.resultFormatter?.(completedResults[0]) ?? null;
+        } else if (config.resultCounter) {
+          const total = completedResults.reduce((sum, r) => sum + config.resultCounter!(r), 0);
+          if (total > 0) summary = `${total} результатов`;
+        }
+      }
+
+      // Details for expandable list
+      const details = items
+        .map(i => config.argsFormatter?.(i.args))
+        .filter((d): d is string => d !== null);
+
+      return {
+        toolName,
+        isActive,
+        config,
+        count: items.length > 1 ? items.length : undefined,
+        summary,
+        details: details.length > 0 ? details : undefined,
+      };
+    });
+  }, [isLoading, dataStream, resolvedToolCallIds, deduplicatedParts]);
+
+  // ТЗ-07: Hide empty assistant message during streaming.
+  // Before any content arrives, the SDK creates an assistant message with empty parts.
+  // This renders an orphan avatar above ThinkingMessage — "double avatar" problem.
+  // We hide it until real content appears (tool parts, text, reasoning, or data-stream indicators).
+  if (message.role === "assistant" && isLoading) {
+    const hasToolParts = message.parts?.some((p) => {
+      const t = (p as any).type as string;
+      return typeof t === "string" && t.startsWith("tool-");
+    });
+    const hasText = message.parts?.some(
+      (p) => p.type === "text" && p.text?.trim()
+    );
+    const hasReasoning = message.parts?.some(
+      (p) => p.type === "reasoning" && (p as any).text?.trim()
+    );
+
+    if (!hasToolParts && !hasText && !hasReasoning && groupedToolActivities.length === 0) {
+      return null;
+    }
+  }
 
   return (
     <motion.div
@@ -126,7 +242,7 @@ const PurePreviewMessage = ({
             "gap-2 md:gap-4": message.parts?.some(
               (p) => p.type === "text" && p.text?.trim()
             ),
-            "min-h-96": message.role === "assistant" && requiresScrollPadding,
+            "min-h-96": message.role === "assistant" && requiresScrollPadding && !isLoading,
             "w-full":
               (message.role === "assistant" &&
                 message.parts?.some(
@@ -155,6 +271,19 @@ const PurePreviewMessage = ({
             </div>
           )}
 
+          {/* ТЗ-07: Unified tool activity indicators (grouped by toolName) */}
+          {groupedToolActivities.map((group) => (
+            <ToolActivityIndicator
+              key={`tool-activity-${group.toolName}`}
+              toolName={group.toolName}
+              isActive={group.isActive}
+              config={group.config}
+              count={group.count}
+              summary={group.summary}
+              details={group.details}
+            />
+          ))}
+
           {deduplicatedParts.map((part, index) => {
             const { type } = part;
             const key = `message-${message.id}-part-${index}`;
@@ -181,17 +310,12 @@ const PurePreviewMessage = ({
                   <div key={key}>
                     <MessageContent
                       className={cn({
-                        "w-fit break-words rounded-2xl px-3 py-2 text-right text-white":
+                        "w-fit break-words rounded-2xl bg-secondary px-3 py-2 text-secondary-foreground":
                           message.role === "user",
                         "bg-transparent px-0 py-0 text-left":
                           message.role === "assistant",
                       })}
                       data-testid="message-content"
-                      style={
-                        message.role === "user"
-                          ? { backgroundColor: "#006cff" }
-                          : undefined
-                      }
                     >
                       <Response>{cleanText}</Response>
                     </MessageContent>
@@ -405,6 +529,15 @@ const PurePreviewMessage = ({
               }
 
               return null;
+            }
+
+            // ТЗ-07: Catch-all — tools with TOOL_ACTIVITY_CONFIG are rendered
+            // grouped above (one indicator per toolName, not per toolCallId)
+            if (typeof type === "string" && type.startsWith("tool-")) {
+              const toolName = type.replace("tool-", "");
+              if (TOOL_ACTIVITY_CONFIG[toolName]) {
+                return null;
+              }
             }
 
             return null;
