@@ -71,16 +71,22 @@ function prepareChatHistory(messages: DBMessage[]): string {
 }
 
 function buildUserMessage(
-  taskTitle: string,
-  taskGoal: string,
-  chatMessages: DBMessage[]
+  chatMessages: DBMessage[],
+  options?: { taskTitle?: string; taskGoal?: string; chatTitle?: string }
 ): string {
   const chatHistory = prepareChatHistory(chatMessages);
 
-  return `<task>
-  Название: "${taskTitle}"
-  Цель: "${taskGoal || "не указана"}"
-</task>
+  // Task context (project expert chat) vs general chat context
+  const contextBlock = options?.taskTitle
+    ? `<task>
+  Название: "${options.taskTitle}"
+  Цель: "${options.taskGoal || "не указана"}"
+</task>`
+    : `<context>
+  Чат: "${options?.chatTitle || "Диалог"}"
+</context>`;
+
+  return `${contextBlock}
 
 <chat_history>
 ${chatHistory}
@@ -135,8 +141,12 @@ function buildFullMarkdown(params: SnapshotOutput): string {
 // --- Main function ---
 
 interface CreateFallbackSnapshotInput {
-  taskTitle: string;
-  taskGoal: string;
+  /** Task title (project context). Optional for regular chat. */
+  taskTitle?: string;
+  /** Task goal (project context). Optional for regular chat. */
+  taskGoal?: string;
+  /** Chat title (regular chat context). Used when no task context. */
+  chatTitle?: string;
   chatMessages: DBMessage[];
 }
 
@@ -151,11 +161,11 @@ export async function createFallbackSnapshot(
   const modelId = process.env.SNAPSHOT_CLERK_MODEL || "gemini-2.5-flash";
 
   try {
-    const userMessage = buildUserMessage(
-      input.taskTitle,
-      input.taskGoal,
-      input.chatMessages
-    );
+    const userMessage = buildUserMessage(input.chatMessages, {
+      taskTitle: input.taskTitle,
+      taskGoal: input.taskGoal,
+      chatTitle: input.chatTitle,
+    });
 
     const result = await generateText({
       model: myProvider.languageModel(modelId),
@@ -169,14 +179,15 @@ export async function createFallbackSnapshot(
     const snapshot = snapshotOutputSchema.parse(rawJson);
     const fullMarkdown = buildFullMarkdown(snapshot);
 
+    const label = input.taskTitle || input.chatTitle || "chat";
     console.log(
-      `[SnapshotCreator] Fallback snapshot for "${input.taskTitle}": ${snapshot.decisions.length} decisions, ${snapshot.nextSteps.length} next steps`
+      `[SnapshotCreator] Fallback snapshot for "${label}": ${snapshot.decisions.length} decisions, ${snapshot.nextSteps.length} next steps`
     );
 
     return { ...snapshot, fullMarkdown };
   } catch (error) {
     console.error(
-      `[SnapshotCreator] Error for "${input.taskTitle}":`,
+      `[SnapshotCreator] Error for "${input.taskTitle || input.chatTitle || "chat"}":`,
       error instanceof Error ? error.message : error
     );
     return null;

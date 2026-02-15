@@ -50,7 +50,7 @@ export function getStandardTools({
     ...(isProjectChat && projectId
       ? { readProjectFile: readProjectFile({ projectId }) }
       : {}),
-    ...(isProjectChat && chatId && messageId
+    ...(chatId && messageId
       ? { createSnapshot: createSnapshot({ chatId, messageId }) }
       : {}),
     createDocument: createDocument({ session, dataStream }),
@@ -109,5 +109,6 @@ export function getActiveToolNames(isProjectChat: boolean): ToolName[] {
     "requestSuggestions",
     "parseExcel",
     "loadSkill",
+    "createSnapshot",
   ];
 }
