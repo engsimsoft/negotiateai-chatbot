@@ -153,7 +153,7 @@ function useExtractedMaterials(messages: ChatMessage[]) {
       for (const part of message.parts) {
         if (part.type === "file") {
           list.push({
-            name: (part as any).filename ?? "file",
+            name: (part as any).name ?? (part as any).filename ?? "file",
             url: (part as any).url ?? "",
             contentType: (part as any).mediaType ?? "application/octet-stream",
             messageId: message.id,

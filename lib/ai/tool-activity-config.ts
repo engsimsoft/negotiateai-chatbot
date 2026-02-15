@@ -8,7 +8,7 @@
  */
 
 import type { LucideIcon } from "lucide-react";
-import { FolderOpen, Search, Table2 } from "lucide-react";
+import { FileText, FolderOpen, Pencil, Search, Table2 } from "lucide-react";
 
 export interface ToolActivityConfig {
   icon: LucideIcon;
@@ -53,5 +53,18 @@ export const TOOL_ACTIVITY_CONFIG: Record<string, ToolActivityConfig> = {
     activeLabel: "Читаю файл проекта",
     doneLabel: "Файл прочитан",
     argsFormatter: (args) => args?.fileName || null,
+  },
+
+  createDocument: {
+    icon: FileText,
+    activeLabel: "Создаю документ",
+    doneLabel: "Документ создан",
+    argsFormatter: (args) => args?.title || null,
+  },
+
+  updateDocument: {
+    icon: Pencil,
+    activeLabel: "Обновляю документ",
+    doneLabel: "Документ обновлён",
   },
 };

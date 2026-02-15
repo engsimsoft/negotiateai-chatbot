@@ -150,10 +150,13 @@ const PurePreviewMessage = ({
     }
 
     // 2. Completed tools from message.parts (only TOOL_ACTIVITY_CONFIG tools)
+    // Skip tools with custom renderers — they handle their own completed state
+    const customRendered = new Set(["createDocument", "updateDocument"]);
     for (const part of deduplicatedParts) {
       const type = (part as any).type as string;
       if (typeof type !== "string" || !type.startsWith("tool-")) continue;
       const toolName = type.replace("tool-", "");
+      if (customRendered.has(toolName)) continue;
       const config = TOOL_ACTIVITY_CONFIG[toolName];
       if (!config) continue;
       const { input, output } = part as any;
@@ -262,7 +265,7 @@ const PurePreviewMessage = ({
               {attachmentsFromMessage.map((attachment) => (
                 <PreviewAttachment
                   attachment={{
-                    name: attachment.filename ?? "file",
+                    name: (attachment as any).name ?? attachment.filename ?? "file",
                     contentType: attachment.mediaType,
                     url: attachment.url,
                   }}
@@ -373,7 +376,7 @@ const PurePreviewMessage = ({
             }
 
             if (type === "tool-createDocument") {
-              const { toolCallId } = part;
+              const { toolCallId, state } = part;
 
               if (part.output && "error" in part.output) {
                 return (
@@ -382,6 +385,17 @@ const PurePreviewMessage = ({
                     key={toolCallId}
                   >
                     Error creating document: {String(part.output.error)}
+                  </div>
+                );
+              }
+
+              if (state !== "output-available") {
+                return (
+                  <div key={toolCallId} className="my-1">
+                    <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm cursor-default">
+                      <Loader size={16} className="shrink-0 text-muted-foreground" />
+                      <span className="text-muted-foreground">Создаю документ...</span>
+                    </div>
                   </div>
                 );
               }
@@ -396,7 +410,7 @@ const PurePreviewMessage = ({
             }
 
             if (type === "tool-updateDocument") {
-              const { toolCallId } = part;
+              const { toolCallId, state } = part;
 
               if (part.output && "error" in part.output) {
                 return (
@@ -405,6 +419,17 @@ const PurePreviewMessage = ({
                     key={toolCallId}
                   >
                     Error updating document: {String(part.output.error)}
+                  </div>
+                );
+              }
+
+              if (state !== "output-available") {
+                return (
+                  <div key={toolCallId} className="my-1">
+                    <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm cursor-default">
+                      <Loader size={16} className="shrink-0 text-muted-foreground" />
+                      <span className="text-muted-foreground">Обновляю документ...</span>
+                    </div>
                   </div>
                 );
               }
