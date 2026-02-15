@@ -35,6 +35,7 @@ import { ChatSidebar } from "./chat-sidebar";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
+import { ContextIndicator } from "./projects/context-indicator";
 import { ProfessorProgress } from "./projects/professor-progress";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
 import { toast } from "./toast";
@@ -89,6 +90,9 @@ export function Chat({
   const [delayState, setDelayState] = useState<"normal" | "slow" | "timeout">(
     "normal"
   );
+
+  // ТЗ-C3: Context usage indicator
+  const [contextPercent, setContextPercent] = useState(0);
 
   // ТЗ-03 Фаза 7: Professor Pipeline state
   const [professorPhase, setProfessorPhase] = useState<PipelinePhase | null>(null);
@@ -210,6 +214,12 @@ export function Chat({
       setDataStream((ds) => (ds ? [...ds, dataPart as typeof ds[number]] : []));
       if (dataPart.type === "data-usage") {
         setUsage(dataPart.data as AppUsage);
+      }
+
+      // ТЗ-C3: Handle context usage indicator
+      if (dataPart.type === "data-context-usage") {
+        const data = dataPart.data as { percent: number };
+        setContextPercent(data.percent);
       }
 
       // ТЗ-03 Фаза 7: Handle Professor Pipeline events
@@ -456,7 +466,9 @@ export function Chat({
           votes={votes}
         />
 
-        <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
+        <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl flex-col gap-0 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
+            {/* ТЗ-C3: Context usage indicator */}
+            <ContextIndicator percent={contextPercent} />
             {!isReadonly && (
               <MultimodalInput
                 attachments={attachments}

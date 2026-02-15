@@ -20,6 +20,7 @@ import {
   FileIcon,
   Inbox,
   Download,
+  Bookmark,
 } from "lucide-react";
 import { RightSidebar } from "@/components/right-sidebar";
 import type { ArtifactKind } from "@/components/artifact";
@@ -39,6 +40,11 @@ interface SidebarAttachment {
   url: string;
   contentType: string;
   messageId: string;
+}
+
+interface SidebarSnapshot {
+  messageId: string;
+  shortSummary: string;
 }
 
 interface ChatSidebarProps {
@@ -159,7 +165,34 @@ function useExtractedMaterials(messages: ChatMessage[]) {
     return list;
   }, [messages]);
 
-  return { artifacts, attachments };
+  const snapshots = useMemo(() => {
+    const list: SidebarSnapshot[] = [];
+
+    for (const message of messages) {
+      if (!message.parts) continue;
+      for (const part of message.parts) {
+        const p = part as any;
+        if (
+          p.type === "tool-createSnapshot" &&
+          p.state === "output-available"
+        ) {
+          const output = p.output as
+            | { shortSummary?: string }
+            | undefined;
+          if (output?.shortSummary) {
+            list.push({
+              messageId: message.id,
+              shortSummary: output.shortSummary,
+            });
+          }
+        }
+      }
+    }
+
+    return list;
+  }, [messages]);
+
+  return { artifacts, attachments, snapshots };
 }
 
 // --- Scroll + highlight ---
@@ -203,8 +236,9 @@ async function downloadArtifact(artifact: SidebarArtifact) {
 // --- Component ---
 
 export function ChatSidebar({ open, onClose, messages }: ChatSidebarProps) {
-  const { artifacts, attachments } = useExtractedMaterials(messages);
-  const isEmpty = artifacts.length === 0 && attachments.length === 0;
+  const { artifacts, attachments, snapshots } = useExtractedMaterials(messages);
+  const isEmpty =
+    artifacts.length === 0 && attachments.length === 0 && snapshots.length === 0;
 
   const handleArtifactClick = useCallback((artifact: SidebarArtifact) => {
     scrollToMessage(artifact.messageId);
@@ -212,6 +246,10 @@ export function ChatSidebar({ open, onClose, messages }: ChatSidebarProps) {
 
   const handleAttachmentClick = useCallback((attachment: SidebarAttachment) => {
     scrollToMessage(attachment.messageId);
+  }, []);
+
+  const handleSnapshotClick = useCallback((snapshot: SidebarSnapshot) => {
+    scrollToMessage(snapshot.messageId);
   }, []);
 
   const handleArtifactDownload = useCallback(
@@ -238,6 +276,37 @@ export function ChatSidebar({ open, onClose, messages }: ChatSidebarProps) {
         </div>
       ) : (
         <div className="flex flex-col gap-4 p-2">
+          {/* Snapshots section */}
+          {snapshots.length > 0 && (
+            <section>
+              <div className="flex h-8 items-center px-2 text-xs font-medium text-sidebar-foreground/70">
+                Итоги · {snapshots.length}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {snapshots.map((snapshot, index) => (
+                  <button
+                    key={`snapshot-${snapshot.messageId}-${index}`}
+                    type="button"
+                    onClick={() => handleSnapshotClick(snapshot)}
+                    className="group flex w-full items-center gap-2 rounded-md p-2 text-left transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  >
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-accent">
+                      <Bookmark className="size-4 text-sidebar-foreground/70" />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-sm font-medium">
+                        Итог #{index + 1}
+                      </span>
+                      <span className="truncate text-xs text-sidebar-foreground/50">
+                        {snapshot.shortSummary}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Artifacts section */}
           {artifacts.length > 0 && (
             <section>
