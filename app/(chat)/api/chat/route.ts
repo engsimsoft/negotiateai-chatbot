@@ -25,20 +25,30 @@ import {
   DEFAULT_PROJECT_MODEL,
   type ProjectModelTier,
 } from "@/lib/ai/model-tiers";
+import { createFallbackSnapshot } from "@/lib/ai/clerks/snapshot-creator";
+import {
+  SNAPSHOT_THRESHOLD,
+  FALLBACK_MESSAGE_PAIRS,
+  calcUsagePercent,
+} from "@/lib/ai/context-limits";
 import { executeProfessorPipeline } from "@/lib/ai/professor-pipeline";
 import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment } from "@/lib/constants";
 import {
+  addChatSnapshot,
   createStreamId,
   deleteChatById,
   getChatById,
+  getChatWithSnapshotState,
   getFilesByProjectId,
   getMessageCountByUserId,
   getMessagesByChatId,
   getProjectById,
   getUserById,
+  resetChatContextState,
   saveChat,
   saveMessages,
+  updateChatContextState,
   updateChatLastContextById,
   updateChatTaskStatus,
 } from "@/lib/db/queries";
@@ -242,19 +252,53 @@ export async function POST(request: Request) {
       minMessages: 20,
     });
 
+    // ТЗ-C3: Load snapshot state for context management
+    const chatWithState = await getChatWithSnapshotState({ chatId: id });
+    const snapshots = chatWithState?.snapshots || [];
+    const contextState = chatWithState?.contextState || null;
+    let snapshotContext: string | undefined;
+    let messagesForModel = messagesFromDb;
+
+    // ТЗ-C3: Snapshot-aware message trimming
+    if (snapshots.length > 0) {
+      const lastSnapshot = snapshots[snapshots.length - 1];
+      const snapshotMsgIndex = messagesFromDb.findIndex(
+        (m) => m.id === lastSnapshot.messageId
+      );
+
+      if (snapshotMsgIndex >= 0) {
+        const snapshotMsg = messagesFromDb[snapshotMsgIndex];
+        const snapshotPart = (snapshotMsg.parts as any[])?.find(
+          (p: any) =>
+            p.type === "tool-createSnapshot" && p.output?.fullMarkdown
+        );
+        snapshotContext =
+          snapshotPart?.output?.fullMarkdown ||
+          `## Итог\n${lastSnapshot.summary}`;
+        messagesForModel = messagesFromDb.slice(snapshotMsgIndex + 1);
+      } else {
+        snapshotContext =
+          lastSnapshot.fullMarkdown || `## Итог\n${lastSnapshot.summary}`;
+      }
+
+      console.log(
+        `[ContextMgmt] Chat ${id}: snapshot found, trimmed ${messagesFromDb.length - messagesForModel.length} messages, snapshotContext = ${snapshotContext!.length} chars`
+      );
+    }
+
     // ⚠️ ВРЕМЕННО: Конвертация text/plain отключена (Gemini поддерживает)
     // Код сохранён для будущего возврата к Claude
     // const processedMessage = await convertTextFilePartsInMessage(message as ChatMessage);
-    const uiMessages = [...convertToUIMessages(messagesFromDb), message as ChatMessage];
+    const uiMessages = [...convertToUIMessages(messagesForModel), message as ChatMessage];
 
-    // Подсчитываем общее количество токенов в контексте
-    const totalHistoryTokens = messagesFromDb.reduce((sum, msg) => {
+    // Подсчитываем общее количество токенов в контексте (after trimming)
+    const totalHistoryTokens = messagesForModel.reduce((sum, msg) => {
       return sum + (msg.tokenCount || estimateMessageTokens(msg.parts as any));
     }, 0);
 
     console.log(
       `[Token Aware] Chat ${id}: Total context = ${totalHistoryTokens + newMessageTokens} tokens ` +
-      `(${messagesFromDb.length} history messages + 1 new message)`
+      `(${messagesForModel.length} history messages + 1 new message)`
     );
 
     const { longitude, latitude, city, country } = geolocation(request);
@@ -341,6 +385,79 @@ export async function POST(request: Request) {
           modelToUse = myProvider.languageModel(geminiModel);
         }
 
+        // ТЗ-C3: Inject previous snapshot context into system prompt
+        if (snapshotContext) {
+          systemPromptText += `\n\n<previous_context>\n${snapshotContext}\n</previous_context>`;
+        }
+
+        // ТЗ-C3: Calculate estimated usage for context management
+        const systemPromptTokens = estimateMessageTokens([
+          { type: "text", text: systemPromptText },
+        ]);
+        const estimatedPercent = calcUsagePercent(
+          totalHistoryTokens + systemPromptTokens + newMessageTokens
+        );
+
+        // ТЗ-C3: Context suggestion injection
+        if (
+          estimatedPercent >= SNAPSHOT_THRESHOLD * 100 &&
+          !contextState?.suggestionActive
+        ) {
+          systemPromptText += `\n\n[SYSTEM: Контекстное окно заполнено на ${Math.round(estimatedPercent)}%. Мягко предложи пользователю зафиксировать итог разговора. Если пользователь согласится, вызови tool createSnapshot.]`;
+          await updateChatContextState({
+            chatId: id,
+            contextState: { suggestionActive: true, messagesSinceSuggestion: 0 },
+          });
+        } else if (contextState?.suggestionActive) {
+          const newCount = (contextState.messagesSinceSuggestion || 0) + 1;
+
+          if (newCount >= FALLBACK_MESSAGE_PAIRS) {
+            // ТЗ-C3: Fallback — model ignored suggestion, clerk creates snapshot
+            console.log(
+              `[ContextMgmt] Chat ${id}: fallback triggered (${newCount} messages since suggestion)`
+            );
+            const fallbackResult = await createFallbackSnapshot({
+              chatTitle: chat?.title || undefined,
+              chatMessages: messagesFromDb,
+            });
+
+            if (fallbackResult) {
+              await addChatSnapshot({
+                chatId: id,
+                messageId: `fallback-${generateUUID()}`,
+                summary: fallbackResult.shortSummary,
+                fullMarkdown: fallbackResult.fullMarkdown,
+              });
+              await resetChatContextState({ chatId: id });
+              console.log(
+                `[ContextMgmt] Chat ${id}: fallback snapshot saved — will apply on next request`
+              );
+            } else {
+              await resetChatContextState({ chatId: id });
+              console.warn(
+                `[ContextMgmt] Chat ${id}: fallback clerk failed — contextState reset`
+              );
+            }
+          } else {
+            await updateChatContextState({
+              chatId: id,
+              contextState: {
+                ...contextState,
+                messagesSinceSuggestion: newCount,
+              },
+            });
+          }
+        }
+
+        // ТЗ-C3: Emit context usage to client
+        dataStream.write({
+          type: "data-context-usage",
+          data: { percent: Math.round(estimatedPercent), tokens: totalHistoryTokens + systemPromptTokens },
+        });
+
+        // ТЗ-C3: Generate assistant message ID upfront (needed for snapshot tool)
+        const assistantMessageId = generateUUID();
+
         const startTime = Date.now();
         let firstTokenTime: number | null = null;
 
@@ -418,7 +535,7 @@ export async function POST(request: Request) {
           // ТЗ-C1: Tools extracted to shared module (lib/ai/tools/chat-tools.ts)
           experimental_activeTools: getActiveToolNames(isProjectChat),
           experimental_transform: smoothStream({ chunking: "word" }),
-          tools: getStandardTools({ session, dataStream, isProjectChat, projectId: projectId || undefined }),
+          tools: getStandardTools({ session, dataStream, isProjectChat, projectId: projectId || undefined, chatId: id, messageId: assistantMessageId }),
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
             functionId: "stream-text",
@@ -564,6 +681,11 @@ export async function POST(request: Request) {
             // Keep artifact tool results (createDocument, updateDocument)
             // These are small and needed to render artifact buttons after reload
             if (type === 'tool-createDocument' || type === 'tool-updateDocument') {
+              return true;
+            }
+
+            // ТЗ-C3: Keep snapshot tool results (needed for SnapshotCard after reload)
+            if (type === 'tool-createSnapshot') {
               return true;
             }
 
