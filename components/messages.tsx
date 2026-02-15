@@ -29,7 +29,6 @@ type MessagesProps = {
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
   regenerate: UseChatHelpers<ChatMessage>["regenerate"];
   isReadonly: boolean;
-  isArtifactVisible: boolean;
   selectedModelId: string;
   onActionButton?: (payload: string) => void;
   /** ТЗ-C1.5: Snapshot metadata from Chat.snapshots[] (for fallback dividers) */
@@ -194,11 +193,6 @@ function PureMessages({
 }
 
 export const Messages = memo(PureMessages, (prevProps, nextProps) => {
-  // If artifact is visible, skip re-render for both prev and next
-  if (prevProps.isArtifactVisible && nextProps.isArtifactVisible) {
-    return true;
-  }
-
   // Re-render if status changed
   if (prevProps.status !== nextProps.status) {
     return false;

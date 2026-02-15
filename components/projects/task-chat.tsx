@@ -5,7 +5,7 @@ import { DefaultChatTransport } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
-import { useArtifactSelector } from "@/hooks/use-artifact";
+
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
 import { Artifact } from "@/components/artifact";
@@ -56,7 +56,7 @@ export function TaskChat({
   const { setDataStream } = useDataStream();
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
+
 
   // ТЗ-C1.5: Context usage tracking
   const [contextPercent, setContextPercent] = useState(0);
@@ -265,7 +265,6 @@ export function TaskChat({
 
         <Messages
           chatId={chatId}
-          isArtifactVisible={isArtifactVisible}
           isReadonly={isReadonly || isCompleting}
           messages={messages}
           regenerate={regenerate}

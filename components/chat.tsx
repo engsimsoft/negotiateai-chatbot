@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useArtifactSelector } from "@/hooks/use-artifact";
+
 import { useSidebar } from "@/components/ui/sidebar";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
@@ -383,8 +383,6 @@ export function Chat({
   );
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
-
   // ТЗ-08: Chat sidebar state + push-layout
   const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false);
   const { setOpen: setLeftSidebarOpen, open: leftSidebarOpen } = useSidebar();
@@ -455,7 +453,6 @@ export function Chat({
 
         <Messages
           chatId={id}
-          isArtifactVisible={isArtifactVisible}
           isReadonly={isReadonly}
           messages={messages}
           onActionButton={handleActionButton}
