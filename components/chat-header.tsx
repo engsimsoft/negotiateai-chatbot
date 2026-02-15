@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { memo, useState, useEffect } from "react";
 import useSWR from "swr";
-import { ChevronRight, FolderOpen, HelpCircle } from "lucide-react";
+import { ChevronRight, FolderOpen, HelpCircle, PanelRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { SidebarToggle } from "@/components/sidebar-toggle";
 import {
   ServiceChatTrigger,
@@ -33,6 +34,10 @@ interface ChatHeaderProps {
   helperName?: string;
   /** Helper emoji if this is a helper chat */
   helperEmoji?: string;
+  /** ТЗ-08: Toggle chat sidebar */
+  onToggleSidebar?: () => void;
+  /** ТЗ-08: Whether chat sidebar is open */
+  isSidebarOpen?: boolean;
 }
 
 function PureChatHeader({
@@ -42,6 +47,8 @@ function PureChatHeader({
   helperId,
   helperName,
   helperEmoji,
+  onToggleSidebar,
+  isSidebarOpen,
 }: ChatHeaderProps) {
   // Modal assistants state
   const [benOpen, setBenOpen] = useState(false);
@@ -110,8 +117,23 @@ function PureChatHeader({
         </div>
       )}
 
-      {/* Ben help — always right-aligned */}
+      {/* Right-aligned actions */}
       <div className="ml-auto flex items-center gap-1">
+        {/* ТЗ-08: Chat sidebar toggle */}
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            className={cn(
+              "rounded-lg p-2 transition-colors hover:bg-muted/60",
+              isSidebarOpen && "bg-muted"
+            )}
+            title="Материалы чата"
+          >
+            <PanelRight className="h-5 w-5" />
+            <span className="sr-only">Материалы чата</span>
+          </button>
+        )}
+
         <div className="relative">
           <ServiceChatTrigger
             icon={<HelpCircle className="h-5 w-5" />}

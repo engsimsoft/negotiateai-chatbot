@@ -30,6 +30,7 @@ import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
 import { Artifact } from "./artifact";
+import { ChatSidebar } from "./chat-sidebar";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
@@ -373,6 +374,9 @@ export function Chat({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
 
+  // ТЗ-08: Chat sidebar state
+  const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false);
+
   // Handle action button clicks (send payload as user message)
   const handleActionButton = useCallback(
     (payload: string) => {
@@ -398,6 +402,8 @@ export function Chat({
           onInsertToChat={setInput}
           projectId={projectId}
           projectName={projectName}
+          onToggleSidebar={() => setIsChatSidebarOpen((prev) => !prev)}
+          isSidebarOpen={isChatSidebarOpen}
         />
 
         {/* ТЗ-03 Фаза 7: Professor Pipeline Progress */}
@@ -468,6 +474,13 @@ export function Chat({
         status={status}
         stop={stop}
         votes={votes}
+      />
+
+      {/* ТЗ-08: Chat sidebar (materials panel) */}
+      <ChatSidebar
+        open={isChatSidebarOpen}
+        onClose={() => setIsChatSidebarOpen(false)}
+        messages={messages}
       />
 
       <AlertDialog
