@@ -1971,7 +1971,13 @@ export async function getGeneralChatsCount({ userId }: { userId: string }) {
     const [result] = await db
       .select({ count: count(chat.id) })
       .from(chat)
-      .where(and(eq(chat.userId, userId), isNull(chat.projectId)));
+      .where(
+        and(
+          eq(chat.userId, userId),
+          isNull(chat.projectId),
+          eq(chat.chatMode, "chat")
+        )
+      );
 
     return result?.count ?? 0;
   } catch (_error) {
@@ -2006,7 +2012,13 @@ export async function getGeneralChatsWithStats({
       })
       .from(chat)
       .leftJoin(message, eq(message.chatId, chat.id))
-      .where(and(eq(chat.userId, userId), isNull(chat.projectId)))
+      .where(
+        and(
+          eq(chat.userId, userId),
+          isNull(chat.projectId),
+          eq(chat.chatMode, "chat")
+        )
+      )
       .groupBy(chat.id)
       .orderBy(desc(chat.createdAt))
       .limit(limit);
