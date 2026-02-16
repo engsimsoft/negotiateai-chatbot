@@ -5,6 +5,6 @@
 export { GlavnayaHeader } from "./glavnaya-header";
 export { GlavnayaGreeting } from "./glavnaya-greeting";
 export { GlavnayaInput } from "./glavnaya-input";
-export { ProjectsSection } from "./projects-section";
+export { ModeCardsSection } from "./mode-cards-section";
 export { SectionTitle } from "./section-title";
 export { ChatHistoryCard } from "./chat-history-card";

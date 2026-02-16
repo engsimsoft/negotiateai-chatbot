@@ -15,7 +15,6 @@ import {
 import { InputTextarea } from "./input-textarea";
 import { InputVoiceButton } from "./input-voice-button";
 import { InputVoiceModeButton } from "./input-voice-mode-button";
-import { InputModelSelector } from "./input-model-selector";
 import { InputAttachments } from "./input-attachments";
 import { InputSubmitButton } from "./input-submit-button";
 import type { ProjectModelTier } from "@/lib/ai/model-tiers";
@@ -27,7 +26,7 @@ import type { ProjectModelTier } from "@/lib/ai/model-tiers";
  * ╭──────────────────────────────────────────────────────╮
  * │  Спросите что угодно...                              │
  * ├──────────────────────────────────────────────────────┤
- * │  📎          Авто (рекомендуется) ▾      🎤    🔊   │
+ * │  📎                                    🎤    🔊   ➤ │
  * ╰──────────────────────────────────────────────────────╯
  */
 
@@ -78,7 +77,6 @@ export function CompactInput({
           </InputToolbarLeft>
 
           <InputToolbarRight>
-            <InputModelSelector />
             <InputVoiceButton />
             <InputVoiceModeButton />
             <InputSubmitButton />

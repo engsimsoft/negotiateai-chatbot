@@ -7,7 +7,7 @@ import {
   GlavnayaHeader,
   GlavnayaGreeting,
   GlavnayaInput,
-  ProjectsSection,
+  ModeCardsSection,
   ChatHistoryCard,
 } from "@/components/glavnaya";
 
@@ -49,8 +49,8 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* Projects */}
-        <ProjectsSection />
+        {/* Mode cards */}
+        <ModeCardsSection />
       </main>
     </div>
   );

@@ -10,9 +10,9 @@
 
 | Метрика | Значение |
 |---------|----------|
-| Этапов | 6 |
-| Текущий этап | 4 |
-| Сессий (оценка) | 3-4 |
+| Этапов | 8 (1, 2, 3, 4A, 4B, 4C, 4D, 5, 6) |
+| Текущий этап | 4A |
+| Сессий (оценка) | 5-6 |
 
 **Принятые решения (от архитектора):**
 - `chatMode` — varchar с Zod-валидацией (не pgEnum)
@@ -21,6 +21,15 @@
 - ToolsSection — удаляем вместе с HelpersSection
 - Greeting — одинаковый для всех режимов (PE настроит позже)
 - Badge chatMode в истории — да, эмодзи (🔍/✨) рядом с названием
+
+**Решения сессии 4 (обновление ТЗ v2.0):**
+- Вместо простых карточек-ссылок — полноценные страницы `/expertise`, `/create`
+- ListDetailPage — composition подход (layout-shell + render props, НЕ generics)
+- `/projects` переводить на list-detail (единый паттерн)
+- Flow создания: вариант B — redirect `/chat?mode=...`, чат при первом сообщении
+- `/chats` — все непроектные чаты (вариант A, единый архив)
+- Sidebar — не трогать, не добавлять новые пункты
+- Этап 4 разбит на 4A/4B/4C/4D с валидацией после каждого
 
 ---
 
@@ -181,54 +190,226 @@ git commit -m "feat(tz-dv2): add expertise/create composers and chatMode-based t
 
 ---
 
-## Этап 4: UI — карточки на дашборде + убрать селектор модели
+## Этап 4A: Карточки на дашборде + убрать селектор модели
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 3
-
-**Цель:** Три карточки на дашборде. Клик на Экспертиза/Создать → новый чат с нужным chatMode. Убрать модельный селектор из UI.
+**Цель:** Три карточки-лаунчера на дашборде. Убрать ProjectsSection. Убрать модельный селектор. Обработка `?mode=` query param в чате.
 
 **Задачи:**
-- [ ] Создать `components/glavnaya/mode-cards-section.tsx` — три карточки:
-  - Экспертиза (🔍) → redirect к `/chat?mode=expertise`
-  - Создать (✨) → redirect к `/chat?mode=create`
-  - Проекты (📁) → link к `/projects`
-  - Дизайн по `docs/design-system.md` (hover: border-primary + shadow)
-- [ ] Обновить `components/glavnaya/index.ts` — экспорт ModeCardsSection
-- [ ] Интегрировать ModeCardsSection в `app/(dashboard)/dashboard/page.tsx` (под инпутом)
-- [ ] Обновить главную страницу / роут для обработки `?mode=expertise|create` query param → создание чата с chatMode
-- [ ] Убрать `InputModelSelector` из `components/input/compact-input.tsx` (или не рендерить)
-- [ ] Убрать model badge из `components/chat-header.tsx` (если есть)
-- [ ] Оставить dev-badge модели под аватаркой AI в `components/message.tsx` (уже есть, не трогать)
+- [x] Создать `components/glavnaya/mode-cards-section.tsx` — три карточки:
+  - Экспертиза (🔍) — «Точные ответы с проверкой фактов» → `/expertise`
+  - Создать (✨) — «Презентации, отчёты, изображения» → `/create`
+  - Проекты (📁) — «Сложная работа с вашими данными» → `/projects`
+  - Дизайн: Паттерн A (`hover:border-primary hover:shadow-sm transition-all`)
+  - Grid: расширяемый (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`)
+- [x] Обновить `components/glavnaya/index.ts` — экспорт ModeCardsSection, убрать ProjectsSection
+- [x] Удалить `components/glavnaya/projects-section.tsx`
+- [x] Обновить `app/(dashboard)/dashboard/page.tsx`:
+  - Заменить ProjectsSection на ModeCardsSection
+  - Оставить ChatHistoryCard и getGeneralChatsCount
+- [x] Убрать `InputModelSelector` из `components/input/compact-input.tsx`
+- [x] Обработать `?mode=` query param в `app/(chat)/chat/page.tsx`:
+  - Читать `searchParams.mode` → передавать `initialChatMode` в Chat
+- [x] Оставить dev-badge модели под аватаркой AI (не трогать)
 
 **Файлы (новые):**
-- `components/glavnaya/mode-cards-section.tsx` — карточки режимов
+- `components/glavnaya/mode-cards-section.tsx`
 
 **Файлы (модификация):**
 - `components/glavnaya/index.ts` — экспорт
-- `app/(dashboard)/dashboard/page.tsx` — интеграция карточек
-- `components/input/compact-input.tsx` — убрать model selector
-- `components/chat-header.tsx` — убрать model badge (если есть)
-- `app/(chat)/page.tsx` или `app/(chat)/chat/page.tsx` — обработка query param mode
+- `app/(dashboard)/dashboard/page.tsx` — ModeCardsSection вместо ProjectsSection
+- `components/input/compact-input.tsx` — убрать InputModelSelector
+- `app/(chat)/chat/page.tsx` — `?mode=` → `initialChatMode`
+
+**Файлы (удаление):**
+- `components/glavnaya/projects-section.tsx`
+
+**Валидация этапа:**
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] Браузер: `/dashboard` — 3 карточки вместо ProjectsSection
+- [x] Браузер: клик «Экспертиза» → `/expertise` (404 — ок, страница в 4C)
+- [x] Браузер: клик «Проекты» → `/projects`
+- [x] Браузер: нет модельного селектора в поле ввода
+- [x] Браузер: `/chat?mode=expertise` → чат с chatMode=expertise (Sonnet в dev-badge)
+- [x] 🧪 Мануальный тест пользователем
+
+**Git:**
+```bash
+git commit -m "feat(tz-dv2): dashboard mode cards + remove model selector"
+```
+
+**Критерий готовности:** Карточки на дашборде, нет селектора модели, `?mode=` работает.
+
+---
+
+## Этап 4B: ListDetailPage — универсальный layout-shell
+
+**Статус:** ⬜ Не начат
+
+⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4A
+
+**Цель:** Извлечь из `/chats` универсальный composition-компонент ListDetailPage. Рефакторить `/chats` на его основе.
+
+**Архитектура:** Composition подход — layout-shell + render props (НЕ generics).
+
+ListDetailPage отвечает за:
+- Header (← Dashboard, заголовок, счётчик, кнопка создания, UserMenu)
+- Двухколоночный layout (список слева w-80/lg:w-96, детали справа flex-1)
+- Empty state (иконка + текст + кнопка создания)
+- Mobile: правая колонка скрыта (`hidden md:block`)
+
+Содержимое списка и правой панели — через props.
+
+**Задачи:**
+- [ ] Создать `components/list-detail/list-detail-page.tsx`:
+  ```tsx
+  interface ListDetailPageProps {
+    title: string;
+    itemCount: number;
+    itemCountLabel: (count: number) => string;
+    createButton?: { label: string; onClick: () => void } | { label: string; href: string };
+    emptyState: { icon: React.ReactNode; title: string; description: string };
+    isEmpty: boolean;
+    listContent: React.ReactNode;
+    detailContent: React.ReactNode;
+  }
+  ```
+- [ ] Создать `components/list-detail/index.ts` — экспорты
+- [ ] Рефакторить `components/chats/chats-page-content.tsx`:
+  - Заменить ручной layout на `<ListDetailPage>`
+  - ChatList → `listContent`, ChatDetailPanel → `detailContent`
+  - State/handlers остаются в chats-page-content
+- [ ] Проверить что `/chats` работает идентично
+
+**Файлы (новые):**
+- `components/list-detail/list-detail-page.tsx`
+- `components/list-detail/index.ts`
+
+**Файлы (модификация):**
+- `components/chats/chats-page-content.tsx` — использовать ListDetailPage
 
 **Валидация этапа:**
 - [ ] `npx tsc --noEmit` — 0 ошибок
 - [ ] `npm run build` — успешен
-- [ ] Браузер: `/dashboard` показывает 3 карточки
-- [ ] Браузер: клик "Экспертиза" → новый чат с chatMode=expertise (Sonnet в dev-badge)
-- [ ] Браузер: клик "Создать" → новый чат с chatMode=create (Sonnet в dev-badge)
-- [ ] Браузер: клик "Проекты" → страница /projects
-- [ ] Браузер: нет модельного селектора в поле ввода
+- [ ] Браузер: `/chats` — выглядит и работает идентично (list + detail, delete, star)
 - [ ] 🧪 Мануальный тест пользователем
 
-**Git (после валидации):**
+**Git:**
 ```bash
-git add [файлы]
-git commit -m "feat(tz-dv2): dashboard mode cards + remove model selector UI"
+git commit -m "feat(tz-dv2): extract ListDetailPage layout shell from /chats"
 ```
 
-**Критерий готовности:** Три карточки работают, переход в чат с правильным chatMode, нет селектора модели.
+**Критерий готовности:** ListDetailPage создан, `/chats` работает через него.
+
+---
+
+## Этап 4C: Страницы /expertise и /create
+
+**Статус:** ⬜ Не начат
+
+⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4B
+
+**Цель:** Две новые страницы на базе ListDetailPage. Чаты фильтруются по chatMode. Кнопка создания → `/chat?mode=...`.
+
+**Задачи:**
+- [ ] Добавить `getChatsByModeWithStats()` в `lib/db/queries.ts`:
+  - Фильтр: `chatMode = :mode AND projectId IS NULL`
+  - Формат: тот же что getGeneralChatsWithStats (id, title, summary, createdAt, isStarred, isRenamed, messageCount)
+- [ ] Создать общий клиентский компонент `components/chats/mode-chats-page.tsx`:
+  - Props: `mode`, `title`, `createLabel`, `createMode`, `emptyIcon`, `emptyTitle`, `emptyDescription`, `initialChats`
+  - Использует ListDetailPage + ChatList + ChatDetailPanel
+  - Кнопка создания → `router.push('/chat?mode=${createMode}')`
+- [ ] Создать `app/(dashboard)/expertise/page.tsx`:
+  - Server Component: auth + getChatsByModeWithStats('expertise')
+  - Рендерит ModeChatsPage с конфигурацией Экспертизы
+- [ ] Создать `app/(dashboard)/create/page.tsx`:
+  - Server Component: auth + getChatsByModeWithStats('create')
+  - Рендерит ModeChatsPage с конфигурацией Создать
+- [ ] Рефакторить `/chats` через mode-chats-page (если выгодно) или оставить как есть
+
+**Файлы (новые):**
+- `app/(dashboard)/expertise/page.tsx`
+- `app/(dashboard)/create/page.tsx`
+- `components/chats/mode-chats-page.tsx`
+
+**Файлы (модификация):**
+- `lib/db/queries.ts` — getChatsByModeWithStats()
+
+**Валидация этапа:**
+- [ ] `npx tsc --noEmit` — 0 ошибок
+- [ ] `npm run build` — успешен
+- [ ] Браузер: `/expertise` — страница с empty state + кнопка «+ Новая экспертиза»
+- [ ] Браузер: `/create` — аналогично
+- [ ] Браузер: кнопка «+» → `/chat?mode=expertise` → чат с Sonnet
+- [ ] Браузер: дашборд → «Экспертиза» → `/expertise` (работает)
+- [ ] Браузер: `/chats` — все непроектные чаты без изменений
+- [ ] 🧪 Мануальный тест пользователем
+
+**Git:**
+```bash
+git commit -m "feat(tz-dv2): add /expertise and /create pages with ListDetailPage"
+```
+
+**Критерий готовности:** Страницы работают, создание чатов ведёт в правильный chatMode.
+
+---
+
+## Этап 4D: Рефакторинг /projects на ListDetailPage
+
+**Статус:** ⬜ Не начат
+
+⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4C
+
+**Цель:** Перевести `/projects` с grid-карточек на двухколоночный list-detail layout. Единый паттерн.
+
+**Задачи:**
+- [ ] Создать `components/projects/project-list-item.tsx`:
+  - Элемент списка: иконка, название, мета (задачи, файлы, последняя активность)
+  - Контекстное меню: переименовать, удалить (паттерн из ChatListItem)
+  - Selected state
+- [ ] Создать `components/projects/project-detail-panel.tsx`:
+  - Детали: название, описание, фаза, задачи, файлы, дата
+  - «Открыть проект →» → `/projects/[id]`
+  - Действия: переименовать, удалить
+- [ ] Создать `components/projects/projects-page-content.tsx`:
+  - Клиентский компонент с ListDetailPage
+  - State: selectedProjectId, projects list
+  - Handlers: delete, rename (из ProjectCard)
+  - Кнопка «+ Новый проект» → `/projects/new`
+- [ ] Рефакторить `app/(dashboard)/projects/page.tsx`:
+  - Server Component → ProjectsPageContent
+- [ ] Удалить `components/projects/project-card.tsx` (если больше не используется)
+
+**Файлы (новые):**
+- `components/projects/project-list-item.tsx`
+- `components/projects/project-detail-panel.tsx`
+- `components/projects/projects-page-content.tsx`
+
+**Файлы (модификация):**
+- `app/(dashboard)/projects/page.tsx` — рефакторинг
+
+**Файлы (возможное удаление):**
+- `components/projects/project-card.tsx`
+- `components/projects/create-project-dialog.tsx` — проверить использование
+
+**Валидация этапа:**
+- [ ] `npx tsc --noEmit` — 0 ошибок
+- [ ] `npm run build` — успешен
+- [ ] Браузер: `/projects` — двухколоночный layout (список + детали)
+- [ ] Браузер: клик на проект → правая панель с деталями
+- [ ] Браузер: «Открыть проект →» → `/projects/[id]`
+- [ ] Браузер: «+ Новый проект» → `/projects/new`
+- [ ] Браузер: переименование и удаление работают
+- [ ] 🧪 Мануальный тест пользователем
+
+**Git:**
+```bash
+git commit -m "feat(tz-dv2): refactor /projects to ListDetailPage layout"
+```
+
+**Критерий готовности:** `/projects` на ListDetailPage, все действия работают.
 
 ---
 
@@ -236,45 +417,41 @@ git commit -m "feat(tz-dv2): dashboard mode cards + remove model selector UI"
 
 **Статус:** ⬜ Не начат
 
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4
+⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4D
 
 **Цель:** AI называется Simply в UI. В истории чатов виден тип чата (badge).
 
 **Задачи:**
-- [ ] Обновить аватар AI в `components/message.tsx` — заменить SparklesIcon на стилизованную "S" (или оставить SparklesIcon но добавить tooltip "Simply"). Решение: оставить SparklesIcon (архитектор подтвердил).
-- [ ] Проверить все места где AI называется "Claude" в UI-компонентах — заменить на "Simply"
-- [ ] В `lib/ai/models.ts` — обновить `name` полей: "Claude Sonnet" → "Simply Sonnet" (или убрать если нигде не используется в UI)
+- [ ] Оставить SparklesIcon (SVG логотип позже)
+- [ ] Проверить все места где AI называется "Claude" в UI — заменить на "Simply"
+- [ ] В `lib/ai/models.ts` — обновить `name` (если используется в UI)
 - [ ] Добавить chatMode badge в sidebar history (`components/sidebar-history-item.tsx`):
-  - `expertise` → 🔍
-  - `create` → ✨
-  - `chat` → без badge (default)
-- [ ] Добавить chatMode badge на странице `/chats` (`components/chats/chat-list-item.tsx`):
-  - Аналогичные эмодзи рядом с названием
-- [ ] Убедиться что Chat тип в queries возвращает chatMode для использования в UI
+  - `expertise` → 🔍, `create` → ✨, `chat` → без badge
+- [ ] Добавить chatMode badge в списках ListDetailPage (ChatListItem):
+  - 🔍 / ✨ рядом с названием
+- [ ] Убедиться что queries возвращают chatMode
 
 **Файлы (модификация):**
-- `components/message.tsx` — аватар (минимальные изменения)
-- `lib/ai/models.ts` — названия моделей
-- `components/sidebar-history-item.tsx` — chatMode badge
-- `components/chats/chat-list-item.tsx` — chatMode badge
-- `lib/db/queries.ts` — chatMode в ответах (если не включён)
+- `components/message.tsx` — минимальные изменения
+- `lib/ai/models.ts` — названия
+- `components/sidebar-history-item.tsx` — badge
+- `components/chats/chat-list-item.tsx` — badge
+- `lib/db/queries.ts` — chatMode в select
 
 **Валидация этапа:**
 - [ ] `npx tsc --noEmit` — 0 ошибок
 - [ ] `npm run build` — успешен
-- [ ] Браузер: AI не называется "Claude" нигде в чат-интерфейсе
-- [ ] Браузер: dev-badge модели под аватаркой — сохранён
-- [ ] Браузер: в sidebar-history чаты expertise/create имеют эмодзи-badge
-- [ ] Браузер: на странице /chats — аналогично
+- [ ] Браузер: AI не называется "Claude" нигде
+- [ ] Браузер: dev-badge модели — сохранён
+- [ ] Браузер: sidebar — эмодзи у expertise/create чатов
 - [ ] 🧪 Мануальный тест пользователем
 
-**Git (после валидации):**
+**Git:**
 ```bash
-git add [файлы]
-git commit -m "feat(tz-dv2): rebrand AI to Simply + chatMode badges in history"
+git commit -m "feat(tz-dv2): rebrand AI to Simply + chatMode badges"
 ```
 
-**Критерий готовности:** AI везде = Simply. В истории чатов виден тип.
+**Критерий готовности:** AI = Simply. Badge в истории.
 
 ---
 
@@ -287,36 +464,38 @@ git commit -m "feat(tz-dv2): rebrand AI to Simply + chatMode badges in history"
 **Цель:** Финальная проверка, DB-cleanup, документация, версия.
 
 **Задачи:**
-- [ ] DB-миграция: удалить колонку `helperId` из Chat и таблицу `Helper` (drop FK → drop column → drop table)
+- [ ] DB-миграция: удалить `helperId` из Chat и таблицу `Helper`
 - [ ] Создать и применить миграцию
-- [ ] SQL-проверка: таблицы, колонки, FK
-- [ ] Финальное мануальное тестирование (пользователь):
-  - Дашборд: 3 карточки
-  - Каждая карточка → правильный чат
-  - История: chatMode badge
-  - Нет модельного селектора
-  - AI = Simply
-  - Проекты работают без изменений
-  - Бен работает без изменений
-- [ ] Обновить главный `CHANGELOG.md`
+- [ ] SQL-проверка
+- [ ] Финальное тестирование:
+  - Дашборд: 3 карточки-инструмента
+  - Каждая карточка → страница list-detail
+  - Кнопка создания → чат с правильным chatMode
+  - `/chats` — все непроектные чаты
+  - `/expertise`, `/create` — отфильтрованные
+  - `/projects` — list-detail
+  - Нет селектора модели
+  - AI = Simply + badge
+  - Бен работает
+  - Проекты (внутренние) работают
+- [ ] Обновить `CHANGELOG.md`
 - [ ] Обновить `SIMPLY_STATUS.md`
-- [ ] Обновить `CLAUDE.md` (структура кода, текущий этап)
+- [ ] Обновить `CLAUDE.md` (ListDetailPage, новые страницы, текущий этап)
 - [ ] Обновить `package.json` → 3.24.0
-- [ ] Обновить `docs/ai-chats-map.md` — убрать helpers, добавить chatMode
-- [ ] Обновить `docs/architecture.md` — убрать helpers references
-- [ ] Обновить `docs/design-system.md` — убрать helpers routes
+- [ ] Обновить `docs/ai-chats-map.md` — chatMode + страницы
+- [ ] Обновить `docs/architecture.md` — ListDetailPage
+- [ ] Обновить `docs/design-system.md` — /expertise, /create
 - [ ] Переместить `specs/TZ_DV2_DashboardV2/` → `_archive/`
 
 **Валидация этапа:**
 - [ ] `npx tsc --noEmit` — 0 ошибок
 - [ ] `npm run build` — успешен
-- [ ] SQL: нет таблицы Helper, нет колонки helperId в Chat, есть chatMode
+- [ ] SQL: нет Helper, нет helperId, есть chatMode
 - [ ] Документация актуальна
-- [ ] 🧪 Финальный мануальный тест пользователем
+- [ ] 🧪 Финальный мануальный тест
 
-**Git (после валидации):**
+**Git:**
 ```bash
-git add [файлы]
 git commit -m "feat(tz-dv2): finalize Dashboard V2 v3.24.0"
 ```
 
