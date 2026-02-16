@@ -246,7 +246,7 @@ git commit -m "feat(tz-dv2): dashboard mode cards + remove model selector"
 
 ## Этап 4B: ListDetailPage — универсальный layout-shell
 
-**Статус:** 🔄 Валидация (ожидание мануального теста)
+**Статус:** ✅ Завершён
 
 **Цель:** Извлечь из `/chats` универсальный composition-компонент ListDetailPage. Рефакторить `/chats` на его основе.
 
@@ -269,6 +269,8 @@ ListDetailPage отвечает за:
   - State/handlers остаются в chats-page-content
 - [x] Удалить orphaned `components/chats/chats-empty-state.tsx` (встроено в ListDetailPage)
 - [x] Проверить что `/chats` работает идентично
+- [x] Убрать селектор модели из обычных чатов (multimodal-input.tsx)
+- [x] Добавить dev-badge модели в проектные чаты (task chat route)
 
 **Файлы (новые):**
 - `components/list-detail/list-detail-page.tsx`
@@ -277,6 +279,8 @@ ListDetailPage отвечает за:
 **Файлы (модификация):**
 - `components/chats/chats-page-content.tsx` — использовать ListDetailPage
 - `components/chats/index.ts` — убрать экспорт ChatsEmptyState
+- `components/multimodal-input.tsx` — скрыть ModelSelectorCompact для !isProjectChat
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — data-model-info
 
 **Файлы (удаление):**
 - `components/chats/chats-empty-state.tsx` — заменён emptyState prop в ListDetailPage
@@ -284,15 +288,12 @@ ListDetailPage отвечает за:
 **Валидация этапа:**
 - [x] `npx tsc --noEmit` — 0 ошибок
 - [x] `npm run build` — успешен
-- [ ] Браузер: `/chats` — выглядит и работает идентично (list + detail, delete, star)
-- [ ] 🧪 Мануальный тест пользователем
+- [x] Браузер: `/chats` — выглядит и работает идентично (list + detail, delete, star)
+- [x] 🧪 Мануальный тест пользователем
 
-**Git:**
-```bash
-git commit -m "feat(tz-dv2): extract ListDetailPage layout shell from /chats"
-```
+**Git:** commit `71735a0`
 
-**Критерий готовности:** ListDetailPage создан, `/chats` работает через него.
+**Критерий готовности:** ListDetailPage создан, `/chats` работает через него. Селектор модели убран из обычных чатов.
 
 ---
 

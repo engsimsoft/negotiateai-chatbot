@@ -2021,6 +2021,52 @@ export async function getGeneralChatsWithStats({
 }
 
 /**
+ * ТЗ-DV2: Get chats filtered by chatMode with stats
+ * Used for /expertise and /create pages
+ */
+export async function getChatsByModeWithStats({
+  userId,
+  mode,
+  limit = 50,
+}: {
+  userId: string;
+  mode: string;
+  limit?: number;
+}) {
+  try {
+    const result = await db
+      .select({
+        id: chat.id,
+        createdAt: chat.createdAt,
+        title: chat.title,
+        summary: chat.summary,
+        isStarred: chat.isStarred,
+        isRenamed: chat.isRenamed,
+        messageCount: sql<number>`COALESCE(COUNT(${message.id}), 0)::int`,
+      })
+      .from(chat)
+      .leftJoin(message, eq(message.chatId, chat.id))
+      .where(
+        and(
+          eq(chat.userId, userId),
+          isNull(chat.projectId),
+          eq(chat.chatMode, mode)
+        )
+      )
+      .groupBy(chat.id)
+      .orderBy(desc(chat.createdAt))
+      .limit(limit);
+
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get chats by mode with stats"
+    );
+  }
+}
+
+/**
  * ТЗ-07C1: Get project chats (tasks) with message count
  * Returns chats for a specific project with messageCount for each
  */
