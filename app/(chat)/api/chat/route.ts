@@ -14,7 +14,7 @@ import { getUsage } from "tokenlens/helpers";
 import { auth } from "@/app/(auth)/auth";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import { getModelForChatMode } from "@/lib/ai/chat-mode-config";
-import { buildChatPrompt } from "@/lib/prompts/server";
+import { buildChatPrompt, buildExpertisePrompt, buildCreatePrompt } from "@/lib/prompts/server";
 import type { BuildContext } from "@/lib/prompts";
 import { buildProjectContext } from "@/lib/prompts/contexts";
 import { myProvider } from "@/lib/ai/providers";
@@ -375,8 +375,12 @@ export async function POST(request: Request) {
           console.log(`[Project Chat] Using ${projectModelConfig.name} (${tier}) for project ${project.name}`);
           console.log(`[Project Chat] Context length: ${projectContext.length} chars`);
         } else {
-          // Regular chat: use Claude — model determined by chatMode
-          const builtPrompt = buildChatPrompt(promptContext);
+          // Regular chat: use Claude — builder and model determined by chatMode
+          const builtPrompt = chatMode === 'expertise'
+            ? buildExpertisePrompt(promptContext)
+            : chatMode === 'create'
+              ? buildCreatePrompt(promptContext)
+              : buildChatPrompt(promptContext);
           systemPromptText = builtPrompt.systemPrompt;
           const chatModelId = getModelForChatMode(chatMode);
           modelToUse = myProvider.languageModel(chatModelId);
@@ -530,9 +534,9 @@ export async function POST(request: Request) {
           temperature: 1.0,
           stopWhen: stepCountIs(5),
           // ТЗ-C1: Tools extracted to shared module (lib/ai/tools/chat-tools.ts)
-          experimental_activeTools: getActiveToolNames(isProjectChat),
+          experimental_activeTools: getActiveToolNames(isProjectChat, chatMode),
           experimental_transform: smoothStream({ chunking: "word" }),
-          tools: getStandardTools({ session, dataStream, isProjectChat, projectId: projectId || undefined, chatId: id, messageId: assistantMessageId }),
+          tools: getStandardTools({ session, dataStream, isProjectChat, projectId: projectId || undefined, chatId: id, messageId: assistantMessageId, chatMode }),
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
             functionId: "stream-text",

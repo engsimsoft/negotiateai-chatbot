@@ -24,6 +24,8 @@ import 'server-only';
 export {
   // High-level builders
   buildChatPrompt,
+  buildExpertisePrompt,
+  buildCreatePrompt,
   buildAgentPrompt,
   buildBenPrompt,
   buildSkillPrompt,
@@ -42,6 +44,8 @@ export {
 
   // Composers
   composeChatPrompt,
+  composeExpertisePrompt,
+  composeCreatePrompt,
   composeAgentPrompt,
   composeSkillPrompt,
 

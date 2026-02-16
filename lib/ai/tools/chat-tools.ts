@@ -6,6 +6,7 @@
  */
 
 import type { Session } from "next-auth";
+import type { ChatMode } from "@/lib/ai/chat-mode-config";
 import { createDocument } from "./create-document";
 import { createSnapshot } from "./create-snapshot";
 import { parseExcel } from "./excel";
@@ -26,6 +27,8 @@ interface GetStandardToolsParams {
   chatId?: string;
   /** Current assistant message ID — needed for snapshot tool */
   messageId?: string;
+  /** Chat mode for regular (non-project) chats — determines tool availability */
+  chatMode?: ChatMode;
 }
 
 /**
@@ -42,6 +45,7 @@ export function getStandardTools({
   projectId,
   chatId,
   messageId,
+  chatMode: _chatMode,
 }: GetStandardToolsParams) {
   return {
     getCurrentDate,
@@ -82,8 +86,11 @@ type ToolName = (typeof ALL_TOOL_NAMES)[number];
 /**
  * Active tools list for experimental_activeTools.
  * Controls which tools the model can call.
+ *
+ * @param isProjectChat - true for project chats (separate tool set)
+ * @param _chatMode - chat mode for regular chats (reserved for future per-mode filtering)
  */
-export function getActiveToolNames(isProjectChat: boolean): ToolName[] {
+export function getActiveToolNames(isProjectChat: boolean, _chatMode?: ChatMode): ToolName[] {
   if (isProjectChat) {
     return [
       "getCurrentDate",

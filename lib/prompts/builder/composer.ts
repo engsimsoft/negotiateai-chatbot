@@ -186,9 +186,37 @@ export function composeChatPrompt(context: BuildContext = {}): ComposedPrompt {
 
   return {
     systemPrompt: parts.join('\n\n'),
-    model: context.model || 'claude-sonnet',
+    model: context.model || 'claude-haiku',
     greeting: 'Привет! Чем могу помочь?',
     toolAccess: null, // All tools
+  };
+}
+
+/**
+ * Compose prompt for expertise chat mode
+ *
+ * Stub: delegates to composeChatPrompt, hardcodes Sonnet.
+ * PE will replace with real expertise prompt later.
+ */
+export function composeExpertisePrompt(context: BuildContext = {}): ComposedPrompt {
+  const base = composeChatPrompt(context);
+  return {
+    ...base,
+    model: 'claude-sonnet',
+  };
+}
+
+/**
+ * Compose prompt for create chat mode
+ *
+ * Stub: delegates to composeChatPrompt, hardcodes Sonnet.
+ * PE will replace with real create prompt later.
+ */
+export function composeCreatePrompt(context: BuildContext = {}): ComposedPrompt {
+  const base = composeChatPrompt(context);
+  return {
+    ...base,
+    model: 'claude-sonnet',
   };
 }
 

@@ -19,6 +19,8 @@ import { loadSkill, loadSkillReference, loadSkillsContent, type Skill } from './
 import { loadAgent, getAgentGreeting, type Agent } from './agent-loader';
 import {
   composeChatPrompt,
+  composeExpertisePrompt,
+  composeCreatePrompt,
   composeAgentPrompt,
   composeSkillPrompt,
   type ComposedPrompt,
@@ -53,6 +55,8 @@ export {
 
   // Composers
   composeChatPrompt,
+  composeExpertisePrompt,
+  composeCreatePrompt,
   composeAgentPrompt,
   composeSkillPrompt,
 };
@@ -71,6 +75,40 @@ export {
  */
 export function buildChatPrompt(context: BuildContext = {}): BuiltPrompt {
   const composed = composeChatPrompt(context);
+
+  return {
+    systemPrompt: composed.systemPrompt,
+    model: composed.model,
+    greeting: composed.greeting,
+    toolAccess: composed.toolAccess,
+  };
+}
+
+/**
+ * Build prompt for expertise chat mode
+ *
+ * @example
+ * const result = buildExpertisePrompt({ user: { displayName: 'Владимир' } });
+ */
+export function buildExpertisePrompt(context: BuildContext = {}): BuiltPrompt {
+  const composed = composeExpertisePrompt(context);
+
+  return {
+    systemPrompt: composed.systemPrompt,
+    model: composed.model,
+    greeting: composed.greeting,
+    toolAccess: composed.toolAccess,
+  };
+}
+
+/**
+ * Build prompt for create chat mode
+ *
+ * @example
+ * const result = buildCreatePrompt({ user: { displayName: 'Владимир' } });
+ */
+export function buildCreatePrompt(context: BuildContext = {}): BuiltPrompt {
+  const composed = composeCreatePrompt(context);
 
   return {
     systemPrompt: composed.systemPrompt,
