@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 8 (1, 2, 3, 4A, 4B, 4C, 4D, 5, 6) |
-| Текущий этап | 4B |
+| Текущий этап | 4D |
 | Сессий (оценка) | 5-6 |
 
 **Принятые решения (от архитектора):**
@@ -299,27 +299,17 @@ ListDetailPage отвечает за:
 
 ## Этап 4C: Страницы /expertise и /create
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4B
+**Статус:** ✅ Завершён
 
 **Цель:** Две новые страницы на базе ListDetailPage. Чаты фильтруются по chatMode. Кнопка создания → `/chat?mode=...`.
 
 **Задачи:**
-- [ ] Добавить `getChatsByModeWithStats()` в `lib/db/queries.ts`:
-  - Фильтр: `chatMode = :mode AND projectId IS NULL`
-  - Формат: тот же что getGeneralChatsWithStats (id, title, summary, createdAt, isStarred, isRenamed, messageCount)
-- [ ] Создать общий клиентский компонент `components/chats/mode-chats-page.tsx`:
-  - Props: `mode`, `title`, `createLabel`, `createMode`, `emptyIcon`, `emptyTitle`, `emptyDescription`, `initialChats`
-  - Использует ListDetailPage + ChatList + ChatDetailPanel
-  - Кнопка создания → `router.push('/chat?mode=${createMode}')`
-- [ ] Создать `app/(dashboard)/expertise/page.tsx`:
-  - Server Component: auth + getChatsByModeWithStats('expertise')
-  - Рендерит ModeChatsPage с конфигурацией Экспертизы
-- [ ] Создать `app/(dashboard)/create/page.tsx`:
-  - Server Component: auth + getChatsByModeWithStats('create')
-  - Рендерит ModeChatsPage с конфигурацией Создать
-- [ ] Рефакторить `/chats` через mode-chats-page (если выгодно) или оставить как есть
+- [x] Добавить `getChatsByModeWithStats()` в `lib/db/queries.ts`
+- [x] Создать `components/chats/mode-chats-page.tsx` (shared client component)
+- [x] Создать `app/(dashboard)/expertise/page.tsx` (Server Component)
+- [x] Создать `app/(dashboard)/create/page.tsx` (Server Component)
+- [x] Фильтрация `/chats` — только `chatMode='chat'` (getGeneralChatsWithStats + getGeneralChatsCount)
+- [x] `/chats` оставлен как есть (не рефакторить через mode-chats-page)
 
 **Файлы (новые):**
 - `app/(dashboard)/expertise/page.tsx`
@@ -330,21 +320,18 @@ ListDetailPage отвечает за:
 - `lib/db/queries.ts` — getChatsByModeWithStats()
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Браузер: `/expertise` — страница с empty state + кнопка «+ Новая экспертиза»
-- [ ] Браузер: `/create` — аналогично
-- [ ] Браузер: кнопка «+» → `/chat?mode=expertise` → чат с Sonnet
-- [ ] Браузер: дашборд → «Экспертиза» → `/expertise` (работает)
-- [ ] Браузер: `/chats` — все непроектные чаты без изменений
-- [ ] 🧪 Мануальный тест пользователем
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] Браузер: `/expertise` — empty state + «+ Новая экспертиза»
+- [x] Браузер: `/create` — аналогично
+- [x] Браузер: кнопка «+» → `/chat?mode=expertise` → чат с Sonnet
+- [x] Браузер: дашборд → «Экспертиза» → `/expertise`
+- [x] Браузер: `/chats` — только chatMode='chat', экспертизы не показываются
+- [x] 🧪 Мануальный тест пользователем
 
-**Git:**
-```bash
-git commit -m "feat(tz-dv2): add /expertise and /create pages with ListDetailPage"
-```
+**Git:** commits `55939e5`, `e36f3d4`
 
-**Критерий готовности:** Страницы работают, создание чатов ведёт в правильный chatMode.
+**Критерий готовности:** Страницы работают, создание чатов ведёт в правильный chatMode. Фильтрация /chats корректна.
 
 ---
 

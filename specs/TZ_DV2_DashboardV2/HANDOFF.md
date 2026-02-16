@@ -1,63 +1,86 @@
 # Передача сессии ТЗ-DV2: Дашборд V2
 
 **Дата:** 2026-02-17
-**Сессия:** 4 (в процессе)
+**Сессия:** 5 (продолжение)
 
 ## Статус этапов
 - [x] Этап 1: Удаление экосистемы помощников ✅ (commit `0bbe51b`)
 - [x] Этап 2: chatMode — схема, миграция, API ✅ (commit `0ce7dd0`)
 - [x] Этап 3: Промпты и Tools по chatMode ✅ (commit `cee6942`)
-- [ ] **Этап 4A: Карточки на дашборде + убрать селектор модели** ← ТЕКУЩИЙ
-- [ ] Этап 4B: ListDetailPage — универсальный layout-shell
-- [ ] Этап 4C: Страницы /expertise и /create
-- [ ] Этап 4D: Рефакторинг /projects на ListDetailPage
-- [ ] Этап 5: AI = Simply + chatMode badge
+- [x] Этап 4A: Карточки на дашборде + убрать селектор модели ✅ (commit `e666db2`)
+- [x] Этап 4B: ListDetailPage — универсальный layout-shell ✅ (commit `71735a0`)
+- [x] Этап 4C: Страницы /expertise и /create ✅ (commits `55939e5`, `e36f3d4`)
+- [ ] **Этап 4D: Рефакторинг /projects на ListDetailPage** ← СЛЕДУЮЩИЙ
+- [ ] Этап 5: AI = Simply + chatMode badge в истории
 - [ ] Этап 6: Финализация
 
-## Что изменилось в сессии 4
+## Что сделано в сессии 4-5
 
-**ТЗ обновлено до v2.0** — вместо простых карточек-ссылок:
-- Полноценные страницы `/expertise`, `/create` на базе ListDetailPage
-- Рефакторинг `/projects` на единый list-detail паттерн
-- Этап 4 разбит на 4A/4B/4C/4D
+### Этап 4A (commit `e666db2`)
+- Создан `components/glavnaya/mode-cards-section.tsx` — 3 карточки-лаунчера (Экспертиза, Создать, Проекты)
+- Удалён `components/glavnaya/projects-section.tsx`
+- Убран `InputModelSelector` из `components/input/compact-input.tsx`
+- Добавлен `?mode=` query param в `app/(chat)/chat/page.tsx`
 
-**Решения архитектора (сессия 4):**
-1. **Разбивка 4A-4D** — итеративно с валидацией
-2. **ListDetailPage** — composition (layout-shell + render props, НЕ generics)
-3. **`/projects`** — переводить на list-detail (единый паттерн)
-4. **Flow создания** — redirect `/chat?mode=...`, чат при первом сообщении
-5. **`/chats`** — все непроектные чаты (единый архив)
-6. **Sidebar** — не трогать, не добавлять новые пункты
+### Этап 4B (commit `71735a0`)
+- Создан `components/list-detail/list-detail-page.tsx` — универсальный layout-shell (composition: render props)
+- Создан `components/list-detail/index.ts`
+- Рефакторен `components/chats/chats-page-content.tsx` на ListDetailPage
+- Удалён `components/chats/chats-empty-state.tsx` (inlined в ListDetailPage)
+- Убран `ModelSelectorCompact` из обычных чатов (`components/multimodal-input.tsx` — только для isProjectChat)
+- Добавлен dev-badge в проектные чаты (`app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`)
 
-**Документы обновлены:**
-- SPEC.md → v2.0
-- ROADMAP.md → этапы 4A-4D, 5, 6
+### Этап 4C (commits `55939e5`, `e36f3d4`)
+- Добавлен `getChatsByModeWithStats()` в `lib/db/queries.ts`
+- Создан `components/chats/mode-chats-page.tsx` — shared client component
+- Создан `app/(dashboard)/expertise/page.tsx`
+- Создан `app/(dashboard)/create/page.tsx`
+- **Фильтрация:** `getGeneralChatsWithStats` и `getGeneralChatsCount` теперь фильтруют `chatMode='chat'` — экспертизы/создание НЕ попадают в `/chats`
 
-## Следующая сессия: начни с
+### Дополнительно
+- Создан GitHub Issue #1: баг с маршрутизацией проектных чатов (task chat открывается в стандартном окне)
 
-1. **Прочитать ROADMAP.md** → задачи Этапа 4A
-2. **Прочитать `docs/design-system.md`** — ОБЯЗАТЕЛЬНО перед UI работой
-3. **Начать Этап 4A:**
-   - Создать `components/glavnaya/mode-cards-section.tsx` (3 карточки → /expertise, /create, /projects)
-   - Удалить `components/glavnaya/projects-section.tsx`
-   - Обновить дашборд: ModeCardsSection вместо ProjectsSection
-   - Убрать `InputModelSelector` из compact-input.tsx
-   - Обработать `?mode=` query param в `app/(chat)/chat/page.tsx`
+## Ключевые файлы (новые/изменённые)
 
-## Ключевые решения архитектора (все сессии)
+### Новые компоненты
+- `components/list-detail/list-detail-page.tsx` — ListDetailPage (header, two-column, empty state)
+- `components/list-detail/index.ts` — exports
+- `components/chats/mode-chats-page.tsx` — ModeChatsPage (reusable для /expertise, /create)
+- `components/glavnaya/mode-cards-section.tsx` — 3 карточки на дашборде
 
-- chatMode: varchar (не pgEnum) + Zod-валидация
-- selectedChatModel убран из API → сервер определяет по chatMode
-- Аватар: оставить SparklesIcon
-- ToolsSection: удалена
-- Greeting: одинаковый для всех режимов
-- Badge в истории: 🔍 expertise, ✨ create
-- Design system: `docs/design-system.md` — ОБЯЗАТЕЛЬНО
-- Карточки: Паттерн A (border + shadow hover)
-- ListDetailPage: composition, НЕ generics
-- `/projects`: переводить на list-detail
-- `/chats`: все непроектные чаты
-- Sidebar: не трогать
+### Новые страницы
+- `app/(dashboard)/expertise/page.tsx` — Server Component
+- `app/(dashboard)/create/page.tsx` — Server Component
 
-## Блокеры / Вопросы
-- Нет блокеров.
+### Изменённые
+- `lib/db/queries.ts` — getChatsByModeWithStats(), фильтрация getGeneralChats* по chatMode='chat'
+- `components/multimodal-input.tsx` — ModelSelectorCompact только для isProjectChat
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — data-model-info dev-badge
+- `app/(chat)/chat/page.tsx` — ?mode= query param → initialChatMode
+
+### Удалённые
+- `components/glavnaya/projects-section.tsx`
+- `components/chats/chats-empty-state.tsx`
+
+## Решения архитектора (обновлённые)
+
+- `/chats` → только `chatMode='chat'` (НЕ единый архив, каждый режим на своей странице)
+- Sidebar — показывает ВСЕ чаты (не фильтровать)
+- ListDetailPage — composition: render props (НЕ generics)
+- Создание чатов: redirect `/chat?mode=...`, чат при первом сообщении
+
+## Известные проблемы (не блокеры)
+
+1. **GitHub Issue #1:** Проектный чат задачи иногда открывается в стандартном окне чата
+2. **Нет chatMode badge** в списках — запланировано в Stage 5
+3. **Sidebar не фильтрует** по chatMode — показывает все чаты (by design)
+
+## Следующая сессия
+
+1. Прочитать `HANDOFF.md` (этот файл) и `ROADMAP.md`
+2. **Этап 4D:** Рефакторинг `/projects` на ListDetailPage
+   - Создать `project-list-item.tsx`, `project-detail-panel.tsx`, `projects-page-content.tsx`
+   - Рефакторить `app/(dashboard)/projects/page.tsx`
+   - Удалить `project-card.tsx` если не используется
+3. **Этап 5:** AI = Simply + chatMode badge
+4. **Этап 6:** Финализация (DB cleanup, docs, v3.24.0)
