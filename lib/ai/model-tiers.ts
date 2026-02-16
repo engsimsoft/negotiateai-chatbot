@@ -2,12 +2,9 @@
  * Project Model Tiers Configuration (ТЗ-03)
  *
  * Три уровня моделей для проектов:
- * 1. Исполнитель — Gemini 2.5 Flash, быстрый, дешёвый, для простых задач
- * 2. Эксперт — Gemini 3 Pro, баланс, по умолчанию
- * 3. Профессор — Gemini 3 Pro, сложные задачи (pipeline временно отключён)
- *
- * ⚠️ ВРЕМЕННО (v3.7.1): Используем Gemini вместо Claude
- * См. ADR 011: docs/decisions/011-temporary-gemini-for-projects.md
+ * 1. Исполнитель — Claude Haiku, быстрый, дешёвый, для простых задач
+ * 2. Эксперт — Claude Sonnet, баланс, по умолчанию
+ * 3. Профессор — Claude Opus, сложные задачи
  *
  * Источник правды: docs/ai-chats-map.md
  */
@@ -37,41 +34,39 @@ export interface ModelTierConfig {
 
 /**
  * Project models configuration
- *
- * ⚠️ ВРЕМЕННО (v3.7.1): Gemini вместо Claude
  */
 export const PROJECT_MODELS: Record<ProjectModelTier, ModelTierConfig> = {
   executor: {
     id: "executor",
     name: "Исполнитель",
     description: "Быстрый и экономичный для простых задач",
-    model: myProvider.languageModel("gemini-2.5-flash"),
+    model: myProvider.languageModel("claude-haiku"),
     icon: "⚡",
     pricing: {
-      input: 0.075,
-      output: 0.30,
+      input: 1.0,
+      output: 5.0,
     },
   },
   expert: {
     id: "expert",
     name: "Эксперт",
     description: "Баланс скорости и качества",
-    model: myProvider.languageModel("gemini-3-pro"),
+    model: myProvider.languageModel("claude-sonnet"),
     icon: "🎯",
     pricing: {
-      input: 2.0,
-      output: 12.0,
+      input: 3.0,
+      output: 15.0,
     },
   },
   professor: {
     id: "professor",
     name: "Профессор",
     description: "Максимальное качество, сложные задачи",
-    model: myProvider.languageModel("gemini-3-pro"),
+    model: myProvider.languageModel("claude-opus"),
     icon: "🎓",
     pricing: {
-      input: 2.0,
-      output: 12.0,
+      input: 5.0,
+      output: 25.0,
     },
   },
 };

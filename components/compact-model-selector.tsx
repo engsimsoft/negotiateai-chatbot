@@ -19,7 +19,7 @@ import {
  * Компактный селектор модели для инпутов
  *
  * Два режима:
- * - provider="google" — модели Gemini (для универсальных чатов)
+ * - provider="google" — модели Claude (для универсальных чатов)
  * - provider="anthropic" — модели Claude (для проектов)
  */
 
@@ -112,7 +112,7 @@ function PureCompactModelSelector({
     );
   }
 
-  // Google Gemini models
+  // Claude models
   const selectedModel = chatModels.find((m) => m.id === optimisticModelId);
 
   return (

@@ -2,16 +2,9 @@
  * Professor Pipeline (ТЗ-03, Фаза 7)
  *
  * Multi-step reasoning pipeline:
- * 1. Analyze (Pro): Break down task into 3-7 subtasks
- * 2. Execute (Flash): Execute each subtask sequentially
- * 3. Synthesize (Pro): Combine results into final response
- *
- * ⚠️ ВРЕМЕННО (v3.7.1): Используем Gemini вместо Claude
- * - Analyze: Gemini 3 Pro (вместо Claude Opus)
- * - Execute: Gemini 2.5 Flash (вместо Claude Haiku)
- * - Synthesize: Gemini 3 Pro (вместо Claude Opus)
- *
- * См. ADR 011: docs/decisions/011-temporary-gemini-for-projects.md
+ * 1. Analyze (Opus): Break down task into 3-7 subtasks
+ * 2. Execute (Haiku): Execute each subtask sequentially
+ * 3. Synthesize (Opus): Combine results into final response
  *
  * Streaming events:
  * - professor-phase: Phase change (analyze, execute, synthesize)
@@ -25,10 +18,9 @@
 import { generateText, streamText, type CoreMessage } from "ai";
 import { myProvider } from "./providers";
 
-// ⚠️ ВРЕМЕННО: Gemini модели вместо Claude
-const analyzeModel = myProvider.languageModel("gemini-3-pro");   // вместо analyzeModel
-const executeModel = myProvider.languageModel("gemini-2.5-flash"); // вместо executeModel
-const synthesizeModel = myProvider.languageModel("gemini-3-pro"); // вместо analyzeModel
+const analyzeModel = myProvider.languageModel("claude-opus");
+const executeModel = myProvider.languageModel("claude-haiku");
+const synthesizeModel = myProvider.languageModel("claude-opus");
 
 /**
  * Pipeline phases

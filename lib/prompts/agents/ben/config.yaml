@@ -3,7 +3,7 @@
 name: ben
 displayName: Бен
 category: platform
-model: gemini-2.5-flash
+model: claude-haiku
 
 # Ben не использует skills — только отвечает на вопросы
 skills: []

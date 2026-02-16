@@ -18,12 +18,9 @@ export type PromptId = 'chat' | 'ben' | 'prompt-agent';
  * AI model identifier
  */
 export type ModelId =
-  | 'gemini-3-pro'
-  | 'gemini-2.5-flash'
-  | 'claude-sonnet-4-20250514'
-  | 'claude-opus-4-20250514'
-  | 'gpt-4o'
-  | 'gpt-4o-mini';
+  | 'claude-haiku'
+  | 'claude-sonnet'
+  | 'claude-opus';
 
 /**
  * Communication style for personalization

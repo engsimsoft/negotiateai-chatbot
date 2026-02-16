@@ -70,6 +70,11 @@ export type CustomUIDataTypes = {
     toolCallId: string;
     args?: any;
   };
+  // Dev: model info for dev badge (emitted per response)
+  "model-info": {
+    modelId: string;
+    modelName: string;
+  };
 };
 
 export type ChatMessage = UIMessage<

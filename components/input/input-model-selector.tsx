@@ -19,8 +19,8 @@ import { useInputContext } from "./input-context";
  * InputModelSelector — селектор модели
  *
  * Автоматически показывает нужные модели:
- * - provider="google" → Gemini модели
- * - provider="anthropic" → Claude модели
+ * - provider="google" → Claude модели (чат)
+ * - provider="anthropic" → Claude модели (проекты)
  */
 
 interface InputModelSelectorProps {
@@ -88,7 +88,7 @@ function PureInputModelSelector({ className }: InputModelSelectorProps) {
     );
   }
 
-  // Google Gemini models
+  // Claude models
   const selected = chatModels.find((m) => m.id === selectedModelId);
 
   return (

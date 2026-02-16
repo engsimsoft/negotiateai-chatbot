@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.22.0
-**Дата:** 2026-02-15
+**Версия:** 3.23.0
+**Дата:** 2026-02-16
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -29,7 +29,7 @@
 | **Сервисные помощники** | Бен (❓), Секретарь (➕), Менеджер (👤) | ✅ v3.13.0 |
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG/Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity, Plus AI, Ideogram, AssemblyAI | 📋 Фаза 1 |
-| **Мультипровайдер** | GPT, Claude, Gemini через единый интерфейс | ⏸️ v3.7.1 (только Gemini) |
+| **AI-провайдер** | Anthropic Claude — основной и единственный (Gemini только для vision-ocr) | ✅ v3.23.0 (@ai-sdk/anthropic) |
 | **Smart Routing** | Автовыбор модели для экономии без потери качества | 📋 |
 | **Оплата в рублях** | ЮKassa, Тинькофф, СБП | 📋 |
 
@@ -50,7 +50,7 @@
 
 ### AI-возможности
 - ✅ Streaming responses
-- ✅ Автовыбор модели (Gemini 3 Pro / 2.5 Flash)
+- ✅ Anthropic Claude (Sonnet / Haiku / Opus) через @ai-sdk/anthropic
 - ✅ Web Search (Brave API)
 - ✅ Weather (Open-Meteo)
 - ✅ Get Current Date
@@ -83,16 +83,16 @@
 
 | Промпт | Модель | Назначение |
 |--------|--------|------------|
-| **chat** | Gemini 3 Pro | Универсальный AI-чат |
-| **ben** | Gemini 2.5 Flash | Гид по платформе |
-| **project-creation** | Gemini 3 Pro | Секретарь — AI-интервью для создания проектов |
-| **project-manager** | Gemini 2.5 Flash | Менеджер проекта (живой AI-диалог) |
-| **professor-planning** | Gemini 3 Pro | Профессор планирования — генерация плана задач |
-| **task-expert** | Gemini 3 Pro (env) | Эксперт — AI-диалог по задаче проекта |
-| **task-summarizer** (Клерк) | Gemini 2.5 Flash | Суммаризация результатов задачи |
-| **task-reviewer** (Профессор) | Gemini 3 Pro | Ревью завершённой задачи |
-| **file-analyzer** (Клерк) | Gemini 2.5 Flash | Автоанализ файлов проекта |
-| **snapshot-creator** (Клерк) | Gemini 2.5 Flash | Fallback-создание snapshot при заполнении контекста (v3.18) |
+| **chat** | Claude Sonnet | Универсальный AI-чат |
+| **ben** | Claude Haiku | Гид по платформе |
+| **project-creation** | Claude Sonnet | Секретарь — AI-интервью для создания проектов |
+| **project-manager** | Claude Haiku | Менеджер проекта (живой AI-диалог) |
+| **professor-planning** | Claude Opus | Профессор планирования — генерация плана задач |
+| **task-expert** | Claude Sonnet | Эксперт — AI-диалог по задаче проекта |
+| **task-summarizer** (Клерк) | Claude Haiku | Суммаризация результатов задачи |
+| **task-reviewer** (Профессор) | Claude Opus | Ревью завершённой задачи |
+| **file-analyzer** (Клерк) | Claude Haiku | Автоанализ файлов проекта |
+| **snapshot-creator** (Клерк) | Claude Haiku | Fallback-создание snapshot при заполнении контекста (v3.18) |
 
 ### Файловая структура
 
@@ -139,7 +139,8 @@ lib/prompts/
 │   ├── base.md
 │   ├── safety.md
 │   ├── formatting.md
-│   └── russian-market.md
+│   ├── russian-market.md
+│   └── dev-mode.md          # Dev mode промпт (v3.23)
 │
 ├── professors/                  # Промпты профессоров (v3.14+)
 │   ├── planning.md          # Профессор планирования
@@ -180,9 +181,9 @@ lib/prompts/
 
 | Клерк | Модель | Триггер | Назначение |
 |-------|--------|---------|------------|
-| **Анализатор файлов** | Gemini 2.5 Flash | Upload файла в проект | Описание, тип, папка, ключевые темы, manifest |
-| **Суммаризатор задач** | Gemini 2.5 Flash | Завершение задачи | Краткое описание результатов + статус + артефакты |
-| **Snapshot Creator** | Gemini 2.5 Flash | Fallback при заполнении контекста | Автоматический snapshot диалога (v3.18) |
+| **Анализатор файлов** | Claude Haiku | Upload файла в проект | Описание, тип, папка, ключевые темы, manifest |
+| **Суммаризатор задач** | Claude Haiku | Завершение задачи | Краткое описание результатов + статус + артефакты |
+| **Snapshot Creator** | Claude Haiku | Fallback при заполнении контекста | Автоматический snapshot диалога (v3.18) |
 
 ### Профессоры (v3.14+)
 
@@ -190,8 +191,8 @@ lib/prompts/
 
 | Профессор | Модель | Триггер | Назначение |
 |-----------|--------|---------|------------|
-| **Планирование** | Gemini 3 Pro | Кнопка «Начать планирование» | Генерация плана задач проекта (tasks, risks, recommendations) |
-| **Ревью задач** | Gemini 3 Pro | Завершение задачи (needsReview) | Проверка качества: decision, issues, score, overallComment |
+| **Планирование** | Claude Opus | Кнопка «Начать планирование» | Генерация плана задач проекта (tasks, risks, recommendations) |
+| **Ревью задач** | Claude Opus | Завершение задачи (needsReview) | Проверка качества: decision, issues, score, overallComment |
 
 ### Эксперты (v3.16+)
 
@@ -199,25 +200,25 @@ lib/prompts/
 
 | Эксперт | Модель | Оболочка | Назначение |
 |---------|--------|----------|------------|
-| **Эксперт по задаче** | Gemini 3 Pro (env) | Full-screen layout (`app/(task)/`) | AI-диалог по задаче, инструменты, артефакты, завершение задачи |
+| **Эксперт по задаче** | Claude Sonnet | Full-screen layout (`app/(task)/`) | AI-диалог по задаче, инструменты, артефакты, завершение задачи |
 
 ---
 
 ## Проекты (v3.2.0)
 
-> Изолированные рабочие пространства с Claude (Anthropic) через OpenRouter.
+> Изолированные рабочие пространства с Claude (Anthropic) через `@ai-sdk/anthropic`.
 
 ### Концепция
 
-Проект = изолированное рабочее пространство со своими чатами и настройками. В отличие от основного чата (Gemini), проекты используют модели Claude.
+Проект = изолированное рабочее пространство со своими чатами и настройками. Все AI-модели (и основной чат, и проекты) работают через Anthropic Claude.
 
 ### Три уровня моделей
 
 | Уровень | Модель | Иконка | Назначение |
 |---------|--------|--------|------------|
-| **Исполнитель** | Claude Haiku | ⚡ | Быстрый, экономичный, простые задачи |
-| **Эксперт** | Claude Sonnet | 🎯 | Баланс скорости и качества (по умолчанию) |
-| **Профессор** | Claude Opus | 🎓 | Максимальное качество, сложный reasoning |
+| **Исполнитель** | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`, $1/$5) | ⚡ | Быстрый, экономичный, простые задачи |
+| **Эксперт** | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`, $3/$15) | 🎯 | Баланс скорости и качества (по умолчанию) |
+| **Профессор** | Claude Opus 4.6 (`claude-opus-4-6`, $5/$25) | 🎓 | Максимальное качество, сложный reasoning |
 
 ### Режим Профессор (Pipeline)
 
@@ -227,6 +228,8 @@ lib/prompts/
 3. **Синтез (Opus)** — объединяет результаты в финальный ответ
 
 UI показывает прогресс с галочками для каждой подзадачи.
+
+> **v3.23.0:** Все модели переключены с Gemini на Claude через `@ai-sdk/anthropic` (прямое подключение, без OpenRouter).
 
 ### Структура файлов
 
@@ -312,7 +315,7 @@ components/projects/
 | Слой | Технология |
 |------|------------|
 | Frontend | Next.js 15.3, React 18, TypeScript, Tailwind CSS |
-| AI | Vercel AI SDK (@ai-sdk/google, @openrouter/ai-sdk-provider) |
+| AI | Vercel AI SDK (@ai-sdk/anthropic, @ai-sdk/google для vision-ocr) |
 | Auth | NextAuth 5.0-beta.25 |
 | Database | PostgreSQL (Neon) + Drizzle ORM |
 | Storage | Vercel Blob Storage |
@@ -344,6 +347,41 @@ components/projects/
 - `components/message.tsx` — loading states для document tools + file naming fix
 
 **Детали:** [_archive/TZ_C3_ChatContext/](_archive/TZ_C3_ChatContext/)
+
+### ТЗ-C4: Anthropic Provider Switch — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Полное переключение AI-провайдера** — все AI-модели переведены с Google Gemini на Anthropic Claude через `@ai-sdk/anthropic` (прямое подключение, без OpenRouter)
+- **Три модели Claude** — Sonnet (`claude-sonnet-4-5-20250929`), Haiku (`claude-haiku-4-5-20251001`), Opus (`claude-opus-4-6`)
+- **~28 файлов обновлены** — providers, routes, pipeline, clerks, professors, UI components, configs
+- **Tool schema fix** — `getWeather` tool: `z.union()` → `z.object()` с optional полями (Claude API требует `type: "object"` в input_schema)
+- **vision-ocr.ts** — намеренно оставлен на Google Gemini (отдельный `createGoogleGenerativeAI` экземпляр)
+- **`@ai-sdk/anthropic@2.0.63`** — не v3.x, т.к. `LanguageModelV3` несовместим с `ai@5.0.123` (LanguageModelV2)
+
+**Маппинг моделей:**
+| Было (Gemini) | Стало (Claude) | Где используется |
+|---------------|----------------|-----------------|
+| `gemini-3-pro` | `claude-sonnet` | Основной чат, Секретарь, Эксперт |
+| `gemini-2.5-flash` | `claude-haiku` | Бен, Менеджер, Клерки |
+| — | `claude-opus` | Профессоры (планирование, ревью) |
+
+**Пост-тестирование (v3.23.0):**
+- **`sanitizeCoreMessages()`** — 4-проходная санитизация CoreMessage[] для Anthropic API: удаление orphan tool-calls (без tool_result), orphan tool-results (без tool-call), пустых сообщений. Применяется в обоих chat routes
+- **Фикс двойного аватара** — удалено условие `&& isLoading` в `message.tsx`, пустые assistant-сообщения скрываются всегда
+- **Фикс сохранения пустых сообщений** — `onFinish` в обоих routes фильтрует assistant-сообщения без текста/tools перед `saveMessages()`
+- **Dev Mode** — `SIMPLY_DEV_MODE=true`: badge модели в чате + prompt injection, промпт `lib/prompts/core/dev-mode.md`
+- **Переписаны core промпты** — base.md, safety.md, formatting.md, russian-market.md адаптированы под Claude
+
+**Ключевые файлы:**
+- `lib/ai/providers.ts` — полная перезапись (createAnthropic + customProvider)
+- `lib/prompts/types.ts` — ModelId: `'claude-haiku' | 'claude-sonnet' | 'claude-opus'`
+- `lib/ai/models.ts` — UI-список моделей (3 модели Claude)
+- `lib/ai/model-tiers.ts` — executor=haiku, expert=sonnet, professor=opus
+- `lib/ai/professor-pipeline.ts` — analyze/synthesize=opus, execute=haiku
+- `app/(chat)/api/chat/route.ts` — удалён providerOptions, включён convertTextFilePartsInMessage
+- `lib/ai/tools/get-weather.ts` — fix z.union() → z.object() для Claude API
+
+**Детали:** [_archive/TZ_C4_AnthropicProvider/](_archive/TZ_C4_AnthropicProvider/)
 
 ### ТЗ-08CS: Chat Sidebar + RightSidebar — ✅ ЗАВЕРШЁН
 
@@ -440,7 +478,7 @@ components/projects/
 ### ТЗ-C2: TaskCompletion — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
-- **Завершение задач** — полный flow: кнопка «Завершить задачу» → суммаризация (Gemini Flash) → ревью Профессором (Gemini Pro) → карточка результата
+- **Завершение задач** — полный flow: кнопка «Завершить задачу» → суммаризация (Claude Haiku) → ревью Профессором (Claude Opus) → карточка результата
 - **Три типа карточек** — success (задача принята), issues (замечания, можно доработать/принять), critical (замечания, только доработка)
 - **API endpoints** — `POST .../complete` (summarize → review → save), `POST .../reopen` (issues → in_progress), `POST .../accept` (issues → done + unlock)
 - **Разблокировка зависимых** — при завершении задачи автоматически разблокируются все зависимые задачи (locked → pending), если ВСЕ их зависимости done
@@ -491,7 +529,7 @@ components/projects/
 **Архитектурные решения:**
 - Route group `(task)` — изолированный layout без AppSidebar, но с SidebarProvider для Artifact useSidebar context
 - `DefaultChatTransport` — custom API path `/api/projects/${projectId}/tasks/${taskId}/chat`
-- Модель через env: `process.env.EXPERT_MODEL || 'gemini-3-pro'` — гибкость без хардкода
+- Модель через env: `process.env.EXPERT_MODEL || 'claude-sonnet'` — гибкость без хардкода
 - `startTask()` — атомарная операция: создание Chat + обновление ProjectTask.chatId + status → in_progress
 - `createTaskSnapshot` — пропущен (запланирован в C1.5)
 - Карточки задач `<div>` → `<button>` с hover эффектами и cursor pointer
@@ -592,7 +630,7 @@ components/projects/
 ### ТЗ-B1: Professor Planning — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
-- **Профессор планирования** — AI-агент (Gemini 3 Pro), анализирует проект и генерирует структурированный план задач
+- **Профессор планирования** — AI-агент (Claude Opus), анализирует проект и генерирует структурированный план задач
 - **`POST /api/projects/[id]/plan`** — endpoint Профессора: принимает passport, manifest, files, возвращает plan JSON
 - **`Project.planJson`** (jsonb) — хранение плана (discriminated union: complete / partial / needs_input)
 - **`Project.planStatus`** — статус планирования (idle / generating / done / error)
@@ -619,7 +657,7 @@ components/projects/
 ### ТЗ-A3: Manager + Clerk + Manifest — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
-- **Клерк-анализатор файлов** — `POST /api/projects/[id]/analyze-file` (Gemini Flash): анализ файла, определение типа, описания, папки, ключевых тем
+- **Клерк-анализатор файлов** — `POST /api/projects/[id]/analyze-file` (Claude Haiku): анализ файла, определение типа, описания, папки, ключевых тем
 - **Auto-folder + move-to-folder** — автоматическое создание папок и перемещение файлов по рекомендации Клерка
 - **Project Manifest** — `Project.manifestJson` (jsonb), автоматическая агрегация всех анализов
 - **Живой Менеджер в drawer** — `ServiceChatCore` вместо заглушки, серверная персистенция сообщений
@@ -666,7 +704,7 @@ components/projects/
 **Выполнено:**
 - **XML-промпт Секретаря** — качественное адаптивное интервью (2-4 вопроса, не допрос)
 - **Промпт в отдельном файле** — `lib/prompts/service-chats/project-creation.md` (SSOT)
-- **Gemini 3 Pro** — модель повышена с Flash для качественного интервью
+- **Claude Sonnet** — модель для качественного интервью
 - **Динамический user_context** — pronouns, bio, occupation, displayName (пустые поля не включаются)
 - **Pronouns в greeting** — клиент учитывает ты/вы при приветствии
 - **Убраны Quick Actions** — секретарь сам ведёт диалог, кнопки не нужны
@@ -791,7 +829,7 @@ components/projects/
 - **Панель "Пульс проекта"** — живая панель состояния на странице проекта
 - **Статусы задач** — not_started / in_progress / done
 - **Автопереход статуса** — not_started → in_progress при первом сообщении
-- **AI-итог проекта** — генерация summary через Gemini 2.5 Flash
+- **AI-итог проекта** — генерация summary через Claude Haiku
 - **UI статусов** — визуальные индикаторы в списке задач, детальной панели, sidebar
 
 **Ключевые файлы:**
@@ -866,7 +904,7 @@ components/projects/
 
 **Выполнено:**
 - **Проекты** — изолированные рабочие пространства
-- **Claude интеграция** — Haiku, Sonnet, Opus через OpenRouter
+- **Claude интеграция** — Haiku, Sonnet, Opus (v3.23.0: через @ai-sdk/anthropic напрямую)
 - **Три уровня моделей** — Исполнитель/Эксперт/Профессор
 - **Режим Профессор** — Pipeline с Opus→Haiku→Opus
 - **UI прогресса** — галочки для подзадач в pipeline
@@ -945,7 +983,7 @@ components/projects/
 | **8** | Инструменты Фаза 1 (Perplexity, Plus AI, Ideogram) | 🔴 Высокий |
 | **9** | RAG (База знаний) | 🟡 Средний |
 | **10** | Chat Memory | 🟡 Средний |
-| **11** | Мультипровайдер (GPT, Claude) | 🟡 Средний |
+| **11** | Мультипровайдер (GPT) | 🟡 Средний |
 | **12** | Биллинг (Pay-as-you-go) | 🟡 Средний |
 | **13** | Инструменты Фаза 2 | 🟢 Низкий |
 | **14** | Инструменты Фаза 3 + Morning Briefing | 🟢 Низкий |
@@ -960,18 +998,18 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.22.0 |
+| Версия | 3.23.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21), ChatContextManagement (v3.22) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21), ChatContextManagement (v3.22), AnthropicProviderSwitch (v3.23) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Профессоры | 2 (planning, task-review) |
 | Клерки | 3 (file-analyzer, task-summarizer, snapshot-creator) |
 | Сервисные чаты | 3 (ben, project-creation, project-manager) |
 | Промптов | 10 (chat, ben, project-creation, project-manager, professor-planning, task-expert, task-summarizer, task-review, file-analyzer, snapshot-creator) |
-| AI моделей | 5 (Gemini 3 Pro, 2.5 Flash, Claude Haiku, Sonnet, Opus) |
+| AI моделей | 3 (Claude Sonnet, Haiku, Opus) + Gemini для vision-ocr |
 | AI-инструментов | 11 |
 | Типов документов | 5 (text, markdown, excel, presentation-reveal, presentation-pptx) |
 | Тем презентаций | 5 |
@@ -998,6 +1036,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_C4_AnthropicProvider/](_archive/TZ_C4_AnthropicProvider/) — ТЗ-C4 Anthropic Provider Switch
 - [_archive/TZ_C3_ChatContext/](_archive/TZ_C3_ChatContext/) — ТЗ-C3 Chat Context Management
 - [_archive/TZ_08_ChatSidebar/](_archive/TZ_08_ChatSidebar/) — ТЗ-08CS Chat Sidebar + RightSidebar
 - [_archive/TZ_07_ToolActivity/](_archive/TZ_07_ToolActivity/) — ТЗ-07 Tool Activity UX + Sidebar Icon Mode
@@ -1034,4 +1073,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-15
+**Обновлено:** 2026-02-16

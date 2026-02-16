@@ -19,7 +19,7 @@ export const BEN_CONFIG: ServiceChatConfig = {
   size: { width: 380, height: 500 },
 
   // AI
-  model: "gemini-flash",
+  model: "claude-haiku",
   apiEndpoint: "/api/assistant/ben", // Use existing API for now
 
   // UX

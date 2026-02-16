@@ -3,7 +3,7 @@
 name: agent-name
 displayName: Название агента
 category: general
-model: gemini-2.5-flash
+model: claude-haiku
 
 # Какие skills использует этот агент
 skills: []

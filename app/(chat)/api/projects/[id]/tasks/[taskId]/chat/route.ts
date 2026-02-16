@@ -27,7 +27,7 @@ import {
 import { calcUsagePercent, SNAPSHOT_THRESHOLD, FALLBACK_MESSAGE_PAIRS } from "@/lib/ai/context-limits";
 import { createFallbackSnapshot } from "@/lib/ai/clerks/snapshot-creator";
 import { ChatSDKError } from "@/lib/errors";
-import { convertToUIMessages, estimateMessageTokens, generateUUID } from "@/lib/utils";
+import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages } from "@/lib/utils";
 
 export const maxDuration = 180;
 
@@ -257,7 +257,7 @@ export async function POST(
     const assistantMessageId = generateUUID();
 
     // Model: env variable with fallback
-    const expertModelId = process.env.EXPERT_MODEL || "gemini-3-pro";
+    const expertModelId = process.env.EXPERT_MODEL || "claude-sonnet";
     const modelToUse = myProvider.languageModel(expertModelId);
     const isProjectChat = true;
 
@@ -275,7 +275,7 @@ export async function POST(
         const result = streamText({
           model: modelToUse,
           system: finalSystemPrompt,
-          messages: convertToCoreMessages(uiMessages),
+          messages: sanitizeCoreMessages(convertToCoreMessages(uiMessages)),
           temperature: 1.0,
           stopWhen: stepCountIs(5),
           experimental_activeTools: getActiveToolNames(isProjectChat),
@@ -379,9 +379,23 @@ export async function POST(
             chatId,
             tokenCount: estimateMessageTokens(filteredParts),
           };
+        }).filter((msg) => {
+          // Don't save empty assistant messages (no useful content after filtering)
+          if (msg.role === "assistant") {
+            const hasContent = msg.parts.some(
+              (p: any) => p.type === "text" && p.text?.trim()
+            );
+            const hasTools = msg.parts.some(
+              (p: any) => p.type?.startsWith("tool-")
+            );
+            return hasContent || hasTools;
+          }
+          return true;
         });
 
-        await saveMessages({ messages: messagesToSave });
+        if (messagesToSave.length > 0) {
+          await saveMessages({ messages: messagesToSave });
+        }
       },
       onError: () => {
         return "Oops, an error occurred!";

@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.22.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.23.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -41,11 +41,11 @@
 - **Best-in-Class API** — не изобретаем велосипеды, интегрируем лучшие решения
 
 **Ключевые особенности:**
-- Универсальный AI-чат с инструментами (Gemini)
-- Проекты: изолированные рабочие пространства (⚠️ временно Gemini)
+- Универсальный AI-чат с инструментами (Claude Sonnet)
+- Проекты: изолированные рабочие пространства (Claude Haiku/Sonnet/Opus)
 - Сервисные чаты: Бен (❓), создание проекта, менеджер
 - Три уровня персонализации: Профиль + RAG + Chat Memory
-- Мультипровайдер: Gemini + Claude (GPT планируется)
+- Anthropic Claude — основной и единственный провайдер (Gemini только для vision-ocr)
 - Оплата в рублях (ЮKassa, Тинькофф, СБП)
 
 ---
@@ -55,10 +55,10 @@
 **Frontend:** Next.js 15.3 (App Router, RSC), TypeScript, Tailwind CSS
 
 **AI:**
-- Vercel AI SDK (@ai-sdk/google, @ai-sdk/openai, @ai-sdk/anthropic)
-- Текущий: Google Gemini (3 Pro + 2.5 Flash)
+- Vercel AI SDK (@ai-sdk/anthropic, @ai-sdk/google для vision-ocr)
+- Текущий: Anthropic Claude (Sonnet + Haiku + Opus)
 - Voice Input: Deepgram Nova-3 (русский язык)
-- План: мультипровайдер
+- План: мультипровайдер (GPT)
 
 **Backend:** NextAuth 5.0-beta.25, PostgreSQL (Neon), Drizzle ORM
 
@@ -82,7 +82,7 @@
 - `lib/prompts/build-task-expert-prompt.ts` — Prompt builder для Эксперта
 - `lib/prompts/clerks/` — Промпты клерков (file-analyzer.md, task-summarizer.md, snapshot-creator.md)
 - `lib/prompts/service-chats/` — Промпты сервисных чатов (project-creation.md, project-manager.md)
-- `lib/prompts/core/` — Базовые промпты (.md файлы)
+- `lib/prompts/core/` — Базовые промпты (.md файлы: base, safety, formatting, russian-market, dev-mode)
 - `lib/prompts/contexts/` — Контексты (user-profile, chat-memory)
 
 **Unified Input System (v3.4.0):**
@@ -134,15 +134,16 @@
 - `components/chat-sidebar.tsx` — Материалы чата (артефакты + вложения), scroll-to-message навигация, скачивание. Использует RightSidebar
 
 **AI/Chat:**
-- `app/(chat)/api/chat/route.ts` — Chat endpoint (streaming, isStarred PATCH)
+- `app/(chat)/api/chat/route.ts` — Chat endpoint (streaming, sanitizeCoreMessages, isStarred PATCH)
 - `app/(chat)/api/chat/[id]/route.ts` — Chat management (DELETE/PATCH)
 - `app/(chat)/api/chat/[id]/generate-title/route.ts` — Автонейминг + summary (v3.5.0)
-- `lib/ai/providers.ts` — Конфигурация AI-моделей
+- `lib/ai/providers.ts` — Конфигурация AI-моделей (Anthropic Claude)
 - `lib/ai/model-tiers.ts` — Уровни моделей для проектов (Haiku/Sonnet/Opus)
 - `lib/ai/professor-pipeline.ts` — Pipeline для режима Профессор
 - `lib/ai/task-completion-types.ts` — Zod-схемы и типы для завершения задач
-- `lib/ai/clerks/task-summarizer.ts` — Суммаризатор задач (Gemini Flash)
-- `lib/ai/professors/task-reviewer.ts` — Ревьюер задач (Gemini Pro)
+- `lib/ai/clerks/task-summarizer.ts` — Суммаризатор задач (Claude Haiku)
+- `lib/ai/professors/task-reviewer.ts` — Ревьюер задач (Claude Opus)
+- `lib/utils.ts` — `sanitizeCoreMessages()` — санитизация сообщений для Anthropic API (удаление orphan tool-calls/results, пустых сообщений)
 - `lib/ai/tools/` — Инструменты (search, excel, web scraping)
 - `lib/ai/tools/excel/` — Excel tools (create, parse, edit)
 - `lib/ai/tools/read-project-file.ts` — Tool чтения файлов проекта по имени
@@ -163,7 +164,7 @@
 - `app/(dashboard)/projects/new/page.tsx` — Создание проекта
 - `app/(dashboard)/projects/[id]/chat/` — Чаты проекта
 - `app/(chat)/api/projects/` — API проектов (CRUD)
-- `app/(chat)/api/projects/[id]/plan/route.ts` — Профессор планирования (Gemini 3 Pro)
+- `app/(chat)/api/projects/[id]/plan/route.ts` — Профессор планирования (Claude Opus)
 - `app/(chat)/api/projects/[id]/approve-plan/route.ts` — Утверждение плана → ProjectTask[]
 - `app/(chat)/api/projects/[id]/tasks/route.ts` — GET ProjectTask[]
 - `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — Чат с Экспертом (streaming)
@@ -171,7 +172,7 @@
 - `app/(chat)/api/projects/[id]/tasks/[taskId]/complete/route.ts` — Завершение задачи (summarize → review → save)
 - `app/(chat)/api/projects/[id]/tasks/[taskId]/reopen/route.ts` — Доработка (issues → in_progress)
 - `app/(chat)/api/projects/[id]/tasks/[taskId]/accept/route.ts` — Принятие (issues → done + unlock)
-- `app/(chat)/api/projects/[id]/analyze-file/route.ts` — Клерк-анализатор файлов (Gemini Flash)
+- `app/(chat)/api/projects/[id]/analyze-file/route.ts` — Клерк-анализатор файлов (Claude Haiku)
 - `lib/ai/professor-types.ts` — Zod-схемы плана (tasks, risks, recommendations, caveats)
 - `lib/ai/tools/chat-tools.ts` — Shared tools (getStandardTools)
 - `components/projects/professor-progress.tsx` — UI прогресса pipeline
@@ -219,7 +220,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-C3 (v3.22.0 — ChatContextManagement), ТЗ-08CS (v3.21.0 — ChatSidebar + RightSidebar), ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-C4 (v3.23.0 — AnthropicProviderSwitch), ТЗ-C3 (v3.22.0 — ChatContextManagement), ТЗ-08CS (v3.21.0 — ChatSidebar + RightSidebar), ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**
@@ -228,7 +229,7 @@
 | 8 | Инструменты Фаза 1 (Perplexity, Plus AI, Ideogram) | Высокий |
 | 9 | RAG (База знаний) | Средний |
 | 10 | Chat Memory | Средний |
-| 11 | Мультипровайдер GPT | Средний |
+| 11 | Мультипровайдер (GPT) | Средний |
 | 12 | Биллинг (Pay-as-you-go) | Средний |
 
 **Документы в холсте (5 типов):**
@@ -378,4 +379,4 @@ specs/
 
 ---
 
-**Обновлено:** 2026-02-15
+**Обновлено:** 2026-02-16

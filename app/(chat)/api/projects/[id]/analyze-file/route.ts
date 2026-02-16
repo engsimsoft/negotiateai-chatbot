@@ -2,7 +2,7 @@
  * ТЗ-A3: Clerk File Analyzer Endpoint
  *
  * POST /api/projects/[id]/analyze-file
- * Accepts { fileId }, calls Gemini Flash with clerk prompt,
+ * Accepts { fileId }, calls Claude Haiku with clerk prompt,
  * saves analysis to file metadata, auto-creates folder,
  * moves file, rebuilds project manifest.
  */
@@ -119,9 +119,8 @@ ${preview}
 ${folderNames.length > 0 ? JSON.stringify(folderNames) : "[]"}
 </existing_folders>`;
 
-    // Call Gemini Flash
     const result = await generateText({
-      model: myProvider.languageModel("gemini-2.5-flash"),
+      model: myProvider.languageModel("claude-haiku"),
       system: CLERK_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.1,

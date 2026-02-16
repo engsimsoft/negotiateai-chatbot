@@ -156,7 +156,7 @@ export async function POST(
     );
 
     // Resolve model: env variable with fallback
-    const modelId = process.env.PROFESSOR_MODEL || "gemini-3-pro";
+    const modelId = process.env.PROFESSOR_MODEL || "claude-opus";
 
     // Call Professor
     const result = await generateText({

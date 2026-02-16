@@ -93,7 +93,7 @@ export function InputContextProvider({
   redirectPath,
   onSubmit: onSubmitProp,
   disabled = false,
-  defaultModelId = "auto",
+  defaultModelId = "claude-sonnet",
   defaultTier = "expert",
   // Controlled mode props
   value: controlledValue,

@@ -19,7 +19,7 @@ export const PROJECT_CREATION_CONFIG: ServiceChatConfig = {
   size: { width: 440, height: 540 },
 
   // AI
-  model: "gemini-flash",
+  model: "claude-haiku",
   apiEndpoint: "/api/service-chat", // Will use unified API
 
   // UX

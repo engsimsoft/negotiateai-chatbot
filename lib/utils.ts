@@ -1,6 +1,7 @@
 import type {
   CoreAssistantMessage,
   CoreToolMessage,
+  ModelMessage,
   UIMessage,
   UIMessagePart,
 } from 'ai';
@@ -109,6 +110,72 @@ export function convertToUIMessages(messages: DBMessage[]): ChatMessage[] {
         createdAt: formatISO(message.createdAt),
       },
     };
+  });
+}
+
+/**
+ * Sanitize CoreMessage[] for Anthropic API compatibility.
+ * - Removes empty assistant/tool messages
+ * - Removes orphan tool-call parts (tool_use without matching tool_result)
+ * - Removes orphan tool messages (tool_result without preceding tool_use)
+ * Legacy data from Gemini may contain these inconsistencies.
+ */
+export function sanitizeCoreMessages(messages: ModelMessage[]): ModelMessage[] {
+  // Pass 1: Collect all tool result IDs
+  const toolResultIds = new Set<string>();
+  for (const msg of messages) {
+    if (msg.role === 'tool' && Array.isArray(msg.content)) {
+      for (const part of msg.content) {
+        if (part.type === 'tool-result' && part.toolCallId) {
+          toolResultIds.add(part.toolCallId);
+        }
+      }
+    }
+  }
+
+  // Pass 2: Strip orphan tool-calls from assistant messages
+  const cleaned = messages.map((msg) => {
+    if (msg.role !== 'assistant' || typeof msg.content === 'string') return msg;
+
+    const content = (msg.content as any[]).filter((part) => {
+      if (part.type === 'tool-call') {
+        return toolResultIds.has(part.toolCallId);
+      }
+      return true;
+    });
+
+    return { ...msg, content };
+  });
+
+  // Pass 3: Collect surviving tool-call IDs (after stripping)
+  const survivingToolCallIds = new Set<string>();
+  for (const msg of cleaned) {
+    if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+      for (const part of msg.content as any[]) {
+        if (part.type === 'tool-call') {
+          survivingToolCallIds.add(part.toolCallId);
+        }
+      }
+    }
+  }
+
+  // Pass 4: Filter out empty and orphan messages
+  return cleaned.filter((msg) => {
+    // Remove empty assistant messages (empty content array)
+    if (msg.role === 'assistant') {
+      if (typeof msg.content === 'string') return msg.content.trim().length > 0;
+      if (Array.isArray(msg.content)) return msg.content.length > 0;
+      return false;
+    }
+    // Remove tool messages with no surviving tool-call counterpart
+    if (msg.role === 'tool' && Array.isArray(msg.content)) {
+      const filtered = msg.content.filter(
+        (part: any) => part.type === 'tool-result' && survivingToolCallIds.has(part.toolCallId)
+      );
+      if (filtered.length === 0) return false;
+      (msg as any).content = filtered;
+    }
+    return true;
   });
 }
 

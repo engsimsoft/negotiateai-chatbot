@@ -1,6 +1,6 @@
 {
   "name": "simply",
-  "version": "3.22.0",
+  "version": "3.23.0",
   "description": "Simply — AI agents platform for Russian market",
   "private": true,
   "scripts": {
@@ -24,6 +24,7 @@
     "test": "export PLAYWRIGHT=True && pnpm exec playwright test"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.63",
     "@ai-sdk/gateway": "^1.0.15",
     "@ai-sdk/google": "^2.0.44",
     "@ai-sdk/openai": "^2.0.89",

@@ -4,7 +4,7 @@
  * Summarizes a completed task's chat into structured output.
  * Called internally by POST .../complete endpoint.
  *
- * Model: SUMMARIZER_MODEL env || gemini-2.5-flash
+ * Model: SUMMARIZER_MODEL env || claude-haiku
  * Prompt: lib/prompts/clerks/task-summarizer.md
  */
 
@@ -138,7 +138,7 @@ function stripCodeBlocks(text: string): string {
 export async function summarizeTask(
   input: SummarizeTaskInput
 ): Promise<TaskSummary> {
-  const modelId = process.env.SUMMARIZER_MODEL || "gemini-2.5-flash";
+  const modelId = process.env.SUMMARIZER_MODEL || "claude-haiku";
 
   try {
     const userMessage = buildUserMessage(input);

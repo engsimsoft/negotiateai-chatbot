@@ -268,7 +268,7 @@ export function TaskChat({
           isReadonly={isReadonly || isCompleting}
           messages={messages}
           regenerate={regenerate}
-          selectedModelId="gemini-3-pro"
+          selectedModelId="claude-sonnet"
           setMessages={setMessages}
           status={status}
           votes={undefined}
@@ -309,7 +309,7 @@ export function TaskChat({
               setMessages={setMessages}
               status={status}
               stop={stop}
-              selectedModelId="gemini-3-pro"
+              selectedModelId="claude-sonnet"
               selectedVisibilityType="private"
               isProjectChat
             />
@@ -346,7 +346,7 @@ export function TaskChat({
         isReadonly={isReadonly || isCompleting}
         messages={messages}
         regenerate={regenerate}
-        selectedModelId="gemini-3-pro"
+        selectedModelId="claude-sonnet"
         selectedVisibilityType="private"
         sendMessage={sendMessage}
         setAttachments={setAttachments}

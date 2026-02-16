@@ -46,7 +46,7 @@ export interface ServiceChatConfig {
   size?: { width: number; height: number }; // for floating
 
   // AI configuration
-  model: "gemini-flash" | "claude-sonnet";
+  model: "claude-haiku" | "claude-sonnet";
   apiEndpoint?: string; // defaults to /api/service-chat
 
   // UX configuration

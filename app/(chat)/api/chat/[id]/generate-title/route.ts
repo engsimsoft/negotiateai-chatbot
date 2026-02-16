@@ -75,7 +75,7 @@ export async function POST(
       })
       .join("\n");
 
-    // Generate title and summary using Gemini Flash (fast and cheap)
+    // Generate title and summary using Claude Haiku (fast and cheap)
     const { object } = await generateObject({
       model: myProvider.languageModel("title-model"),
       schema: z.object({

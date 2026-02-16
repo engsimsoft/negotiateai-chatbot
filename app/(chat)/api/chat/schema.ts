@@ -27,9 +27,9 @@ export const postRequestBodySchema = z.object({
     parts: z.array(partSchema),
   }),
   selectedChatModel: z.enum([
-    "auto",                 // Авто-выбор на основе агента (по умолчанию)
-    "gemini-3-pro",         // Gemini 3 Pro - профессиональные задачи
-    "gemini-2.5-flash",     // Gemini 2.5 Flash - простые задачи
+    "claude-sonnet",        // Claude Sonnet — баланс скорости и качества
+    "claude-haiku",         // Claude Haiku — быстрая модель
+    "claude-opus",          // Claude Opus — максимальное качество
   ]),
   selectedVisibilityType: z.enum(["public", "private"]),
   // ТЗ-03: Project chat support

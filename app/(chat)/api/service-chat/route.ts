@@ -92,19 +92,16 @@ function extractMessageContent(message: {
 
 /**
  * Get model ID based on context
- *
- * ⚠️ ВРЕМЕННО (v3.7.1): Все на Gemini, Claude отключён
- * См. ADR 011: docs/decisions/011-temporary-gemini-for-projects.md
  */
 function getModelId(context: ServiceChatContext): string {
   switch (context) {
     case "project-creation":
-      return "gemini-3-pro"; // ТЗ-12: Секретарь — нужна Pro модель для качественного интервью
+      return "claude-sonnet";
     case "ben":
     case "project-manager":
-      return "gemini-2.5-flash";
+      return "claude-haiku";
     default:
-      return "gemini-2.5-flash";
+      return "claude-haiku";
   }
 }
 

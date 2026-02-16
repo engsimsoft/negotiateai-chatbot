@@ -4,7 +4,7 @@
  * Creates a snapshot when the model ignores the system signal
  * after FALLBACK_MESSAGE_PAIRS exchanges.
  *
- * Model: SNAPSHOT_CLERK_MODEL env || gemini-2.5-flash
+ * Model: SNAPSHOT_CLERK_MODEL env || claude-haiku
  * Prompt: lib/prompts/clerks/snapshot-creator.md
  */
 
@@ -158,7 +158,7 @@ interface CreateFallbackSnapshotInput {
 export async function createFallbackSnapshot(
   input: CreateFallbackSnapshotInput
 ): Promise<(SnapshotOutput & { fullMarkdown: string }) | null> {
-  const modelId = process.env.SNAPSHOT_CLERK_MODEL || "gemini-2.5-flash";
+  const modelId = process.env.SNAPSHOT_CLERK_MODEL || "claude-haiku";
 
   try {
     const userMessage = buildUserMessage(input.chatMessages, {

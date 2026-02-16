@@ -2,33 +2,33 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-02-13
+**Обновлено:** 2026-02-16
 
 ---
 
 ## Быстрый обзор
 
-> **⚠️ ВРЕМЕННО (v3.7.1):** Проекты переведены на Gemini для тестирования. См. [ADR 011](decisions/011-temporary-gemini-for-projects.md).
+> **v3.23.0:** Все AI-модели переключены с Google Gemini на Anthropic Claude через `@ai-sdk/anthropic`.
 >
 > **v3.8.0:** Сервисные чаты унифицированы в систему ServiceChat. Prompt-агент удалён.
 
 | Чат | Модель | Статус | Назначение |
 |-----|--------|--------|-----------|
-| **Основной чат** | Gemini 3 Pro / 2.5 Flash | ✅ Работает | Универсальный AI-чат с инструментами |
-| **Проект: Исполнитель** | Gemini 2.5 Flash | ✅ Работает | Быстрые простые задачи |
-| **Проект: Эксперт** | Gemini 3 Pro | ✅ Работает | Баланс качества и скорости (DEFAULT) |
-| **Проект: Профессор** | Gemini 3 Pro | ✅ Работает | Сложные задачи |
-| **Бен** | Gemini 2.5 Flash | ✅ Работает | Помощник по платформе |
-| **Создание проекта** | Gemini 3 Pro | ✅ Работает | Секретарь — AI-интервью для создания проекта |
-| **Менеджер проекта** | Gemini 2.5 Flash | ✅ Работает | Живой AI-диалог, управление проектом |
-| **Профессор планирования** | Gemini 3 Pro | ✅ Работает | Генерация плана задач проекта (v3.14) |
-| **Эксперт по задаче** | Gemini 3 Pro (env) | ✅ Работает | AI-диалог по конкретной задаче проекта (v3.16) |
-| **Суммаризатор задач** | Gemini 2.5 Flash | ✅ Работает | Клерк — суммаризация результатов задачи (v3.17) |
-| **Ревьюер задач** | Gemini 3 Pro | ✅ Работает | Профессор — ревью завершённой задачи (v3.17) |
-| **Клерк-анализатор** | Gemini 2.5 Flash | ✅ Работает | Автоматический анализ файлов проекта |
-| **Snapshot Creator** | Gemini 2.5 Flash | ✅ Работает | Fallback-клерк создания snapshot при заполнении контекста (v3.18) |
+| **Основной чат** | Claude Sonnet / Haiku / Opus | ✅ Работает | Универсальный AI-чат с инструментами |
+| **Проект: Исполнитель** | Claude Haiku | ✅ Работает | Быстрые простые задачи |
+| **Проект: Эксперт** | Claude Sonnet | ✅ Работает | Баланс качества и скорости (DEFAULT) |
+| **Проект: Профессор** | Claude Opus | ✅ Работает | Сложные задачи |
+| **Бен** | Claude Haiku | ✅ Работает | Помощник по платформе |
+| **Создание проекта** | Claude Sonnet | ✅ Работает | Секретарь — AI-интервью для создания проекта |
+| **Менеджер проекта** | Claude Haiku | ✅ Работает | Живой AI-диалог, управление проектом |
+| **Профессор планирования** | Claude Opus | ✅ Работает | Генерация плана задач проекта (v3.14) |
+| **Эксперт по задаче** | Claude Sonnet | ✅ Работает | AI-диалог по конкретной задаче проекта (v3.16) |
+| **Суммаризатор задач** | Claude Haiku | ✅ Работает | Клерк — суммаризация результатов задачи (v3.17) |
+| **Ревьюер задач** | Claude Opus | ✅ Работает | Профессор — ревью завершённой задачи (v3.17) |
+| **Клерк-анализатор** | Claude Haiku | ✅ Работает | Автоматический анализ файлов проекта |
+| **Snapshot Creator** | Claude Haiku | ✅ Работает | Fallback-клерк создания snapshot при заполнении контекста (v3.18) |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
-| **Preset Помощники** | Gemini 3 Pro / 2.5 Flash | ⚠️ Частично | Маркетолог, Копирайтер и др. |
+| **Preset Помощники** | Claude Sonnet / Haiku | ⚠️ Частично | Маркетолог, Копирайтер и др. |
 
 ---
 
@@ -43,7 +43,7 @@
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 3 Pro |
+| **Модель** | Claude Sonnet |
 | **Оболочка** | Full-page (split layout: preview + chat) |
 | **Промпт** | XML-промпт Секретаря (`lib/prompts/service-chats/project-creation.md`) |
 | **Инструменты** | `updateProjectDraft` — обновляет черновик в реальном времени |
@@ -67,7 +67,7 @@ app/(chat)/api/service-chat/route.ts                # API (context: project-crea
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 2.5 Flash |
+| **Модель** | Claude Haiku |
 | **Оболочка** | Push-drawer справа (400px desktop, bottom sheet mobile) |
 | **Инструменты** | — (консультативный режим) |
 | **Персистенция** | Серверная (сообщения в БД, Chat с title `__service:project-manager`) |
@@ -99,7 +99,7 @@ lib/db/queries.ts                                    # getOrCreateManagerChat, f
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 3 Pro |
+| **Модель** | Claude Opus |
 | **Тип** | Backend endpoint (не интерактивный чат) |
 | **Триггер** | Кнопка "Начать планирование" → `POST /api/projects/[id]/plan` |
 
@@ -132,7 +132,7 @@ app/(chat)/api/service-chat/route.ts                # Manager с план-кон
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | `process.env.EXPERT_MODEL \|\| 'gemini-3-pro'` |
+| **Модель** | `process.env.EXPERT_MODEL \|\| 'claude-sonnet'` |
 | **Оболочка** | Отдельная route group `app/(task)/` — полноэкранный layout без AppSidebar |
 | **Промпт** | `lib/prompts/experts/task-expert.md` + `buildTaskExpertPrompt()` |
 | **Инструменты** | Shared tools (search, documents, excel, readProjectFile, createSnapshot) — `getStandardTools()` |
@@ -191,7 +191,7 @@ lib/prompts/build-task-expert-prompt.ts                   # Prompt builder
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 2.5 Flash |
+| **Модель** | Claude Haiku |
 | **Тип** | Backend endpoint (не интерактивный чат) |
 | **Триггер** | Fire-and-forget после upload файла |
 
@@ -221,7 +221,7 @@ lib/db/queries.ts                                    # rebuildProjectManifest
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 2.5 Flash |
+| **Модель** | Claude Haiku |
 | **Тип** | Backend (внутренний вызов, не отдельный endpoint) |
 | **Триггер** | Вызов в `complete/route.ts` → `summarizeTask()` |
 
@@ -243,7 +243,7 @@ lib/prompts/clerks/task-summarizer.md     # Промпт
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 3 Pro |
+| **Модель** | Claude Opus |
 | **Тип** | Backend (внутренний вызов, не отдельный endpoint) |
 | **Триггер** | Вызов в `complete/route.ts` → `reviewTask()` (если needsReview) |
 
@@ -266,7 +266,7 @@ lib/prompts/professors/task-review.md     # Промпт
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 2.5 Flash |
+| **Модель** | Claude Haiku |
 | **Тип** | Backend (внутренний вызов в task expert chat route) |
 | **Триггер** | Если Эксперт игнорирует 5+ пар сообщений после порога (≥70% контекста) |
 
@@ -302,7 +302,7 @@ lib/prompts/clerks/snapshot-creator.md     # Промпт клерка
 | 📊 Аналитик | `analyst` | Анализ данных, отчёты |
 | 🎯 Наставник | `mentor` | Карьерные советы, мотивация |
 
-**Модель:** Gemini 3 Pro / 2.5 Flash (как основной чат)
+**Модель:** Claude Sonnet / Haiku (как основной чат)
 
 **⚠️ ПРОБЛЕМА:** Инструкции помощников определены в коде, но **НЕ применяются**!
 - `helperId` не передаётся в API при отправке сообщений
@@ -347,8 +347,9 @@ components/chat.tsx:182-183         # ← helperId НЕ передаётся
 **Где:** Главная страница, `/chat/[id]`
 
 **Модели:**
-- `gemini-3-pro` — Gemini 3 Pro Preview ($2/$12 за 1M токенов)
-- `gemini-2.5-flash` — Gemini 2.5 Flash ($0.075/$0.30 за 1M токенов)
+- `claude-sonnet` — Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`, $3/$15 за 1M токенов) — по умолчанию
+- `claude-haiku` — Claude Haiku 4.5 (`claude-haiku-4-5-20251001`, $1/$5 за 1M токенов)
+- `claude-opus` — Claude Opus 4.6 (`claude-opus-4-6`, $5/$25 за 1M токенов)
 
 **Особенности:**
 - Полная поддержка инструментов (search, documents, excel)
@@ -359,7 +360,7 @@ components/chat.tsx:182-183         # ← helperId НЕ передаётся
 **Файлы:**
 ```
 app/(chat)/api/chat/route.ts          # API endpoint
-lib/ai/providers.ts                   # Конфигурация Gemini
+lib/ai/providers.ts                   # Конфигурация Anthropic Claude
 lib/prompts/builder/index.ts          # buildChatPrompt()
 ```
 
@@ -369,49 +370,50 @@ lib/prompts/builder/index.ts          # buildChatPrompt()
 
 **Где:** `/projects/[id]/chat`
 
-**Провайдер:** Google Gemini (напрямую)
+**Провайдер:** Anthropic Claude через `@ai-sdk/anthropic`
 
-> **⚠️ ВРЕМЕННО (v3.7.1):** Переведены на Gemini. См. [ADR 011](decisions/011-temporary-gemini-for-projects.md).
->
-> **Ранее:** Claude через OpenRouter (см. [ADR 007](decisions/007-projects-claude-integration.md)).
+> **v3.23.0:** Переключены с Gemini на Claude через `@ai-sdk/anthropic` (прямое подключение).
 
 ### 2.1 Исполнитель (Executor)
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 2.5 Flash |
-| **Input** | $0.075 / 1M токенов |
-| **Output** | $0.30 / 1M токенов |
-| **Контекст** | 1M |
+| **Модель** | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) |
+| **Input** | $1 / 1M токенов |
+| **Output** | $5 / 1M токенов |
+| **Контекст** | 200K |
+| **Max output** | 64K токенов |
 | **Когда использовать** | Простые задачи, черновики, быстрые ответы |
 
 ### 2.2 Эксперт (Expert) — DEFAULT
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 3 Pro |
-| **Input** | $2 / 1M токенов |
-| **Output** | $12 / 1M токенов |
-| **Контекст** | 1M |
+| **Модель** | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) |
+| **Input** | $3 / 1M токенов |
+| **Output** | $15 / 1M токенов |
+| **Контекст** | 200K (1M бета) |
+| **Max output** | 64K токенов |
 | **Когда использовать** | Большинство задач, баланс качества и цены |
 
 ### 2.3 Профессор (Professor)
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 3 Pro |
-| **Input** | $2 / 1M токенов |
-| **Output** | $12 / 1M токенов |
-| **Контекст** | 1M |
+| **Модель** | Claude Opus 4.6 (`claude-opus-4-6`) |
+| **Input** | $5 / 1M токенов |
+| **Output** | $25 / 1M токенов |
+| **Контекст** | 200K (1M бета) |
+| **Max output** | 128K токенов |
 | **Когда использовать** | Сложные задачи, анализ, стратегия |
 
-> **⚠️ Pipeline отключён:** Professor = Expert (оба Gemini 3 Pro). Код pipeline сохранён для будущего.
+> **Pipeline активен:** Opus (анализ) → Haiku (исполнение) → Opus (синтез).
 
 **Файлы:**
 ```
 lib/ai/model-tiers.ts                 # Конфигурация уровней
-lib/ai/providers.ts                   # geminiFlash, geminiPro
-lib/ai/professor-pipeline.ts          # Multi-step pipeline (отключён)
+lib/ai/providers.ts                   # claudeHaiku, claudeSonnet, claudeOpus
+lib/ai/professor-pipeline.ts          # Multi-step pipeline
 ```
 
 ---
@@ -422,7 +424,7 @@ lib/ai/professor-pipeline.ts          # Multi-step pipeline (отключён)
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 2.5 Flash |
+| **Модель** | Claude Haiku |
 | **Оболочка** | Floating modal (bottom-right) |
 | **Назначение** | Помощь с вопросами о Simply |
 | **Стиль** | Дружелюбный, конкретный, с примерами |
@@ -452,30 +454,36 @@ lib/prompts/agents/ben/AGENT.md                    # Промпт с frontmatter
 
 ## Конфигурация провайдеров
 
-### Google Gemini (активный)
+### Anthropic Claude (основной — v3.23.0+)
 
 ```typescript
 // lib/ai/providers.ts
-import { google } from "@ai-sdk/google";
+import { createAnthropic } from "@ai-sdk/anthropic";
 
-export const geminiFlash = google("gemini-2.5-flash");
-export const geminiPro = google("gemini-3-pro-preview");
+const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+export const myProvider = customProvider({
+  languageModels: {
+    "claude-sonnet": anthropic("claude-sonnet-4-5-20250929"),
+    "claude-haiku": anthropic("claude-haiku-4-5-20251001"),
+    "claude-opus": anthropic("claude-opus-4-6"),
+    "title-model": anthropic("claude-haiku-4-5-20251001"),
+    "artifact-model": anthropic("claude-sonnet-4-5-20250929"),
+  },
+});
 ```
 
-**API Key:** `GOOGLE_GENERATIVE_AI_API_KEY`
+**API Key:** `ANTHROPIC_API_KEY`
 
-### Claude через OpenRouter (⏸️ временно отключён)
-
-> **⚠️ ВРЕМЕННО ОТКЛЮЧЁН (v3.7.1):** См. [ADR 011](decisions/011-temporary-gemini-for-projects.md).
+### Google Gemini (только vision-ocr)
 
 ```typescript
-// lib/ai/providers.ts (закомментировано)
-// import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-// const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
-// export const claudeHaiku = openrouter("anthropic/claude-haiku-4.5");
+// lib/ai/vision-ocr.ts
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
 ```
 
-**API Key:** `OPENROUTER_API_KEY` (не требуется временно)
+**API Key:** `GOOGLE_GENERATIVE_AI_API_KEY` (используется только для OCR)
 
 ---
 
@@ -483,13 +491,11 @@ export const geminiPro = google("gemini-3-pro-preview");
 
 | Модель | Input | Output | Контекст | Используется в |
 |--------|-------|--------|----------|---------------|
-| Gemini 3 Pro | $2 | $12 | 1M | Основной чат, Секретарь, Эксперт, Профессор планирования, Ревьюер задач |
-| Gemini 2.5 Flash | $0.075 | $0.30 | 1M | Ben, Менеджер, Исполнитель, Клерк-анализатор, Суммаризатор задач, Snapshot Creator |
-| Gemini 2.5 Pro | $1.25 | $5 | 1M | Suggestions (внутренний) |
+| Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) | $3 | $15 | 200K | Основной чат (DEFAULT), Секретарь, Эксперт, артефакты |
+| Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | $1 | $5 | 200K | Бен, Менеджер, Исполнитель, Клерки (анализатор, суммаризатор, snapshot) |
+| Claude Opus 4.6 (`claude-opus-4-6`) | $5 | $25 | 200K | Профессоры (планирование, ревью задач) |
 
 *Цены за 1M токенов*
-
-> **Claude (отключён):** Haiku $1/$5, Sonnet $3/$15, Opus $5/$25 — см. [ADR 007](decisions/007-projects-claude-integration.md)
 
 ---
 

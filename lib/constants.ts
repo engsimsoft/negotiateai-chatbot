@@ -8,4 +8,6 @@ export const isTestEnvironment = Boolean(
     process.env.CI_PLAYWRIGHT
 );
 
+export const isSimplyDevMode = process.env.SIMPLY_DEV_MODE === "true";
+
 export const DUMMY_PASSWORD = generateDummyPassword();

@@ -1,53 +1,32 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-// import { createOpenRouter } from "@openrouter/ai-sdk-provider"; // ⚠️ ВРЕМЕННО ОТКЛЮЧЕНО (v3.7.1)
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { customProvider } from "ai";
 import { isTestEnvironment } from "../constants";
 
 /**
  * AI Provider Configuration
  *
- * Источник правды: docs/ai-chats-map.md
+ * Primary provider: Anthropic Claude (via @ai-sdk/anthropic)
+ * Model map: claude-haiku (fast), claude-sonnet (balanced), claude-opus (best quality)
  *
- * ⚠️ ВРЕМЕННО (v3.7.1): Только Google Gemini
- * См. ADR 011: docs/decisions/011-temporary-gemini-for-projects.md
- *
- * Supported providers:
- * 1. Google Gemini (primary) — АКТИВЕН
- *    - gemini-3-pro — профессиональные задачи, dynamic thinking
- *    - gemini-2.5-flash — простые задачи, быстрый ответ
- *
- * 2. Anthropic Claude 4.5 via OpenRouter — ВРЕМЕННО ОТКЛЮЧЁН
- *    Причина: OpenRouter не поддерживает text/plain файлы как attachments
- *    План: Вернуть при переходе на production через @ai-sdk/anthropic напрямую
+ * Google Gemini retained only for vision-ocr.ts (separate instance, not through myProvider).
  */
 
-// Initialize Google provider
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+const anthropic = createAnthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-// ⚠️ ВРЕМЕННО ОТКЛЮЧЕНО (v3.7.1): OpenRouter для Claude
-// Причина: не поддерживает text/plain file attachments
-// const openRouter = createOpenRouter({
-//   apiKey: process.env.OPENROUTER_API_KEY,
-// });
 
 export const myProvider = isTestEnvironment
   ? (() => {
       const {
         artifactModel,
         chatModel,
-        reasoningModel,
         titleModel,
       } = require("./models.mock");
       return customProvider({
         languageModels: {
-          // Primary model IDs (используются во всём проекте)
-          "auto": chatModel,               // Default fallback (не используется напрямую, только UI)
-          "gemini-3-pro": chatModel,       // Professional agents
-          "gemini-2.5-flash": chatModel,   // Casual agents
-
-          // Internal use only (не показываются в UI)
+          "claude-sonnet": chatModel,
+          "claude-haiku": chatModel,
+          "claude-opus": chatModel,
           "title-model": titleModel,
           "artifact-model": artifactModel,
         },
@@ -55,49 +34,26 @@ export const myProvider = isTestEnvironment
     })()
   : customProvider({
       languageModels: {
-        // Primary model IDs (используются во всём проекте)
-        "auto": google("gemini-2.5-flash"),                   // Default fallback (не используется напрямую, только UI)
-        "gemini-3-pro": google("gemini-3-pro-preview"),       // Professional agents (Marketer, Copywriter, Translator, Mentor)
-        "gemini-2.5-flash": google("gemini-2.5-flash"),       // Casual agents (Cook, Astrologer, Universal, Odessit)
-
-        // Internal use only (не показываются в UI, используются внутри)
-        "title-model": google("gemini-2.5-flash"),            // Генерация заголовков чатов
-        "artifact-model": google("gemini-2.5-pro"),           // Генерация suggestions для артефактов
+        "claude-sonnet": anthropic("claude-sonnet-4-5-20250929"),
+        "claude-haiku": anthropic("claude-haiku-4-5-20251001"),
+        "claude-opus": anthropic("claude-opus-4-6"),
+        "title-model": anthropic("claude-haiku-4-5-20251001"),
+        "artifact-model": anthropic("claude-sonnet-4-5-20250929"),
       },
     });
 
-/**
- * ⚠️ ВРЕМЕННО ОТКЛЮЧЕНО (v3.7.1): OpenRouter/Claude
- * См. ADR 011: docs/decisions/011-temporary-gemini-for-projects.md
- *
- * OpenRouter models (Claude 4.5 via OpenRouter)
- *
- * Use directly with streamText/generateText:
- * ```ts
- * import { claudeSonnet, claudeOpus, claudeHaiku } from '@/lib/ai/providers';
- * const result = await streamText({ model: claudeSonnet, prompt: '...' });
- * ```
- *
- * Pricing (per 1M tokens):
- * - Haiku:  $1 input / $5 output  (fastest, cheapest)
- * - Sonnet: $3 input / $15 output (balanced)
- * - Opus:   $5 input / $25 output (best quality)
- */
-// export const claudeHaiku = openRouter("anthropic/claude-haiku-4.5");
-// export const claudeSonnet = openRouter("anthropic/claude-sonnet-4.5");
-// export const claudeOpus = openRouter("anthropic/claude-opus-4.5");
+// Direct model exports for pipelines and clerks
+export const claudeHaiku = anthropic("claude-haiku-4-5-20251001");
+export const claudeSonnet = anthropic("claude-sonnet-4-5-20250929");
+export const claudeOpus = anthropic("claude-opus-4-6");
 
-/**
- * Get Claude model by name
- * ⚠️ ВРЕМЕННО ОТКЛЮЧЕНО (v3.7.1)
- */
-// export function getClaudeModel(name: "haiku" | "sonnet" | "opus") {
-//   switch (name) {
-//     case "haiku":
-//       return claudeHaiku;
-//     case "opus":
-//       return claudeOpus;
-//     default:
-//       return claudeSonnet;
-//   }
-// }
+export function getClaudeModel(name: "haiku" | "sonnet" | "opus") {
+  switch (name) {
+    case "haiku":
+      return claudeHaiku;
+    case "opus":
+      return claudeOpus;
+    default:
+      return claudeSonnet;
+  }
+}

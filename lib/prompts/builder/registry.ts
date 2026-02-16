@@ -137,7 +137,7 @@ export function getAgentsRegistry(): AgentMetadata[] {
           name: data.name || agentDir.name,
           displayName: data.displayName || agentDir.name,
           description: data.description || '',
-          model: data.model || 'gemini-2.5-flash',
+          model: data.model || 'claude-haiku',
           skills: data.skills || [],
           icon: data.icon || '🤖',
           category: data.category || 'general',

@@ -197,11 +197,18 @@ const PurePreviewMessage = ({
     });
   }, [isLoading, dataStream, resolvedToolCallIds, deduplicatedParts]);
 
-  // ТЗ-07: Hide empty assistant message during streaming.
-  // Before any content arrives, the SDK creates an assistant message with empty parts.
-  // This renders an orphan avatar above ThinkingMessage — "double avatar" problem.
-  // We hide it until real content appears (tool parts, text, reasoning, or data-stream indicators).
-  if (message.role === "assistant" && isLoading) {
+  // Dev: extract model name from data stream for badge (only in development)
+  const devModelName = useMemo(() => {
+    if (process.env.NODE_ENV !== "development") return null;
+    const parts = dataStream.filter(p => p.type === "data-model-info");
+    return (parts[parts.length - 1]?.data as { modelName?: string } | undefined)?.modelName ?? null;
+  }, [dataStream]);
+
+  // Hide empty assistant messages (no visible content).
+  // During streaming the SDK may create an assistant message with empty parts before
+  // content arrives — "double avatar" problem. After completion, a stale empty message
+  // can also remain (e.g. after model switch). Hide in both cases.
+  if (message.role === "assistant") {
     const hasToolParts = message.parts?.some((p) => {
       const t = (p as any).type as string;
       return typeof t === "string" && t.startsWith("tool-");
@@ -238,6 +245,11 @@ const PurePreviewMessage = ({
             <div className="flex size-8 items-center justify-center rounded-full bg-background ring-1 ring-border">
               <SparklesIcon size={14} />
             </div>
+            {devModelName && (
+              <span className="mt-0.5 font-mono text-[10px] leading-none text-muted-foreground/60">
+                {devModelName}
+              </span>
+            )}
           </div>
         )}
 

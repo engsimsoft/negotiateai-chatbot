@@ -176,9 +176,17 @@ export function composeChatPrompt(context: BuildContext = {}): ComposedPrompt {
     parts.push('---\n\n' + buildSkillsMetadataBlock(skills));
   }
 
+  // Dev mode: inject debug instructions (controlled by SIMPLY_DEV_MODE env)
+  if (process.env.SIMPLY_DEV_MODE === 'true') {
+    const devBlock = loadCoreBlock('dev-mode.md');
+    if (devBlock) {
+      parts.push('---\n\n' + devBlock);
+    }
+  }
+
   return {
     systemPrompt: parts.join('\n\n'),
-    model: context.model || 'gemini-3-pro',
+    model: context.model || 'claude-sonnet',
     greeting: 'Привет! Чем могу помочь?',
     toolAccess: null, // All tools
   };
@@ -245,7 +253,7 @@ export function composeAgentPrompt(
 
   return {
     systemPrompt: parts.join('\n\n'),
-    model: (context.model || agent.model || 'gemini-2.5-flash') as ModelId,
+    model: (context.model || 'claude-haiku') as ModelId,
     greeting,
     toolAccess: [], // Agents typically don't have tools
   };
@@ -284,7 +292,7 @@ export function composeSkillPrompt(
 
   return {
     systemPrompt: parts.join('\n\n'),
-    model: context.model || 'gemini-3-pro',
+    model: context.model || 'claude-sonnet',
     toolAccess: skill.tools.length > 0 ? skill.tools : null,
   };
 }

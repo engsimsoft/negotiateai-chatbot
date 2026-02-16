@@ -68,9 +68,8 @@ export async function POST(
       })
       .join("\n");
 
-    // Generate summary using Gemini Flash
     const { text } = await generateText({
-      model: myProvider.languageModel("gemini-2.5-flash"),
+      model: myProvider.languageModel("claude-haiku"),
       prompt: `Ты — менеджер проекта. На основе итогов задач напиши краткий статус проекта.
 
 Проект: ${project.name}

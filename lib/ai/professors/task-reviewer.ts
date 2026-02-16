@@ -4,7 +4,7 @@
  * Reviews a completed task's output against expected goals.
  * Called internally by POST .../complete endpoint (only if needsReview).
  *
- * Model: PROFESSOR_MODEL env || gemini-3-pro
+ * Model: PROFESSOR_MODEL env || claude-opus
  * Prompt: lib/prompts/professors/task-review.md
  * Output: <review_analysis> (markdown) + <review_json> (structured verdict)
  */
@@ -118,7 +118,7 @@ ${artifactsBlock}
 export async function reviewTask(
   input: ReviewTaskInput
 ): Promise<ProfessorVerdict> {
-  const modelId = process.env.PROFESSOR_MODEL || "gemini-3-pro";
+  const modelId = process.env.PROFESSOR_MODEL || "claude-opus";
 
   try {
     const userMessage = buildUserMessage(input);

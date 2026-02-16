@@ -53,7 +53,7 @@ export function CompactInput({
   placeholder,
   className,
   showAttachments = true,
-  defaultModelId = "auto",
+  defaultModelId = "claude-sonnet",
   defaultTier = "expert",
 }: CompactInputProps) {
   return (

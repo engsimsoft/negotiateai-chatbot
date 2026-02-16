@@ -12,6 +12,44 @@
 
 ---
 
+## [3.23.0] - 2026-02-16 - Anthropic Provider Switch (ТЗ-C4)
+
+**MINOR RELEASE**: Полное переключение AI-провайдера с Google Gemini на Anthropic Claude. Все AI-модели теперь работают через `@ai-sdk/anthropic` (прямое подключение, без OpenRouter).
+
+### Changed
+- **AI-провайдер** — `@ai-sdk/google` → `@ai-sdk/anthropic@2.0.63` для всех чатов, клерков, профессоров и экспертов
+- **Основной чат** — `gemini-3-pro` → `claude-sonnet` (`claude-sonnet-4-5-20250929`)
+- **Бен, Менеджер, Клерки** — `gemini-2.5-flash` → `claude-haiku` (`claude-haiku-4-5-20251001`)
+- **Профессоры (планирование, ревью)** — `gemini-3-pro` → `claude-opus` (`claude-opus-4-6`)
+- **Professor Pipeline** — analyze/synthesize: Opus, execute: Haiku
+- **Model Tiers** — executor=Claude Haiku 4.5 ($1/$5), expert=Claude Sonnet 4.5 ($3/$15), professor=Claude Opus 4.6 ($5/$25)
+- **`lib/ai/providers.ts`** — полная перезапись: `createAnthropic` + `customProvider` вместо Google
+- **`lib/prompts/types.ts`** — `ModelId`: `'claude-haiku' | 'claude-sonnet' | 'claude-opus'`
+- **`lib/ai/models.ts`** — UI-список: 3 модели Claude, DEFAULT_CHAT_MODEL = "claude-sonnet"
+- **`app/(chat)/api/chat/route.ts`** — удалён `providerOptions` (thinkingConfig), убрана логика `"auto"`, включён `convertTextFilePartsInMessage`
+- **~28 файлов** — обновлены model IDs во всех routes, configs, UI components
+- **Core prompts** — `base.md`, `safety.md`, `formatting.md`, `russian-market.md` переписаны в XML-формате (оптимизация для Claude)
+
+### Added
+- **Dev mode: Model Badge** — бейдж модели (Haiku/Sonnet/Opus) под аватаром ассистента, видим только при `NODE_ENV=development` (`lib/types.ts`, `components/message.tsx`)
+- **Dev mode: Prompt Injection** — блок `<dev_mode>` в системном промпте при `SIMPLY_DEV_MODE=true`, модель объясняет роль и триггеры перед каждым ответом (`lib/prompts/core/dev-mode.md`, `lib/prompts/builder/composer.ts`)
+- **`SIMPLY_DEV_MODE`** — env-переменная для включения dev-блока в промптах (независимо от NODE_ENV, работает на staging/preview)
+- **`sanitizeCoreMessages()`** — утилита в `lib/utils.ts` для совместимости с Anthropic API: убирает пустые assistant messages, orphan tool-calls без tool-results, orphan tool messages без tool-calls
+
+### Fixed
+- **`getWeather` tool** — `z.union()` → `z.object()` с optional полями (Claude API требует `type: "object"` в tool input_schema)
+- **Double avatar bug** — пустые assistant messages скрыты независимо от `isLoading` (`components/message.tsx`)
+- **Empty message saving** — `onFinish` в обоих chat routes фильтрует пустые assistant messages перед сохранением в БД
+- **Orphan tool_use error** — legacy Gemini-данные с tool_use без tool_result больше не ломают Anthropic API благодаря `sanitizeCoreMessages()`
+
+### Technical
+- **`@ai-sdk/anthropic@2.0.63`** — не v3.x (LanguageModelV3 несовместим с ai@5.0.123 / LanguageModelV2)
+- **vision-ocr.ts** — намеренно оставлен на Google Gemini (`createGoogleGenerativeAI`)
+- **Ответы значительно быстрее** чем на Gemini (подтверждено мануальным тестом)
+- **Anthropic — единственный основной провайдер** (Google только для vision-ocr)
+
+---
+
 ## [3.22.0] - 2026-02-15 - Chat Context Management (ТЗ-C3)
 
 **MINOR RELEASE**: Портирование snapshot-системы управления контекстом из проектного чата в универсальный чат + множественные UX-фиксы.

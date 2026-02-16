@@ -55,7 +55,7 @@ import {
 import { ChatSDKError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
-import { convertToUIMessages, estimateMessageTokens, generateUUID } from "@/lib/utils";
+import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages } from "@/lib/utils";
 // ТЗ-07A: generateTitleFromUserMessage больше не используется здесь
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
@@ -286,10 +286,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // ⚠️ ВРЕМЕННО: Конвертация text/plain отключена (Gemini поддерживает)
-    // Код сохранён для будущего возврата к Claude
-    // const processedMessage = await convertTextFilePartsInMessage(message as ChatMessage);
-    const uiMessages = [...convertToUIMessages(messagesForModel), message as ChatMessage];
+    // Claude API не поддерживает text/plain как file attachment — конвертируем в text
+    const processedMessage = await convertTextFilePartsInMessage(message as ChatMessage);
+    const uiMessages = [...convertToUIMessages(messagesForModel), processedMessage];
 
     // Подсчитываем общее количество токенов в контексте (after trimming)
     const totalHistoryTokens = messagesForModel.reduce((sum, msg) => {
@@ -378,11 +377,10 @@ export async function POST(request: Request) {
           console.log(`[Project Chat] Using ${projectModelConfig.name} (${tier}) for project ${project.name}`);
           console.log(`[Project Chat] Context length: ${projectContext.length} chars`);
         } else {
-          // Regular chat: use Gemini
+          // Regular chat: use Claude
           const builtPrompt = buildChatPrompt(promptContext);
           systemPromptText = builtPrompt.systemPrompt;
-          const geminiModel = selectedChatModel === "auto" ? "gemini-3-pro" : selectedChatModel;
-          modelToUse = myProvider.languageModel(geminiModel);
+          modelToUse = myProvider.languageModel(selectedChatModel);
         }
 
         // ТЗ-C3: Inject previous snapshot context into system prompt
@@ -455,6 +453,14 @@ export async function POST(request: Request) {
           data: { percent: Math.round(estimatedPercent), tokens: totalHistoryTokens + systemPromptTokens },
         });
 
+        // Dev: emit model info for UI badge
+        {
+          const TIER_MODEL: Record<string, string> = { executor: "claude-haiku", expert: "claude-sonnet", professor: "claude-opus" };
+          const DISPLAY: Record<string, string> = { "claude-haiku": "Haiku", "claude-sonnet": "Sonnet", "claude-opus": "Opus" };
+          const mid = isProjectChat ? (TIER_MODEL[tier] || "claude-sonnet") : selectedChatModel;
+          dataStream.write({ type: "data-model-info", data: { modelId: mid, modelName: DISPLAY[mid] || mid } });
+        }
+
         // ТЗ-C3: Generate assistant message ID upfront (needed for snapshot tool)
         const assistantMessageId = generateUUID();
 
@@ -472,7 +478,7 @@ export async function POST(request: Request) {
             .join("\n");
 
           // Convert UI messages to CoreMessage format for pipeline
-          const coreMessages = convertToCoreMessages(uiMessages.slice(0, -1)); // Exclude current message
+          const coreMessages = sanitizeCoreMessages(convertToCoreMessages(uiMessages.slice(0, -1))); // Exclude current message
 
           try {
             let accumulatedContent = "";
@@ -521,16 +527,8 @@ export async function POST(request: Request) {
         const result = streamText({
           model: modelToUse,
           system: systemPromptText,
-          messages: convertToCoreMessages(uiMessages),
+          messages: sanitizeCoreMessages(convertToCoreMessages(uiMessages)),
           temperature: 1.0,
-          // Gemini-specific options (only apply for non-project chats)
-          providerOptions: isProjectChat ? {} : {
-            google: {
-              thinkingConfig: {
-                thinkingBudget: 1024,
-              },
-            },
-          },
           stopWhen: stepCountIs(5),
           // ТЗ-C1: Tools extracted to shared module (lib/ai/tools/chat-tools.ts)
           experimental_activeTools: getActiveToolNames(isProjectChat),
@@ -600,7 +598,7 @@ export async function POST(request: Request) {
 
             // Diagnostic: track tool call timing
             const toolCallTimes: Record<string, number> = {};
-            const modelName = isProjectChat ? `Claude/${tier}` : "Gemini";
+            const modelName = isProjectChat ? `Claude/${tier}` : "Claude";
 
             while (true) {
               const { value, done } = await reader.read();
@@ -704,6 +702,18 @@ export async function POST(request: Request) {
             chatId: id,
             tokenCount,
           };
+        }).filter((msg) => {
+          // Don't save empty assistant messages (no useful content after filtering)
+          if (msg.role === "assistant") {
+            const hasContent = msg.parts.some(
+              (p: any) => p.type === "text" && p.text?.trim()
+            );
+            const hasTools = msg.parts.some(
+              (p: any) => p.type?.startsWith("tool-")
+            );
+            return hasContent || hasTools;
+          }
+          return true;
         });
 
         // Логируем сохранение ассистент-сообщений
@@ -712,7 +722,9 @@ export async function POST(request: Request) {
           `[Token Aware] Chat ${id}: Saving ${messagesToSave.length} assistant message(s) with ~${totalTokens} tokens`
         );
 
-        await saveMessages({ messages: messagesToSave });
+        if (messagesToSave.length > 0) {
+          await saveMessages({ messages: messagesToSave });
+        }
 
         if (finalMergedUsage) {
           try {

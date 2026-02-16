@@ -5,7 +5,7 @@
  * Этот файл содержит только UI-представление моделей.
  */
 
-export const DEFAULT_CHAT_MODEL: string = "auto";
+export const DEFAULT_CHAT_MODEL: string = "claude-sonnet";
 
 export type ChatModel = {
   id: string;
@@ -19,30 +19,30 @@ export type ChatModel = {
 
 export const chatModels: ChatModel[] = [
   {
-    id: "auto",
-    name: "Авто (рекомендуется)",
-    description: "Автоматический выбор модели на основе агента",
+    id: "claude-sonnet",
+    name: "Claude Sonnet",
+    description: "Основная модель — баланс скорости и качества",
     pricing: {
-      input: "Зависит от агента",
-      output: "$2-12 (3 Pro) / $0.075-0.30 (Flash)",
+      input: "$3",
+      output: "$15",
     },
   },
   {
-    id: "gemini-3-pro",
-    name: "Gemini 3 Pro",
-    description: "Профессиональная модель с dynamic thinking",
-    pricing: {
-      input: "$2",
-      output: "$12",
-    },
-  },
-  {
-    id: "gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
+    id: "claude-haiku",
+    name: "Claude Haiku",
     description: "Быстрая модель для простых задач",
     pricing: {
-      input: "$0.075",
-      output: "$0.30",
+      input: "$1",
+      output: "$5",
+    },
+  },
+  {
+    id: "claude-opus",
+    name: "Claude Opus",
+    description: "Максимальное качество для сложных задач",
+    pricing: {
+      input: "$5",
+      output: "$25",
     },
   },
 ];

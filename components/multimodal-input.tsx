@@ -630,7 +630,7 @@ function PureModelSelectorCompact({
     );
   }
 
-  // Regular chat: show Gemini models
+  // Regular chat: show Claude models
   const selectedModel = chatModels.find(
     (model) => model.id === optimisticModelId
   );

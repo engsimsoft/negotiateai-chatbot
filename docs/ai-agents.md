@@ -1,7 +1,7 @@
 # Simply — Система промптов и помощники
 
-**Версия:** 3.17.0
-**Последнее обновление:** 2026-02-10
+**Версия:** 3.23.0
+**Последнее обновление:** 2026-02-16
 **Статус:** Skills + Agents + Experts + Professors + Clerks Architecture
 
 ---
@@ -103,7 +103,7 @@ name: agent-id
 displayName: Имя Агента
 description: >
   Описание агента.
-model: gemini-2.5-flash
+model: claude-haiku
 skills: [skill1, skill2]
 ---
 
@@ -117,7 +117,7 @@ skills: [skill1, skill2]
 name: agent-id
 displayName: Имя Агента
 description: Описание агента
-model: gemini-2.5-flash
+model: claude-haiku
 skills: []
 icon: "❓"
 ```
@@ -126,7 +126,7 @@ icon: "❓"
 
 | Agent | Модель | Описание | UI |
 |-------|--------|----------|-------|
-| **ben** | Gemini 2.5 Flash | Гид по платформе Simply | Модальное окно (❓) |
+| **ben** | Claude Haiku 4.5 | Гид по платформе Simply | Модальное окно (❓) |
 
 ### Структура файлов
 
@@ -155,7 +155,7 @@ lib/prompts/agents/
 | Параметр | Значение |
 |----------|----------|
 | ID | `chat` |
-| Модель | Gemini 3 Pro |
+| Модель | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) |
 | Инструменты | Все (search, documents, weather и др.) |
 | Сборка | `buildChatPrompt()` |
 
@@ -167,7 +167,7 @@ lib/prompts/agents/
 |----------|----------|
 | ID | `prompt-agent` |
 | Тип | Skill (utility/prompt-helper) |
-| Модель | Gemini 3 Pro |
+| Модель | Claude Sonnet 4.5 |
 | Инструменты | Нет (только текст) |
 | UI | Модальное окно (кнопка 📝) |
 | Сборка | `buildPromptAgentPrompt()` |
@@ -186,7 +186,7 @@ lib/prompts/agents/
 |----------|----------|
 | ID | `ben` |
 | Тип | Agent (agents/ben) |
-| Модель | Gemini 2.5 Flash |
+| Модель | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) |
 | Инструменты | Нет (только текст) |
 | UI | Модальное окно (кнопка ❓) |
 | Сборка | `buildBenPrompt()` |
@@ -214,7 +214,7 @@ AI-интервью для создания проектов.
 | Параметр | Значение |
 |----------|----------|
 | ID | `project-creation` |
-| Модель | Gemini 3 Pro |
+| Модель | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) |
 | Промпт | `lib/prompts/service-chats/project-creation.md` |
 | Оболочка | Full-page (split layout: preview + chat) |
 | Инструменты | `updateProjectDraft` |
@@ -227,7 +227,7 @@ AI-интервью для создания проектов.
 | Параметр | Значение |
 |----------|----------|
 | ID | `project-manager` |
-| Модель | Gemini 2.5 Flash |
+| Модель | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) |
 | Промпт | `lib/prompts/service-chats/project-manager.md` |
 | Оболочка | Push-drawer (400px desktop, bottom sheet mobile) |
 | Инструменты | — (консультативный) |
@@ -253,7 +253,7 @@ AI-диалог по конкретной ProjectTask. Эксперт получ
 | Параметр | Значение |
 |----------|----------|
 | ID | `task-expert` |
-| Модель | `process.env.EXPERT_MODEL \|\| 'gemini-3-pro'` |
+| Модель | `process.env.EXPERT_MODEL \|\| 'claude-sonnet'` (`claude-sonnet-4-5-20250929`) |
 | Промпт | `lib/prompts/experts/task-expert.md` |
 | Prompt builder | `lib/prompts/build-task-expert-prompt.ts` |
 | Endpoint | `POST /api/projects/[id]/tasks/[taskId]/chat` |
@@ -308,7 +308,7 @@ lib/ai/tools/read-project-file.ts            # Чтение файлов про�
 | Параметр | Значение |
 |----------|----------|
 | ID | `file-analyzer` |
-| Модель | Gemini 2.5 Flash |
+| Модель | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) |
 | Промпт | `lib/prompts/clerks/file-analyzer.md` |
 | Триггер | Fire-and-forget после upload файла |
 | Endpoint | `POST /api/projects/[id]/analyze-file` |
@@ -327,7 +327,7 @@ lib/ai/tools/read-project-file.ts            # Чтение файлов про�
 | Параметр | Значение |
 |----------|----------|
 | ID | `task-summarizer` |
-| Модель | Gemini 2.5 Flash |
+| Модель | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) |
 | Промпт | `lib/prompts/clerks/task-summarizer.md` |
 | Триггер | Вызов `POST /api/projects/[id]/tasks/[taskId]/complete` |
 | Endpoint | Внутренний вызов в complete endpoint |
@@ -358,7 +358,7 @@ lib/prompts/clerks/task-summarizer.md     # Промпт суммаризато�
 | Параметр | Значение |
 |----------|----------|
 | ID | `professor-planning` |
-| Модель | Gemini 3 Pro |
+| Модель | Claude Opus 4.6 (`claude-opus-4-6`) |
 | Промпт | `lib/prompts/professors/planning.md` |
 | Триггер | Кнопка «Начать планирование» |
 | Endpoint | `POST /api/projects/[id]/plan` |
@@ -375,7 +375,7 @@ lib/prompts/clerks/task-summarizer.md     # Промпт суммаризато�
 | Параметр | Значение |
 |----------|----------|
 | ID | `task-reviewer` |
-| Модель | Gemini 3 Pro |
+| Модель | Claude Opus 4.6 (`claude-opus-4-6`) |
 | Промпт | `lib/prompts/professors/task-review.md` |
 | Триггер | Вызов `POST /api/projects/[id]/tasks/[taskId]/complete` (если `needsReview`) |
 | Endpoint | Внутренний вызов в complete endpoint |
@@ -519,13 +519,14 @@ components/modal-assistants/
 
 | Промпт | Модель по умолчанию | Причина |
 |--------|---------------------|---------|
-| chat | Gemini 3 Pro | Качество, инструменты |
-| ben | Gemini 2.5 Flash | Быстрые ответы, экономия |
-| task-expert | Gemini 3 Pro (env) | Качественный диалог по задаче |
-| task-summarizer | Gemini 2.5 Flash | Быстрая суммаризация |
-| task-reviewer | Gemini 3 Pro | Качественное ревью |
-| professor-planning | Gemini 3 Pro | Сложные аналитические задачи |
-| file-analyzer | Gemini 2.5 Flash | Быстрый анализ файлов |
+| chat | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) | Качество, инструменты |
+| ben | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Быстрые ответы, экономия |
+| task-expert | Claude Sonnet 4.5 (env override) | Качественный диалог по задаче |
+| task-summarizer | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Быстрая суммаризация |
+| task-reviewer | Claude Opus 4.6 (`claude-opus-4-6`) | Качественное ревью |
+| professor-planning | Claude Opus 4.6 (`claude-opus-4-6`) | Сложные аналитические задачи |
+| file-analyzer | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Быстрый анализ файлов |
+| snapshot-creator | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Автоматический snapshot контекста |
 
 > **Источник правды:** [ai-providers.md](ai-providers.md) — полная информация о моделях и ценах.
 
@@ -601,4 +602,4 @@ components/modal-assistants/
 
 ---
 
-**Обновлено:** 2026-02-10
+**Обновлено:** 2026-02-16
