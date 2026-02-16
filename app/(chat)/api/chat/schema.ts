@@ -35,8 +35,6 @@ export const postRequestBodySchema = z.object({
   // ТЗ-03: Project chat support
   projectId: z.string().uuid().optional(),
   projectModelTier: z.enum(["executor", "expert", "professor"]).optional(),
-  // ТЗ-07A: Helper chat support
-  helperId: z.string().optional(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

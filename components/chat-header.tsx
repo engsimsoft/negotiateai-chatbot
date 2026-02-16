@@ -29,12 +29,6 @@ interface ChatHeaderProps {
   projectId?: string;
   /** Project name if this is a project chat */
   projectName?: string;
-  /** Helper ID if this is a helper chat (ТЗ-07A) */
-  helperId?: string;
-  /** Helper name if this is a helper chat */
-  helperName?: string;
-  /** Helper emoji if this is a helper chat */
-  helperEmoji?: string;
   /** ТЗ-08: Toggle chat sidebar */
   onToggleSidebar?: () => void;
   /** ТЗ-08: Whether chat sidebar is open */
@@ -45,9 +39,6 @@ function PureChatHeader({
   onInsertToChat,
   projectId,
   projectName,
-  helperId,
-  helperName,
-  helperEmoji,
   onToggleSidebar,
   isSidebarOpen,
 }: ChatHeaderProps) {
@@ -98,20 +89,6 @@ function PureChatHeader({
           >
             <FolderOpen className="size-3.5" />
             <span className="max-w-[120px] truncate sm:max-w-[200px]">{projectName}</span>
-          </Link>
-          <ChevronRight className="size-3.5 text-muted-foreground/50" />
-          <span className="font-medium text-foreground">Чат</span>
-        </div>
-      )}
-
-      {helperId && helperName && (
-        <div className="flex items-center gap-1 text-sm">
-          <Link
-            href={`/helpers/${helperId}`}
-            className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <span>{helperEmoji || "🤖"}</span>
-            <span className="max-w-[120px] truncate sm:max-w-[200px]">{helperName}</span>
           </Link>
           <ChevronRight className="size-3.5 text-muted-foreground/50" />
           <span className="font-medium text-foreground">Чат</span>

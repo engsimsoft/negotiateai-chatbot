@@ -113,8 +113,6 @@ export function SidebarHistory({
     switch (context.type) {
       case "project":
         return `/api/projects/${context.projectId}/chats`;
-      case "helper":
-        return `/api/helpers/${context.helperId}/chats`;
       default:
         return null; // Use pagination for general
     }

@@ -164,7 +164,6 @@ export async function POST(request: Request) {
       selectedVisibilityType,
       projectId,
       projectModelTier,
-      helperId,
     } = requestBody;
 
     const session = await auth();
@@ -220,10 +219,9 @@ export async function POST(request: Request) {
       await saveChat({
         id,
         userId: session.user.id,
-        title: projectId ? `Чат проекта` : helperId ? "Чат с помощником" : "Новый чат",
+        title: projectId ? `Чат проекта` : "Новый чат",
         visibility: selectedVisibilityType,
         projectId: projectId || undefined,
-        helperId: helperId || undefined,
       });
 
       // ТЗ-07C2: For new project tasks, immediately set status to in_progress

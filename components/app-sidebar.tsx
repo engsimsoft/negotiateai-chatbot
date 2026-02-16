@@ -25,8 +25,7 @@ import { useThemeSync } from "@/hooks/use-theme-sync";
 // Типы контекста sidebar (ТЗ-07A)
 export type SidebarContext =
   | { type: "general" }
-  | { type: "project"; projectId: string }
-  | { type: "helper"; helperId: string };
+  | { type: "project"; projectId: string };
 
 /**
  * Определить контекст sidebar на основе URL
@@ -36,12 +35,6 @@ function getSidebarContext(pathname: string): SidebarContext {
   const projectMatch = pathname.match(/^\/projects\/([^/]+)\/chat/);
   if (projectMatch) {
     return { type: "project", projectId: projectMatch[1] };
-  }
-
-  // /helpers/[id]/* → помощник
-  const helperMatch = pathname.match(/^\/helpers\/([^/]+)/);
-  if (helperMatch) {
-    return { type: "helper", helperId: helperMatch[1] };
   }
 
   // /chat/* → общие чаты
@@ -68,8 +61,6 @@ export function AppSidebar({ user }: AppSidebarProps) {
     switch (context.type) {
       case "project":
         return `/projects/${context.projectId}/chat`;
-      case "helper":
-        return `/helpers/${context.helperId}/chat`;
       default:
         return "/chat";
     }
@@ -80,8 +71,6 @@ export function AppSidebar({ user }: AppSidebarProps) {
     switch (context.type) {
       case "project":
         return "Чаты проекта";
-      case "helper":
-        return "Чаты помощника";
       default:
         return "Чаты";
     }

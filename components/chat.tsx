@@ -53,9 +53,6 @@ export function Chat({
   projectId,
   projectName,
   projectModelTier,
-  helperId,
-  helperName,
-  helperEmoji,
 }: {
   id: string;
   initialMessages: ChatMessage[];
@@ -67,9 +64,6 @@ export function Chat({
   projectId?: string;
   projectName?: string;
   projectModelTier?: string;
-  helperId?: string;
-  helperName?: string;
-  helperEmoji?: string;
 }) {
   const { visibilityType } = useChatVisibility({
     chatId: id,

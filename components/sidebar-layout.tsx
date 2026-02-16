@@ -16,7 +16,6 @@ interface SidebarLayoutProps {
  * Контекстный sidebar показывает чаты в зависимости от URL:
  * - /chat/* → общие чаты
  * - /projects/[id]/chat/* → чаты проекта
- * - /helpers/[id]/* → чаты помощника
  */
 export function SidebarLayout({ user, defaultOpen, children }: SidebarLayoutProps) {
   return (

@@ -8,8 +8,6 @@ import {
   GlavnayaGreeting,
   GlavnayaInput,
   ProjectsSection,
-  HelpersSection,
-  ToolsSection,
   ChatHistoryCard,
 } from "@/components/glavnaya";
 
@@ -53,12 +51,6 @@ export default async function DashboardPage() {
 
         {/* Projects */}
         <ProjectsSection />
-
-        {/* Helpers */}
-        <HelpersSection />
-
-        {/* Tools */}
-        <ToolsSection />
       </main>
     </div>
   );

@@ -36,24 +36,6 @@ export const user = pgTable("User", {
 export type User = InferSelectModel<typeof user>;
 
 // ============================================================================
-// Helper (ТЗ-07A) - Кастомные помощники пользователя
-// ============================================================================
-
-export const helper = pgTable("Helper", {
-  id: uuid("id").primaryKey().notNull().defaultRandom(),
-  userId: uuid("userId")
-    .notNull()
-    .references(() => user.id),
-  name: varchar("name", { length: 100 }).notNull(),
-  emoji: varchar("emoji", { length: 10 }).notNull().default("🤖"),
-  instruction: text("instruction"), // Системный промпт помощника
-  skills: jsonb("skills").$type<string[] | null>(), // Массив ID навыков
-  createdAt: timestamp("createdAt").notNull(),
-});
-
-export type Helper = InferSelectModel<typeof helper>;
-
-// ============================================================================
 // Project (ТЗ-03)
 // ============================================================================
 
@@ -223,8 +205,6 @@ export const chat = pgTable("Chat", {
     .references(() => user.id),
   // ТЗ-03: Привязка к проекту (null = свободный чат)
   projectId: uuid("projectId").references(() => project.id),
-  // ТЗ-07A: Привязка к помощнику (null = обычный чат)
-  helperId: uuid("helperId").references(() => helper.id),
   // ТЗ-07A: Флаг ручного переименования (для автонейминга)
   isRenamed: boolean("isRenamed").notNull().default(false),
   // ТЗ-07B: Краткое содержание чата (AI-generated)
