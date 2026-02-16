@@ -1,5 +1,5 @@
-export { ProjectCard } from "./project-card";
 export { CreateProjectDialog } from "./create-project-dialog";
+export { ProjectsPageContent } from "./projects-page-content";
 export { ProjectInstruction } from "./project-instruction";
 export { ProjectFiles } from "./project-files";
 export { ProjectChats } from "./project-chats";

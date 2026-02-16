@@ -337,29 +337,27 @@ ListDetailPage отвечает за:
 
 ## Этап 4D: Рефакторинг /projects на ListDetailPage
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4C
+**Статус:** ✅ Завершён
 
 **Цель:** Перевести `/projects` с grid-карточек на двухколоночный list-detail layout. Единый паттерн.
 
 **Задачи:**
-- [ ] Создать `components/projects/project-list-item.tsx`:
+- [x] Создать `components/projects/project-list-item.tsx`:
   - Элемент списка: иконка, название, мета (задачи, файлы, последняя активность)
   - Контекстное меню: переименовать, удалить (паттерн из ChatListItem)
   - Selected state
-- [ ] Создать `components/projects/project-detail-panel.tsx`:
+- [x] Создать `components/projects/project-detail-panel.tsx`:
   - Детали: название, описание, фаза, задачи, файлы, дата
   - «Открыть проект →» → `/projects/[id]`
   - Действия: переименовать, удалить
-- [ ] Создать `components/projects/projects-page-content.tsx`:
+- [x] Создать `components/projects/projects-page-content.tsx`:
   - Клиентский компонент с ListDetailPage
   - State: selectedProjectId, projects list
   - Handlers: delete, rename (из ProjectCard)
   - Кнопка «+ Новый проект» → `/projects/new`
-- [ ] Рефакторить `app/(dashboard)/projects/page.tsx`:
+- [x] Рефакторить `app/(dashboard)/projects/page.tsx`:
   - Server Component → ProjectsPageContent
-- [ ] Удалить `components/projects/project-card.tsx` (если больше не используется)
+- [x] Удалить `components/projects/project-card.tsx` (больше не используется)
 
 **Файлы (новые):**
 - `components/projects/project-list-item.tsx`
@@ -369,19 +367,23 @@ ListDetailPage отвечает за:
 **Файлы (модификация):**
 - `app/(dashboard)/projects/page.tsx` — рефакторинг
 
-**Файлы (возможное удаление):**
-- `components/projects/project-card.tsx`
-- `components/projects/create-project-dialog.tsx` — проверить использование
+**Файлы (удалено):**
+- `components/projects/project-card.tsx` — удалён (заменён на project-list-item + project-detail-panel)
+- `components/projects/create-project-dialog.tsx` — оставлен (используется в sidebar-projects.tsx)
+
+**Файлы (модификация дополнительно):**
+- `lib/db/queries.ts` — добавлен `phase` в select getProjectsWithStats
+- `components/projects/index.ts` — убран экспорт ProjectCard, добавлен ProjectsPageContent
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Браузер: `/projects` — двухколоночный layout (список + детали)
-- [ ] Браузер: клик на проект → правая панель с деталями
-- [ ] Браузер: «Открыть проект →» → `/projects/[id]`
-- [ ] Браузер: «+ Новый проект» → `/projects/new`
-- [ ] Браузер: переименование и удаление работают
-- [ ] 🧪 Мануальный тест пользователем
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] Браузер: `/projects` — двухколоночный layout (список + детали)
+- [x] Браузер: клик на проект → правая панель с деталями
+- [x] Браузер: «Открыть проект →» → `/projects/[id]`
+- [x] Браузер: «+ Новый проект» → `/projects/new`
+- [x] Браузер: переименование и удаление работают
+- [x] 🧪 Мануальный тест пользователем
 
 **Git:**
 ```bash

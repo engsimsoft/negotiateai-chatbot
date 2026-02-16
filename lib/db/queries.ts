@@ -1737,6 +1737,7 @@ export async function getProjectsWithStats({ userId }: { userId: string }) {
         name: project.name,
         description: project.description,
         instruction: project.instruction,
+        phase: project.phase,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
         fileCount: sql<number>`COALESCE(COUNT(DISTINCT ${projectFile.id}), 0)::int`,
