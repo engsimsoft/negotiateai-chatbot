@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 8 (1, 2, 3, 4A, 4B, 4C, 4D, 5, 6) |
-| Текущий этап | 4A |
+| Текущий этап | 4B |
 | Сессий (оценка) | 5-6 |
 
 **Принятые решения (от архитектора):**
@@ -246,9 +246,7 @@ git commit -m "feat(tz-dv2): dashboard mode cards + remove model selector"
 
 ## Этап 4B: ListDetailPage — универсальный layout-shell
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4A
+**Статус:** 🔄 Валидация (ожидание мануального теста)
 
 **Цель:** Извлечь из `/chats` универсальный composition-компонент ListDetailPage. Рефакторить `/chats` на его основе.
 
@@ -263,25 +261,14 @@ ListDetailPage отвечает за:
 Содержимое списка и правой панели — через props.
 
 **Задачи:**
-- [ ] Создать `components/list-detail/list-detail-page.tsx`:
-  ```tsx
-  interface ListDetailPageProps {
-    title: string;
-    itemCount: number;
-    itemCountLabel: (count: number) => string;
-    createButton?: { label: string; onClick: () => void } | { label: string; href: string };
-    emptyState: { icon: React.ReactNode; title: string; description: string };
-    isEmpty: boolean;
-    listContent: React.ReactNode;
-    detailContent: React.ReactNode;
-  }
-  ```
-- [ ] Создать `components/list-detail/index.ts` — экспорты
-- [ ] Рефакторить `components/chats/chats-page-content.tsx`:
+- [x] Создать `components/list-detail/list-detail-page.tsx`
+- [x] Создать `components/list-detail/index.ts` — экспорты
+- [x] Рефакторить `components/chats/chats-page-content.tsx`:
   - Заменить ручной layout на `<ListDetailPage>`
   - ChatList → `listContent`, ChatDetailPanel → `detailContent`
   - State/handlers остаются в chats-page-content
-- [ ] Проверить что `/chats` работает идентично
+- [x] Удалить orphaned `components/chats/chats-empty-state.tsx` (встроено в ListDetailPage)
+- [x] Проверить что `/chats` работает идентично
 
 **Файлы (новые):**
 - `components/list-detail/list-detail-page.tsx`
@@ -289,10 +276,14 @@ ListDetailPage отвечает за:
 
 **Файлы (модификация):**
 - `components/chats/chats-page-content.tsx` — использовать ListDetailPage
+- `components/chats/index.ts` — убрать экспорт ChatsEmptyState
+
+**Файлы (удаление):**
+- `components/chats/chats-empty-state.tsx` — заменён emptyState prop в ListDetailPage
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: `/chats` — выглядит и работает идентично (list + detail, delete, star)
 - [ ] 🧪 Мануальный тест пользователем
 

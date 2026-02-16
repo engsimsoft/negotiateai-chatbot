@@ -439,13 +439,15 @@ function PureMultimodalInput({
                 disabled={status !== "ready"}
               />
             )}
-            <ModelSelectorCompact
-              onModelChange={onModelChange}
-              selectedModelId={selectedModelId}
-              isProjectChat={isProjectChat}
-              projectModelTier={projectModelTier}
-              onProjectModelChange={onProjectModelChange}
-            />
+            {isProjectChat && (
+              <ModelSelectorCompact
+                onModelChange={onModelChange}
+                selectedModelId={selectedModelId}
+                isProjectChat={isProjectChat}
+                projectModelTier={projectModelTier}
+                onProjectModelChange={onProjectModelChange}
+              />
+            )}
             {/* ТЗ-5: Hints panel button */}
             <Button
               className="aspect-square h-8 rounded-lg p-1 transition-colors hover:bg-accent"

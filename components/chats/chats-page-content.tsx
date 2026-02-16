@@ -1,14 +1,11 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { MessageSquare } from "lucide-react";
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { UserMenu } from "@/components/user-menu";
+import { ListDetailPage } from "@/components/list-detail";
 import { ChatList } from "./chat-list";
 import { ChatDetailPanel } from "./chat-detail-panel";
-import { ChatsEmptyState } from "./chats-empty-state";
 
 export type ChatWithStats = {
   id: string;
@@ -22,6 +19,12 @@ export type ChatWithStats = {
 
 interface ChatsPageContentProps {
   initialChats: ChatWithStats[];
+}
+
+function chatCountLabel(count: number): string {
+  if (count === 1) return "чат";
+  if (count >= 2 && count <= 4) return "чата";
+  return "чатов";
 }
 
 export function ChatsPageContent({ initialChats }: ChatsPageContentProps) {
@@ -93,50 +96,32 @@ export function ChatsPageContent({ initialChats }: ChatsPageContentProps) {
   };
 
   return (
-    <div className="flex min-h-svh flex-col bg-muted/30">
-      {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard">
-            <Button size="icon" variant="ghost">
-              <ArrowLeft className="size-5" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="font-semibold">История чатов</h1>
-            <p className="text-xs text-muted-foreground">
-              {chats.length} {chats.length === 1 ? "чат" : chats.length < 5 ? "чата" : "чатов"}
-            </p>
-          </div>
-        </div>
-        <UserMenu />
-      </header>
-
-      {/* Content */}
-      {chats.length === 0 ? (
-        <ChatsEmptyState />
-      ) : (
-        <div className="flex flex-1">
-          {/* Left column: Chat list */}
-          <div className="w-full border-r md:w-80 lg:w-96">
-            <ChatList
-              chats={chats}
-              selectedChatId={selectedChatId}
-              onSelectChat={setSelectedChatId}
-              onDeleteChat={handleDeleteChat}
-              onToggleStar={handleToggleStar}
-            />
-          </div>
-
-          {/* Right column: Detail panel (hidden on mobile) */}
-          <div className="hidden flex-1 md:block">
-            <ChatDetailPanel
-              chat={selectedChat}
-              onToggleStar={handleToggleStar}
-            />
-          </div>
-        </div>
-      )}
-    </div>
+    <ListDetailPage
+      title="История чатов"
+      itemCount={chats.length}
+      itemCountLabel={chatCountLabel}
+      emptyState={{
+        icon: <MessageSquare className="size-8 text-muted-foreground" />,
+        title: "Нет чатов",
+        description:
+          "Здесь будут отображаться ваши чаты. Начните разговор с AI на главной странице.",
+      }}
+      isEmpty={chats.length === 0}
+      listContent={
+        <ChatList
+          chats={chats}
+          selectedChatId={selectedChatId}
+          onSelectChat={setSelectedChatId}
+          onDeleteChat={handleDeleteChat}
+          onToggleStar={handleToggleStar}
+        />
+      }
+      detailContent={
+        <ChatDetailPanel
+          chat={selectedChat}
+          onToggleStar={handleToggleStar}
+        />
+      }
+    />
   );
 }

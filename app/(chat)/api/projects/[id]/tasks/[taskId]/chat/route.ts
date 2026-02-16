@@ -272,6 +272,12 @@ export async function POST(
           data: { percent: estimatedPercent, tokens: messagesTokens + systemPromptTokens },
         });
 
+        // Dev: emit model info for UI badge
+        {
+          const DISPLAY: Record<string, string> = { "claude-haiku": "Haiku", "claude-sonnet": "Sonnet", "claude-opus": "Opus" };
+          dataStream.write({ type: "data-model-info", data: { modelId: expertModelId, modelName: DISPLAY[expertModelId] || expertModelId } });
+        }
+
         const result = streamText({
           model: modelToUse,
           system: finalSystemPrompt,
