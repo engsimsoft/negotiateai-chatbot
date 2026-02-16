@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { chatModeSchema } from "@/lib/ai/chat-mode-config";
 
 const textPartSchema = z.object({
   type: z.enum(["text"]),
@@ -26,11 +27,8 @@ export const postRequestBodySchema = z.object({
     role: z.enum(["user"]),
     parts: z.array(partSchema),
   }),
-  selectedChatModel: z.enum([
-    "claude-sonnet",        // Claude Sonnet — баланс скорости и качества
-    "claude-haiku",         // Claude Haiku — быстрая модель
-    "claude-opus",          // Claude Opus — максимальное качество
-  ]),
+  // ТЗ-DV2: chatMode replaces selectedChatModel — server determines model
+  chatMode: chatModeSchema.default("chat"),
   selectedVisibilityType: z.enum(["public", "private"]),
   // ТЗ-03: Project chat support
   projectId: z.string().uuid().optional(),

@@ -12,9 +12,8 @@ import type { ModelCatalog } from "tokenlens/core";
 import { fetchModels } from "tokenlens/fetch";
 import { getUsage } from "tokenlens/helpers";
 import { auth } from "@/app/(auth)/auth";
-import type { VisibilityType } from "@/components/visibility-selector";
 import { userEntitlements } from "@/lib/ai/entitlements";
-import type { ChatModel } from "@/lib/ai/models";
+import { getModelForChatMode } from "@/lib/ai/chat-mode-config";
 import { buildChatPrompt } from "@/lib/prompts/server";
 import type { BuildContext } from "@/lib/prompts";
 import { buildProjectContext } from "@/lib/prompts/contexts";
@@ -160,7 +159,7 @@ export async function POST(request: Request) {
     const {
       id,
       message,
-      selectedChatModel,
+      chatMode,
       selectedVisibilityType,
       projectId,
       projectModelTier,
@@ -222,6 +221,7 @@ export async function POST(request: Request) {
         title: projectId ? `Чат проекта` : "Новый чат",
         visibility: selectedVisibilityType,
         projectId: projectId || undefined,
+        chatMode,
       });
 
       // ТЗ-07C2: For new project tasks, immediately set status to in_progress
@@ -375,10 +375,11 @@ export async function POST(request: Request) {
           console.log(`[Project Chat] Using ${projectModelConfig.name} (${tier}) for project ${project.name}`);
           console.log(`[Project Chat] Context length: ${projectContext.length} chars`);
         } else {
-          // Regular chat: use Claude
+          // Regular chat: use Claude — model determined by chatMode
           const builtPrompt = buildChatPrompt(promptContext);
           systemPromptText = builtPrompt.systemPrompt;
-          modelToUse = myProvider.languageModel(selectedChatModel);
+          const chatModelId = getModelForChatMode(chatMode);
+          modelToUse = myProvider.languageModel(chatModelId);
         }
 
         // ТЗ-C3: Inject previous snapshot context into system prompt
@@ -455,7 +456,7 @@ export async function POST(request: Request) {
         {
           const TIER_MODEL: Record<string, string> = { executor: "claude-haiku", expert: "claude-sonnet", professor: "claude-opus" };
           const DISPLAY: Record<string, string> = { "claude-haiku": "Haiku", "claude-sonnet": "Sonnet", "claude-opus": "Opus" };
-          const mid = isProjectChat ? (TIER_MODEL[tier] || "claude-sonnet") : selectedChatModel;
+          const mid = isProjectChat ? (TIER_MODEL[tier] || "claude-sonnet") : getModelForChatMode(chatMode);
           dataStream.write({ type: "data-model-info", data: { modelId: mid, modelName: DISPLAY[mid] || mid } });
         }
 
@@ -546,8 +547,9 @@ export async function POST(request: Request) {
             );
             try {
               const providers = await getTokenlensCatalog();
+              const chatModelId = getModelForChatMode(chatMode);
               const modelId =
-                myProvider.languageModel(selectedChatModel).modelId;
+                myProvider.languageModel(chatModelId).modelId;
               if (!modelId) {
                 finalMergedUsage = usage;
                 dataStream.write({

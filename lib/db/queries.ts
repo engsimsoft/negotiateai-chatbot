@@ -151,15 +151,17 @@ export async function saveChat({
   title,
   visibility,
   projectId,
+  chatMode,
 }: {
   id: string;
   userId: string;
   title: string;
   visibility: VisibilityType;
   projectId?: string;
+  chatMode?: string;
 }) {
   try {
-    console.log('[saveChat] Attempting to save chat:', { id, userId, title, visibility, projectId });
+    console.log('[saveChat] Attempting to save chat:', { id, userId, title, visibility, projectId, chatMode });
     return await db.insert(chat).values({
       id,
       createdAt: new Date(),
@@ -167,6 +169,7 @@ export async function saveChat({
       title,
       visibility,
       projectId: projectId || null,
+      chatMode: chatMode || "chat",
     });
   } catch (error) {
     console.error('[saveChat] Database error:', error);
@@ -251,6 +254,7 @@ export async function getChatsByUserId({
           title: chat.title,
           userId: chat.userId,
           projectId: chat.projectId,
+          chatMode: chat.chatMode,
           isRenamed: chat.isRenamed,
           summary: chat.summary,
           isStarred: chat.isStarred,
@@ -1693,6 +1697,7 @@ export async function getChatsByProjectId({ projectId }: { projectId: string }) 
         title: chat.title,
         userId: chat.userId,
         projectId: chat.projectId,
+        chatMode: chat.chatMode,
         isRenamed: chat.isRenamed,
         summary: chat.summary,
         isStarred: chat.isStarred,

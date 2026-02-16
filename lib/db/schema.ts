@@ -205,6 +205,8 @@ export const chat = pgTable("Chat", {
     .references(() => user.id),
   // ТЗ-03: Привязка к проекту (null = свободный чат)
   projectId: uuid("projectId").references(() => project.id),
+  // ТЗ-DV2: Режим чата (chat/expertise/create)
+  chatMode: varchar("chatMode", { length: 20 }).notNull().default("chat"),
   // ТЗ-07A: Флаг ручного переименования (для автонейминга)
   isRenamed: boolean("isRenamed").notNull().default(false),
   // ТЗ-07B: Краткое содержание чата (AI-generated)

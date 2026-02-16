@@ -46,6 +46,7 @@ export function Chat({
   id,
   initialMessages,
   initialChatModel,
+  initialChatMode = "chat",
   initialVisibilityType,
   isReadonly,
   autoResume,
@@ -57,6 +58,7 @@ export function Chat({
   id: string;
   initialMessages: ChatMessage[];
   initialChatModel: string;
+  initialChatMode?: string;
   initialVisibilityType: VisibilityType;
   isReadonly: boolean;
   autoResume: boolean;
@@ -78,6 +80,8 @@ export function Chat({
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   const currentModelIdRef = useRef(currentModelId);
+  const [currentChatMode, setCurrentChatMode] = useState(initialChatMode);
+  const currentChatModeRef = useRef(currentChatMode);
   const [currentProjectTier, setCurrentProjectTier] = useState(projectModelTier || "expert");
   const currentProjectTierRef = useRef(currentProjectTier);
   const [retryState, setRetryState] = useState({ count: 0, maxRetries: 3 });
@@ -100,6 +104,10 @@ export function Chat({
   useEffect(() => {
     currentModelIdRef.current = currentModelId;
   }, [currentModelId]);
+
+  useEffect(() => {
+    currentChatModeRef.current = currentChatMode;
+  }, [currentChatMode]);
 
   useEffect(() => {
     currentProjectTierRef.current = currentProjectTier;
@@ -176,7 +184,8 @@ export function Chat({
             body: {
               id: request.id,
               message: request.messages.at(-1),
-              selectedChatModel: currentModelIdRef.current,
+              // ТЗ-DV2: chatMode replaces selectedChatModel
+              chatMode: currentChatModeRef.current,
               selectedVisibilityType: visibilityType,
               // ТЗ-03: Project chat support
               ...(projectId && { projectId }),
