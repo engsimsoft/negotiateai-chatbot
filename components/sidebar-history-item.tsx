@@ -85,6 +85,9 @@ const PureChatItem = ({
             {chat.projectId && chat.taskStatus === "done" && (
               <Check className="size-3.5 shrink-0 text-green-600" />
             )}
+            {/* ТЗ-DV2: chatMode badge */}
+            {chat.chatMode === "expertise" && <span className="shrink-0">🔍</span>}
+            {chat.chatMode === "create" && <span className="shrink-0">✨</span>}
             <span>{chat.title}</span>
           </Link>
         </SidebarMenuButton>

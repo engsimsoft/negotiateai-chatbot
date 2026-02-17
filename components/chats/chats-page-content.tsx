@@ -14,6 +14,7 @@ export type ChatWithStats = {
   summary: string | null;
   isStarred: boolean;
   isRenamed: boolean;
+  chatMode: string;
   messageCount: number;
 };
 

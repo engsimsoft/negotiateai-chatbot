@@ -2009,6 +2009,7 @@ export async function getGeneralChatsWithStats({
         summary: chat.summary,
         isStarred: chat.isStarred,
         isRenamed: chat.isRenamed,
+        chatMode: chat.chatMode,
         messageCount: sql<number>`COALESCE(COUNT(${message.id}), 0)::int`,
       })
       .from(chat)
@@ -2055,6 +2056,7 @@ export async function getChatsByModeWithStats({
         summary: chat.summary,
         isStarred: chat.isStarred,
         isRenamed: chat.isRenamed,
+        chatMode: chat.chatMode,
         messageCount: sql<number>`COALESCE(COUNT(${message.id}), 0)::int`,
       })
       .from(chat)

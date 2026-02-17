@@ -602,7 +602,7 @@ export async function POST(request: Request) {
 
             // Diagnostic: track tool call timing
             const toolCallTimes: Record<string, number> = {};
-            const modelName = isProjectChat ? `Claude/${tier}` : "Claude";
+            const modelName = isProjectChat ? `Simply/${tier}` : "Simply";
 
             while (true) {
               const { value, done } = await reader.read();

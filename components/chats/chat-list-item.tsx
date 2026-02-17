@@ -79,7 +79,11 @@ export function ChatListItem({
         {/* Content */}
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="truncate font-medium text-sm">{chat.title}</h3>
+            <h3 className="truncate font-medium text-sm">
+              {chat.chatMode === "expertise" && "🔍 "}
+              {chat.chatMode === "create" && "✨ "}
+              {chat.title}
+            </h3>
             <span className="shrink-0 text-xs text-muted-foreground">
               {timeAgo}
             </span>

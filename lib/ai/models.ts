@@ -20,7 +20,7 @@ export type ChatModel = {
 export const chatModels: ChatModel[] = [
   {
     id: "claude-sonnet",
-    name: "Claude Sonnet",
+    name: "Simply Sonnet",
     description: "Основная модель — баланс скорости и качества",
     pricing: {
       input: "$3",
@@ -29,7 +29,7 @@ export const chatModels: ChatModel[] = [
   },
   {
     id: "claude-haiku",
-    name: "Claude Haiku",
+    name: "Simply Haiku",
     description: "Быстрая модель для простых задач",
     pricing: {
       input: "$1",
@@ -38,7 +38,7 @@ export const chatModels: ChatModel[] = [
   },
   {
     id: "claude-opus",
-    name: "Claude Opus",
+    name: "Simply Opus",
     description: "Максимальное качество для сложных задач",
     pricing: {
       input: "$5",

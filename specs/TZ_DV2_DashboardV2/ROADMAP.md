@@ -396,34 +396,35 @@ git commit -m "feat(tz-dv2): refactor /projects to ListDetailPage layout"
 
 ## Этап 5: AI = Simply + chatMode badge в истории
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4D
+**Статус:** ✅ Завершён
 
 **Цель:** AI называется Simply в UI. В истории чатов виден тип чата (badge).
 
 **Задачи:**
-- [ ] Оставить SparklesIcon (SVG логотип позже)
-- [ ] Проверить все места где AI называется "Claude" в UI — заменить на "Simply"
-- [ ] В `lib/ai/models.ts` — обновить `name` (если используется в UI)
-- [ ] Добавить chatMode badge в sidebar history (`components/sidebar-history-item.tsx`):
+- [x] Оставить SparklesIcon (SVG логотип позже)
+- [x] Проверить все места где AI называется "Claude" в UI — заменить на "Simply"
+- [x] В `lib/ai/models.ts` — обновить `name` (Claude → Simply)
+- [x] В `app/(chat)/api/chat/route.ts` — dev-badge "Claude" → "Simply"
+- [x] Добавить chatMode badge в sidebar history (`components/sidebar-history-item.tsx`):
   - `expertise` → 🔍, `create` → ✨, `chat` → без badge
-- [ ] Добавить chatMode badge в списках ListDetailPage (ChatListItem):
+- [x] Добавить chatMode badge в списках ListDetailPage (ChatListItem):
   - 🔍 / ✨ рядом с названием
-- [ ] Убедиться что queries возвращают chatMode
+- [x] Убедиться что queries возвращают chatMode (getGeneralChatsWithStats, getChatsByModeWithStats)
+- [x] Добавить chatMode в тип ChatWithStats
 
 **Файлы (модификация):**
-- `components/message.tsx` — минимальные изменения
-- `lib/ai/models.ts` — названия
-- `components/sidebar-history-item.tsx` — badge
-- `components/chats/chat-list-item.tsx` — badge
-- `lib/db/queries.ts` — chatMode в select
+- `lib/ai/models.ts` — Claude → Simply в названиях
+- `app/(chat)/api/chat/route.ts` — dev-badge Claude → Simply
+- `components/sidebar-history-item.tsx` — chatMode badge (🔍/✨)
+- `components/chats/chat-list-item.tsx` — chatMode badge в заголовке
+- `components/chats/chats-page-content.tsx` — chatMode в типе ChatWithStats
+- `lib/db/queries.ts` — chatMode в select обоих queries
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: AI не называется "Claude" нигде
-- [ ] Браузер: dev-badge модели — сохранён
+- [ ] Браузер: dev-badge модели — сохранён (теперь "Simply")
 - [ ] Браузер: sidebar — эмодзи у expertise/create чатов
 - [ ] 🧪 Мануальный тест пользователем
 
