@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { memo, useState, useEffect } from "react";
 import useSWR from "swr";
-import { ChevronRight, FolderOpen, HelpCircle, PanelRight } from "lucide-react";
+import { ChevronRight, FolderOpen, HelpCircle, PanelRight, Search, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SidebarToggle } from "@/components/sidebar-toggle";
@@ -22,7 +22,15 @@ interface BenIntroResponse {
   hasSeenBenIntro: boolean;
 }
 
+/** ТЗ-DV2U: Breadcrumb config per chatMode */
+const CHAT_MODE_BREADCRUMBS: Record<string, { label: string; href: string; icon: typeof Search; itemLabel: string }> = {
+  expertise: { label: "Экспертиза", href: "/expertise", icon: Search, itemLabel: "Запрос" },
+  create: { label: "Создание", href: "/create", icon: Sparkles, itemLabel: "Задание" },
+};
+
 interface ChatHeaderProps {
+  /** ТЗ-DV2U: Chat mode for breadcrumbs */
+  chatMode?: string;
   /** Callback to insert text into main chat input */
   onInsertToChat?: (text: string) => void;
   /** Project ID if this is a project chat */
@@ -36,12 +44,14 @@ interface ChatHeaderProps {
 }
 
 function PureChatHeader({
+  chatMode,
   onInsertToChat,
   projectId,
   projectName,
   onToggleSidebar,
   isSidebarOpen,
 }: ChatHeaderProps) {
+  const modeBreadcrumb = chatMode ? CHAT_MODE_BREADCRUMBS[chatMode] : undefined;
   // Modal assistants state
   const [benOpen, setBenOpen] = useState(false);
 
@@ -80,7 +90,7 @@ function PureChatHeader({
     <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-background px-4">
       <SidebarToggle />
 
-      {/* Контекстные breadcrumbs — только для проектов/помощников */}
+      {/* Контекстные breadcrumbs — проекты */}
       {projectId && projectName && (
         <div className="flex items-center gap-1 text-sm">
           <Link
@@ -92,6 +102,21 @@ function PureChatHeader({
           </Link>
           <ChevronRight className="size-3.5 text-muted-foreground/50" />
           <span className="font-medium text-foreground">Чат</span>
+        </div>
+      )}
+
+      {/* ТЗ-DV2U: Контекстные breadcrumbs — chatMode (expertise/create) */}
+      {!projectId && modeBreadcrumb && (
+        <div className="flex items-center gap-1 text-sm">
+          <Link
+            href={modeBreadcrumb.href}
+            className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <modeBreadcrumb.icon className="size-3.5" />
+            <span>{modeBreadcrumb.label}</span>
+          </Link>
+          <ChevronRight className="size-3.5 text-muted-foreground/50" />
+          <span className="font-medium text-foreground">{modeBreadcrumb.itemLabel}</span>
         </div>
       )}
 

@@ -435,6 +435,7 @@ export function Chat({
         isChatSidebarOpen && "md:mr-[380px]"
       )}>
         <ChatHeader
+          chatMode={currentChatMode}
           onInsertToChat={setInput}
           projectId={projectId}
           projectName={projectName}

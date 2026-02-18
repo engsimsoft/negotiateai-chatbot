@@ -61,6 +61,7 @@ export default async function Page(props: {
         autoResume={true}
         id={chat.id}
         initialChatModel={initialModel}
+        initialChatMode={chat.chatMode ?? "chat"}
         initialLastContext={chat.lastContext ?? undefined}
         initialMessages={uiMessages}
         initialVisibilityType={chat.visibility}
