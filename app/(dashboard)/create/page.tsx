@@ -19,15 +19,18 @@ export default async function CreatePage() {
 
   return (
     <ModeChatsPage
-      title="Создать"
-      createButton={{ label: "Новый документ", href: "/chat?mode=create" }}
+      title="Создание"
+      createButton={{ label: "Новое задание", href: "/chat?mode=create" }}
       emptyState={{
         icon: <Sparkles className="size-8 text-muted-foreground" />,
-        title: "Нет документов",
+        title: "Нет заданий",
         description:
           "Презентации, отчёты, изображения. Создайте что-то новое.",
       }}
       initialChats={chats}
+      countNoun={{ one: "задание", few: "задания", many: "заданий" }}
+      summaryLabel="О чём задание"
+      openLabel="Открыть задание"
     />
   );
 }

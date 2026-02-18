@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { ChatWithStats } from "./chats-page-content";
+import type { ChatWithStats } from "./mode-chats-page";
 
 interface ChatListItemProps {
   chat: ChatWithStats;

@@ -6,16 +6,22 @@ import { ArrowRight, MessageSquare, Star } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import type { ChatWithStats } from "./chats-page-content";
+import type { ChatWithStats } from "./mode-chats-page";
 
 interface ChatDetailPanelProps {
   chat: ChatWithStats | null;
   onToggleStar: (chatId: string) => void;
+  /** Label for summary section, e.g. "О чём запрос" */
+  summaryLabel?: string;
+  /** Label for open button, e.g. "Открыть запрос" */
+  openLabel?: string;
 }
 
 export function ChatDetailPanel({
   chat,
   onToggleStar,
+  summaryLabel = "О чём чат",
+  openLabel = "Открыть чат",
 }: ChatDetailPanelProps) {
   if (!chat) {
     return (
@@ -60,7 +66,7 @@ export function ChatDetailPanel({
         {/* Open chat button - сразу под meta */}
         <Button asChild className="mt-4" size="sm">
           <Link href={`/chat/${chat.id}`}>
-            Открыть чат
+            {openLabel}
             <ArrowRight className="ml-2 size-4" />
           </Link>
         </Button>
@@ -70,7 +76,7 @@ export function ChatDetailPanel({
       {chat.summary ? (
         <div>
           <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-            О чём чат
+            {summaryLabel}
           </h3>
           <p className="text-sm leading-relaxed">{chat.summary}</p>
         </div>

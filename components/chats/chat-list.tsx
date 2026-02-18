@@ -1,7 +1,7 @@
 "use client";
 
 import { ChatListItem } from "./chat-list-item";
-import type { ChatWithStats } from "./chats-page-content";
+import type { ChatWithStats } from "./mode-chats-page";
 
 interface ChatListProps {
   chats: ChatWithStats[];

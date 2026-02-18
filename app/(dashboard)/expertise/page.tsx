@@ -20,14 +20,17 @@ export default async function ExpertisePage() {
   return (
     <ModeChatsPage
       title="Экспертиза"
-      createButton={{ label: "Новая экспертиза", href: "/chat?mode=expertise" }}
+      createButton={{ label: "Новый запрос", href: "/chat?mode=expertise" }}
       emptyState={{
         icon: <Search className="size-8 text-muted-foreground" />,
-        title: "Нет экспертиз",
+        title: "Нет запросов",
         description:
-          "Точные ответы с проверкой фактов. Начните новую экспертизу.",
+          "Точные ответы с проверкой фактов. Начните новый запрос.",
       }}
       initialChats={chats}
+      countNoun={{ one: "запрос", few: "запроса", many: "запросов" }}
+      summaryLabel="О чём запрос"
+      openLabel="Открыть запрос"
     />
   );
 }

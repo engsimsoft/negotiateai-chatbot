@@ -6,19 +6,46 @@ import { useState } from "react";
 import { ListDetailPage } from "@/components/list-detail";
 import { ChatList } from "./chat-list";
 import { ChatDetailPanel } from "./chat-detail-panel";
-import type { ChatWithStats } from "./chats-page-content";
 
-function chatCountLabel(count: number): string {
-  if (count === 1) return "чат";
-  if (count >= 2 && count <= 4) return "чата";
-  return "чатов";
+export type ChatWithStats = {
+  id: string;
+  createdAt: Date;
+  title: string;
+  summary: string | null;
+  isStarred: boolean;
+  isRenamed: boolean;
+  chatMode: string;
+  messageCount: number;
+};
+
+/** Serializable noun forms for Russian plural rules: 1 запрос, 2 запроса, 5 запросов */
+export interface CountNoun {
+  one: string;
+  few: string;
+  many: string;
+}
+
+const DEFAULT_COUNT_NOUN: CountNoun = { one: "чат", few: "чата", many: "чатов" };
+
+function makeCountLabel(noun: CountNoun): (count: number) => string {
+  return (count: number) => {
+    if (count === 1) return noun.one;
+    if (count >= 2 && count <= 4) return noun.few;
+    return noun.many;
+  };
 }
 
 interface ModeChatsPageProps {
   title: string;
-  createButton: { label: string; href: string };
+  createButton?: { label: string; href: string };
   emptyState: { icon: ReactNode; title: string; description: string };
   initialChats: ChatWithStats[];
+  /** Serializable noun forms for count label, e.g. { one: "запрос", few: "запроса", many: "запросов" } */
+  countNoun?: CountNoun;
+  /** Label for summary section in detail panel */
+  summaryLabel?: string;
+  /** Label for open button in detail panel */
+  openLabel?: string;
 }
 
 export function ModeChatsPage({
@@ -26,6 +53,9 @@ export function ModeChatsPage({
   createButton,
   emptyState,
   initialChats,
+  countNoun = DEFAULT_COUNT_NOUN,
+  summaryLabel,
+  openLabel,
 }: ModeChatsPageProps) {
   const [chats, setChats] = useState<ChatWithStats[]>(initialChats);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(
@@ -92,7 +122,7 @@ export function ModeChatsPage({
     <ListDetailPage
       title={title}
       itemCount={chats.length}
-      itemCountLabel={chatCountLabel}
+      itemCountLabel={makeCountLabel(countNoun)}
       createButton={createButton}
       emptyState={emptyState}
       isEmpty={chats.length === 0}
@@ -109,6 +139,8 @@ export function ModeChatsPage({
         <ChatDetailPanel
           chat={selectedChat}
           onToggleStar={handleToggleStar}
+          summaryLabel={summaryLabel}
+          openLabel={openLabel}
         />
       }
     />
