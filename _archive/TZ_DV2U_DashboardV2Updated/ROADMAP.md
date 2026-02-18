@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 4 |
-| Текущий этап | 1 |
+| Текущий этап | ЗАКРЫТО |
 | Сессий (оценка) | 1-2 |
 
 ---
@@ -99,78 +99,14 @@ git commit -m "feat(tz-dv2u): stage 2 — chat breadcrumbs by chatMode"
 
 ---
 
-## Этап 3: Контекст sidebar
+## ~~Этап 3: Контекст sidebar~~ — ОТМЕНЁН
 
-**Статус:** ⬜ Не начат
+**Статус:** ❌ Отменён — переход на route groups в следующем ТЗ
 
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 2
-
-**Цель:** AppSidebar фильтрует историю чатов и адаптирует навигацию под текущий chatMode. Кнопки "Новый чат" и "Все чаты" — контекстные.
-
-**Задачи:**
-
-- [ ] 3.1 Создать `ChatModeContext` (React Context) — Provider в `(chat)` layout, Chat компонент устанавливает chatMode
-- [ ] 3.2 Добавить параметр `chatMode` в `/api/history` route — фильтрация чатов по chatMode
-- [ ] 3.3 Обновить `getChatsByUserId` в `lib/db/queries.ts` — поддержка фильтрации по chatMode
-- [ ] 3.4 Обновить `AppSidebar` — читать chatMode из ChatModeContext, адаптировать:
-  - Кнопка "Новый чат" → "Новый запрос" (expertise) / "Новое задание" (create), href → `/chat?mode=xxx`
-  - Ссылка "Все чаты" → "Все запросы" (→ /expertise) / "Все задания" (→ /create)
-  - Заголовок истории: "Чаты" → "Запросы" / "Задания"
-- [ ] 3.5 Обновить `SidebarHistory` — передавать chatMode в API `/api/history?chatMode=xxx`
-- [ ] 3.6 Обновить `getChatHistoryPaginationKey` — добавить chatMode в URL пагинации
-
-**Файлы:**
-- `lib/contexts/chat-mode-context.tsx` — новый: React Context + Provider
-- `app/(chat)/layout.tsx` — обернуть в ChatModeProvider
-- `components/chat.tsx` — установить chatMode в контексте
-- `components/app-sidebar.tsx` — читать chatMode, адаптировать навигацию
-- `components/sidebar-history.tsx` — фильтрация через API с chatMode param
-- `app/(chat)/api/history/route.ts` — параметр chatMode
-- `lib/db/queries.ts` — getChatsByUserId + chatMode filter
-
-**Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Браузер: открыть чат с chatMode='expertise' → sidebar показывает только запросы экспертизы
-- [ ] Браузер: кнопка "Новый запрос" → создаёт чат с chatMode='expertise'
-- [ ] Браузер: "Все запросы" → ведёт на /expertise
-- [ ] Браузер: открыть обычный чат → sidebar показывает обычные чаты, "Все чаты" → /chats
-- [ ] Браузер: переход между чатами разных mode → sidebar обновляется
-- [ ] 🧪 Мануальный тест пользователем
-
-**Git (после валидации):**
-```bash
-git add [файлы этапа]
-git commit -m "feat(tz-dv2u): stage 3 — contextual sidebar by chatMode"
-```
-
-**Критерий готовности:** Sidebar полностью контекстный — фильтрация, кнопки, ссылки соответствуют текущему chatMode.
+**Причина:** Контекстный sidebar через React Context/деривацию — workaround. Route groups Next.js (`/expertise/[id]`, `/create/[id]`) дают layout + sidebar "из коробки".
 
 ---
 
-## Этап 4: Финализация
+## ~~Этап 4: Финализация~~ — ОТМЕНЁН
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 3
-
-**Задачи:**
-- [ ] 4.1 Финальное мануальное тестирование (пользователь) — полный flow всех трёх частей
-- [ ] 4.2 Обновить главный CHANGELOG.md
-- [ ] 4.3 Обновить SIMPLY_STATUS.md
-- [ ] 4.4 Обновить CLAUDE.md (если менялась структура)
-- [ ] 4.5 Обновить package.json: 3.24.0 → 3.25.0
-- [ ] 4.6 Переместить папку в `_archive/`
-
-**Валидация:**
-- [ ] `npm run build` — успешен
-- [ ] Все функции работают в браузере
-- [ ] Документация актуальна
-
-**Git (после валидации):**
-```bash
-git add [файлы]
-git commit -m "feat(tz-dv2u): finalize — v3.25.0"
-```
-
-**Критерий готовности:** Документация обновлена, ТЗ в архиве, version bumped.
+**Статус:** ❌ Отменён — версия не поднимается, ТЗ закрывается как частично выполненное
