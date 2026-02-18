@@ -18,19 +18,19 @@
 
 ## Этап 1: БД + Конфигурация
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** 3 новые таблицы в БД, конфигурация брифинга, каталог тем с реальными RSS-фидами.
 
 **Задачи:**
-- [ ] Установить npm-пакеты: `rss-parser`, `cheerio`, `@mozilla/readability`, `jsdom`, `@types/jsdom`
-- [ ] Добавить 3 таблицы в `lib/db/schema.ts`: `briefingSettings`, `briefingSources`, `briefingHistory`
-- [ ] Добавить индексы: userId для всех, (userId, generatedAt DESC) для history
-- [ ] Сгенерировать Drizzle миграцию (`npm run db:generate`)
-- [ ] Применить миграцию (`npm run db:migrate`)
-- [ ] Добавить CRUD queries в `lib/db/queries.ts` (getBriefingSettings, upsertBriefingSettings, getBriefingSources, addBriefingSource, deleteBriefingSource, saveBriefingHistory, getBriefingHistory)
-- [ ] Создать `lib/briefing/briefing-config.ts` — константы (лимиты, таймауты, модели)
-- [ ] Создать `lib/briefing/topics-catalog.ts` — 10 тем × 3-5 источников с реальными RSS
+- [x] Установить npm-пакеты: `rss-parser`, `cheerio`, `@mozilla/readability`, `jsdom`, `@types/jsdom`
+- [x] Добавить 3 таблицы в `lib/db/schema.ts`: `briefingSettings`, `briefingSources`, `briefingHistory`
+- [x] Добавить индексы: userId для всех, (userId, generatedAt DESC) для history
+- [x] Сгенерировать Drizzle миграцию (`npm run db:generate`)
+- [x] Применить миграцию (`npm run db:migrate`)
+- [x] Добавить CRUD queries в `lib/db/queries.ts` (getBriefingSettings, upsertBriefingSettings, getBriefingSources, addBriefingSource, deleteBriefingSource, saveBriefingHistory, getBriefingHistory)
+- [x] Создать `lib/briefing/briefing-config.ts` — константы (лимиты, таймауты, модели)
+- [x] Создать `lib/briefing/topics-catalog.ts` — 10 тем × 3-5 источников с реальными RSS
 
 **Файлы:**
 - `lib/db/schema.ts` — +3 таблицы
@@ -41,10 +41,10 @@
 - `package.json` — +зависимости
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] SQL: проверить что таблицы созданы (`SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'Briefing%'`)
-- [ ] 🧪 Мануальный тест: проверить что таблицы существуют в DB
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] SQL: проверить что таблицы созданы (`SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'Briefing%'`)
+- [x] 🧪 Мануальный тест: SQL-проверка колонок, FK, индексов — всё ОК
 
 **Git (после валидации):**
 ```bash

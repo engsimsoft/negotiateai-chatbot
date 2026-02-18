@@ -2,6 +2,7 @@ import type { InferSelectModel } from "drizzle-orm";
 import {
   boolean,
   foreignKey,
+  index,
   integer,
   json,
   jsonb,
@@ -366,3 +367,82 @@ export const stream = pgTable(
 );
 
 export type Stream = InferSelectModel<typeof stream>;
+
+// ============================================================================
+// Briefing (ТЗ-BR1)
+// ============================================================================
+
+export const briefingSettings = pgTable(
+  "BriefingSettings",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .unique()
+      .references(() => user.id),
+    isActive: boolean("isActive").notNull().default(false),
+    timezone: varchar("timezone", { length: 50 }).notNull().default("Europe/Moscow"),
+    generationTime: varchar("generationTime", { length: 5 }).notNull().default("06:00"),
+    language: varchar("language", { length: 10 }).notNull().default("ru"),
+    maxItems: integer("maxItems").notNull().default(15),
+    createdAt: timestamp("createdAt").notNull(),
+    updatedAt: timestamp("updatedAt").notNull(),
+  },
+  (table) => ({
+    userIdx: index("briefing_settings_user_idx").on(table.userId),
+  })
+);
+
+export type BriefingSettings = InferSelectModel<typeof briefingSettings>;
+
+export const briefingSources = pgTable(
+  "BriefingSources",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    topicId: varchar("topicId", { length: 50 }).notNull(),
+    sourceUrl: text("sourceUrl").notNull(),
+    sourceName: varchar("sourceName", { length: 200 }).notNull(),
+    sourceLanguage: varchar("sourceLanguage", { length: 10 }).notNull().default("ru"),
+    tier: varchar("tier", { length: 20 }).notNull().default("unknown"),
+    rssUrl: text("rssUrl"),
+    fetchMethod: varchar("fetchMethod", { length: 20 }).notNull(),
+    isActive: boolean("isActive").notNull().default(true),
+    priority: integer("priority").notNull().default(5),
+    createdAt: timestamp("createdAt").notNull(),
+  },
+  (table) => ({
+    userIdx: index("briefing_sources_user_idx").on(table.userId),
+  })
+);
+
+export type BriefingSource = InferSelectModel<typeof briefingSources>;
+
+export const briefingHistory = pgTable(
+  "BriefingHistory",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    briefingJson: jsonb("briefingJson").notNull(),
+    sourcesChecked: integer("sourcesChecked"),
+    itemsIncluded: integer("itemsIncluded"),
+    duplicatesRemoved: integer("duplicatesRemoved"),
+    tokensUsed: integer("tokensUsed"),
+    status: varchar("status", { length: 20 }).notNull(),
+    generatedAt: timestamp("generatedAt").notNull(),
+    createdAt: timestamp("createdAt").notNull(),
+  },
+  (table) => ({
+    userIdx: index("briefing_history_user_idx").on(table.userId),
+    userGeneratedAtIdx: index("briefing_history_user_generated_idx").on(
+      table.userId,
+      table.generatedAt
+    ),
+  })
+);
+
+export type BriefingHistory = InferSelectModel<typeof briefingHistory>;

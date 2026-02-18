@@ -218,6 +218,13 @@
       "when": 1771372800000,
       "tag": "0030_drop-helper",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1771459200000,
+      "tag": "0031_briefing-tables",
+      "breakpoints": true
     }
   ]
 }

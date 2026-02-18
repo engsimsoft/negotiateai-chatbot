@@ -23,6 +23,12 @@ import { ChatSDKError } from "../errors";
 import type { AppUsage } from "../usage";
 import { estimateMessageTokens, generateUUID } from "../utils";
 import {
+  type BriefingHistory,
+  type BriefingSettings,
+  type BriefingSource,
+  briefingHistory,
+  briefingSettings,
+  briefingSources,
   type Chat,
   chat,
   type ContextState,
@@ -2672,6 +2678,251 @@ export async function resetChatContextState({ chatId }: { chatId: string }) {
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to reset chat context state"
+    );
+  }
+}
+
+// ============================================
+// ТЗ-BR1: Briefing Functions
+// ============================================
+
+/**
+ * Get briefing settings for a user
+ */
+export async function getBriefingSettings({ userId }: { userId: string }) {
+  try {
+    const [settings] = await db
+      .select()
+      .from(briefingSettings)
+      .where(eq(briefingSettings.userId, userId));
+
+    return settings || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get briefing settings"
+    );
+  }
+}
+
+/**
+ * Create or update briefing settings (one per user)
+ */
+export async function upsertBriefingSettings({
+  userId,
+  isActive,
+  timezone,
+  generationTime,
+  language,
+  maxItems,
+}: {
+  userId: string;
+  isActive?: boolean;
+  timezone?: string;
+  generationTime?: string;
+  language?: string;
+  maxItems?: number;
+}) {
+  try {
+    const now = new Date();
+    const existing = await getBriefingSettings({ userId });
+
+    if (existing) {
+      const updateData: Record<string, unknown> = { updatedAt: now };
+      if (isActive !== undefined) updateData.isActive = isActive;
+      if (timezone !== undefined) updateData.timezone = timezone;
+      if (generationTime !== undefined) updateData.generationTime = generationTime;
+      if (language !== undefined) updateData.language = language;
+      if (maxItems !== undefined) updateData.maxItems = maxItems;
+
+      const [updated] = await db
+        .update(briefingSettings)
+        .set(updateData)
+        .where(eq(briefingSettings.userId, userId))
+        .returning();
+
+      return updated;
+    }
+
+    const [created] = await db
+      .insert(briefingSettings)
+      .values({
+        userId,
+        isActive: isActive ?? false,
+        timezone: timezone ?? "Europe/Moscow",
+        generationTime: generationTime ?? "06:00",
+        language: language ?? "ru",
+        maxItems: maxItems ?? 15,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to upsert briefing settings"
+    );
+  }
+}
+
+/**
+ * Get all active sources for a user
+ */
+export async function getBriefingSources({ userId }: { userId: string }) {
+  try {
+    return await db
+      .select()
+      .from(briefingSources)
+      .where(
+        and(eq(briefingSources.userId, userId), eq(briefingSources.isActive, true))
+      )
+      .orderBy(asc(briefingSources.priority));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get briefing sources"
+    );
+  }
+}
+
+/**
+ * Add a briefing source for a user
+ */
+export async function addBriefingSource({
+  userId,
+  topicId,
+  sourceUrl,
+  sourceName,
+  sourceLanguage,
+  tier,
+  rssUrl,
+  fetchMethod,
+  priority,
+}: {
+  userId: string;
+  topicId: string;
+  sourceUrl: string;
+  sourceName: string;
+  sourceLanguage?: string;
+  tier?: string;
+  rssUrl?: string;
+  fetchMethod: string;
+  priority?: number;
+}) {
+  try {
+    const [created] = await db
+      .insert(briefingSources)
+      .values({
+        userId,
+        topicId,
+        sourceUrl,
+        sourceName,
+        sourceLanguage: sourceLanguage ?? "ru",
+        tier: tier ?? "unknown",
+        rssUrl: rssUrl ?? null,
+        fetchMethod,
+        priority: priority ?? 5,
+        createdAt: new Date(),
+      })
+      .returning();
+
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to add briefing source"
+    );
+  }
+}
+
+/**
+ * Delete a briefing source
+ */
+export async function deleteBriefingSource({ id }: { id: string }) {
+  try {
+    const [deleted] = await db
+      .delete(briefingSources)
+      .where(eq(briefingSources.id, id))
+      .returning();
+
+    return deleted || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete briefing source"
+    );
+  }
+}
+
+/**
+ * Save a generated briefing to history
+ */
+export async function saveBriefingHistory({
+  userId,
+  briefingJson,
+  sourcesChecked,
+  itemsIncluded,
+  duplicatesRemoved,
+  tokensUsed,
+  status,
+}: {
+  userId: string;
+  briefingJson: unknown;
+  sourcesChecked?: number;
+  itemsIncluded?: number;
+  duplicatesRemoved?: number;
+  tokensUsed?: number;
+  status: string;
+}) {
+  try {
+    const now = new Date();
+    const [created] = await db
+      .insert(briefingHistory)
+      .values({
+        userId,
+        briefingJson,
+        sourcesChecked: sourcesChecked ?? null,
+        itemsIncluded: itemsIncluded ?? null,
+        duplicatesRemoved: duplicatesRemoved ?? null,
+        tokensUsed: tokensUsed ?? null,
+        status,
+        generatedAt: now,
+        createdAt: now,
+      })
+      .returning();
+
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to save briefing history"
+    );
+  }
+}
+
+/**
+ * Get briefing history for a user (most recent first)
+ */
+export async function getBriefingHistory({
+  userId,
+  limit = 10,
+}: {
+  userId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select()
+      .from(briefingHistory)
+      .where(eq(briefingHistory.userId, userId))
+      .orderBy(desc(briefingHistory.generatedAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get briefing history"
     );
   }
 }
