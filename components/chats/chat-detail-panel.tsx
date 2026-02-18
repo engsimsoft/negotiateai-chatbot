@@ -6,6 +6,7 @@ import { ArrowRight, MessageSquare, Star } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { getChatUrl } from "@/lib/utils";
 import type { ChatWithStats } from "./mode-chats-page";
 
 interface ChatDetailPanelProps {
@@ -65,7 +66,7 @@ export function ChatDetailPanel({
 
         {/* Open chat button - сразу под meta */}
         <Button asChild className="mt-4" size="sm">
-          <Link href={`/chat/${chat.id}`}>
+          <Link href={getChatUrl(chat.id, chat.chatMode)}>
             {openLabel}
             <ArrowRight className="ml-2 size-4" />
           </Link>

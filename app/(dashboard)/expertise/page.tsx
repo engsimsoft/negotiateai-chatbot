@@ -20,6 +20,7 @@ export default async function ExpertisePage() {
   return (
     <ModeChatsPage
       title="Экспертиза"
+      chatMode="expertise"
       createButton={{ label: "Новый запрос", href: "/chat?mode=expertise" }}
       emptyState={{
         icon: <Search className="size-8 text-muted-foreground" />,

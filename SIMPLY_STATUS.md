@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.24.0
-**Дата:** 2026-02-17
+**Версия:** 3.25.0
+**Дата:** 2026-02-18
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -325,6 +325,28 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-RG: Route Groups — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Route Groups** — три режима чатов (chat/expertise/create) получили отдельные URL: `/chat/[id]`, `/expertise/[id]`, `/create/[id]`
+- **`getChatUrl()`** — утилита формирования URL чатов по chatMode, замена всех хардкодов `/chat/${id}`
+- **Mode-aware sidebar** — заголовок ("Чаты"/"Запросы"/"Задания"), кнопка создания, ссылка "Все..." адаптируются к текущему режиму
+- **History API фильтрация** — `?chatMode=` параметр в `/api/history`, `getChatsByUserId()` фильтрует по chatMode
+- **Redirect** — `/chat/[id]` для expertise/create чатов автоматически редиректит на правильный route group
+- **Server-side auto-naming** — генерация title+summary перенесена с клиента на сервер (устранение race condition)
+- **SWR cache** — mode-aware pagination keys для корректной инвалидации кэша sidebar
+
+**Ключевые файлы:**
+- `lib/utils.ts` — `getChatUrl()` утилита
+- `app/(expertise)/layout.tsx` + `app/(expertise)/expertise/[id]/page.tsx` — route group экспертиза
+- `app/(create)/layout.tsx` + `app/(create)/create/[id]/page.tsx` — route group создание
+- `components/app-sidebar.tsx` — `getSidebarContext()`, mode-aware навигация
+- `components/sidebar-history.tsx` — `makeChatHistoryPaginationKey()` factory
+- `app/(chat)/api/history/route.ts` — `?chatMode=` параметр
+- `lib/db/queries.ts` — `getChatsByUserId({ chatMode })`
+
+**Детали:** [_archive/TZ_RG_RouteGroups/](_archive/TZ_RG_RouteGroups/)
 
 ### ТЗ-DV2: Dashboard V2 — ✅ ЗАВЕРШЁН
 
@@ -1024,11 +1046,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.24.0 |
+| Версия | 3.25.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21), ChatContextManagement (v3.22), AnthropicProviderSwitch (v3.23), DashboardV2 (v3.24) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21), ChatContextManagement (v3.22), AnthropicProviderSwitch (v3.23), DashboardV2 (v3.24), RouteGroups (v3.25) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Профессоры | 2 (planning, task-review) |
@@ -1062,6 +1084,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_RG_RouteGroups/](_archive/TZ_RG_RouteGroups/) — ТЗ-RG Route Groups
 - [_archive/TZ_DV2_DashboardV2/](_archive/TZ_DV2_DashboardV2/) — ТЗ-DV2 Dashboard V2
 - [_archive/TZ_C4_AnthropicProvider/](_archive/TZ_C4_AnthropicProvider/) — ТЗ-C4 Anthropic Provider Switch
 - [_archive/TZ_C3_ChatContext/](_archive/TZ_C3_ChatContext/) — ТЗ-C3 Chat Context Management
@@ -1100,4 +1123,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-17
+**Обновлено:** 2026-02-18

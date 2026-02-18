@@ -64,6 +64,28 @@ export function generateUUID(): string {
   });
 }
 
+/**
+ * Build a mode-aware chat URL.
+ * /chat/[id], /expertise/[id], /create/[id], or /projects/[pid]/chat/[id]
+ */
+export function getChatUrl(
+  chatId: string,
+  chatMode?: string,
+  projectId?: string,
+): string {
+  if (projectId) {
+    return `/projects/${projectId}/chat/${chatId}`;
+  }
+  switch (chatMode) {
+    case "expertise":
+      return `/expertise/${chatId}`;
+    case "create":
+      return `/create/${chatId}`;
+    default:
+      return `/chat/${chatId}`;
+  }
+}
+
 type ResponseMessageWithoutId = CoreToolMessage | CoreAssistantMessage;
 type ResponseMessage = ResponseMessageWithoutId & { id: string };
 

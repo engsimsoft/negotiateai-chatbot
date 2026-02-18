@@ -25,7 +25,7 @@ import { getProjectModelTiers, type ProjectModelTier } from "@/lib/ai/model-tier
 import { myProvider } from "@/lib/ai/providers";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
-import { cn } from "@/lib/utils";
+import { cn, getChatUrl } from "@/lib/utils";
 import { ChatHintsPanel } from "./chat-hints-panel";
 import { Context } from "./elements/context";
 import {
@@ -53,6 +53,7 @@ import type { VisibilityType } from "./visibility-selector";
 
 function PureMultimodalInput({
   chatId,
+  chatMode,
   input,
   setInput,
   status,
@@ -74,6 +75,7 @@ function PureMultimodalInput({
   onProjectModelChange,
 }: {
   chatId: string;
+  chatMode?: string;
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
   status: UseChatHelpers<ChatMessage>["status"];
@@ -170,7 +172,7 @@ function PureMultimodalInput({
     }
     isSubmittingRef.current = true;
 
-    window.history.replaceState({}, "", `/chat/${chatId}`);
+    window.history.replaceState({}, "", getChatUrl(chatId, chatMode));
 
     sendMessage({
       role: "user",
@@ -210,6 +212,7 @@ function PureMultimodalInput({
     setLocalStorageInput,
     width,
     chatId,
+    chatMode,
     resetHeight,
   ]);
 
@@ -342,6 +345,7 @@ function PureMultimodalInput({
         uploadQueue.length === 0 && (
           <SuggestedActions
             chatId={chatId}
+            chatMode={chatMode}
             selectedVisibilityType={selectedVisibilityType}
             sendMessage={sendMessage}
           />

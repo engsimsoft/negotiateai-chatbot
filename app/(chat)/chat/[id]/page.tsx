@@ -6,7 +6,7 @@ import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
 import { getChatById, getMessagesByChatId } from "@/lib/db/queries";
-import { convertToUIMessages } from "@/lib/utils";
+import { convertToUIMessages, getChatUrl } from "@/lib/utils";
 
 export default async function Page(props: {
   params: Promise<{ id: string }>;
@@ -27,6 +27,11 @@ export default async function Page(props: {
   if (!chat) {
     console.log(`[Chat Page] Chat not found in DB: ${id}`);
     return notFound();
+  }
+
+  // ТЗ-RG: Redirect expertise/create chats to their route groups
+  if (chat.chatMode === "expertise" || chat.chatMode === "create") {
+    redirect(getChatUrl(id, chat.chatMode));
   }
 
   // Existing chat scenario

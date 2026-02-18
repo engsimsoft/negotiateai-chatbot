@@ -27,7 +27,7 @@ import type { Chat } from "@/lib/db/schema";
 import { fetcher } from "@/lib/utils";
 import { LoaderIcon } from "./icons";
 import { ChatItem } from "./sidebar-history-item";
-import type { SidebarContext } from "./app-sidebar";
+import type { ChatMode, SidebarContext } from "./app-sidebar";
 
 type GroupedChats = {
   today: Chat[];
@@ -77,33 +77,43 @@ const groupChatsByDate = (chats: Chat[]): GroupedChats => {
   );
 };
 
-export function getChatHistoryPaginationKey(
-  pageIndex: number,
-  previousPageData: ChatHistory
-) {
-  if (previousPageData && previousPageData.hasMore === false) {
-    return null;
-  }
+// ТЗ-RG: Factory that creates a pagination key function with chatMode filter
+export function makeChatHistoryPaginationKey(chatMode?: ChatMode) {
+  const modeParam = chatMode ? `&chatMode=${chatMode}` : "";
 
-  if (pageIndex === 0) {
-    return `/api/history?limit=${PAGE_SIZE}`;
-  }
+  return function getChatHistoryPaginationKey(
+    pageIndex: number,
+    previousPageData: ChatHistory
+  ) {
+    if (previousPageData && previousPageData.hasMore === false) {
+      return null;
+    }
 
-  const firstChatFromPage = previousPageData.chats.at(-1);
+    if (pageIndex === 0) {
+      return `/api/history?limit=${PAGE_SIZE}${modeParam}`;
+    }
 
-  if (!firstChatFromPage) {
-    return null;
-  }
+    const firstChatFromPage = previousPageData.chats.at(-1);
 
-  return `/api/history?ending_before=${firstChatFromPage.id}&limit=${PAGE_SIZE}`;
+    if (!firstChatFromPage) {
+      return null;
+    }
+
+    return `/api/history?ending_before=${firstChatFromPage.id}&limit=${PAGE_SIZE}${modeParam}`;
+  };
 }
+
+/** @deprecated Use makeChatHistoryPaginationKey() instead */
+export const getChatHistoryPaginationKey = makeChatHistoryPaginationKey();
 
 export function SidebarHistory({
   user,
-  context = { type: "general" },
+  context = { type: "general", chatMode: "chat" },
+  chatMode,
 }: {
   user: User | undefined;
   context?: SidebarContext;
+  chatMode?: ChatMode;
 }) {
   const { setOpenMobile } = useSidebar();
   const { id } = useParams();
@@ -118,8 +128,20 @@ export function SidebarHistory({
     }
   };
 
+  // ТЗ-RG: Mode-aware labels
+  const modeNoun = (() => {
+    switch (chatMode) {
+      case "expertise": return { plural: "запросов", loading: "запросов" };
+      case "create": return { plural: "заданий", loading: "заданий" };
+      default: return { plural: "чатов", loading: "чатов" };
+    }
+  })();
+
   const contextApiUrl = getApiUrl();
   const isContextual = contextApiUrl !== null;
+
+  // ТЗ-RG: Mode-aware pagination key
+  const paginationKey = makeChatHistoryPaginationKey(chatMode);
 
   // Для контекстных чатов (проект/помощник) используем простой useSWR
   const {
@@ -127,7 +149,7 @@ export function SidebarHistory({
     isLoading: isContextualLoading,
     mutate: mutateContextual,
   } = useSWRInfinite<ChatHistory>(
-    isContextual ? () => contextApiUrl : getChatHistoryPaginationKey,
+    isContextual ? () => contextApiUrl : paginationKey,
     fetcher,
     { fallbackData: [] }
   );
@@ -140,7 +162,7 @@ export function SidebarHistory({
     isLoading,
     mutate,
   } = useSWRInfinite<ChatHistory>(
-    isContextual ? () => null : getChatHistoryPaginationKey,
+    isContextual ? () => null : paginationKey,
     fetcher,
     { fallbackData: [] }
   );
@@ -310,7 +332,7 @@ export function SidebarHistory({
       <SidebarGroup>
         <SidebarGroupContent>
           <div className="flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-muted-foreground">
-            Ваши чаты появятся здесь
+            Ваши {chatMode === "expertise" ? "запросы" : chatMode === "create" ? "задания" : "чаты"} появятся здесь
           </div>
         </SidebarGroupContent>
       </SidebarGroup>
@@ -461,14 +483,14 @@ export function SidebarHistory({
           {!isContextual && (
             hasReachedEnd ? (
               <div className="mt-8 flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-muted-foreground">
-                Вы достигли конца истории чатов.
+                Вы достигли конца истории {modeNoun.plural}.
               </div>
             ) : (
               <div className="mt-8 flex flex-row items-center gap-2 p-2 text-muted-foreground dark:text-muted-foreground">
                 <div className="animate-spin">
                   <LoaderIcon />
                 </div>
-                <div>Загрузка чатов...</div>
+                <div>Загрузка {modeNoun.loading}...</div>
               </div>
             )
           )}

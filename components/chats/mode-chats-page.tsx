@@ -3,7 +3,10 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import { useRouter } from "next/navigation";
+
 import { ListDetailPage } from "@/components/list-detail";
+import { generateUUID, getChatUrl } from "@/lib/utils";
 import { ChatList } from "./chat-list";
 import { ChatDetailPanel } from "./chat-detail-panel";
 
@@ -40,6 +43,8 @@ interface ModeChatsPageProps {
   createButton?: { label: string; href: string };
   emptyState: { icon: ReactNode; title: string; description: string };
   initialChats: ChatWithStats[];
+  /** chatMode for UUID-based navigation (expertise → /expertise/[uuid]) */
+  chatMode?: string;
   /** Serializable noun forms for count label, e.g. { one: "запрос", few: "запроса", many: "запросов" } */
   countNoun?: CountNoun;
   /** Label for summary section in detail panel */
@@ -53,16 +58,31 @@ export function ModeChatsPage({
   createButton,
   emptyState,
   initialChats,
+  chatMode,
   countNoun = DEFAULT_COUNT_NOUN,
   summaryLabel,
   openLabel,
 }: ModeChatsPageProps) {
+  const router = useRouter();
   const [chats, setChats] = useState<ChatWithStats[]>(initialChats);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(
     initialChats.length > 0 ? initialChats[0].id : null
   );
 
   const selectedChat = chats.find((c) => c.id === selectedChatId) || null;
+
+  // ТЗ-RG: Build create button — use UUID-based onClick for mode-specific routes
+  const resolvedCreateButton = createButton
+    ? chatMode && chatMode !== "chat"
+      ? {
+          label: createButton.label,
+          onClick: () => {
+            const newId = generateUUID();
+            router.push(getChatUrl(newId, chatMode));
+          },
+        }
+      : createButton
+    : undefined;
 
   const handleDeleteChat = async (chatId: string) => {
     try {
@@ -123,7 +143,7 @@ export function ModeChatsPage({
       title={title}
       itemCount={chats.length}
       itemCountLabel={makeCountLabel(countNoun)}
-      createButton={createButton}
+      createButton={resolvedCreateButton}
       emptyState={emptyState}
       isEmpty={chats.length === 0}
       listContent={

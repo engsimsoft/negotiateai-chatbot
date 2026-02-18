@@ -6,16 +6,18 @@ import { unstable_serialize } from "swr/infinite";
 import { updateChatVisibility } from "@/app/(chat)/actions";
 import {
   type ChatHistory,
-  getChatHistoryPaginationKey,
+  makeChatHistoryPaginationKey,
 } from "@/components/sidebar-history";
 import type { VisibilityType } from "@/components/visibility-selector";
 
 export function useChatVisibility({
   chatId,
   initialVisibilityType,
+  chatMode,
 }: {
   chatId: string;
   initialVisibilityType: VisibilityType;
+  chatMode?: "chat" | "expertise" | "create";
 }) {
   const { mutate, cache } = useSWRConfig();
   const history: ChatHistory = cache.get("/api/history")?.data;
@@ -41,7 +43,7 @@ export function useChatVisibility({
 
   const setVisibilityType = (updatedVisibilityType: VisibilityType) => {
     setLocalVisibility(updatedVisibilityType);
-    mutate(unstable_serialize(getChatHistoryPaginationKey));
+    mutate(unstable_serialize(makeChatHistoryPaginationKey(chatMode)));
 
     updateChatVisibility({
       chatId,

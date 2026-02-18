@@ -12,6 +12,32 @@
 
 ---
 
+## [3.25.0] - 2026-02-18 - Route Groups (ТЗ-RG)
+
+**MINOR RELEASE**: Три режима чатов (chat/expertise/create) получили отдельные URL через Next.js Route Groups. Sidebar стал контекстным — показывает режим-специфичный заголовок, кнопку создания и отфильтрованную историю.
+
+### Added
+- **Route Groups** — `/expertise/[id]` и `/create/[id]` как отдельные маршруты (layouts + pages)
+- **`getChatUrl()`** — утилита формирования URL чатов по chatMode (`lib/utils.ts`)
+- **Mode-aware sidebar** — заголовок, кнопка создания, ссылка "Все..." адаптируются к текущему режиму
+- **`?chatMode=` filter** — API `/api/history` фильтрует чаты по режиму
+- **`makeChatHistoryPaginationKey()`** — factory для mode-aware SWR pagination keys
+- **ADR 014** — решение о переходе от единого `/chat/[id]` к route groups
+
+### Changed
+- **`getSidebarContext()`** — определяет chatMode из pathname (не из БД)
+- **`getChatsByUserId()`** — принимает optional `chatMode` для фильтрации
+- **Redirect** — `/chat/[id]` для expertise/create чатов редиректит на правильный route group
+- **SWR cache keys** — `chat.tsx` и `use-chat-visibility.ts` используют mode-aware keys
+- **Server-side auto-naming** — генерация title+summary перенесена на сервер (из клиентского setTimeout)
+
+### Technical
+- Route groups: `app/(expertise)/`, `app/(create)/` с дублированными layout-ами (провайдеры)
+- `SidebarContext` union type расширен полем `chatMode`
+- `ChatMode` type: `"chat" | "expertise" | "create"`
+
+---
+
 ## [3.24.0] - 2026-02-17 - Dashboard V2 (ТЗ-DV2)
 
 **MINOR RELEASE**: Полная переработка дашборда. Три режима чатов (chat/expertise/create) вместо помощников. Универсальный ListDetailPage для всех списковых страниц. Удалена экосистема помощников.

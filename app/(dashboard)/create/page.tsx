@@ -20,6 +20,7 @@ export default async function CreatePage() {
   return (
     <ModeChatsPage
       title="Создание"
+      chatMode="create"
       createButton={{ label: "Новое задание", href: "/chat?mode=create" }}
       emptyState={{
         icon: <Sparkles className="size-8 text-muted-foreground" />,

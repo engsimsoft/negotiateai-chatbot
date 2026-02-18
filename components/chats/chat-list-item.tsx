@@ -23,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+import { cn, getChatUrl } from "@/lib/utils";
 import type { ChatWithStats } from "./mode-chats-page";
 
 interface ChatListItemProps {
@@ -108,7 +108,7 @@ export function ChatListItem({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <Link href={`/chat/${chat.id}`}>
+              <Link href={getChatUrl(chat.id, chat.chatMode)}>
                 <ExternalLink className="mr-2 size-4" />
                 Открыть чат
               </Link>

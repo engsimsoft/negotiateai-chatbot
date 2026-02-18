@@ -29,7 +29,7 @@ import {
 } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
-import { cn, fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
+import { cn, fetcher, fetchWithErrorHandlers, generateUUID, getChatUrl } from "@/lib/utils";
 import { Artifact } from "./artifact";
 import { ChatSidebar } from "./chat-sidebar";
 import { useDataStream } from "./data-stream-provider";
@@ -37,7 +37,7 @@ import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
 import { ContextIndicator } from "./projects/context-indicator";
 import { ProfessorProgress } from "./projects/professor-progress";
-import { getChatHistoryPaginationKey } from "./sidebar-history";
+import { makeChatHistoryPaginationKey } from "./sidebar-history";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
 import type { PipelinePhase, Subtask } from "@/lib/ai/professor-pipeline";
@@ -70,6 +70,7 @@ export function Chat({
   const { visibilityType } = useChatVisibility({
     chatId: id,
     initialVisibilityType,
+    chatMode: initialChatMode as "chat" | "expertise" | "create",
   });
 
   const { mutate } = useSWRConfig();
@@ -267,7 +268,7 @@ export function Chat({
       }
     },
     onFinish: () => {
-      mutate(unstable_serialize(getChatHistoryPaginationKey));
+      mutate(unstable_serialize(makeChatHistoryPaginationKey(initialChatMode as "chat" | "expertise" | "create")));
       setRetryState({ count: 0, maxRetries: retryState.maxRetries });
       setDelayState("normal");
       // ТЗ-07: Clear tool-activity events from data stream to prevent stale indicators
@@ -282,26 +283,8 @@ export function Chat({
         }, 3000);
       }
 
-      // ТЗ-07A: Автонейминг чата после 2-го ответа AI (4+ сообщений)
-      // Используем setTimeout чтобы messages успели обновиться
-      setTimeout(async () => {
-        // messages.length проверяем внутри timeout, т.к. state может быть stale
-        // Получаем актуальное количество через DOM или просто делаем запрос
-        try {
-          const response = await fetch(`/api/chat/${id}/generate-title`, {
-            method: "POST",
-          });
-          if (response.ok) {
-            const data = await response.json();
-            if (data.generated) {
-              // Обновить sidebar для отображения нового названия
-              mutate(unstable_serialize(getChatHistoryPaginationKey));
-            }
-          }
-        } catch {
-          // Ignore auto-naming errors silently
-        }
-      }, 500);
+      // ТЗ-07A: Автонейминг теперь происходит server-side (chat/route.ts onFinish)
+      // Sidebar обновится через mutate выше (line 270)
     },
     onError: (error) => {
       if (error instanceof ChatSDKError) {
@@ -359,11 +342,8 @@ export function Chat({
         role: "user" as const,
         parts: [{ type: "text", text: query }],
       });
-      // ТЗ-07A: Сохраняем контекст проекта в URL
-      const newUrl = projectId
-        ? `/projects/${projectId}/chat/${id}`
-        : `/chat/${id}`;
-      window.history.replaceState({}, "", newUrl);
+      // ТЗ-RG: Mode-aware URL
+      window.history.replaceState({}, "", getChatUrl(id, currentChatModeRef.current, projectId));
     }
   }, [query, sendMessage, id, projectId]);
 
@@ -372,7 +352,7 @@ export function Chat({
   useEffect(() => {
     if (projectId && messages.length > 0 && !hasUpdatedUrlRef.current) {
       hasUpdatedUrlRef.current = true;
-      const expectedUrl = `/projects/${projectId}/chat/${id}`;
+      const expectedUrl = getChatUrl(id, currentChatModeRef.current, projectId);
       // Проверяем, что URL ещё не содержит chatId
       if (!window.location.pathname.includes(id)) {
         window.history.replaceState({}, "", expectedUrl);
@@ -474,6 +454,7 @@ export function Chat({
               <MultimodalInput
                 attachments={attachments}
                 chatId={id}
+                chatMode={currentChatMode}
                 input={input}
                 messages={messages}
                 retryState={retryState}

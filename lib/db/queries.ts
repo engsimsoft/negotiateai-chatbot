@@ -233,18 +233,25 @@ export async function getChatsByUserId({
   limit,
   startingAfter,
   endingBefore,
+  chatMode,
 }: {
   id: string;
   limit: number;
   startingAfter: string | null;
   endingBefore: string | null;
+  chatMode?: string | null;
 }) {
   try {
     const extendedLimit = limit + 1;
 
     // Performance: Exclude lastContext (heavy JSONB) from history listing
     // ТЗ-03: Filter out project chats - only show free chats (projectId = null)
-    const baseCondition = and(eq(chat.userId, id), isNull(chat.projectId));
+    // ТЗ-RG: Filter by chatMode when provided
+    const baseCondition = and(
+      eq(chat.userId, id),
+      isNull(chat.projectId),
+      chatMode ? eq(chat.chatMode, chatMode) : undefined
+    );
 
     const query = (whereCondition?: SQL<any>) =>
       db

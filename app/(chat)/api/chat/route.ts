@@ -2,11 +2,13 @@ import { geolocation } from "@vercel/functions";
 import {
   convertToCoreMessages,
   createUIMessageStream,
+  generateObject,
   JsonToSseTransformStream,
   smoothStream,
   stepCountIs,
   streamText,
 } from "ai";
+import { z } from "zod";
 import { unstable_cache as cache } from "next/cache";
 import type { ModelCatalog } from "tokenlens/core";
 import { fetchModels } from "tokenlens/fetch";
@@ -49,6 +51,7 @@ import {
   saveMessages,
   updateChatContextState,
   updateChatLastContextById,
+  updateChatTitleAndSummary,
   updateChatTaskStatus,
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
@@ -59,6 +62,75 @@ import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreM
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
 export const maxDuration = 180; // 3 minutes - increased for complex document generation
+
+/**
+ * ТЗ-07A: Server-side auto-naming after messages are saved.
+ * Eliminates race condition where client calls generate-title
+ * before assistant messages are persisted to DB.
+ */
+async function autoNameChat(chatId: string): Promise<void> {
+  const chat = await getChatById({ id: chatId });
+  if (!chat || chat.isRenamed) return;
+
+  // Skip if already auto-named (title changed from default)
+  if (chat.title !== "Новый чат") return;
+
+  const messages = await getMessagesByChatId({ id: chatId });
+  if (messages.length < 4) return;
+
+  const contextMessages = messages.slice(0, 4);
+  const contextSummary = contextMessages
+    .map((m) => {
+      const role = m.role === "user" ? "Пользователь" : "Ассистент";
+      const text = Array.isArray(m.parts)
+        ? (m.parts as { type: string; text?: string }[])
+            .filter((p) => p.type === "text")
+            .map((p) => p.text || "")
+            .join(" ")
+        : "";
+      const truncated = text.length > 200 ? text.slice(0, 200) + "..." : text;
+      return `${role}: ${truncated}`;
+    })
+    .join("\n");
+
+  const { object } = await generateObject({
+    model: myProvider.languageModel("title-model"),
+    schema: z.object({
+      title: z.string().describe("Короткое название чата (2-4 слова)"),
+      summary: z.string().describe("Краткое описание темы разговора (1-2 предложения)"),
+    }),
+    system: `Ты анализируешь чаты и генерируешь для них название и краткое описание на русском языке.
+
+Правила для title (названия):
+- 2-4 слова максимум
+- Используй существительные или именные группы
+- НЕ используй глаголы (не "Написать текст", а "Текст для сайта")
+- НЕ используй кавычки, двоеточия, точки
+- Отражай суть разговора, не первое сообщение
+
+Примеры хороших названий:
+- Маркетинг кофейни
+- Перевод договора
+- Анализ конкурентов
+
+Правила для summary (описания):
+- 1-2 коротких предложения
+- Опиши о чём конкретно шёл разговор
+- Используй нейтральный тон`,
+    prompt: `Проанализируй этот чат и сгенерируй название и краткое описание:\n\n${contextSummary}`,
+  });
+
+  const cleanTitle = object.title
+    .replace(/["«»:]/g, "")
+    .replace(/^\s+|\s+$/g, "")
+    .slice(0, 80);
+  const cleanSummary = object.summary
+    .replace(/^\s+|\s+$/g, "")
+    .slice(0, 300);
+
+  await updateChatTitleAndSummary({ chatId, title: cleanTitle, summary: cleanSummary });
+  console.log(`[generate-title] Server-side success for ${chatId}: "${cleanTitle}"`);
+}
 
 /**
  * Convert text/plain file parts to text parts in a single message
@@ -728,6 +800,13 @@ export async function POST(request: Request) {
 
         if (messagesToSave.length > 0) {
           await saveMessages({ messages: messagesToSave });
+        }
+
+        // ТЗ-07A: Server-side auto-naming (fire-and-forget, after messages saved)
+        if (!projectId) {
+          void autoNameChat(id).catch((err) =>
+            console.error("[generate-title] Background error:", err)
+          );
         }
 
         if (finalMergedUsage) {

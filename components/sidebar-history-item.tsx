@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { memo, useState, useRef, useEffect } from "react";
 import type { Chat } from "@/lib/db/schema";
+import { getChatUrl } from "@/lib/utils";
 import { Check, Star } from "lucide-react";
 import {
   MoreHorizontalIcon,
@@ -80,7 +81,7 @@ const PureChatItem = ({
         </div>
       ) : (
         <SidebarMenuButton asChild isActive={isActive} tooltip={chat.title}>
-          <Link href={`/chat/${chat.id}`} onClick={() => setOpenMobile(false)}>
+          <Link href={getChatUrl(chat.id, chat.chatMode ?? undefined, chat.projectId ?? undefined)} onClick={() => setOpenMobile(false)}>
             {/* ТЗ-07C2: Show check mark for completed project tasks */}
             {chat.projectId && chat.taskStatus === "done" && (
               <Check className="size-3.5 shrink-0 text-green-600" />
