@@ -57,6 +57,12 @@ export function TaskChat({
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
+  // Model tier selection (Исполнитель/Эксперт/Профессор)
+  const [currentProjectTier, setCurrentProjectTier] = useState("expert");
+  const currentProjectTierRef = useRef(currentProjectTier);
+  useEffect(() => {
+    currentProjectTierRef.current = currentProjectTier;
+  }, [currentProjectTier]);
 
   // ТЗ-C1.5: Context usage tracking
   const [contextPercent, setContextPercent] = useState(0);
@@ -107,6 +113,7 @@ export function TaskChat({
               message: request.messages.at(-1),
               projectId,
               taskId,
+              projectModelTier: currentProjectTierRef.current,
             },
           };
         },
@@ -312,6 +319,8 @@ export function TaskChat({
               selectedModelId="claude-sonnet"
               selectedVisibilityType="private"
               isProjectChat
+              projectModelTier={currentProjectTier}
+              onProjectModelChange={setCurrentProjectTier}
             />
           )}
         </div>

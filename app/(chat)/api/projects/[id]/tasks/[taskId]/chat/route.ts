@@ -9,7 +9,7 @@ import {
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { buildTaskExpertPrompt } from "@/lib/prompts/build-task-expert-prompt";
-import { myProvider } from "@/lib/ai/providers";
+import { getProjectModel, isValidModelTier, DEFAULT_PROJECT_MODEL } from "@/lib/ai/model-tiers";
 import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment } from "@/lib/constants";
 import {
@@ -31,7 +31,7 @@ import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreM
 
 export const maxDuration = 180;
 
-// Simplified schema for task chat — no model selector, no visibility, no projectModelTier
+// Task chat schema
 const textPartSchema = z.object({
   type: z.enum(["text"]),
   text: z.string().min(1).max(2000),
@@ -60,6 +60,7 @@ const taskChatRequestSchema = z.object({
   }),
   projectId: z.string().uuid(),
   taskId: z.string().uuid(),
+  projectModelTier: z.enum(["executor", "expert", "professor"]).optional(),
 });
 
 type TaskChatRequest = z.infer<typeof taskChatRequestSchema>;
@@ -78,7 +79,7 @@ export async function POST(
   }
 
   try {
-    const { id: chatId, message, projectId, taskId } = requestBody;
+    const { id: chatId, message, projectId, taskId, projectModelTier } = requestBody;
     const { id: paramProjectId, taskId: paramTaskId } = await params;
 
     // Verify URL params match body
@@ -256,9 +257,12 @@ export async function POST(
     // ТЗ-C1.5: Generate assistant message ID upfront (needed for snapshot tool)
     const assistantMessageId = generateUUID();
 
-    // Model: env variable with fallback
-    const expertModelId = process.env.EXPERT_MODEL || "claude-sonnet";
-    const modelToUse = myProvider.languageModel(expertModelId);
+    // Model: use selected tier (Исполнитель/Эксперт/Профессор)
+    const tier = projectModelTier && isValidModelTier(projectModelTier)
+      ? projectModelTier
+      : DEFAULT_PROJECT_MODEL;
+    const projectModelConfig = getProjectModel(tier);
+    const modelToUse = projectModelConfig.model;
     const isProjectChat = true;
 
     const startTime = Date.now();
@@ -274,8 +278,10 @@ export async function POST(
 
         // Dev: emit model info for UI badge
         {
+          const TIER_MODEL: Record<string, string> = { executor: "claude-haiku", expert: "claude-sonnet", professor: "claude-opus" };
+          const mid = TIER_MODEL[tier] || "claude-sonnet";
           const DISPLAY: Record<string, string> = { "claude-haiku": "Haiku", "claude-sonnet": "Sonnet", "claude-opus": "Opus" };
-          dataStream.write({ type: "data-model-info", data: { modelId: expertModelId, modelName: DISPLAY[expertModelId] || expertModelId } });
+          dataStream.write({ type: "data-model-info", data: { modelId: mid, modelName: DISPLAY[mid] || mid } });
         }
 
         const result = streamText({

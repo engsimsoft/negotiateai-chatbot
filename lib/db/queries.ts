@@ -14,8 +14,9 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import ws from "ws";
 import type { ArtifactKind } from "@/components/artifact";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { ChatSDKError } from "../errors";
@@ -50,9 +51,12 @@ import { generateHashedPassword } from "./utils";
 // use the Drizzle adapter for Auth.js / NextAuth
 // https://authjs.dev/reference/adapter/drizzle
 
+// Neon serverless driver: WebSocket-based, no TCP ECONNRESET
+// Handles reconnection natively, serverless-compatible
+neonConfig.webSocketConstructor = ws;
 // biome-ignore lint: Forbidden non-null assertion.
-const client = postgres(process.env.POSTGRES_URL!);
-const db = drizzle(client);
+const pool = new Pool({ connectionString: process.env.POSTGRES_URL! });
+const db = drizzle(pool);
 
 export async function getUser(email: string): Promise<User[]> {
   try {
@@ -333,11 +337,7 @@ export async function getChatsByUserId({
 export async function getChatById({ id }: { id: string }) {
   try {
     const [selectedChat] = await db.select().from(chat).where(eq(chat.id, id));
-    if (!selectedChat) {
-      return null;
-    }
-
-    return selectedChat;
+    return selectedChat || null;
   } catch (_error) {
     throw new ChatSDKError("bad_request:database", "Failed to get chat by id");
   }
@@ -2319,7 +2319,8 @@ export async function unlockTask({ taskId }: { taskId: string }) {
       })
       .where(
         and(eq(projectTask.id, taskId), eq(projectTask.status, "locked"))
-      );
+      )
+      .returning();
 
     return updated || null;
   } catch (_error) {

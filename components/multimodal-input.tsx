@@ -172,7 +172,10 @@ function PureMultimodalInput({
     }
     isSubmittingRef.current = true;
 
-    window.history.replaceState({}, "", getChatUrl(chatId, chatMode));
+    // Task chats have fixed URLs — don't override with getChatUrl
+    if (!isProjectChat) {
+      window.history.replaceState({}, "", getChatUrl(chatId, chatMode));
+    }
 
     sendMessage({
       role: "user",
