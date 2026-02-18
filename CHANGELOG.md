@@ -12,6 +12,22 @@
 
 ---
 
+## [3.25.1] - 2026-02-18 - Stability Fixes
+
+### Fixed
+- **Neon Serverless Driver (ADR-015)** — заменён `postgres.js` (TCP) на `@neondatabase/serverless` (WebSocket). Устранены массовые `ECONNRESET` из-за Neon proxy. Масштабирование до 10 000+ пользователей
+- **Task Chat URL Redirect (BUG-001)** — `MultimodalInput.submitForm()` менял URL задачи на `/chat/[id]` через `replaceState`. Теперь `isProjectChat` пропускает замену URL
+- **Model Tier Selection (BUG-002)** — селектор Исполнитель/Эксперт/Профессор в задачах проекта не работал. Восстановлена полная цепочка: state → transport → API schema → `getProjectModel(tier)`
+
+### Added
+- **ADR 015** — решение о переходе на `@neondatabase/serverless` с анализом масштабирования
+
+### Changed
+- **Task Chat API** — принимает `projectModelTier` из запроса вместо хардкода `process.env.EXPERT_MODEL`
+- **`lib/db/queries.ts`** — драйвер `postgres.js` → `@neondatabase/serverless` (WebSocket Pool)
+
+---
+
 ## [3.25.0] - 2026-02-18 - Route Groups (ТЗ-RG)
 
 **MINOR RELEASE**: Три режима чатов (chat/expertise/create) получили отдельные URL через Next.js Route Groups. Sidebar стал контекстным — показывает режим-специфичный заголовок, кнопку создания и отфильтрованную историю.

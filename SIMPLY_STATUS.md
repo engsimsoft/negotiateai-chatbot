@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.25.0
+**Версия:** 3.25.1
 **Дата:** 2026-02-18
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -44,7 +44,7 @@
 ### Инфраструктура
 - ✅ Next.js 15.3 (App Router, RSC)
 - ✅ NextAuth 5.0-beta.25
-- ✅ PostgreSQL (Neon) + Drizzle ORM
+- ✅ PostgreSQL (Neon) + Drizzle ORM + `@neondatabase/serverless` (WebSocket)
 - ✅ Vercel AI SDK
 - ✅ Vercel Blob Storage
 
