@@ -1,8 +1,8 @@
 # Инструменты AI-агентов
 
-**Версия:** 3.17.0
-**Последнее обновление:** 2026-02-10
-**Статус:** 10 инструментов (readProjectFile добавлен в v3.17)
+**Версия:** 3.25.1
+**Последнее обновление:** 2026-02-18
+**Статус:** 11 инструментов (createSnapshot добавлен в v3.18, getWeather обновлён в v3.25.1)
 
 ---
 
@@ -30,6 +30,7 @@
 | `parseExcel` | Анализ загруженных Excel-файлов | Все агенты |
 | `loadSkill` | Загрузка инструкций из SKILL.md | Все агенты |
 | `readProjectFile` | Чтение файлов проекта по имени из manifest | Только проектные чаты (Эксперт) |
+| `createSnapshot` | Фиксация прогресса диалога (сжатие контекста) | Все чаты (при наличии chatId + messageId) |
 
 > **Примечание:** Excel создаётся через `createDocument(kind: "excel")`, редактируется через `updateDocument`. Отдельный `parseExcel` используется только для анализа **загруженных** пользователем файлов.
 
@@ -73,18 +74,47 @@ webSearch({
 Погода по координатам или названию города через Open-Meteo API.
 
 ### Возможности
-- Погода по названию города
-- Геокодирование (название → координаты)
-- Текущая температура
+- Погода по названию города (геокодирование с `language=ru`)
+- Погода по координатам (latitude + longitude)
+- Текущая температура + ощущается как
+- Описание погоды (WMO-коды → русский текст, 28 описаний)
+- Влажность, скорость ветра
 - Восход/закат солнца
-- Почасовой прогноз
+- Почасовой прогноз (24 часа, `forecast_days=1`)
 
 ### Параметры
 
 ```typescript
 getWeather({
-  city: string,         // Название города
+  city?: string,           // Название города (e.g., "Москва", "London")
+  latitude?: number,       // Широта (альтернатива city)
+  longitude?: number,      // Долгота (альтернатива city)
 })
+```
+
+### Возвращает
+
+Два формата данных в одном ответе:
+
+1. **Сырые данные Open-Meteo** — для Weather UI-компонента (`current`, `hourly`, `daily`)
+2. **`summary`** — чистые данные для модели:
+
+```typescript
+{
+  summary: {
+    location: string,      // "Москва"
+    temperature: string,   // "-8°C"
+    feelsLike: string,     // "-12°C"
+    description: string,   // "Небольшой снег" (из WMO-кодов)
+    humidity: string,      // "85%"
+    wind: string,          // "15 км/ч"
+    time: string,          // ISO timestamp
+  },
+  cityName: string,        // Для UI-компонента
+  current: { ... },        // Сырые данные API
+  hourly: { ... },         // 24 значения (forecast_days=1)
+  daily: { ... },          // sunrise/sunset
+}
 ```
 
 ### Требования
@@ -384,6 +414,84 @@ loadSkill({
 
 ---
 
+## Create Snapshot
+
+Фиксация прогресса диалога (snapshot) для управления контекстным окном. Добавлен в v3.18.0 (ТЗ-C1.5).
+
+### Доступность
+
+| Тип чата | Доступен |
+|----------|----------|
+| Обычный чат | Да (при наличии chatId + messageId) |
+| Проектный чат (Эксперт) | Да (при наличии chatId + messageId) |
+
+### Когда используется
+
+- Пользователь согласился подвести итог диалога
+- Системный сигнал указывает на заполнение контекста (context indicator)
+- Fallback: если модель игнорирует предложение — клерк `snapshot-creator` создаёт snapshot автоматически
+
+### Возможности
+- Сжатие истории диалога в структурированный markdown
+- Сохранение snapshot в `Chat.snapshots[]` (БД)
+- Сброс `contextState` (счётчик сообщений)
+- Snapshot инжектируется как `<previous_context>` в system prompt на следующем ходе
+
+### Параметры
+
+```typescript
+createSnapshot({
+  shortSummary: string,         // Краткий итог (2-3 предложения)
+  decisions: string[],          // Ключевые решения
+  currentState: string,         // Где остановились
+  artifacts?: string[],         // Созданные артефакты
+  openQuestions?: string[],     // Открытые вопросы
+  nextSteps: string[],          // Следующие шаги
+})
+```
+
+### Возвращает
+
+```typescript
+{
+  status: "snapshot_created",
+  shortSummary: string,
+  fullMarkdown: string,     // Полный markdown (6 секций)
+  message: string,          // Подтверждение
+}
+```
+
+### Архитектура
+
+Closure-based tool — фабричная функция принимает `chatId` + `messageId`:
+
+```typescript
+// lib/ai/tools/create-snapshot.ts
+export const createSnapshot = ({ chatId, messageId }: CreateSnapshotProps) =>
+  tool({ ... });
+```
+
+### Связанные компоненты
+
+- `lib/ai/context-limits.ts` — пороги срабатывания (`SNAPSHOT_THRESHOLD`)
+- `lib/ai/clerks/snapshot-creator.ts` — fallback-клерк
+- `components/projects/snapshot-card.tsx` — UI (expand/collapse)
+- `components/projects/context-indicator.tsx` — progress bar над input
+
+### Файл
+[lib/ai/tools/create-snapshot.ts](../lib/ai/tools/create-snapshot.ts)
+
+### Пример использования
+```
+[Context indicator достиг жёлтой зоны]
+→ Модель предлагает: «Предлагаю зафиксировать прогресс»
+→ Пользователь: «Да, давай»
+→ Модель вызывает createSnapshot({...})
+→ На следующем ходе — чистый контекст + <previous_context>
+```
+
+---
+
 ## Read Project File
 
 Чтение файлов проекта по имени из manifest. Доступен только в проектных чатах (Эксперт).
@@ -522,13 +630,16 @@ export const readProjectFile = ({ projectId }: { projectId: string }) =>
 
 ```typescript
 // lib/ai/tools/chat-tools.ts
-export function getStandardTools({ session, dataStream, isProjectChat, projectId }) {
+export function getStandardTools({ session, dataStream, isProjectChat, projectId, chatId, messageId }) {
   return {
     getCurrentDate,
     getWeather,
     ...(isProjectChat ? {} : { readDocument }),              // только обычные чаты
     ...(isProjectChat && projectId
       ? { readProjectFile: readProjectFile({ projectId }) }  // только проектные чаты
+      : {}),
+    ...(chatId && messageId
+      ? { createSnapshot: createSnapshot({ chatId, messageId }) }  // управление контекстом
       : {}),
     createDocument: createDocument({ session, dataStream }),
     updateDocument: updateDocument({ session, dataStream }),
@@ -567,16 +678,19 @@ export function getStandardTools({ session, dataStream, isProjectChat, projectId
      });
    ```
 
-2. **Зарегистрировать в chat route:**
+2. **Зарегистрировать в `getStandardTools()`:**
    ```typescript
-   // app/(chat)/api/chat/route.ts
-   import { myTool } from "@/lib/ai/tools/my-tool";
+   // lib/ai/tools/chat-tools.ts
+   import { myTool } from "./my-tool";
 
-   const tools = {
-     ...,
-     myTool: myTool(),
-   };
+   export function getStandardTools(...) {
+     return {
+       ...,
+       myTool,
+     };
+   }
    ```
+   И добавить в `getActiveToolNames()` в обе ветки (project / non-project).
 
 3. **Обновить документацию** (этот файл!)
 
@@ -622,4 +736,4 @@ export function getStandardTools({ session, dataStream, isProjectChat, projectId
 
 ---
 
-**Обновлено:** 2026-02-10 (v3.17.0 — readProjectFile для Эксперта, getStandardTools() shared factory)
+**Обновлено:** 2026-02-18 (v3.25.1 — createSnapshot для управления контекстом, getWeather: summary + WMO-коды + forecast_days=1)

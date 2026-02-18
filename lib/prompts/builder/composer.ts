@@ -155,14 +155,43 @@ function combineContextBlocks(context: BuildContext): string {
  *
  * Includes:
  * - All core blocks
+ * - Simply Chat role & behavior (simply-chat.md)
  * - User context
  * - All skills metadata (for routing)
+ * - Dev mode + dev_reminder (if SIMPLY_DEV_MODE=true)
  */
-export function composeChatPrompt(context: BuildContext = {}): ComposedPrompt {
+export function composeChatPrompt(context: BuildContext = {}, chatMode: string = 'chat'): ComposedPrompt {
   const parts: string[] = [];
 
   // Core blocks
   parts.push(getAllCoreBlocks());
+
+  // Simply Chat role & behavior
+  const chatPromptPath = path.join(process.cwd(), 'lib', 'prompts', 'chat', 'simply-chat.md');
+  try {
+    const chatPrompt = fs.readFileSync(chatPromptPath, 'utf-8').trim();
+    if (chatPrompt) {
+      // Inject current_mode and current_model based on chatMode
+      const modelDisplayMap: Record<string, string> = {
+        'claude-haiku': 'Haiku',
+        'claude-sonnet': 'Sonnet',
+        'claude-opus': 'Opus',
+      };
+      const modelMapForDisplay: Record<string, string> = {
+        chat: 'claude-haiku',
+        expertise: 'claude-sonnet',
+        create: 'claude-sonnet',
+      };
+      const displayModel = modelDisplayMap[modelMapForDisplay[chatMode] || 'claude-haiku'] || 'Haiku';
+
+      const promptWithInjections = chatPrompt
+        .replace('<current_mode>chat</current_mode>', `<current_mode>${chatMode}</current_mode>`)
+        .replace('<current_model>Haiku</current_model>', `<current_model>${displayModel}</current_model>`);
+      parts.push('---\n\n' + promptWithInjections);
+    }
+  } catch (e) {
+    console.warn('Simply Chat prompt not found, using core blocks only');
+  }
 
   // User context
   const userContext = combineContextBlocks(context);
@@ -176,48 +205,51 @@ export function composeChatPrompt(context: BuildContext = {}): ComposedPrompt {
     parts.push('---\n\n' + buildSkillsMetadataBlock(skills));
   }
 
-  // Dev mode: inject debug instructions (controlled by SIMPLY_DEV_MODE env)
+  // Dev mode block
   if (process.env.SIMPLY_DEV_MODE === 'true') {
     const devBlock = loadCoreBlock('dev-mode.md');
     if (devBlock) {
       parts.push('---\n\n' + devBlock);
     }
+    // Dev reminder — в самом конце, ближе к ответу модели
+    parts.push(`<dev_reminder>DEV-РЕЖИМ: каждый ответ НАЧИНАЕТСЯ с блока [DEV]. Режим: ${chatMode}</dev_reminder>`);
   }
+
+  // Модель определяется chatMode
+  const modelMap: Record<string, ModelId> = {
+    chat: 'claude-haiku',
+    expertise: 'claude-sonnet',
+    create: 'claude-sonnet',
+  };
 
   return {
     systemPrompt: parts.join('\n\n'),
-    model: context.model || 'claude-haiku',
+    model: modelMap[chatMode] || 'claude-haiku',
     greeting: 'Привет! Чем могу помочь?',
-    toolAccess: null, // All tools
+    toolAccess: null,
   };
 }
 
 /**
  * Compose prompt for expertise chat mode
  *
- * Stub: delegates to composeChatPrompt, hardcodes Sonnet.
+ * Delegates to composeChatPrompt with chatMode='expertise'.
+ * Model (Sonnet) determined by modelMap inside composeChatPrompt.
  * PE will replace with real expertise prompt later.
  */
 export function composeExpertisePrompt(context: BuildContext = {}): ComposedPrompt {
-  const base = composeChatPrompt(context);
-  return {
-    ...base,
-    model: 'claude-sonnet',
-  };
+  return composeChatPrompt(context, 'expertise');
 }
 
 /**
  * Compose prompt for create chat mode
  *
- * Stub: delegates to composeChatPrompt, hardcodes Sonnet.
+ * Delegates to composeChatPrompt with chatMode='create'.
+ * Model (Sonnet) determined by modelMap inside composeChatPrompt.
  * PE will replace with real create prompt later.
  */
 export function composeCreatePrompt(context: BuildContext = {}): ComposedPrompt {
-  const base = composeChatPrompt(context);
-  return {
-    ...base,
-    model: 'claude-sonnet',
-  };
+  return composeChatPrompt(context, 'create');
 }
 
 /**
