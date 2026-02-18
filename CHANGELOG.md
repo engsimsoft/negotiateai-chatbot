@@ -12,6 +12,46 @@
 
 ---
 
+## [3.24.0] - 2026-02-17 - Dashboard V2 (ТЗ-DV2)
+
+**MINOR RELEASE**: Полная переработка дашборда. Три режима чатов (chat/expertise/create) вместо помощников. Универсальный ListDetailPage для всех списковых страниц. Удалена экосистема помощников.
+
+### Added
+- **chatMode** — новое поле в Chat: `chat` (Haiku), `expertise` (Sonnet), `create` (Sonnet). Модель определяется на сервере по режиму
+- **`lib/ai/chat-mode-config.ts`** — конфигурация режимов чата (модель, tools, промпт)
+- **Дашборд: 3 карточки-лаунчера** — Экспертиза (🔍), Создать (✨), Проекты (📁) вместо ProjectsSection
+- **`ListDetailPage`** — универсальный composition-компонент для двухколоночного layout (list + detail). `components/list-detail/`
+- **Страница `/expertise`** — список экспертизных чатов (chatMode=expertise) на базе ListDetailPage
+- **Страница `/create`** — список креативных чатов (chatMode=create) на базе ListDetailPage
+- **`ModeChatsPage`** — переиспользуемый клиентский компонент для страниц по chatMode
+- **chatMode badges** — 🔍/✨ рядом с названием чата в sidebar и списках
+- **`?mode=` query param** — `/chat?mode=expertise` создаёт чат в указанном режиме
+- **`composeExpertisePrompt()`**, **`composeCreatePrompt()`** — composer-функции для новых режимов
+
+### Changed
+- **`/projects`** — рефакторинг с grid-карточек на ListDetailPage (project-list-item + project-detail-panel)
+- **`/chats`** — фильтрация только `chatMode='chat'` (каждый режим на своей странице), рефакторинг на ListDetailPage
+- **Основной чат** — chatMode=chat → Claude Haiku (было Sonnet). Экспертиза/Создание → Sonnet
+- **API `selectedChatModel`** — удалён, заменён на `chatMode`
+- **Селектор модели** — убран из UI (InputModelSelector, ModelSelectorCompact)
+- **Simply branding** — Claude → Simply в models.ts и серверных логах
+
+### Removed
+- **Экосистема помощников** — удалены `lib/helpers/`, `app/(chat)/helpers/`, `app/(chat)/api/helpers/`, `components/glavnaya/helpers-section.tsx`, `components/glavnaya/tools-section.tsx`
+- **`Helper` таблица** — удалена из БД (миграция 0030)
+- **`helperId` колонка** — удалена из Chat (миграция 0030)
+- **`ProjectCard`** — заменён на project-list-item + project-detail-panel
+- **`ChatsEmptyState`** — встроен в ListDetailPage
+- **`ProjectsSection`** — заменена на ModeCardsSection
+
+### Technical
+- **DB миграции** — `0029_add-chat-mode.sql` (ADD chatMode), `0030_drop-helper.sql` (DROP Helper + helperId)
+- **`getStandardTools()`** — расширен параметром `chatMode` для фильтрации инструментов
+- **`getChatsByModeWithStats()`** — новый query для фильтрации по chatMode
+- **`getGeneralChatsWithStats()`** — фильтрует только chatMode='chat'
+
+---
+
 ## [3.23.0] - 2026-02-16 - Anthropic Provider Switch (ТЗ-C4)
 
 **MINOR RELEASE**: Полное переключение AI-провайдера с Google Gemini на Anthropic Claude. Все AI-модели теперь работают через `@ai-sdk/anthropic` (прямое подключение, без OpenRouter).

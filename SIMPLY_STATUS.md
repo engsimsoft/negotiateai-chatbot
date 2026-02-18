@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.23.0
-**Дата:** 2026-02-16
+**Версия:** 3.24.0
+**Дата:** 2026-02-17
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -325,6 +325,32 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-DV2: Dashboard V2 — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Удаление помощников** — полностью убрана экосистема helpers (код, UI, API, DB)
+- **chatMode** — новое поле в Chat (chat/expertise/create), модель определяется на сервере по режиму
+- **Три режима чатов** — chat (Haiku), expertise (Sonnet), create (Sonnet) с отдельными composer-функциями и tools-конфигурацией
+- **Дашборд: 3 карточки** — Экспертиза (🔍), Создать (✨), Проекты (📁) вместо ProjectsSection и HelpersSection
+- **ListDetailPage** — универсальный composition layout-shell для двухколоночных страниц (список + детали)
+- **`/expertise`** и **`/create`** — новые страницы с фильтрацией чатов по chatMode
+- **`/projects`** — рефакторинг на ListDetailPage (project-list-item + project-detail-panel)
+- **`/chats`** — рефакторинг на ListDetailPage, фильтрация только chatMode='chat'
+- **chatMode badges** — 🔍/✨ рядом с названием чата в sidebar и списках чатов
+- **Убран селектор модели** — модель определяется по chatMode, нет UI выбора
+- **DB cleanup** — удалена таблица Helper и колонка helperId из Chat (миграция 0030)
+
+**Ключевые файлы:**
+- `lib/ai/chat-mode-config.ts` — конфигурация режимов
+- `components/list-detail/list-detail-page.tsx` — универсальный layout
+- `components/glavnaya/mode-cards-section.tsx` — 3 карточки на дашборде
+- `components/chats/mode-chats-page.tsx` — shared компонент для /expertise, /create
+- `components/projects/projects-page-content.tsx` — /projects на ListDetailPage
+- `app/(dashboard)/expertise/page.tsx` — страница экспертиз
+- `app/(dashboard)/create/page.tsx` — страница создания
+
+**Детали:** [_archive/TZ_DV2_DashboardV2/](_archive/TZ_DV2_DashboardV2/)
 
 ### ТЗ-C3: Chat Context Management — ✅ ЗАВЕРШЁН
 
@@ -998,11 +1024,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.23.0 |
+| Версия | 3.24.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21), ChatContextManagement (v3.22), AnthropicProviderSwitch (v3.23) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21), ChatContextManagement (v3.22), AnthropicProviderSwitch (v3.23), DashboardV2 (v3.24) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Профессоры | 2 (planning, task-review) |
@@ -1036,6 +1062,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_DV2_DashboardV2/](_archive/TZ_DV2_DashboardV2/) — ТЗ-DV2 Dashboard V2
 - [_archive/TZ_C4_AnthropicProvider/](_archive/TZ_C4_AnthropicProvider/) — ТЗ-C4 Anthropic Provider Switch
 - [_archive/TZ_C3_ChatContext/](_archive/TZ_C3_ChatContext/) — ТЗ-C3 Chat Context Management
 - [_archive/TZ_08_ChatSidebar/](_archive/TZ_08_ChatSidebar/) — ТЗ-08CS Chat Sidebar + RightSidebar
@@ -1073,4 +1100,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-16
+**Обновлено:** 2026-02-17

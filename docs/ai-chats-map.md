@@ -2,19 +2,21 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-02-16
+**Обновлено:** 2026-02-17
 
 ---
 
 ## Быстрый обзор
 
-> **v3.23.0:** Все AI-модели переключены с Google Gemini на Anthropic Claude через `@ai-sdk/anthropic`.
+> **v3.24.0:** Дашборд V2 — три режима чатов (chat/expertise/create), удалены помощники, ListDetailPage.
 >
-> **v3.8.0:** Сервисные чаты унифицированы в систему ServiceChat. Prompt-агент удалён.
+> **v3.23.0:** Все AI-модели переключены с Google Gemini на Anthropic Claude через `@ai-sdk/anthropic`.
 
 | Чат | Модель | Статус | Назначение |
 |-----|--------|--------|-----------|
-| **Основной чат** | Claude Sonnet / Haiku / Opus | ✅ Работает | Универсальный AI-чат с инструментами |
+| **Чат (chatMode=chat)** | Claude Haiku | ✅ Работает | Обычный чат |
+| **Экспертиза (chatMode=expertise)** | Claude Sonnet | ✅ Работает | Точные ответы с проверкой фактов |
+| **Создание (chatMode=create)** | Claude Sonnet | ✅ Работает | Презентации, отчёты, изображения |
 | **Проект: Исполнитель** | Claude Haiku | ✅ Работает | Быстрые простые задачи |
 | **Проект: Эксперт** | Claude Sonnet | ✅ Работает | Баланс качества и скорости (DEFAULT) |
 | **Проект: Профессор** | Claude Opus | ✅ Работает | Сложные задачи |
@@ -28,7 +30,6 @@
 | **Клерк-анализатор** | Claude Haiku | ✅ Работает | Автоматический анализ файлов проекта |
 | **Snapshot Creator** | Claude Haiku | ✅ Работает | Fallback-клерк создания snapshot при заполнении контекста (v3.18) |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
-| **Preset Помощники** | Claude Sonnet / Haiku | ⚠️ Частично | Маркетолог, Копирайтер и др. |
 
 ---
 
@@ -289,44 +290,7 @@ lib/prompts/clerks/snapshot-creator.md     # Промпт клерка
 
 ---
 
-## ⚠️ Частично реализовано
-
-### Preset Помощники (Маркетолог, Копирайтер, и др.)
-**Где:** Секция "ПОМОЩНИКИ" на dashboard, URL `/helpers/[id]/chat`
-
-| Помощник | ID | Описание |
-|----------|-----|----------|
-| 📈 Маркетолог | `marketer` | Стратегии продвижения, анализ рынка |
-| ✍️ Копирайтер | `copywriter` | Тексты для сайтов, рекламы, соцсетей |
-| 🌍 Переводчик | `translator` | Перевод EN↔RU |
-| 📊 Аналитик | `analyst` | Анализ данных, отчёты |
-| 🎯 Наставник | `mentor` | Карьерные советы, мотивация |
-
-**Модель:** Claude Sonnet / Haiku (как основной чат)
-
-**⚠️ ПРОБЛЕМА:** Инструкции помощников определены в коде, но **НЕ применяются**!
-- `helperId` не передаётся в API при отправке сообщений
-- Чат работает как обычный, без кастомного системного промпта
-
-**Файлы:**
-```
-lib/helpers/presets.ts              # Определение помощников с инструкциями
-lib/helpers/types.ts                # Типы
-app/(chat)/helpers/[id]/chat/       # Страницы чата
-components/chat.tsx:182-183         # ← helperId НЕ передаётся
-```
-
-**TODO:** Добавить передачу `helperId` в API и применение инструкции в системном промпте.
-
----
-
 ## 🚧 Заглушки (не подключены к AI)
-
-### Конструктор помощников
-**Где:** Карточка "🔧 Конструктор" в секции "Помощники", ведёт на `/helpers/new`
-**Статус:** Страница не существует (404)
-
-**Файл:** [components/glavnaya/helpers-section.tsx](../components/glavnaya/helpers-section.tsx) (строка 46)
 
 ### Помощники проекта
 **Где:** Кнопка "+ добавить" в паспорте проекта
@@ -342,14 +306,21 @@ components/chat.tsx:182-183         # ← helperId НЕ передаётся
 
 ---
 
-## 1. Основной чат (Main Chat)
+## 1. Чаты по режимам (chatMode v3.24)
 
-**Где:** Главная страница, `/chat/[id]`
+**Где:** Главная страница (`/chat`), `/expertise`, `/create`, `/chats`
 
-**Модели:**
-- `claude-sonnet` — Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`, $3/$15 за 1M токенов) — по умолчанию
-- `claude-haiku` — Claude Haiku 4.5 (`claude-haiku-4-5-20251001`, $1/$5 за 1M токенов)
-- `claude-opus` — Claude Opus 4.6 (`claude-opus-4-6`, $5/$25 за 1M токенов)
+> **v3.24.0:** Модель определяется на сервере по chatMode. Убран UI-селектор модели.
+
+### chatMode routing
+
+| chatMode | Модель | Страница | Описание |
+|----------|--------|----------|----------|
+| `chat` | Claude Haiku | `/chats` | Обычный чат (по умолчанию) |
+| `expertise` | Claude Sonnet | `/expertise` | Точные ответы с проверкой фактов |
+| `create` | Claude Sonnet | `/create` | Презентации, отчёты, изображения |
+
+**Создание чата:** `/chat?mode=expertise` → чат с chatMode=expertise, модель Sonnet.
 
 **Особенности:**
 - Полная поддержка инструментов (search, documents, excel)
@@ -359,9 +330,10 @@ components/chat.tsx:182-183         # ← helperId НЕ передаётся
 
 **Файлы:**
 ```
-app/(chat)/api/chat/route.ts          # API endpoint
+app/(chat)/api/chat/route.ts          # API endpoint (chatMode routing)
+lib/ai/chat-mode-config.ts           # Конфиг: chatMode → модель, tools
 lib/ai/providers.ts                   # Конфигурация Anthropic Claude
-lib/prompts/builder/index.ts          # buildChatPrompt()
+lib/prompts/builder/index.ts          # buildChatPrompt, buildExpertisePrompt, buildCreatePrompt
 ```
 
 ---

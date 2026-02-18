@@ -36,7 +36,7 @@
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  External Services                                          │
-│  ├── AI Providers      - Gemini, Claude (OpenRouter)       │
+│  ├── AI Providers      - Anthropic Claude (@ai-sdk/anthropic) │
 │  ├── Brave Search API  - Web search                        │
 │  ├── Deepgram          - Voice input (Nova-3)              │
 │  ├── CloudConvert API  - PPTX preview                      │
@@ -89,8 +89,8 @@
 
 #### providers.ts
 - Конфигурация AI-моделей
-- Gemini: 3 Pro, 2.5 Flash
-- Claude: Haiku, Sonnet, Opus (через OpenRouter)
+- Anthropic Claude: Haiku, Sonnet, Opus (через @ai-sdk/anthropic)
+- Google Gemini: только vision-ocr
 
 #### Prompt System (v3.3 — Skills + Agents)
 - `lib/prompts/` — Файловая система промптов
@@ -118,12 +118,12 @@
 
 **Основные таблицы:**
 - `User` — пользователи (displayName, pronouns, occupation, bio, theme, hasSeenBenIntro)
-- `Chat` — чаты (title, summary, isStarred, projectId, helperId)
+- `Chat` — чаты (title, summary, isStarred, projectId, chatMode)
 - `Message_v2` — сообщения
 - `Document` — артефакты
 - `Project` — проекты (изолированные рабочие пространства)
 - `ProjectFile` — файлы проектов
-- `Helper` — помощники
+- `ProjectTask` — задачи проекта
 - `Vote_v2` — голосование за сообщения
 - NextAuth таблицы (Account, Session, VerificationToken)
 
@@ -210,16 +210,10 @@ lib/prompts/
 - Built-in API routes
 - Легкий деплой на Vercel
 
-**Google Gemini (текущий):**
-- Free tier для старта
-- Хорошее качество
-- Мультимодальность
-- См. [ADR 001](decisions/001-why-gemini.md)
-
-**Мультипровайдер (план):**
-- Vercel AI SDK поддерживает все провайдеры
-- Гибкость выбора модели
-- Оптимизация затрат
+**Anthropic Claude (основной — v3.23.0+):**
+- Три модели: Haiku (быстрый), Sonnet (баланс), Opus (качество)
+- Прямое подключение через @ai-sdk/anthropic
+- Google Gemini — только для vision-ocr
 
 **PostgreSQL + Drizzle:**
 - Type-safe queries
@@ -240,4 +234,4 @@ lib/prompts/
 
 ---
 
-**Обновлено:** 2026-02-04 (v3.5.0 — Chat History)
+**Обновлено:** 2026-02-17 (v3.24.0 — Dashboard V2)

@@ -2,7 +2,7 @@
 
 **Создан:** 2026-02-16
 **Версия проекта:** 3.23.0 → 3.24.0
-**Статус:** В работе
+**Статус:** ✅ Завершён
 
 ---
 
@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 8 (1, 2, 3, 4A, 4B, 4C, 4D, 5, 6) |
-| Текущий этап | 4D |
+| Текущий этап | ✅ Завершён |
 | Сессий (оценка) | 5-6 |
 
 **Принятые решения (от архитектора):**
@@ -439,17 +439,15 @@ git commit -m "feat(tz-dv2): rebrand AI to Simply + chatMode badges"
 
 ## Этап 6: Финализация
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 5
+**Статус:** ✅ Завершён
 
 **Цель:** Финальная проверка, DB-cleanup, документация, версия.
 
 **Задачи:**
-- [ ] DB-миграция: удалить `helperId` из Chat и таблицу `Helper`
-- [ ] Создать и применить миграцию
-- [ ] SQL-проверка
-- [ ] Финальное тестирование:
+- [x] DB-миграция: удалить `helperId` из Chat и таблицу `Helper`
+- [x] Создать и применить миграцию
+- [x] SQL-проверка
+- [x] Финальное тестирование:
   - Дашборд: 3 карточки-инструмента
   - Каждая карточка → страница list-detail
   - Кнопка создания → чат с правильным chatMode
@@ -460,20 +458,20 @@ git commit -m "feat(tz-dv2): rebrand AI to Simply + chatMode badges"
   - AI = Simply + badge
   - Бен работает
   - Проекты (внутренние) работают
-- [ ] Обновить `CHANGELOG.md`
-- [ ] Обновить `SIMPLY_STATUS.md`
-- [ ] Обновить `CLAUDE.md` (ListDetailPage, новые страницы, текущий этап)
-- [ ] Обновить `package.json` → 3.24.0
-- [ ] Обновить `docs/ai-chats-map.md` — chatMode + страницы
-- [ ] Обновить `docs/architecture.md` — ListDetailPage
-- [ ] Обновить `docs/design-system.md` — /expertise, /create
-- [ ] Переместить `specs/TZ_DV2_DashboardV2/` → `_archive/`
+- [x] Обновить `CHANGELOG.md`
+- [x] Обновить `SIMPLY_STATUS.md`
+- [x] Обновить `CLAUDE.md` (ListDetailPage, новые страницы, текущий этап)
+- [x] Обновить `package.json` → 3.24.0
+- [x] Обновить `docs/ai-chats-map.md` — chatMode + страницы
+- [x] Обновить `docs/architecture.md` — ListDetailPage
+- [x] Обновить `docs/design-system.md` — /expertise, /create
+- [x] Переместить `specs/TZ_DV2_DashboardV2/` → `_archive/`
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] SQL: нет Helper, нет helperId, есть chatMode
-- [ ] Документация актуальна
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] SQL: нет Helper, нет helperId, есть chatMode
+- [x] Документация актуальна
 - [ ] 🧪 Финальный мануальный тест
 
 **Git:**

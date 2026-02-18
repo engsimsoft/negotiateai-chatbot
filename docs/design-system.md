@@ -40,7 +40,7 @@ Root Layout (app/layout.tsx)
 │   ├── /chat/[id] → существующий чат
 │   ├── /projects/[id]/chat → чат проекта
 │   ├── /projects/[id]/chat/[chatId] → чат проекта
-│   └── /helpers/[id]/* → чаты помощника
+│   └── /chat?mode=expertise|create → новый чат в режиме
 │
 ├── (dashboard) — БЕЗ глобального sidebar
 │   │   Каждая страница сама отвечает за свой header
@@ -58,7 +58,13 @@ Root Layout (app/layout.tsx)
 │   ├── /projects/[id] → ProjectPageLayout (breadcrumbs + "Менеджер" + UserMenu)
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │
-│   ├── /chats → свой header (← Dashboard + "История чатов" + UserMenu)
+│   ├── /chats → ListDetailPage (← Dashboard + "История чатов" + UserMenu)
+│   │   User Menu: ✅   Theme Toggle: ✅
+│   │
+│   ├── /expertise → ListDetailPage (← Dashboard + "Экспертиза" + UserMenu)
+│   │   User Menu: ✅   Theme Toggle: ✅
+│   │
+│   ├── /create → ListDetailPage (← Dashboard + "Создание" + UserMenu)
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │
 │   └── /projects/new → создание проекта (header + UserMenu)
@@ -84,6 +90,7 @@ Root Layout (app/layout.tsx)
 | `RightSidebar` | `(chat)`, будущее: projects, helpers | Унифицированный правый сайдбар-shell (bg-sidebar, Sheet на мобильных). Переиспользуемый контейнер |
 | `ChatSidebar` | `(chat)` страницы | Материалы чата (артефакты + вложения). Использует RightSidebar |
 | `TaskSidebar` | `(task)` страницы | Список задач проекта, навигация между задачами, UserMenu |
+| `ListDetailPage` | `/chats`, `/expertise`, `/create`, `/projects` | Универсальный composition layout: header (← back, title, count, createButton, UserMenu) + двухколоночный layout (list w-80/lg:w-96 + detail flex-1) + empty state |
 | `ProjectPageLayout` | `/projects/[id]` | Header (breadcrumbs + Менеджер + UserMenu), Pulse + WorkArea |
 
 **Важно:** User dropdown реализован в двух компонентах:
