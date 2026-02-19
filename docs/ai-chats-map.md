@@ -2,12 +2,14 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-02-17
+**Обновлено:** 2026-02-19
 
 ---
 
 ## Быстрый обзор
 
+> **v3.26.0:** Morning Briefing Backend — двухэтапный AI-пайплайн на Gemini (Flash + Pro) для генерации новостных сводок.
+>
 > **v3.24.0:** Дашборд V2 — три режима чатов (chat/expertise/create), удалены помощники, ListDetailPage.
 >
 > **v3.23.0:** Все AI-модели переключены с Google Gemini на Anthropic Claude через `@ai-sdk/anthropic`.
@@ -29,6 +31,8 @@
 | **Ревьюер задач** | Claude Opus | ✅ Работает | Профессор — ревью завершённой задачи (v3.17) |
 | **Клерк-анализатор** | Claude Haiku | ✅ Работает | Автоматический анализ файлов проекта |
 | **Snapshot Creator** | Claude Haiku | ✅ Работает | Fallback-клерк создания snapshot при заполнении контекста (v3.18) |
+| **Briefing: Фильтр** | Gemini 2.0 Flash | ✅ Работает | Фильтрация и дедупликация новостей (v3.26) |
+| **Briefing: Анализатор** | Gemini 3 Pro | ✅ Работает | Анализ и группировка новостей по темам (v3.26) |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
 
 ---
@@ -288,6 +292,49 @@ lib/ai/context-limits.ts                   # Конфиг бюджетов
 lib/prompts/clerks/snapshot-creator.md     # Промпт клерка
 ```
 
+#### Briefing: AI-пайплайн (v3.26)
+**Где:** `POST /api/briefing/generate` (backend-only, без интерактивного UI)
+
+> **Особенность:** Единственный пайплайн в Simply, использующий Gemini вместо Claude. Причина: batch-обработка ~200 статей, разгрузка основного провайдера, экономия. [ADR 016](decisions/016-briefing-backend-architecture.md)
+
+**Этап 1 — Фильтр:**
+
+| Параметр | Значение |
+|----------|----------|
+| **Модель** | Gemini 2.0 Flash (`gemini-2.0-flash`) |
+| **Тип** | Backend (внутренний вызов в generate/route.ts) |
+| **Вход** | ~200 RawContent[] из 3 фетчеров (RSS, Telegram, Web) |
+| **Выход** | ~30 FilteredItem[] (дедуплицированные, с оценкой релевантности) |
+
+**Этап 2 — Анализатор:**
+
+| Параметр | Значение |
+|----------|----------|
+| **Модель** | Gemini 3 Pro (`gemini-3-pro`) |
+| **Тип** | Backend (внутренний вызов в generate/route.ts) |
+| **Вход** | ~30 FilteredItem[] |
+| **Выход** | BriefingJSON (новости сгруппированные по темам, с impact, sentiment, links) |
+
+**Полный flow:**
+1. Endpoint получает POST с auth
+2. Загружает настройки и источники пользователя из БД
+3. Параллельный fetch всех источников → RawContent[]
+4. Gemini Flash: фильтрация, дедупликация → FilteredItem[]
+5. Gemini Pro: анализ, группировка → BriefingJSON
+6. Сохранение в BriefingHistory
+
+**Файлы:**
+```
+app/(chat)/api/briefing/generate/route.ts    # POST endpoint (auth, orchestration)
+lib/briefing/briefing-filter.ts              # Gemini Flash: filterAndDeduplicate()
+lib/briefing/briefing-analyzer.ts            # Gemini Pro: analyzeBriefing()
+lib/briefing/briefing-config.ts              # Константы (модели, лимиты)
+lib/briefing/source-fetchers/index.ts        # fetchSource() dispatcher
+lib/briefing/source-fetchers/rss-fetcher.ts  # RSS через rss-parser
+lib/briefing/source-fetchers/telegram-fetcher.ts # Telegram через cheerio
+lib/briefing/source-fetchers/web-fetcher.ts  # Web через Readability + jsdom
+```
+
 ---
 
 ## 🚧 Заглушки (не подключены к AI)
@@ -447,7 +494,7 @@ export const myProvider = customProvider({
 
 **API Key:** `ANTHROPIC_API_KEY`
 
-### Google Gemini (только vision-ocr)
+### Google Gemini (vision-ocr + Briefing pipeline)
 
 ```typescript
 // lib/ai/vision-ocr.ts
@@ -455,7 +502,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
 ```
 
-**API Key:** `GOOGLE_GENERATIVE_AI_API_KEY` (используется только для OCR)
+**API Key:** `GOOGLE_GENERATIVE_AI_API_KEY` (vision-ocr + Briefing pipeline)
 
 ---
 
@@ -466,6 +513,8 @@ const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_
 | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) | $3 | $15 | 200K | Основной чат (DEFAULT), Секретарь, Эксперт, артефакты |
 | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | $1 | $5 | 200K | Бен, Менеджер, Исполнитель, Клерки (анализатор, суммаризатор, snapshot) |
 | Claude Opus 4.6 (`claude-opus-4-6`) | $5 | $25 | 200K | Профессоры (планирование, ревью задач) |
+| Gemini 2.0 Flash (`gemini-2.0-flash`) | ~$0.10 | ~$0.40 | 1M | Briefing: фильтрация и дедупликация (v3.26) |
+| Gemini 3 Pro (`gemini-3-pro`) | ~$1.25 | ~$10 | 1M | Briefing: анализ и группировка (v3.26) |
 
 *Цены за 1M токенов*
 

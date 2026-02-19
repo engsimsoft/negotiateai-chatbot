@@ -26,6 +26,7 @@
 │  │  Business Logic (lib/)                               │  │
 │  │  ├── ai/providers.ts   - AI Provider config          │  │
 │  │  ├── ai/tools/         - AI-инструменты              │  │
+│  │  ├── briefing/         - Briefing pipeline (v3.26)   │  │
 │  │  ├── prompts/          - Skills + Agents system      │  │
 │  │  ├── db/queries.ts     - Database queries            │  │
 │  │  └── db/schema.ts      - Database schema             │  │
@@ -37,6 +38,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │  External Services                                          │
 │  ├── AI Providers      - Anthropic Claude (@ai-sdk/anthropic) │
+│  ├── AI Providers      - Google Gemini (vision-ocr, Briefing) │
 │  ├── Brave Search API  - Web search                        │
 │  ├── Deepgram          - Voice input (Nova-3)              │
 │  ├── CloudConvert API  - PPTX preview                      │
@@ -90,7 +92,7 @@
 #### providers.ts
 - Конфигурация AI-моделей
 - Anthropic Claude: Haiku, Sonnet, Opus (через @ai-sdk/anthropic)
-- Google Gemini: только vision-ocr
+- Google Gemini: vision-ocr + Briefing pipeline (Flash, Pro)
 
 #### Prompt System (v3.3 — Skills + Agents)
 - `lib/prompts/` — Файловая система промптов
@@ -124,6 +126,9 @@
 - `Project` — проекты (изолированные рабочие пространства)
 - `ProjectFile` — файлы проектов
 - `ProjectTask` — задачи проекта
+- `BriefingSettings` — настройки брифинга (timezone, language, maxItems)
+- `BriefingSources` — источники новостей (topicId, sourceUrl, fetchMethod, tier)
+- `BriefingHistory` — история генераций (briefingJson, stats, status)
 - `Vote_v2` — голосование за сообщения
 - NextAuth таблицы (Account, Session, VerificationToken)
 
@@ -213,7 +218,7 @@ lib/prompts/
 **Anthropic Claude (основной — v3.23.0+):**
 - Три модели: Haiku (быстрый), Sonnet (баланс), Opus (качество)
 - Прямое подключение через @ai-sdk/anthropic
-- Google Gemini — только для vision-ocr
+- Google Gemini — vision-ocr + Briefing pipeline ([ADR 016](decisions/016-briefing-backend-architecture.md))
 
 **PostgreSQL + Drizzle:**
 - Type-safe queries
@@ -234,4 +239,4 @@ lib/prompts/
 
 ---
 
-**Обновлено:** 2026-02-17 (v3.24.0 — Dashboard V2)
+**Обновлено:** 2026-02-19 (v3.26.0 — Morning Briefing Backend)
