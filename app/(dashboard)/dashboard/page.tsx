@@ -2,13 +2,14 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
-import { getUserById, getGeneralChatsCount } from "@/lib/db/queries";
+import { getUserById, getGeneralChatsCount, getBriefingHistory } from "@/lib/db/queries";
 import {
   GlavnayaHeader,
   GlavnayaGreeting,
   GlavnayaInput,
   ModeCardsSection,
   ChatHistoryCard,
+  ToolsSection,
 } from "@/components/glavnaya";
 
 export default async function DashboardPage() {
@@ -18,11 +19,13 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Get user profile and chat count from database
-  const [userProfile, generalChatsCount] = await Promise.all([
+  // Get user profile, chat count, and latest briefing from database
+  const [userProfile, generalChatsCount, briefingHistoryRows] = await Promise.all([
     getUserById(session.user.id),
     getGeneralChatsCount({ userId: session.user.id }),
+    getBriefingHistory({ userId: session.user.id, limit: 1 }),
   ]);
+  const latestBriefing = briefingHistoryRows[0] ?? null;
   // User was deleted from DB but JWT still valid — force re-auth
   if (!userProfile) {
     const cookieStore = await cookies();
@@ -51,6 +54,9 @@ export default async function DashboardPage() {
 
         {/* Mode cards */}
         <ModeCardsSection />
+
+        {/* Tools */}
+        <ToolsSection latestBriefing={latestBriefing} />
       </main>
     </div>
   );

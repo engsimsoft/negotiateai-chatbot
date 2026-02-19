@@ -10,7 +10,10 @@ import {
 } from "./briefing-config";
 import type { FilteredItem } from "./briefing-filter";
 import type { RawContent } from "./source-fetchers/types";
+import type { BriefingJSON } from "./briefing-types";
 import { TOPICS_CATALOG } from "./topics-catalog";
+
+export type { BriefingItem, BriefingBlock, BriefingJSON } from "./briefing-types";
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
@@ -41,10 +44,6 @@ const briefingJsonSchema = z.object({
   totalCandidates: z.number(),
   blocks: z.array(briefingBlockSchema),
 });
-
-export type BriefingItem = z.infer<typeof briefingItemSchema>;
-export type BriefingBlock = z.infer<typeof briefingBlockSchema>;
-export type BriefingJSON = z.infer<typeof briefingJsonSchema>;
 
 interface AnalyzerInput {
   candidates: FilteredItem[];

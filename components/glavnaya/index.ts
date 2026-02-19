@@ -8,3 +8,4 @@ export { GlavnayaInput } from "./glavnaya-input";
 export { ModeCardsSection } from "./mode-cards-section";
 export { SectionTitle } from "./section-title";
 export { ChatHistoryCard } from "./chat-history-card";
+export { ToolsSection } from "./tools-section";
