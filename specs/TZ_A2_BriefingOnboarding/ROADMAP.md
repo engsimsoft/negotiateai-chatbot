@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 5 |
-| Текущий этап | 1 |
+| Текущий этап | 2 |
 | Сессий (оценка) | 3-4 |
 
 ---
@@ -67,40 +67,41 @@ git commit -m "feat(tz-a2): DB migration + prompts + claude-sonnet-4-6 model"
 
 ## Этап 2: Backend — service-chat расширение
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** Добавить контекст `"briefing-onboarding"` в service-chat API: prompt builder, tools (updateBriefingPreview + saveBriefingProfile + deepResearch + fetchUrl), model routing, maxDuration, stepCount.
 
 **Задачи:**
-- [ ] Добавить `"briefing-onboarding"` в тип `ServiceChatContext` и `requestSchema` (+ поле `briefingMode`)
-- [ ] Поднять `maxDuration` с 60 до 120 (глобальный ceiling)
-- [ ] Сделать `stepCountIs` динамическим по контексту (8 для briefing-onboarding, 3 для остальных)
-- [ ] Добавить `getModelId()` case: `"briefing-onboarding"` → `"claude-sonnet-4-6"`
-- [ ] Реализовать `buildBriefingOnboardingPrompt()`:
+- [x] Добавить `"briefing-onboarding"` в тип `ServiceChatContext` и `requestSchema` (+ поле `briefingMode`)
+- [x] Поднять `maxDuration` с 60 до 120 (глобальный ceiling)
+- [x] Сделать `stepCountIs` динамическим по контексту (8 для briefing-onboarding, 3 для остальных)
+- [x] Добавить `getModelId()` case: `"briefing-onboarding"` → `"claude-sonnet-4-6"`
+- [x] Реализовать `buildBriefingOnboardingPrompt()`:
   - Загрузка шаблона из .md при старте модуля
   - Подстановка `{{USER_CONTEXT}}` — паттерн Secretary (XML, пустые поля пропускать)
   - Подстановка `{{DATE}}` — текущая дата ISO
+  - Подстановка `{{YEAR}}` — текущий год
   - Подстановка `{{MODE_INJECTION}}`:
     - mode "create" → статический XML-блок
     - mode "edit" → программная сборка строки с текущими topics/sources из БД (как Manager `buildFirstContactMode()`)
-- [ ] Добавить case в `buildSystemPrompt()` → `buildBriefingOnboardingPrompt()`
-- [ ] Определить tool `updateBriefingPreview`:
+- [x] Добавить case в `buildSystemPrompt()` → `buildBriefingOnboardingPrompt()`
+- [x] Определить tool `updateBriefingPreview`:
   - Zod schema: `{ topics: [{ topicId, topicName, emoji }], sources: [{ topicId, sourceName, sourceUrl, rssUrl?, fetchMethod, sourceLanguage, tier }], settings?: { timezone?, language?, maxItems? } }`
   - execute: return `{ success: true, preview: input }` (только для клиентского отображения, не пишет в БД)
-- [ ] Определить tool `saveBriefingProfile`:
+- [x] Определить tool `saveBriefingProfile`:
   - Та же Zod schema что у updateBriefingPreview
   - execute: `upsertBriefingSettings()` + `deleteAllBriefingTopicsByUser()` + `addBriefingTopic()` × N + `deleteAllBriefingSourcesByUser()` + `addBriefingSource()` × N + `isActive: true`
   - return `{ success: true, topicsCount, sourcesCount }`
-- [ ] Подключить `deepResearch({ defaultDepth: "pro" })` и `fetchUrl` через прямой импорт
-- [ ] Добавить инструкцию для `updateBriefingPreview` в промпт (когда вызывать — после каждого deepResearch)
+- [x] Подключить `deepResearch({ defaultDepth: "pro" })` и `fetchUrl` через прямой импорт
+- [x] Инструкции для `updateBriefingPreview` уже в промпте briefing-onboarding.md (секция tools_usage)
 
 **Файлы:**
 - `app/(chat)/api/service-chat/route.ts` — основные изменения
 - `lib/prompts/service-chats/briefing-onboarding.md` — возможные правки для упоминания updateBriefingPreview
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Проверка в браузере: POST `/api/service-chat` с `context: "briefing-onboarding"` возвращает streaming response (через curl или dev tools)
 - [ ] 🧪 Мануальный тест пользователем
 

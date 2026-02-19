@@ -26,7 +26,17 @@ import {
   findManagerChat,
   saveMessages,
   getMessagesByChatId,
+  getBriefingSettings,
+  getBriefingTopics,
+  getBriefingSources,
+  upsertBriefingSettings,
+  addBriefingTopic,
+  addBriefingSource,
+  deleteAllBriefingTopicsByUser,
+  deleteAllBriefingSourcesByUser,
 } from "@/lib/db/queries";
+import { deepResearch } from "@/lib/ai/tools/deep-research";
+import { fetchUrl } from "@/lib/ai/tools/fetch-url";
 import { ChatSDKError } from "@/lib/errors";
 import { generateUUID } from "@/lib/utils";
 import type { Project } from "@/lib/db/schema";
@@ -44,10 +54,15 @@ const MANAGER_PROMPT_TEMPLATE = fs.readFileSync(
   "utf-8"
 );
 
-export const maxDuration = 60;
+const BRIEFING_ONBOARDING_PROMPT_TEMPLATE = fs.readFileSync(
+  path.join(PROMPTS_DIR, "briefing-onboarding.md"),
+  "utf-8"
+);
+
+export const maxDuration = 120;
 
 // Supported service chat contexts
-type ServiceChatContext = "ben" | "project-creation" | "project-manager";
+type ServiceChatContext = "ben" | "project-creation" | "project-manager" | "briefing-onboarding";
 
 // Message part schema (from useChat)
 const messagePartSchema = z.object({
@@ -66,9 +81,10 @@ const requestSchema = z.object({
       parts: z.array(messagePartSchema).optional(),
     })
   ),
-  context: z.enum(["ben", "project-creation", "project-manager"]),
+  context: z.enum(["ben", "project-creation", "project-manager", "briefing-onboarding"]),
   projectId: z.string().optional(), // For project-manager
   isFirstTime: z.boolean().optional(), // For ben onboarding
+  briefingMode: z.enum(["create", "edit"]).optional(), // For briefing-onboarding
 });
 
 /**
@@ -97,6 +113,8 @@ function getModelId(context: ServiceChatContext): string {
   switch (context) {
     case "project-creation":
       return "claude-sonnet";
+    case "briefing-onboarding":
+      return "claude-sonnet-4-6";
     case "ben":
     case "project-manager":
       return "claude-haiku";
@@ -116,6 +134,8 @@ async function buildSystemPrompt(
     userPronouns?: string;
     userBio?: string;
     projectId?: string;
+    briefingMode?: "create" | "edit";
+    userId?: string;
   } = {}
 ): Promise<string> {
   switch (context) {
@@ -129,6 +149,9 @@ async function buildSystemPrompt(
 
     case "project-manager":
       return await buildFullManagerPrompt(options.projectId);
+
+    case "briefing-onboarding":
+      return await buildBriefingOnboardingPrompt(options);
 
     default:
       return "Ты — AI-помощник Simply.";
@@ -155,6 +178,98 @@ function buildProjectCreationPrompt(options: {
     : "";
 
   return SECRETARY_PROMPT_TEMPLATE.replace("{{USER_CONTEXT}}", userContextBlock);
+}
+
+// ============================================================================
+// ТЗ-A2: Briefing Onboarding Prompt Builder
+// ============================================================================
+
+/**
+ * Build briefing onboarding prompt: template + user context + date/year + mode injection
+ */
+async function buildBriefingOnboardingPrompt(options: {
+  userName?: string;
+  userOccupation?: string;
+  userPronouns?: string;
+  userBio?: string;
+  briefingMode?: "create" | "edit";
+  userId?: string;
+}): Promise<string> {
+  // 1. USER_CONTEXT — same pattern as Secretary
+  const contextLines: string[] = [];
+  if (options.userName) contextLines.push(`Имя: ${options.userName}`);
+  if (options.userPronouns) contextLines.push(`Обращение: ${options.userPronouns}`);
+  if (options.userOccupation) contextLines.push(`Профессия: ${options.userOccupation}`);
+  if (options.userBio) contextLines.push(`О себе: ${options.userBio}`);
+
+  const userContextBlock = contextLines.length > 0
+    ? `<user_context>\n${contextLines.join("\n")}\n</user_context>`
+    : "";
+
+  // 2. DATE and YEAR
+  const now = new Date();
+  const dateISO = now.toISOString().split("T")[0]; // "2026-02-20"
+  const year = now.getFullYear().toString(); // "2026"
+
+  // 3. MODE_INJECTION — depends on briefingMode
+  const mode = options.briefingMode ?? "create";
+  let modeInjection: string;
+
+  if (mode === "edit" && options.userId) {
+    modeInjection = await buildBriefingEditModeInjection(options.userId);
+  } else {
+    // Static create mode block
+    modeInjection = `<mode>
+Режим: первая настройка. У пользователя нет профиля брифинга.
+Начни с приветствия и открытого вопроса.
+</mode>`;
+  }
+
+  // 4. Assemble prompt
+  return BRIEFING_ONBOARDING_PROMPT_TEMPLATE
+    .replace("{{USER_CONTEXT}}", userContextBlock)
+    .replace(/\{\{DATE\}\}/g, dateISO)
+    .replace(/\{\{YEAR\}\}/g, year)
+    .replace("{{MODE_INJECTION}}", modeInjection);
+}
+
+/**
+ * Build edit mode injection: current topics, sources, settings from DB
+ */
+async function buildBriefingEditModeInjection(userId: string): Promise<string> {
+  const [settings, topics, sources] = await Promise.all([
+    getBriefingSettings({ userId }),
+    getBriefingTopics({ userId }),
+    getBriefingSources({ userId }),
+  ]);
+
+  const settingsLines: string[] = [];
+  settingsLines.push(`- Часовой пояс: ${settings?.timezone ?? "Europe/Moscow"}`);
+  settingsLines.push(`- Язык источников: ${settings?.language ?? "ru"}`);
+  settingsLines.push(`- Количество новостей: ${settings?.maxItems ?? 15}`);
+
+  const topicsLines = topics.length > 0
+    ? topics.map(t => `- ${t.emoji} ${t.topicName} (id: ${t.topicId})`).join("\n")
+    : "- (нет тем)";
+
+  const sourcesLines = sources.length > 0
+    ? sources.map(s => `- [${s.topicId}] ${s.sourceName} — ${s.sourceUrl} (${s.tier})`).join("\n")
+    : "- (нет источников)";
+
+  return `<mode>
+Режим: изменение настроек. У пользователя есть профиль.
+
+Текущие настройки:
+${settingsLines.join("\n")}
+
+Текущие темы:
+${topicsLines}
+
+Текущие источники:
+${sourcesLines}
+
+Начни с краткого показа текущих настроек и вопроса что хочет изменить.
+</mode>`;
 }
 
 // ============================================================================
@@ -463,7 +578,7 @@ export async function POST(request: Request) {
       return new ChatSDKError("bad_request:api").toResponse();
     }
 
-    const { messages, context, projectId } = parsed.data;
+    const { messages, context, projectId, briefingMode } = parsed.data;
     const userId = session.user.id!;
 
     // Get user profile
@@ -473,13 +588,15 @@ export async function POST(request: Request) {
     const userPronouns = user?.pronouns || undefined;
     const userBio = user?.bio || undefined;
 
-    // Build system prompt (async for project-manager which loads project data)
+    // Build system prompt (async for project-manager and briefing-onboarding)
     const systemPrompt = await buildSystemPrompt(context, {
       userName,
       userOccupation,
       userPronouns,
       userBio,
       projectId,
+      briefingMode,
+      userId,
     });
 
     // Get model
@@ -524,6 +641,94 @@ export async function POST(request: Request) {
       });
     }
 
+    // ТЗ-A2: Tools for briefing-onboarding context
+    if (context === "briefing-onboarding") {
+      const briefingProfileSchema = z.object({
+        topics: z.array(z.object({
+          topicId: z.string().describe("Латиница, slug, lowercase"),
+          topicName: z.string().describe("Название темы на русском"),
+          emoji: z.string().describe("Одна emoji для темы"),
+        })).describe("Список тем брифинга (макс. 8)"),
+        sources: z.array(z.object({
+          topicId: z.string().describe("ID темы к которой относится источник"),
+          sourceName: z.string().describe("Название источника"),
+          sourceUrl: z.string().describe("URL источника"),
+          rssUrl: z.string().nullable().optional().describe("RSS URL если найден"),
+          fetchMethod: z.enum(["rss", "telegram_parse", "jina"]).describe("Метод получения контента"),
+          sourceLanguage: z.enum(["ru", "en"]).describe("Язык источника"),
+          tier: z.enum(["flagship", "respected", "niche", "community"]).describe("Уровень источника"),
+        })).describe("Список источников (макс. 25)"),
+        settings: z.object({
+          timezone: z.string().default("Europe/Moscow").optional(),
+          language: z.enum(["ru", "en", "both"]).default("ru").optional(),
+          maxItems: z.number().min(5).max(30).default(15).optional(),
+        }).optional().describe("Настройки брифинга"),
+      });
+
+      tools.updateBriefingPreview = tool({
+        description: "Обновить превью профиля брифинга в реальном времени. Вызывай после каждого deepResearch с ПОЛНЫМ текущим списком тем и источников.",
+        inputSchema: briefingProfileSchema,
+        execute: async (input: z.infer<typeof briefingProfileSchema>) => {
+          return { success: true, preview: input };
+        },
+      });
+
+      tools.saveBriefingProfile = tool({
+        description: "Финальное сохранение профиля брифинга в БД. Вызывай только когда пользователь подтвердил настройки.",
+        inputSchema: briefingProfileSchema,
+        execute: async (input: z.infer<typeof briefingProfileSchema>) => {
+          // 1. Upsert settings
+          await upsertBriefingSettings({
+            userId,
+            isActive: true,
+            timezone: input.settings?.timezone ?? "Europe/Moscow",
+            language: input.settings?.language ?? "ru",
+            maxItems: input.settings?.maxItems ?? 15,
+          });
+
+          // 2. Replace all topics
+          await deleteAllBriefingTopicsByUser({ userId });
+          for (let i = 0; i < input.topics.length; i++) {
+            const t = input.topics[i];
+            await addBriefingTopic({
+              userId,
+              topicId: t.topicId,
+              topicName: t.topicName,
+              emoji: t.emoji,
+              orderIndex: i,
+            });
+          }
+
+          // 3. Replace all sources
+          await deleteAllBriefingSourcesByUser({ userId });
+          for (const s of input.sources) {
+            await addBriefingSource({
+              userId,
+              topicId: s.topicId,
+              sourceName: s.sourceName,
+              sourceUrl: s.sourceUrl,
+              rssUrl: s.rssUrl ?? undefined,
+              fetchMethod: s.fetchMethod,
+              sourceLanguage: s.sourceLanguage,
+              tier: s.tier,
+            });
+          }
+
+          return {
+            success: true,
+            topicsCount: input.topics.length,
+            sourcesCount: input.sources.length,
+          };
+        },
+      });
+
+      // deepResearch with default depth "pro" for source discovery
+      tools.deepResearch = deepResearch({ defaultDepth: "pro" });
+
+      // fetchUrl for verifying specific sources
+      tools.fetchUrl = fetchUrl;
+    }
+
     // ТЗ-A3: Server persistence for project-manager
     let managerChatId: string | null = null;
     if (context === "project-manager" && projectId) {
@@ -554,13 +759,16 @@ export async function POST(request: Request) {
       content: extractMessageContent(msg),
     }));
 
+    // Dynamic step count: briefing-onboarding needs more steps for multiple deepResearch calls
+    const maxSteps = context === "briefing-onboarding" ? 8 : 3;
+
     // Stream response
     const result = streamText({
       model: myProvider.languageModel(modelId),
       system: systemPrompt,
       messages: transformedMessages,
       tools: Object.keys(tools).length > 0 ? tools : undefined,
-      stopWhen: stepCountIs(3),
+      stopWhen: stepCountIs(maxSteps),
       temperature: context === "project-manager" ? 0.5 : 1.0,
     });
 

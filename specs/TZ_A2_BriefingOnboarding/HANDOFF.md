@@ -1,15 +1,15 @@
 # Передача сессии ТЗ-A2: Briefing Onboarding
 
 **Последнее обновление:** 2026-02-20
-**Сессия:** 1 (анализ + планирование)
+**Сессия:** 2
 
 ---
 
 ## Статус этапов
 
-- [ ] Этап 1: БД + Queries + Промпт-файлы
-- [ ] Этап 2: Backend — service-chat расширение
-- [ ] Этап 3: Frontend — split layout + чат
+- [x] Этап 1: БД + Queries + Промпт-файлы ✅ (commit `bc2db18`)
+- [x] Этап 2: Backend — service-chat расширение ✅ (ожидает коммит)
+- [ ] Этап 3: Frontend — split layout + чат ← СЛЕДУЮЩИЙ
 - [ ] Этап 4: Edit mode + edge cases + polish
 - [ ] Этап 5: Финализация
 
@@ -17,38 +17,69 @@
 
 ## Следующая сессия: начни с
 
-1. Прочитай ROADMAP.md (Этап 1)
-2. Запусти `npm run dev` — проверь текущее состояние
-3. **Первая задача:** Добавить таблицу BriefingTopics в schema.ts
+1. Прочитай ROADMAP.md — Этап 3 (Frontend — split layout + чат)
+2. Прочитай `app/(dashboard)/briefing/setup/page.tsx` — текущая заглушка
+3. **Первая задача:** Переписать Server Component page.tsx (auth, mode detection, props)
 
 ---
 
-## Что сделано в последней сессии
+## Что сделано в Сессии 2
 
-- Создана папка `specs/TZ_A2_BriefingOnboarding/`
-- Изучены ТЗ + промпты (TZ_A2_BRIEFING_ONBOARDING.md, briefing-onboarding-v2.md, briefing-onboarding-mode-injection.md)
-- Глубокий анализ кодовой базы (service-chat, projects/new, briefing backend, providers, tools, prompts)
+### Этап 2 (завершён)
+- `"briefing-onboarding"` добавлен в `ServiceChatContext` и `requestSchema` (+ поле `briefingMode: "create" | "edit"`)
+- `maxDuration` поднят с 60 до 120 (глобальный ceiling)
+- `stepCountIs` динамический: 8 для briefing-onboarding, 3 для остальных
+- `getModelId()` case: `"briefing-onboarding"` → `"claude-sonnet-4-6"`
+- `buildBriefingOnboardingPrompt()`: загрузка .md шаблона, подстановка USER_CONTEXT/DATE/YEAR/MODE_INJECTION
+- `buildBriefingEditModeInjection()`: программная сборка из БД (settings + topics + sources)
+- Tool `updateBriefingPreview`: Zod schema, return preview (только для UI)
+- Tool `saveBriefingProfile`: Zod schema, пишет в БД (upsert settings + replace topics + replace sources)
+- `deepResearch({ defaultDepth: "pro" })` и `fetchUrl` подключены через прямой импорт
+- Валидация: tsc 0 ошибок, build успешен
+
+---
+
+## Что сделано в Сессии 1
+
+### Фаза анализа
+- Глубокий анализ 5 подсистем параллельно (service-chat, projects/new, briefing backend, AI providers/tools, prompt builders)
 - Выявлены 6 технических проблем, все согласованы с архитектором
-- Создан ANALYSIS.md с код-ревью и рекомендациями
-- Создан ROADMAP.md (5 этапов)
+- ANALYSIS.md с код-ревью, ROADMAP.md с 5 этапами
+
+### Этап 1 (завершён)
+- Таблица `BriefingTopics` в schema.ts + миграция `0032_briefing-topics.sql` (применена к production БД)
+- 4 новых query: `getBriefingTopics`, `addBriefingTopic`, `deleteAllBriefingTopicsByUser`, `deleteAllBriefingSourcesByUser`
+- Default `generationTime` изменён с "06:00" на "07:00"
+- Промпт `briefing-onboarding.md` — адаптирован из PE v2, добавлены инструкции для `updateBriefingPreview`
+- Mode injection `briefing-onboarding-mode-injection.md` — справочный документ (без Handlebars)
+- Модель `claude-sonnet-4-6` добавлена в providers.ts как отдельный entry
+- Валидация: tsc 0 ошибок, build успешен, SQL подтверждён, мануальный тест ОК
 
 ---
 
-## Ключевые решения
+## Ключевые решения (для контекста Этапа 2)
 
-1. **Новая таблица BriefingTopics** — для хранения кастомных тем пользователя (topicId, topicName, emoji, orderIndex)
-2. **Два tool вместо одного** — `updateBriefingPreview` (live) + `saveBriefingProfile` (final в БД)
-3. **Mode injection строится программно** — как Manager `buildFirstContactMode()`, не через Handlebars
-4. **Claude Sonnet 4.6** — model ID `claude-sonnet-4-6`, отдельный entry в providers.ts
-5. **maxDuration 120** — глобальный ceiling для всего service-chat route
-6. **stepCountIs динамический** — 8 для briefing-onboarding, 3 для остальных
-7. **generationTime default** — "07:00" вместо "06:00"
+1. **Два tool вместо одного:** `updateBriefingPreview` (live, только для клиента) + `saveBriefingProfile` (финальный, пишет в БД)
+2. **Mode injection строится программно** — как Manager `buildFirstContactMode()`, через string concatenation
+3. **stepCountIs динамический:** 8 для briefing-onboarding, 3 для остальных
+4. **maxDuration:** поднять с 60 до 120 (глобальный ceiling)
+5. **Модель:** `claude-sonnet-4-6` (отдельный entry, НЕ alias `claude-sonnet`)
+6. **Prompt builder:** `buildBriefingOnboardingPrompt()` — загрузка .md, подстановка `{{USER_CONTEXT}}`, `{{DATE}}`, `{{YEAR}}`, `{{MODE_INJECTION}}`
+7. **Новое поле в requestSchema:** `briefingMode: "create" | "edit"` — клиент определяет
+8. **deepResearch + fetchUrl** — прямой импорт из `lib/ai/tools/`
 
 ---
 
-## Блокеры / Вопросы
+## Файлы в работе
 
-- Нет блокеров. Все вопросы согласованы с архитектором.
+| Файл | Статус | Примечание |
+|------|--------|------------|
+| `lib/db/schema.ts` | Готов | +BriefingTopics таблица |
+| `lib/db/queries.ts` | Готов | +4 queries, generationTime 07:00 |
+| `lib/ai/providers.ts` | Готов | +claude-sonnet-4-6 |
+| `lib/prompts/service-chats/briefing-onboarding.md` | Готов | Промпт с updateBriefingPreview |
+| `lib/prompts/service-chats/briefing-onboarding-mode-injection.md` | Готов | Справочный документ |
+| `app/(chat)/api/service-chat/route.ts` | Готов | Этап 2: контекст, tools, prompt builder, mode injection |
 
 ---
 
