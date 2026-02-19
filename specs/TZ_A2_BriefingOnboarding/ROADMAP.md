@@ -183,30 +183,29 @@ git commit -m "feat(tz-a2): briefing setup split layout + chat UI"
 
 ## Этап 4: Edit mode + edge cases + polish
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** Mode "edit" с загрузкой текущего профиля, edge cases (ошибки deepResearch, повторный визит), polish.
 
 **Задачи:**
-- [ ] Mode "edit" в Server Component: загрузить текущие topics + sources из БД, передать в client
-- [ ] Mode "edit" в Client Component: показать текущий профиль в preview при загрузке
-- [ ] Mode "edit" в prompt builder: программная сборка mode injection с текущими темами/источниками
-- [ ] Обновить лендинг `/briefing`: если settings существуют и isActive — НЕ показывать лендинг, показывать последний выпуск (или заглушку "нет выпусков") + кнопку "Настройки" → `/briefing/setup`
-- [ ] Edge case: deepResearch ошибка → промпт уже содержит fallback инструкцию, проверить что UI не ломается
-- [ ] Edge case: пустые ответы от AI → graceful handling
-- [ ] Loading state кнопки "Сгенерировать первый брифинг" (POST `/api/briefing/generate` может быть долгим)
-- [ ] Доступность: focus management, keyboard navigation в split layout
+- [x] Mode "edit" в Server Component: загрузить текущие topics + sources из БД, передать в client
+- [x] Mode "edit" в Client Component: показать текущий профиль в preview при загрузке
+- [x] Mode "edit" в prompt builder: программная сборка mode injection с текущими темами/источниками (уже сделано в Этапе 2)
+- [x] Обновить лендинг `/briefing`: если settings существуют и isActive — НЕ показывать лендинг, показывать последний выпуск (или заглушку "нет выпусков") + кнопку "Настройки" → `/briefing/setup`
+- [x] Edge case: deepResearch ошибка → промпт уже содержит fallback инструкцию, UI показывает ошибку в chat panel
+- [x] Edge case: пустые ответы от AI → graceful handling (error display в chat panel)
+- [x] Loading state кнопки "Сгенерировать" (в setup-client и active-page — Loader2 spinner + disabled)
+- [ ] Доступность: focus management, keyboard navigation в split layout (отложено)
 
 **Файлы:**
 - `app/(dashboard)/briefing/setup/page.tsx` — загрузка topics/sources для edit
-- `app/(dashboard)/briefing/setup/briefing-setup-client.tsx` — edit mode state
-- `app/(chat)/api/service-chat/route.ts` — edit mode injection builder
+- `app/(dashboard)/briefing/setup/briefing-setup-client.tsx` — edit mode state + initialProfile
 - `app/(dashboard)/briefing/page.tsx` — условный рендер (лендинг vs выпуск)
-- `components/briefing/briefing-page.tsx` — возможные изменения
+- `components/briefing/briefing-active-page.tsx` — новый: выпуск/заглушка + кнопка настроек
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: `/briefing/setup` в mode "edit" — текущие темы/источники показаны в preview
 - [ ] Браузер: `/briefing` для юзера с профилем — не показывает лендинг
 - [ ] Браузер: deepResearch timeout — UI не ломается, AI продолжает диалог

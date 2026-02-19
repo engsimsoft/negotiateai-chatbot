@@ -1,13 +1,19 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
-import { getUserById, getBriefingSettings } from "@/lib/db/queries";
+import {
+  getUserById,
+  getBriefingSettings,
+  getBriefingTopics,
+  getBriefingSources,
+} from "@/lib/db/queries";
 import { BriefingSetupClient } from "./briefing-setup-client";
 
 /**
  * ТЗ-A2: Страница настройки брифинга
  *
  * Server Component: auth guard, mode detection (create/edit), userProfile.
+ * Edit mode: загружает текущие topics/sources из БД для preview.
  * Передаёт props в BriefingSetupClient.
  */
 export default async function BriefingSetupRoute() {
@@ -29,6 +35,38 @@ export default async function BriefingSetupRoute() {
   const briefingMode: "create" | "edit" =
     settings?.isActive ? "edit" : "create";
 
+  // Edit mode: load current topics + sources for preview
+  let initialProfile = undefined;
+  if (briefingMode === "edit") {
+    const [topics, sources] = await Promise.all([
+      getBriefingTopics({ userId }),
+      getBriefingSources({ userId }),
+    ]);
+
+    initialProfile = {
+      topics: topics.map((t) => ({
+        topicId: t.topicId,
+        topicName: t.topicName,
+        emoji: t.emoji,
+      })),
+      sources: sources.map((s) => ({
+        topicId: s.topicId,
+        sourceName: s.sourceName,
+        sourceUrl: s.sourceUrl,
+        rssUrl: s.rssUrl,
+        fetchMethod: s.fetchMethod,
+        sourceLanguage: s.sourceLanguage,
+        tier: s.tier,
+      })),
+      settings: settings
+        ? {
+            language: settings.language ?? undefined,
+            maxItems: settings.maxItems ?? undefined,
+          }
+        : undefined,
+    };
+  }
+
   return (
     <BriefingSetupClient
       briefingMode={briefingMode}
@@ -42,6 +80,7 @@ export default async function BriefingSetupRoute() {
             }
           : undefined
       }
+      initialProfile={initialProfile}
     />
   );
 }

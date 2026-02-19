@@ -35,6 +35,7 @@ interface UserProfile {
 interface BriefingSetupClientProps {
   briefingMode: "create" | "edit";
   userProfile?: UserProfile;
+  initialProfile?: BriefingProfile;
 }
 
 // Message type for display
@@ -110,6 +111,7 @@ function checkSaveComplete(
 export function BriefingSetupClient({
   briefingMode,
   userProfile,
+  initialProfile,
 }: BriefingSetupClientProps) {
   const router = useRouter();
   const [input, setInput] = useState("");
@@ -117,12 +119,10 @@ export function BriefingSetupClient({
   const [isSaved, setIsSaved] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Briefing profile state for live preview
-  const [preview, setPreview] = useState<BriefingProfile>({
-    topics: [],
-    sources: [],
-    settings: undefined,
-  });
+  // Briefing profile state for live preview (edit mode: pre-loaded from DB)
+  const [preview, setPreview] = useState<BriefingProfile>(
+    initialProfile ?? { topics: [], sources: [], settings: undefined },
+  );
 
   // Create transport for the chat API
   const transport = useMemo(
@@ -138,13 +138,20 @@ export function BriefingSetupClient({
     [briefingMode, userProfile]
   );
 
-  // Initial greeting
+  // Initial greeting (different for create vs edit)
   const isInformal = userProfile?.pronouns === "ты";
-  const greetingText = userProfile?.displayName
-    ? isInformal
-      ? `Привет, ${userProfile.displayName}! Давай настроим твой утренний брифинг. Чем ты занимаешься и что важно знать каждое утро?`
-      : `Привет, ${userProfile.displayName}! Давайте настроим ваш утренний брифинг. Чем вы занимаетесь и что важно знать каждое утро?`
-    : "Привет! Давайте настроим ваш утренний брифинг. Чем вы занимаетесь и что важно знать каждое утро?";
+  const greetingText =
+    briefingMode === "edit"
+      ? userProfile?.displayName
+        ? isInformal
+          ? `С возвращением, ${userProfile.displayName}! Вижу твой текущий профиль — ${initialProfile?.topics.length ?? 0} тем, ${initialProfile?.sources.length ?? 0} источников. Что хочешь изменить?`
+          : `С возвращением, ${userProfile.displayName}! Вижу ваш текущий профиль — ${initialProfile?.topics.length ?? 0} тем, ${initialProfile?.sources.length ?? 0} источников. Что хотите изменить?`
+        : `С возвращением! Вижу ваш текущий профиль — ${initialProfile?.topics.length ?? 0} тем, ${initialProfile?.sources.length ?? 0} источников. Что хотите изменить?`
+      : userProfile?.displayName
+        ? isInformal
+          ? `Привет, ${userProfile.displayName}! Давай настроим твой утренний брифинг. Чем ты занимаешься и что важно знать каждое утро?`
+          : `Привет, ${userProfile.displayName}! Давайте настроим ваш утренний брифинг. Чем вы занимаетесь и что важно знать каждое утро?`
+        : "Привет! Давайте настроим ваш утренний брифинг. Чем вы занимаетесь и что важно знать каждое утро?";
 
   const initialMessages = [
     {
