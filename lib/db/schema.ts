@@ -4,6 +4,7 @@ import {
   foreignKey,
   index,
   integer,
+  uniqueIndex,
   json,
   jsonb,
   pgEnum,
@@ -419,6 +420,31 @@ export const briefingSources = pgTable(
 );
 
 export type BriefingSource = InferSelectModel<typeof briefingSources>;
+
+// ТЗ-A2: Custom user topics (AI-generated during onboarding)
+export const briefingTopics = pgTable(
+  "BriefingTopics",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    topicId: varchar("topicId", { length: 50 }).notNull(),
+    topicName: varchar("topicName", { length: 100 }).notNull(),
+    emoji: varchar("emoji", { length: 10 }).notNull(),
+    orderIndex: integer("orderIndex").notNull().default(0),
+    createdAt: timestamp("createdAt").notNull(),
+  },
+  (table) => ({
+    userIdx: index("briefing_topics_user_idx").on(table.userId),
+    userTopicIdx: uniqueIndex("briefing_topics_user_topic_idx").on(
+      table.userId,
+      table.topicId
+    ),
+  })
+);
+
+export type BriefingTopic = InferSelectModel<typeof briefingTopics>;
 
 export const briefingHistory = pgTable(
   "BriefingHistory",

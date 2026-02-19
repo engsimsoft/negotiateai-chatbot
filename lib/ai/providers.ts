@@ -37,6 +37,7 @@ export const myProvider = isTestEnvironment
         "claude-sonnet": anthropic("claude-sonnet-4-5-20250929"),
         "claude-haiku": anthropic("claude-haiku-4-5-20251001"),
         "claude-opus": anthropic("claude-opus-4-6"),
+        "claude-sonnet-4-6": anthropic("claude-sonnet-4-6"),
         "title-model": anthropic("claude-haiku-4-5-20251001"),
         "artifact-model": anthropic("claude-sonnet-4-5-20250929"),
       },

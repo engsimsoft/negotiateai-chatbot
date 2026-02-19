@@ -225,6 +225,13 @@
       "when": 1771459200000,
       "tag": "0031_briefing-tables",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1771545600000,
+      "tag": "0032_briefing-topics",
+      "breakpoints": true
     }
   ]
 }

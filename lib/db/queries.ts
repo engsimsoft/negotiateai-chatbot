@@ -26,9 +26,11 @@ import {
   type BriefingHistory,
   type BriefingSettings,
   type BriefingSource,
+  type BriefingTopic,
   briefingHistory,
   briefingSettings,
   briefingSources,
+  briefingTopics,
   type Chat,
   chat,
   type ContextState,
@@ -2750,7 +2752,7 @@ export async function upsertBriefingSettings({
         userId,
         isActive: isActive ?? false,
         timezone: timezone ?? "Europe/Moscow",
-        generationTime: generationTime ?? "06:00",
+        generationTime: generationTime ?? "07:00",
         language: language ?? "ru",
         maxItems: maxItems ?? 15,
         createdAt: now,
@@ -2923,6 +2925,106 @@ export async function getBriefingHistory({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get briefing history"
+    );
+  }
+}
+
+// ============================================================================
+// Briefing Topics (ТЗ-A2)
+// ============================================================================
+
+/**
+ * Get all topics for a user (ordered by orderIndex)
+ */
+export async function getBriefingTopics({ userId }: { userId: string }) {
+  try {
+    return await db
+      .select()
+      .from(briefingTopics)
+      .where(eq(briefingTopics.userId, userId))
+      .orderBy(asc(briefingTopics.orderIndex));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get briefing topics"
+    );
+  }
+}
+
+/**
+ * Add a briefing topic for a user
+ */
+export async function addBriefingTopic({
+  userId,
+  topicId,
+  topicName,
+  emoji,
+  orderIndex,
+}: {
+  userId: string;
+  topicId: string;
+  topicName: string;
+  emoji: string;
+  orderIndex?: number;
+}) {
+  try {
+    const [created] = await db
+      .insert(briefingTopics)
+      .values({
+        userId,
+        topicId,
+        topicName,
+        emoji,
+        orderIndex: orderIndex ?? 0,
+        createdAt: new Date(),
+      })
+      .returning();
+
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to add briefing topic"
+    );
+  }
+}
+
+/**
+ * Delete all topics for a user (for reset during onboarding)
+ */
+export async function deleteAllBriefingTopicsByUser({
+  userId,
+}: {
+  userId: string;
+}) {
+  try {
+    await db
+      .delete(briefingTopics)
+      .where(eq(briefingTopics.userId, userId));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete briefing topics"
+    );
+  }
+}
+
+/**
+ * Delete all sources for a user (for reset during onboarding)
+ */
+export async function deleteAllBriefingSourcesByUser({
+  userId,
+}: {
+  userId: string;
+}) {
+  try {
+    await db
+      .delete(briefingSources)
+      .where(eq(briefingSources.userId, userId));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete briefing sources"
     );
   }
 }
