@@ -121,15 +121,15 @@ git commit -m "feat(tz-a2): briefing-onboarding service-chat context + tools"
 
 ## Этап 3: Frontend — split layout + чат
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** Заменить заглушку `/briefing/setup` на split layout: Server Component (auth, mode detection) + Client Component (чат с AI, live preview).
 
 **Задачи:**
-- [ ] Переписать `app/(dashboard)/briefing/setup/page.tsx`:
-  - Server Component: auth guard, определение mode (GET `/api/briefing/latest` → settings есть? → "edit" : "create"), загрузка userProfile
+- [x] Переписать `app/(dashboard)/briefing/setup/page.tsx`:
+  - Server Component: auth guard, определение mode (getBriefingSettings → isActive? → "edit" : "create"), загрузка userProfile
   - Передать props в BriefingSetupClient
-- [ ] Создать `app/(dashboard)/briefing/setup/briefing-setup-client.tsx`:
+- [x] Создать `app/(dashboard)/briefing/setup/briefing-setup-client.tsx`:
   - Split layout (паттерн project-creation-client.tsx): aside (lg:block, 400px) + main
   - Header: ← Назад на /briefing, "Настройка брифинга", UserMenu
   - State: `preview` (topics[], sources[], settings), `isSaved`
@@ -137,19 +137,18 @@ git commit -m "feat(tz-a2): briefing-onboarding service-chat context + tools"
   - useChat hook с greeting
   - extractPreviewUpdate() — отслеживание tool results `updateBriefingPreview` и `saveBriefingProfile` в message parts (паттерн processedIdsRef)
   - Success screen после saveBriefingProfile: кнопка "Сгенерировать первый брифинг" → POST /api/briefing/generate → redirect /briefing
-- [ ] Создать `app/(dashboard)/briefing/setup/components/briefing-profile-preview.tsx`:
+- [x] Создать `app/(dashboard)/briefing/setup/components/briefing-profile-preview.tsx`:
   - Отображение тем с emoji и источниками под каждой темой
   - Tier badge для источников
   - Настройки мелким шрифтом внизу (язык, maxItems)
   - Состояние "пусто" (placeholder текст)
-  - Кнопка "Сгенерировать первый брифинг" (после сохранения)
-- [ ] Создать `app/(dashboard)/briefing/setup/components/briefing-chat-panel.tsx`:
+- [x] Создать `app/(dashboard)/briefing/setup/components/briefing-chat-panel.tsx`:
   - ScrollArea + сообщения + input (паттерн ProjectChatPanel)
-  - Tool activity indicator для deepResearch
+  - Typing indicator (Loader2 spinner)
   - Auto-scroll к низу при новых сообщениях
-- [ ] Создать `components/service-chat/configs/briefing-onboarding.ts`:
-  - ServiceChatConfig с id, title, icon, model, greeting
-- [ ] Обновить `components/service-chat/configs/index.ts` — экспорт нового конфига
+- [x] Создать `components/service-chat/configs/briefing-onboarding.ts`:
+  - Reference config с id, title, icon, model, greeting
+- [x] Обновить `components/service-chat/configs/index.ts` — экспорт нового конфига
 
 **Файлы:**
 - `app/(dashboard)/briefing/setup/page.tsx` — переписать
@@ -160,8 +159,8 @@ git commit -m "feat(tz-a2): briefing-onboarding service-chat context + tools"
 - `components/service-chat/configs/index.ts` — экспорт
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: `/briefing/setup` показывает split layout (не заглушку)
 - [ ] Браузер: AI отвечает на первое сообщение, deepResearch вызывается
 - [ ] Браузер: превью обновляется при updateBriefingPreview

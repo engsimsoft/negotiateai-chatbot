@@ -1,8 +1,8 @@
 # AI-провайдеры и модели
 
-**Версия:** 2.0.0
-**Последнее обновление:** 2026-02-16
-**Статус:** 2 провайдера, 3 основные модели + vision-ocr
+**Версия:** 2.1.0
+**Последнее обновление:** 2026-02-20
+**Статус:** 2 провайдера, 3 модели Anthropic + 3 модели Gemini
 
 ---
 
@@ -37,7 +37,7 @@
 
 > **Важно:** Используем `@ai-sdk/anthropic@2.0.63` (не v3.x), т.к. v3 возвращает `LanguageModelV3`, несовместимый с текущим `ai@5.0.123` (ожидает `LanguageModelV2`).
 
-### Google AI (только vision-ocr)
+### Google AI (vision-ocr + Briefing pipeline)
 
 | Параметр | Значение |
 |----------|----------|
@@ -45,7 +45,7 @@
 | API Key | `GOOGLE_GENERATIVE_AI_API_KEY` |
 | Документация | https://ai.google.dev/ |
 
-> **Примечание:** Google AI используется только для vision-ocr (`lib/ai/vision-ocr.ts`). Все остальные AI-запросы идут через Anthropic.
+> **Примечание:** Google AI используется для vision-ocr (`lib/ai/vision-ocr.ts`) и Briefing pipeline (`lib/briefing/`). Все остальные AI-запросы идут через Anthropic.
 
 ---
 
@@ -59,11 +59,15 @@
 | **Claude Haiku 4.5** | `claude-haiku` | `claude-haiku-4-5-20251001` | $1.00/1M | $5.00/1M | 200K токенов | Самый быстрый и дешёвый, max output 64K |
 | **Claude Opus 4.6** | `claude-opus` | `claude-opus-4-6` | $5.00/1M | $25.00/1M | 200K токенов (1M бета) | Максимальное качество, reasoning, max output 128K |
 
-### Google Gemini (только vision-ocr)
+### Google Gemini
 
-| Модель | Использование |
-|--------|---------------|
-| Gemini (через `createGoogleGenerativeAI`) | OCR для изображений и PDF |
+| Модель | Реальный ID | Использование | Файл |
+|--------|-------------|---------------|------|
+| **Gemini 3 Pro** | `gemini-3-pro-preview` | Briefing: Stage 2 — анализ и группировка | `lib/briefing/briefing-config.ts` |
+| **Gemini 2.5 Pro** | `gemini-2.5-pro` | Briefing: fallback для Stage 2 | `lib/briefing/briefing-config.ts` |
+| **Gemini 2.0 Flash** | `gemini-2.0-flash` | Briefing: Stage 1 — фильтрация, vision-ocr | `lib/briefing/briefing-config.ts`, `lib/ai/vision-ocr.ts` |
+
+> **ВАЖНО:** ID модели Gemini 3 Pro — именно `gemini-3-pro-preview` (с суффиксом `-preview`). Без суффикса (`gemini-3-pro`) API возвращает ошибку "model not found".
 
 ---
 
@@ -191,6 +195,7 @@ GOOGLE_GENERATIVE_AI_API_KEY=your_google_api_key
 
 | Дата | Версия | Изменения |
 |------|--------|-----------|
+| 2026-02-20 | 2.1.0 | Добавлены модели Gemini для Briefing pipeline (gemini-3-pro-preview, gemini-2.5-pro, gemini-2.0-flash) |
 | 2026-02-16 | 2.0.0 | Полное переключение на Anthropic Claude через `@ai-sdk/anthropic`. OpenRouter удалён. Google только для vision-ocr |
 | 2026-02-03 | 1.1.1 | Переход на официальный OpenRouter SDK (`@openrouter/ai-sdk-provider`) |
 | 2026-02-02 | 1.1.0 | Обновлены модели Claude на 4.5 (Haiku, Sonnet, Opus) |
@@ -198,4 +203,4 @@ GOOGLE_GENERATIVE_AI_API_KEY=your_google_api_key
 
 ---
 
-**Обновлено:** 2026-02-16
+**Обновлено:** 2026-02-20

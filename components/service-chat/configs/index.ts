@@ -8,3 +8,4 @@
 export { BEN_CONFIG } from "./ben";
 export { PROJECT_CREATION_CONFIG } from "./project-creation";
 export { PROJECT_MANAGER_CONFIG } from "./project-manager";
+export { BRIEFING_ONBOARDING_CONFIG } from "./briefing-onboarding";

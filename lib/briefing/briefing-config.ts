@@ -27,7 +27,7 @@ export const ROUTE_MAX_DURATION = 60;
 export const FILTER_MODEL = "gemini-2.0-flash";
 
 /** Stage 2: Analyzer — smart & quality */
-export const ANALYZER_MODEL = "gemini-3-pro";
+export const ANALYZER_MODEL = "gemini-3-pro-preview";
 
 /** Fallback analyzer if primary is unavailable */
 export const ANALYZER_MODEL_FALLBACK = "gemini-2.5-pro";
