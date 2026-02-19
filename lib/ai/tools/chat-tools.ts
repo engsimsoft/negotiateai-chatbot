@@ -17,6 +17,8 @@ import { readProjectFile } from "./read-project-file";
 import { requestSuggestions } from "./request-suggestions";
 import { updateDocument } from "./update-document";
 import { webSearch } from "./web-search";
+import { fetchUrl } from "./fetch-url";
+import { deepResearch } from "./deep-research";
 import { loadSkill } from "./load-skill";
 
 interface GetStandardToolsParams {
@@ -29,6 +31,8 @@ interface GetStandardToolsParams {
   messageId?: string;
   /** Chat mode for regular (non-project) chats — determines tool availability */
   chatMode?: ChatMode;
+  /** ТЗ-PX: Override depth for deepResearch (from dev-mode UI switcher) */
+  researchDepth?: "pro" | "deep";
 }
 
 /**
@@ -46,6 +50,7 @@ export function getStandardTools({
   chatId,
   messageId,
   chatMode: _chatMode,
+  researchDepth,
 }: GetStandardToolsParams) {
   return {
     getCurrentDate,
@@ -61,6 +66,8 @@ export function getStandardTools({
     updateDocument: updateDocument({ session, dataStream }),
     requestSuggestions: requestSuggestions({ session, dataStream }),
     webSearch,
+    fetchUrl,
+    deepResearch: deepResearch({ defaultDepth: researchDepth }),
     parseExcel,
     loadSkill,
   };
@@ -71,6 +78,8 @@ const ALL_TOOL_NAMES = [
   "getCurrentDate",
   "getWeather",
   "webSearch",
+  "fetchUrl",
+  "deepResearch",
   "createDocument",
   "updateDocument",
   "requestSuggestions",
@@ -83,19 +92,24 @@ const ALL_TOOL_NAMES = [
 
 type ToolName = (typeof ALL_TOOL_NAMES)[number];
 
+/** Tools excluded for chatMode 'chat' (Haiku) — expensive research tools */
+const CHAT_MODE_EXCLUDED_TOOLS: ToolName[] = ["fetchUrl", "deepResearch"];
+
 /**
  * Active tools list for experimental_activeTools.
  * Controls which tools the model can call.
  *
  * @param isProjectChat - true for project chats (separate tool set)
- * @param _chatMode - chat mode for regular chats (reserved for future per-mode filtering)
+ * @param chatMode - chat mode for regular chats — filters expensive tools for 'chat' (Haiku)
  */
-export function getActiveToolNames(isProjectChat: boolean, _chatMode?: ChatMode): ToolName[] {
+export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode): ToolName[] {
   if (isProjectChat) {
     return [
       "getCurrentDate",
       "getWeather",
       "webSearch",
+      "fetchUrl",
+      "deepResearch",
       "createDocument",
       "updateDocument",
       "requestSuggestions",
@@ -106,11 +120,13 @@ export function getActiveToolNames(isProjectChat: boolean, _chatMode?: ChatMode)
     ];
   }
 
-  return [
+  const baseTools: ToolName[] = [
     "getCurrentDate",
     "getWeather",
     "readDocument",
     "webSearch",
+    "fetchUrl",
+    "deepResearch",
     "createDocument",
     "updateDocument",
     "requestSuggestions",
@@ -118,4 +134,11 @@ export function getActiveToolNames(isProjectChat: boolean, _chatMode?: ChatMode)
     "loadSkill",
     "createSnapshot",
   ];
+
+  // Filter out expensive tools for chatMode 'chat' (Haiku)
+  if (chatMode === "chat") {
+    return baseTools.filter((t) => !CHAT_MODE_EXCLUDED_TOOLS.includes(t));
+  }
+
+  return baseTools;
 }

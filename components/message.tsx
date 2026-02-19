@@ -119,11 +119,19 @@ const PurePreviewMessage = ({
     return ids;
   }, [message.parts]);
 
+  // ТЗ-PX: Extract research depth override from data stream (inline, for groupedToolActivities)
+  const _devResearchDepth = useMemo(() => {
+    if (process.env.NODE_ENV !== "development") return null;
+    const parts = dataStream.filter(p => p.type === "data-research-depth");
+    return (parts[parts.length - 1]?.data as { depth?: string } | undefined)?.depth ?? null;
+  }, [dataStream]);
+
   // ТЗ-07: Unified tool activity groups
   // Merges active (data stream) + completed (message.parts) indicators,
   // groups by toolName, computes aggregated summary and details.
   // Single source of truth for all tool activity rendering.
   const groupedToolActivities = useMemo(() => {
+    const devResearchDepth = _devResearchDepth;
     const groups = new Map<string, {
       config: ToolActivityConfig;
       activeCount: number;
@@ -179,6 +187,9 @@ const PurePreviewMessage = ({
           const total = completedResults.reduce((sum, r) => sum + config.resultCounter!(r), 0);
           if (total > 0) summary = `${total} результатов`;
         }
+      } else if (isActive && toolName === "deepResearch" && devResearchDepth) {
+        // ТЗ-PX: Show actual depth override during execution (dev mode)
+        summary = devResearchDepth === "deep" ? "Deep" : "Pro";
       }
 
       // Details for expandable list
@@ -195,7 +206,7 @@ const PurePreviewMessage = ({
         details: details.length > 0 ? details : undefined,
       };
     });
-  }, [isLoading, dataStream, resolvedToolCallIds, deduplicatedParts]);
+  }, [isLoading, dataStream, resolvedToolCallIds, deduplicatedParts, _devResearchDepth]);
 
   // Dev: extract model name from data stream for badge (only in development)
   const devModelName = useMemo(() => {

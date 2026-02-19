@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.27.1
+**Версия:** 3.29.0
 **Дата:** 2026-02-19
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -28,7 +28,7 @@
 | **Проекты** | Изолированные рабочие пространства с Профессором, Менеджером, утверждением плана, картой задач, чатом с Экспертом, завершением задач и управлением контекстом | ✅ v3.18.0 |
 | **Сервисные помощники** | Бен (❓), Секретарь (➕), Менеджер (👤) | ✅ v3.13.0 |
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG/Memory 📋 |
-| **Best-in-Class инструменты** | Perplexity, Plus AI, Ideogram, AssemblyAI | 📋 Фаза 1 |
+| **Best-in-Class инструменты** | Perplexity ✅, Plus AI, Ideogram, AssemblyAI | 🔄 Фаза 1 |
 | **AI-провайдер** | Anthropic Claude — основной и единственный (Gemini только для vision-ocr) | ✅ v3.23.0 (@ai-sdk/anthropic) |
 | **Smart Routing** | Автовыбор модели для экономии без потери качества | 📋 |
 | **Оплата в рублях** | ЮKassa, Тинькофф, СБП | 📋 |
@@ -52,6 +52,8 @@
 - ✅ Streaming responses
 - ✅ Anthropic Claude (Sonnet / Haiku / Opus) через @ai-sdk/anthropic
 - ✅ Web Search (Brave API)
+- ✅ Deep Research (Perplexity Sonar API — Pro/Deep)
+- ✅ Fetch URL (Readability + JSDOM)
 - ✅ Weather (Open-Meteo)
 - ✅ Get Current Date
 
@@ -302,9 +304,10 @@ components/projects/
 - **Load Skill** (динамическая загрузка инструкций) ← v3.3.2
 - **Read Project File** (чтение файлов проекта по имени из manifest) ← v3.17.0
 - **Create Snapshot** (создание итога диалога для управления контекстом) ← v3.18.0
+- **Deep Research** (Perplexity Sonar API — Pro/Deep исследование) ← v3.29.0
+- **Fetch URL** (чтение веб-страниц через Readability) ← v3.29.0
 
 **Планируемые:**
-- Website Analyzer (fetch, screenshot, SEO)
 - Transcription (Whisper)
 - Image Generation
 
@@ -319,12 +322,32 @@ components/projects/
 | Auth | NextAuth 5.0-beta.25 |
 | Database | PostgreSQL (Neon) + Drizzle ORM |
 | Storage | Vercel Blob Storage |
-| External | Brave Search, CloudConvert, Open-Meteo, Deepgram |
+| External | Brave Search, Perplexity, CloudConvert, Open-Meteo, Deepgram |
 | Deploy | Vercel |
 
 ---
 
 ## План развития
+
+### ТЗ-PX + ТЗ-FU: Deep Research + Fetch URL — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **deepResearch** — глубокое исследование через Perplexity Sonar API. Два режима: Pro (sonar-pro, ~$0.02) и Deep (sonar-deep-research, ~$0.80). Factory-pattern с `defaultDepth` через замыкание
+- **fetchUrl** — чтение веб-страниц по URL (@mozilla/readability + jsdom). Shared utility `fetch-page.ts`
+- **chatMode-фильтрация** — fetchUrl и deepResearch исключены для chatMode='chat' (Haiku) через `CHAT_MODE_EXCLUDED_TOOLS`
+- **Dev-mode toggle** — переключатель 🔬 Auto/Pro/Deep в toolbar + server-side depth emission через dataStream
+- **webSearch description** — дифференциация с deepResearch
+
+**Ключевые файлы:**
+- `lib/ai/tools/deep-research.ts` — deepResearch tool (factory pattern, Perplexity API)
+- `lib/ai/tools/fetch-url.ts` — fetchUrl tool (Readability + JSDOM)
+- `lib/ai/tools/fetch-page.ts` — shared utility для чтения веб-страниц
+- `lib/ai/tools/chat-tools.ts` — регистрация + chatMode-фильтрация
+- `lib/ai/tool-activity-config.ts` — UI конфиг (deepResearch + fetchUrl)
+- `components/multimodal-input.tsx` — dev-mode toggle (🔬 Auto/Pro/Deep)
+- `components/message.tsx` — dev-mode depth display from dataStream
+
+**Детали:** [_archive/TZ_PX_DeepResearch/](_archive/TZ_PX_DeepResearch/)
 
 ### ТЗ-A1: Briefing Landing — ✅ ЗАВЕРШЁН
 
@@ -1084,7 +1107,7 @@ components/projects/
 
 | Этап | Описание | Приоритет |
 |------|----------|-----------|
-| **8** | Инструменты Фаза 1 (Perplexity, Plus AI, Ideogram) | 🔴 Высокий |
+| **8** | Инструменты Фаза 1 (Perplexity ✅, Plus AI, Ideogram) | 🔄 В работе |
 | **9** | RAG (База знаний) | 🟡 Средний |
 | **10** | Chat Memory | 🟡 Средний |
 | **11** | Мультипровайдер (GPT) | 🟡 Средний |
@@ -1102,11 +1125,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.26.0 |
+| Версия | 3.29.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21), ChatContextManagement (v3.22), AnthropicProviderSwitch (v3.23), DashboardV2 (v3.24), RouteGroups (v3.25), MorningBriefingBackend (v3.26) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21), ChatContextManagement (v3.22), AnthropicProviderSwitch (v3.23), DashboardV2 (v3.24), RouteGroups (v3.25), MorningBriefingBackend (v3.26), DeepResearch+FetchUrl (v3.29) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Профессоры | 2 (planning, task-review) |
@@ -1114,7 +1137,7 @@ components/projects/
 | Сервисные чаты | 3 (ben, project-creation, project-manager) |
 | Промптов | 10 (chat, ben, project-creation, project-manager, professor-planning, task-expert, task-summarizer, task-review, file-analyzer, snapshot-creator) |
 | AI моделей | 3 (Claude Sonnet, Haiku, Opus) + Gemini для vision-ocr |
-| AI-инструментов | 11 |
+| AI-инструментов | 13 |
 | Типов документов | 5 (text, markdown, excel, presentation-reveal, presentation-pptx) |
 | Тем презентаций | 5 |
 | Тем Excel | 5 |
@@ -1140,6 +1163,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_PX_DeepResearch/](_archive/TZ_PX_DeepResearch/) — ТЗ-PX + ТЗ-FU Deep Research + Fetch URL
 - [_archive/TZ_BR1_BriefingBackend/](_archive/TZ_BR1_BriefingBackend/) — ТЗ-BR1 Morning Briefing Backend
 - [_archive/TZ_RG_RouteGroups/](_archive/TZ_RG_RouteGroups/) — ТЗ-RG Route Groups
 - [_archive/TZ_DV2_DashboardV2/](_archive/TZ_DV2_DashboardV2/) — ТЗ-DV2 Dashboard V2

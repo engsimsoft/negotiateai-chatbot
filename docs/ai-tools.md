@@ -1,8 +1,8 @@
 # Инструменты AI-агентов
 
-**Версия:** 3.25.1
-**Последнее обновление:** 2026-02-18
-**Статус:** 11 инструментов (createSnapshot добавлен в v3.18, getWeather обновлён в v3.25.1)
+**Версия:** 3.29.0
+**Последнее обновление:** 2026-02-20
+**Статус:** 13 инструментов (deepResearch + fetchUrl добавлены в v3.29.0)
 
 ---
 
@@ -20,7 +20,9 @@
 
 | Инструмент | Описание | Доступ |
 |------------|----------|--------|
-| `webSearch` | Поиск в интернете | Все агенты |
+| `webSearch` | Поиск в интернете (Brave API) | Все агенты (кроме chat) |
+| `deepResearch` | Глубокое исследование (Perplexity Sonar API) | Все агенты (кроме chat) |
+| `fetchUrl` | Чтение веб-страниц по URL (Readability) | Все агенты (кроме chat) |
 | `getWeather` | Погода по городу | Все агенты |
 | `getCurrentDate` | Текущая дата | Все агенты |
 | `readDocument` | Чтение из knowledge/ | Только обычные чаты |
@@ -65,6 +67,126 @@ webSearch({
 ```
 Найди последние новости о GPT-5
 Что нового в React 19?
+```
+
+---
+
+## Deep Research
+
+Глубокое исследование тем через Perplexity Sonar API. Добавлен в v3.29.0 (ТЗ-PX).
+
+### Два режима
+
+| Режим | Модель | Время | Стоимость | Когда |
+|-------|--------|-------|-----------|-------|
+| **Pro** | sonar-pro | 5-15 сек | ~$0.02 | По умолчанию. Быстрый мультишаговый поиск |
+| **Deep** | sonar-deep-research | 30-120 сек | ~$0.80 | Исчерпывающее исследование. Только по явному запросу |
+
+### Доступность
+
+| Тип чата | Доступен |
+|----------|----------|
+| Chat (Haiku) | Нет (отфильтрован через `CHAT_MODE_EXCLUDED_TOOLS`) |
+| Expertise (Sonnet) | Да |
+| Create (Sonnet) | Да |
+| Проектный чат | Да |
+
+### Параметры
+
+```typescript
+deepResearch({
+  query: string,       // Что исследовать
+  depth?: "pro" | "deep",  // Режим (default: "pro")
+})
+```
+
+### Возвращает
+
+```typescript
+{
+  query: string,
+  depth: "pro" | "deep",
+  content: string,        // Текст исследования
+  citations: Array<{ url: string, title?: string }>,
+  citationsCount: number,
+  usage?: { totalTokens: number, searchQueries?: number },
+}
+```
+
+### Dev-mode override
+
+Переключатель 🔬 Auto/Pro/Deep в toolbar (только `NODE_ENV=development`, не chatMode='chat'). Override передаётся через `researchDepth` в request body → `defaultDepth` в factory-замыкании.
+
+### Архитектура
+
+Factory-pattern — `deepResearch({ defaultDepth })` возвращает tool с замкнутым `defaultDepth`. Client override побеждает выбор модели: `const depth = defaultDepth ?? modelDepth`.
+
+### Требования
+- `PERPLEXITY_API_KEY` в `.env.local`
+
+### Файл
+[lib/ai/tools/deep-research.ts](../lib/ai/tools/deep-research.ts)
+
+### Пример использования
+```
+Исследуй тенденции рынка EdTech в России
+Сравни React vs Vue для enterprise проекта
+```
+
+---
+
+## Fetch URL
+
+Чтение веб-страниц по URL через Readability + JSDOM. Добавлен в v3.29.0 (ТЗ-FU).
+
+### Доступность
+
+| Тип чата | Доступен |
+|----------|----------|
+| Chat (Haiku) | Нет (отфильтрован через `CHAT_MODE_EXCLUDED_TOOLS`) |
+| Expertise (Sonnet) | Да |
+| Create (Sonnet) | Да |
+| Проектный чат | Да |
+
+### Возможности
+- Извлечение текста из веб-страниц (@mozilla/readability + jsdom)
+- Автоматическая обрезка по `maxLength`
+- Fallback на HTML body если Readability не справляется
+- Timeout 15 сек на fetch
+
+### Параметры
+
+```typescript
+fetchUrl({
+  url: string,             // URL страницы
+  maxLength?: number,      // Макс символов (default: 10000, max: 50000)
+})
+```
+
+### Возвращает
+
+```typescript
+{
+  url: string,
+  title: string | null,
+  content: string,
+  originalLength: number,
+  truncated: boolean,
+}
+```
+
+### Архитектура
+
+Shared utility `fetch-page.ts` переиспользует логику из briefing `web-fetcher.ts`. Используется как tool `fetchUrl` и может быть повторно использован в других контекстах.
+
+### Файл
+- [lib/ai/tools/fetch-url.ts](../lib/ai/tools/fetch-url.ts) — tool definition
+- [lib/ai/tools/fetch-page.ts](../lib/ai/tools/fetch-page.ts) — shared utility
+
+### Пример использования
+```
+Прочитай статью по ссылке https://example.com/article
+Что написано на этой странице: https://...
 ```
 
 ---
@@ -630,7 +752,7 @@ export const readProjectFile = ({ projectId }: { projectId: string }) =>
 
 ```typescript
 // lib/ai/tools/chat-tools.ts
-export function getStandardTools({ session, dataStream, isProjectChat, projectId, chatId, messageId }) {
+export function getStandardTools({ session, dataStream, isProjectChat, projectId, chatId, messageId, chatMode, researchDepth }) {
   return {
     getCurrentDate,
     getWeather,
@@ -645,10 +767,16 @@ export function getStandardTools({ session, dataStream, isProjectChat, projectId
     updateDocument: updateDocument({ session, dataStream }),
     requestSuggestions: requestSuggestions({ session, dataStream }),
     webSearch,
+    fetchUrl,                                                // v3.29.0
+    deepResearch: deepResearch({ defaultDepth: researchDepth }),  // v3.29.0 (factory)
     parseExcel,
     loadSkill,
   };
 }
+
+// chatMode-фильтрация: fetchUrl + deepResearch исключены для 'chat' (Haiku)
+const CHAT_MODE_EXCLUDED_TOOLS = ["fetchUrl", "deepResearch"];
+
 ```
 
 **Используется в:**
@@ -716,6 +844,7 @@ export function getStandardTools({ session, dataStream, isProjectChat, projectId
 |------------|--------|-------------|
 | `GOOGLE_GENERATIVE_AI_API_KEY` | Google Gemini | Да |
 | `BRAVE_SEARCH_API_KEY` | Brave Search | Нет (для webSearch) |
+| `PERPLEXITY_API_KEY` | Perplexity | Нет (для deepResearch) |
 | `CLOUDCONVERT_API_KEY` | CloudConvert | Нет (для PPTX превью) |
 
 ### Инфраструктура
@@ -736,4 +865,4 @@ export function getStandardTools({ session, dataStream, isProjectChat, projectId
 
 ---
 
-**Обновлено:** 2026-02-18 (v3.25.1 — createSnapshot для управления контекстом, getWeather: summary + WMO-коды + forecast_days=1)
+**Обновлено:** 2026-02-20 (v3.29.0 — deepResearch + fetchUrl, chatMode-фильтрация)

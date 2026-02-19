@@ -140,7 +140,7 @@ app/(chat)/api/service-chat/route.ts                # Manager с план-кон
 | **Модель** | `process.env.EXPERT_MODEL \|\| 'claude-sonnet'` |
 | **Оболочка** | Отдельная route group `app/(task)/` — полноэкранный layout без AppSidebar |
 | **Промпт** | `lib/prompts/experts/task-expert.md` + `buildTaskExpertPrompt()` |
-| **Инструменты** | Shared tools (search, documents, excel, readProjectFile, createSnapshot) — `getStandardTools()` |
+| **Инструменты** | Shared tools (search, deepResearch, fetchUrl, documents, excel, readProjectFile, createSnapshot) — `getStandardTools()` |
 | **Персистенция** | Серверная (Chat в БД, привязан к ProjectTask через chatId) |
 | **Артефакты** | Поддерживаются (SidebarProvider в layout) |
 
@@ -370,7 +370,7 @@ lib/briefing/source-fetchers/web-fetcher.ts  # Web через Readability + jsdo
 **Создание чата:** `/chat?mode=expertise` → чат с chatMode=expertise, модель Sonnet.
 
 **Особенности:**
-- Полная поддержка инструментов (search, documents, excel)
+- Полная поддержка инструментов (search, deepResearch, fetchUrl, documents, excel)
 - Skills-based routing
 - Персонализация (профиль + память)
 - Стриминг ответов

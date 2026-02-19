@@ -75,6 +75,10 @@ export type CustomUIDataTypes = {
     modelId: string;
     modelName: string;
   };
+  // ТЗ-PX: Research depth override (dev-mode, emitted when researchDepth is set)
+  "research-depth": {
+    depth: string;
+  };
 };
 
 export type ChatMessage = UIMessage<

@@ -33,6 +33,8 @@ export const postRequestBodySchema = z.object({
   // ТЗ-03: Project chat support
   projectId: z.string().uuid().optional(),
   projectModelTier: z.enum(["executor", "expert", "professor"]).optional(),
+  // ТЗ-PX: Override depth for deepResearch (dev-mode UI switcher)
+  researchDepth: z.enum(["pro", "deep"]).optional(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

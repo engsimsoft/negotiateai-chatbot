@@ -85,6 +85,9 @@ export function Chat({
   const currentChatModeRef = useRef(currentChatMode);
   const [currentProjectTier, setCurrentProjectTier] = useState(projectModelTier || "expert");
   const currentProjectTierRef = useRef(currentProjectTier);
+  // ТЗ-PX: Research depth override (dev-mode only)
+  const [researchDepth, setResearchDepth] = useState<"pro" | "deep" | undefined>(undefined);
+  const researchDepthRef = useRef(researchDepth);
   const [retryState, setRetryState] = useState({ count: 0, maxRetries: 3 });
   const [delayState, setDelayState] = useState<"normal" | "slow" | "timeout">(
     "normal"
@@ -113,6 +116,10 @@ export function Chat({
   useEffect(() => {
     currentProjectTierRef.current = currentProjectTier;
   }, [currentProjectTier]);
+
+  useEffect(() => {
+    researchDepthRef.current = researchDepth;
+  }, [researchDepth]);
 
   const clearDelayTimers = useCallback(() => {
     if (slowTimerRef.current) {
@@ -191,6 +198,7 @@ export function Chat({
               // ТЗ-03: Project chat support
               ...(projectId && { projectId }),
               ...(projectId && { projectModelTier: currentProjectTierRef.current }),
+              ...(researchDepthRef.current && { researchDepth: researchDepthRef.current }),
               ...request.body,
             },
           };
@@ -472,6 +480,8 @@ export function Chat({
                 isProjectChat={!!projectId}
                 projectModelTier={currentProjectTier}
                 onProjectModelChange={setCurrentProjectTier}
+                researchDepth={researchDepth}
+                onResearchDepthChange={setResearchDepth}
               />
             )}
         </div>

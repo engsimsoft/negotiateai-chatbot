@@ -8,7 +8,26 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- Этап 8+: Инструменты Фаза 1, RAG, Chat Memory, биллинг
+- Этап 8+: Инструменты Фаза 1 (Plus AI, Ideogram), RAG, Chat Memory, биллинг
+
+---
+
+## [3.29.0] - 2026-02-19 - Deep Research + Fetch URL (ТЗ-PX + ТЗ-FU)
+
+**MINOR RELEASE**: Два новых инструмента — deepResearch (Perplexity Sonar API, два режима: Pro/Deep) и fetchUrl (чтение веб-страниц через Readability). ChatMode-фильтрация инструментов. Dev-mode переключатель глубины исследования.
+
+### Added
+- **deepResearch** — глубокое исследование через Perplexity Sonar API. Два режима: Pro (sonar-pro, 5-15 сек, ~$0.02) и Deep (sonar-deep-research, 30-120 сек, ~$0.80). Factory-pattern с `defaultDepth` через замыкание
+- **fetchUrl** — чтение веб-страниц по URL (@mozilla/readability + jsdom). Shared utility `fetch-page.ts` (переиспользует логику из briefing web-fetcher)
+- **Dev-mode toggle** — переключатель 🔬 Auto/Pro/Deep в toolbar (только в development, не в chatMode='chat')
+- **data-research-depth** — серверная эмиссия глубины исследования через dataStream для отображения в UI
+- **chatMode-фильтрация** — fetchUrl и deepResearch исключены для chatMode='chat' (Haiku) через `CHAT_MODE_EXCLUDED_TOOLS`
+
+### Changed
+- **webSearch description** — добавлена дифференциация с deepResearch ("для простых фактов — webSearch, для глубокого анализа — deepResearch")
+- **tool-activity-config.ts** — добавлены конфиги deepResearch (FlaskConical, Pro/Deep в resultFormatter) и fetchUrl (Globe, hostname + title)
+- **postRequestBodySchema** — расширена `researchDepth?: "pro" | "deep"` для передачи override с клиента
+- **CustomUIDataTypes** — добавлен тип `"research-depth"` для dataStream
 
 ---
 

@@ -73,6 +73,8 @@ function PureMultimodalInput({
   isProjectChat,
   projectModelTier,
   onProjectModelChange,
+  researchDepth,
+  onResearchDepthChange,
 }: {
   chatId: string;
   chatMode?: string;
@@ -95,6 +97,9 @@ function PureMultimodalInput({
   isProjectChat?: boolean;
   projectModelTier?: string;
   onProjectModelChange?: (tier: string) => void;
+  // ТЗ-PX: Research depth override (dev-mode only)
+  researchDepth?: "pro" | "deep";
+  onResearchDepthChange?: (depth: "pro" | "deep" | undefined) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -455,6 +460,34 @@ function PureMultimodalInput({
                 onProjectModelChange={onProjectModelChange}
               />
             )}
+            {/* ТЗ-PX: Dev-mode research depth toggle */}
+            {process.env.NODE_ENV === "development" &&
+              chatMode !== "chat" &&
+              onResearchDepthChange && (
+                <Button
+                  className="h-8 rounded-lg px-2 text-xs font-medium transition-colors hover:bg-accent"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    if (!researchDepth) {
+                      onResearchDepthChange("pro");
+                    } else if (researchDepth === "pro") {
+                      onResearchDepthChange("deep");
+                    } else {
+                      onResearchDepthChange(undefined);
+                    }
+                  }}
+                  title="Research depth (dev): Auto → Pro → Deep"
+                  variant="ghost"
+                >
+                  <span className="text-muted-foreground">
+                    {!researchDepth
+                      ? "🔬 Auto"
+                      : researchDepth === "pro"
+                        ? "🔬 Pro"
+                        : "🔬 Deep"}
+                  </span>
+                </Button>
+              )}
             {/* ТЗ-5: Hints panel button */}
             <Button
               className="aspect-square h-8 rounded-lg p-1 transition-colors hover:bg-accent"
@@ -524,6 +557,9 @@ export const MultimodalInput = memo(
       return false;
     }
     if (prevProps.delayState !== nextProps.delayState) {
+      return false;
+    }
+    if (prevProps.researchDepth !== nextProps.researchDepth) {
       return false;
     }
 

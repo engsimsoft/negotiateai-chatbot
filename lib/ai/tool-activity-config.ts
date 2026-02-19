@@ -8,7 +8,7 @@
  */
 
 import type { LucideIcon } from "lucide-react";
-import { FileText, FolderOpen, Pencil, Search, Table2 } from "lucide-react";
+import { FileText, FlaskConical, FolderOpen, Globe, Pencil, Search, Table2 } from "lucide-react";
 
 export interface ToolActivityConfig {
   icon: LucideIcon;
@@ -66,5 +66,44 @@ export const TOOL_ACTIVITY_CONFIG: Record<string, ToolActivityConfig> = {
     icon: Pencil,
     activeLabel: "Обновляю документ",
     doneLabel: "Документ обновлён",
+  },
+
+  deepResearch: {
+    icon: FlaskConical,
+    activeLabel: "Исследую тему",
+    doneLabel: "Исследование завершено",
+    argsFormatter: (args) => args?.query || null,
+    resultFormatter: (result) => {
+      if (result?.error) return null;
+      const parts: string[] = [];
+      if (result?.depth === "deep") parts.push("Deep");
+      else parts.push("Pro");
+      const count = result?.citationsCount;
+      if (typeof count === "number" && count > 0)
+        parts.push(`${count} источников`);
+      return parts.length > 0 ? parts.join(", ") : null;
+    },
+  },
+
+  fetchUrl: {
+    icon: Globe,
+    activeLabel: "Читаю страницу",
+    doneLabel: "Страница прочитана",
+    argsFormatter: (args) => {
+      if (!args?.url) return null;
+      try {
+        return new URL(args.url).hostname;
+      } catch {
+        return args.url;
+      }
+    },
+    resultFormatter: (result) => {
+      if (result?.error) return null;
+      const parts: string[] = [];
+      if (result?.title) parts.push(result.title);
+      if (typeof result?.originalLength === "number")
+        parts.push(`${Math.round(result.originalLength / 1000)}k символов`);
+      return parts.length > 0 ? parts.join(" — ") : null;
+    },
   },
 };

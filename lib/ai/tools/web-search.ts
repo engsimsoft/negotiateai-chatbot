@@ -44,10 +44,11 @@ interface BraveSearchResponse {
  * await webSearch({ query: "population of Tokyo 2024" });
  */
 export const webSearch = tool({
-  description: `Search the web for current information, news, facts, and answers to questions.
-Use this when you need up-to-date information that's not in your training data,
-or when the user asks about current events, recent developments, or specific facts.
-Returns a list of search results with titles, URLs, and descriptions.`,
+  description: `Быстрый поиск фактов, новостей, простых справок в интернете.
+Используй для: конкретных фактов, погоды, курсов валют, текущих событий, быстрых ответов.
+Возвращает список результатов с заголовками, URL и описаниями.
+
+Для глубокого исследования темы (мультишаговый анализ, синтез источников, сравнение) — используй deepResearch.`,
 
   inputSchema: z.object({
     query: z.string().describe("The search query. Be specific and clear."),

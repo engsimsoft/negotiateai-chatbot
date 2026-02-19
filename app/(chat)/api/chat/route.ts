@@ -235,6 +235,7 @@ export async function POST(request: Request) {
       selectedVisibilityType,
       projectId,
       projectModelTier,
+      researchDepth,
     } = requestBody;
 
     const session = await auth();
@@ -536,6 +537,11 @@ export async function POST(request: Request) {
           dataStream.write({ type: "data-model-info", data: { modelId: mid, modelName: DISPLAY[mid] || mid } });
         }
 
+        // ТЗ-PX: Emit research depth override for dev UI
+        if (researchDepth) {
+          dataStream.write({ type: "data-research-depth", data: { depth: researchDepth } });
+        }
+
         // ТЗ-C3: Generate assistant message ID upfront (needed for snapshot tool)
         const assistantMessageId = generateUUID();
 
@@ -608,7 +614,7 @@ export async function POST(request: Request) {
           // ТЗ-C1: Tools extracted to shared module (lib/ai/tools/chat-tools.ts)
           experimental_activeTools: getActiveToolNames(isProjectChat, chatMode),
           experimental_transform: smoothStream({ chunking: "word" }),
-          tools: getStandardTools({ session, dataStream, isProjectChat, projectId: projectId || undefined, chatId: id, messageId: assistantMessageId, chatMode }),
+          tools: getStandardTools({ session, dataStream, isProjectChat, projectId: projectId || undefined, chatId: id, messageId: assistantMessageId, chatMode, researchDepth }),
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
             functionId: "stream-text",
