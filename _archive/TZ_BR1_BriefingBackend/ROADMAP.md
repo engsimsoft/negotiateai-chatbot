@@ -2,7 +2,7 @@
 
 **Создан:** 2026-02-19
 **Версия проекта:** 3.25.1 → 3.26.0
-**Статус:** В работе
+**Статус:** ✅ Завершён
 
 ---
 
@@ -58,18 +58,16 @@ git commit -m "feat(tz-br1): database schema + config + topics catalog"
 
 ## Этап 2: Фетчеры источников
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 1
+**Статус:** ✅ Завершён
 
 **Цель:** 3 фетчера (RSS, Telegram, Web) с единым интерфейсом RawContent[].
 
 **Задачи:**
-- [ ] Создать `lib/briefing/source-fetchers/types.ts` — интерфейсы RawContent, FetchResult
-- [ ] Создать `lib/briefing/source-fetchers/rss-fetcher.ts` — парсинг RSS/Atom через `rss-parser`, фильтр 24ч
-- [ ] Создать `lib/briefing/source-fetchers/telegram-fetcher.ts` — парсинг `t.me/s/{channel}` через cheerio, посты за 24ч
-- [ ] Создать `lib/briefing/source-fetchers/web-fetcher.ts` — fetch + `@mozilla/readability` + `jsdom`, извлечение контента
-- [ ] Создать `lib/briefing/source-fetchers/index.ts` — единый fetchSource dispatcher (по fetchMethod)
+- [x] Создать `lib/briefing/source-fetchers/types.ts` — интерфейсы RawContent, FetchResult
+- [x] Создать `lib/briefing/source-fetchers/rss-fetcher.ts` — парсинг RSS/Atom через `rss-parser`, фильтр 24ч
+- [x] Создать `lib/briefing/source-fetchers/telegram-fetcher.ts` — парсинг `t.me/s/{channel}` через cheerio, посты за 24ч
+- [x] Создать `lib/briefing/source-fetchers/web-fetcher.ts` — fetch + `@mozilla/readability` + `jsdom`, извлечение контента
+- [x] Создать `lib/briefing/source-fetchers/index.ts` — единый fetchSource dispatcher (по fetchMethod)
 
 **Файлы:**
 - `lib/briefing/source-fetchers/types.ts` — новый
@@ -79,9 +77,9 @@ git commit -m "feat(tz-br1): database schema + config + topics catalog"
 - `lib/briefing/source-fetchers/index.ts` — новый
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] 🧪 Мануальный тест: нет (backend-only, тестируется в Этапе 4 через API)
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] 🧪 Мануальный тест: нет (backend-only, тестируется в Этапе 4 через API)
 
 **Git (после валидации):**
 ```bash
@@ -95,25 +93,23 @@ git commit -m "feat(tz-br1): source fetchers (RSS, Telegram, Web)"
 
 ## Этап 3: AI-пайплайн
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 2
+**Статус:** ✅ Завершён
 
 **Цель:** Двухэтапный AI-пайплайн: фильтрация (Gemini Flash) → анализ (Gemini 3 Pro).
 
 **Задачи:**
-- [ ] Создать `lib/briefing/briefing-filter.ts` — Этап 1: Gemini 2.0 Flash, дедупликация, фильтрация → FilteredItem[]
-- [ ] Создать `lib/briefing/briefing-analyzer.ts` — Этап 2: Gemini 3 Pro, анализ, группировка → BriefingJSON
-- [ ] Определить Zod-схемы для FilteredItem и BriefingJSON (для generateObject)
+- [x] Создать `lib/briefing/briefing-filter.ts` — Этап 1: Gemini 2.0 Flash, дедупликация, фильтрация → FilteredItem[]
+- [x] Создать `lib/briefing/briefing-analyzer.ts` — Этап 2: Gemini 3 Pro, анализ, группировка → BriefingJSON
+- [x] Определить Zod-схемы для FilteredItem и BriefingJSON (для generateObject) — внутри filter.ts и analyzer.ts
 
 **Файлы:**
 - `lib/briefing/briefing-filter.ts` — новый
 - `lib/briefing/briefing-analyzer.ts` — новый
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] 🧪 Мануальный тест: нет (тестируется в Этапе 4 через API)
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] 🧪 Мануальный тест: нет (тестируется в Этапе 4 через API)
 
 **Git (после валидации):**
 ```bash
@@ -127,19 +123,17 @@ git commit -m "feat(tz-br1): AI pipeline (filter + analyzer)"
 
 ## Этап 4: API Endpoint + Seed
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 3
+**Статус:** ✅ Завершён
 
 **Цель:** Рабочий endpoint POST /api/briefing/generate + seed-скрипт для тестирования.
 
 **Задачи:**
-- [ ] Создать `app/(chat)/api/briefing/generate/route.ts` — POST endpoint (auth, fetch, filter, analyze, save)
-- [ ] Добавить `maxDuration = 60` в route.ts
-- [ ] Создать `lib/db/seed-briefing.ts` — seed-скрипт (settings + 10-15 источников)
-- [ ] Добавить `"db:seed-briefing": "tsx lib/db/seed-briefing.ts"` в package.json scripts
-- [ ] Запустить seed для тестового пользователя
-- [ ] Протестировать полный пайплайн через curl
+- [x] Создать `app/(chat)/api/briefing/generate/route.ts` — POST endpoint (auth, fetch, filter, analyze, save)
+- [x] Добавить `maxDuration = 60` в route.ts
+- [x] Создать `lib/db/seed-briefing.ts` — seed-скрипт (settings + 10-15 источников)
+- [x] Добавить `"db:seed-briefing": "tsx lib/db/seed-briefing.ts"` в package.json scripts
+- [x] Запустить seed для тестового пользователя
+- [x] Протестировать полный пайплайн через curl
 
 **Файлы:**
 - `app/(chat)/api/briefing/generate/route.ts` — новый
@@ -147,11 +141,11 @@ git commit -m "feat(tz-br1): AI pipeline (filter + analyzer)"
 - `package.json` — +script
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Seed выполнен успешно (данные в БД)
-- [ ] `POST /api/briefing/generate` возвращает briefingJson с реальными новостями
-- [ ] 🧪 Мануальный тест: пользователь вызывает endpoint, проверяет ответ
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] Seed выполнен успешно (20 источников в БД)
+- [x] `POST /api/briefing/generate` возвращает briefingJson с реальными новостями (14 items, 8 тем, 56K токенов)
+- [x] 🧪 Мануальный тест: curl → 200 OK, реальные новости на русском
 
 **Git (после валидации):**
 ```bash
@@ -165,25 +159,23 @@ git commit -m "feat(tz-br1): API endpoint + seed script"
 
 ## Этап 5: Финализация
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4
+**Статус:** ✅ Завершён
 
 **Цель:** Документация, версия, архив.
 
 **Задачи:**
-- [ ] SQL-проверка БД (таблицы, колонки, FK, индексы)
-- [ ] Финальное мануальное тестирование (пользователь)
-- [ ] Обновить главный `CHANGELOG.md`
-- [ ] Обновить `SIMPLY_STATUS.md`
-- [ ] Обновить `CLAUDE.md` (добавить секцию Briefing)
-- [ ] Обновить `package.json` версию → 3.26.0
-- [ ] Переместить папку в `_archive/`
+- [x] SQL-проверка БД (таблицы, колонки, FK, индексы)
+- [x] Финальное мануальное тестирование (пользователь) — подтверждено в Этапе 4
+- [x] Обновить главный `CHANGELOG.md`
+- [x] Обновить `SIMPLY_STATUS.md`
+- [x] Обновить `CLAUDE.md` (добавить секцию Briefing)
+- [x] Обновить `package.json` версию → 3.26.0
+- [x] Переместить папку в `_archive/`
 
 **Валидация:**
-- [ ] `npm run build` — успешен
-- [ ] Документация актуальна
-- [ ] Версия 3.26.0
+- [x] `npm run build` — успешен
+- [x] Документация актуальна
+- [x] Версия 3.26.0
 
 **Git (после валидации):**
 ```bash

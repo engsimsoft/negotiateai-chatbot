@@ -12,6 +12,29 @@
 
 ---
 
+## [3.26.0] - 2026-02-19 - Morning Briefing Backend (ТЗ-BR1)
+
+**MINOR RELEASE**: Backend-система утреннего новостного брифинга. 3 таблицы в БД, 3 фетчера источников (RSS, Telegram, Web), двухэтапный AI-пайплайн (Gemini Flash фильтрация + Gemini Pro анализ), API endpoint и seed-скрипт.
+
+### Added
+- **3 таблицы в БД** — `BriefingSettings`, `BriefingSources`, `BriefingHistory` (Drizzle ORM, миграция 0031)
+- **Конфигурация** — `lib/briefing/briefing-config.ts` (лимиты, таймауты, модели)
+- **Каталог тем** — `lib/briefing/topics-catalog.ts` (10 тем × 3-4 источника с реальными RSS)
+- **Source Fetchers** — RSS (`rss-parser`), Telegram (cheerio `t.me/s/`), Web (`@mozilla/readability` + `jsdom`) с единым dispatcher
+- **AI Filter** — Gemini 2.0 Flash: дедупликация, фильтрация → FilteredItem[] (Zod-схема)
+- **AI Analyzer** — Gemini 3 Pro: анализ, группировка по темам → BriefingJSON (Zod-схема)
+- **API endpoint** — `POST /api/briefing/generate` (auth, fetch sources, filter, analyze, save to DB)
+- **Seed-скрипт** — `lib/db/seed-briefing.ts` + npm script `db:seed-briefing`
+- **7 CRUD queries** — getBriefingSettings, upsertBriefingSettings, getBriefingSources, addBriefingSource, deleteBriefingSource, saveBriefingHistory, getBriefingHistory
+
+### Technical
+- `maxDuration = 60` в route.ts для Vercel timeout
+- Zod-схемы для `generateObject`: filteredItemSchema, briefingJsonSchema
+- Gemini вызовы через `@ai-sdk/google` (отдельно от основного Anthropic провайдера)
+- 20 источников → 196 статей → 28 кандидатов → 14 финальных новостей в тесте
+
+---
+
 ## [3.25.1] - 2026-02-18 - Stability Fixes
 
 ### Fixed

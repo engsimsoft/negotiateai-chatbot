@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.25.1
-**Дата:** 2026-02-18
+**Версия:** 3.26.0
+**Дата:** 2026-02-19
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -325,6 +325,30 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-BR1: Morning Briefing Backend — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **3 таблицы в БД** — BriefingSettings, BriefingSources, BriefingHistory (Drizzle ORM, миграция 0031)
+- **Конфигурация + Каталог тем** — `lib/briefing/briefing-config.ts`, `lib/briefing/topics-catalog.ts` (10 тем × 3-4 источника)
+- **3 фетчера** — RSS (rss-parser), Telegram (cheerio t.me/s/), Web (@mozilla/readability + jsdom) с единым dispatcher
+- **AI-пайплайн** — двухэтапный: Gemini 2.0 Flash (фильтрация, дедупликация) → Gemini 3 Pro (анализ, группировка)
+- **API endpoint** — `POST /api/briefing/generate` (auth, fetch, filter, analyze, save)
+- **Seed-скрипт** — `lib/db/seed-briefing.ts` + `npm run db:seed-briefing`
+- **7 CRUD queries** — полный набор для briefing settings, sources, history
+
+**Ключевые файлы:**
+- `lib/db/schema.ts` — +3 таблицы (briefingSettings, briefingSources, briefingHistory)
+- `lib/db/queries.ts` — +7 CRUD queries
+- `lib/briefing/briefing-config.ts` — константы (лимиты, таймауты, модели)
+- `lib/briefing/topics-catalog.ts` — каталог тем с RSS
+- `lib/briefing/source-fetchers/` — 5 файлов (types, rss, telegram, web, index)
+- `lib/briefing/briefing-filter.ts` — AI фильтр (Gemini Flash)
+- `lib/briefing/briefing-analyzer.ts` — AI анализатор (Gemini Pro)
+- `app/(chat)/api/briefing/generate/route.ts` — API endpoint
+- `lib/db/seed-briefing.ts` — seed-скрипт
+
+**Детали:** [_archive/TZ_BR1_BriefingBackend/](_archive/TZ_BR1_BriefingBackend/)
 
 ### ТЗ-RG: Route Groups — ✅ ЗАВЕРШЁН
 
@@ -1034,7 +1058,7 @@ components/projects/
 | **11** | Мультипровайдер (GPT) | 🟡 Средний |
 | **12** | Биллинг (Pay-as-you-go) | 🟡 Средний |
 | **13** | Инструменты Фаза 2 | 🟢 Низкий |
-| **14** | Инструменты Фаза 3 + Morning Briefing | 🟢 Низкий |
+| **14** | Инструменты Фаза 3 + Morning Briefing Frontend | 🟢 Низкий |
 
 **Философия инструментов:** Best-in-Class API — интегрируем лучшие готовые решения, не изобретаем велосипеды.
 
@@ -1046,11 +1070,11 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.25.0 |
+| Версия | 3.26.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
-| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21), ChatContextManagement (v3.22), AnthropicProviderSwitch (v3.23), DashboardV2 (v3.24), RouteGroups (v3.25) |
+| Архитектура UI | Унифицированные инпуты (v3.4), File Viewer (v3.7), ServiceChat (v3.8), Live Preview (v3.9), Context/Instruction (v3.10), Secretary (v3.11), Project Layout (v3.12), Manager+Clerk+Manifest (v3.13), Professor Planning (v3.14), Approval+ProjectTask (v3.15), ExpertTaskChat (v3.16), TaskCompletion (v3.17), ContextManagement (v3.18), DesignSystem (v3.19), ToolActivity+SidebarIconMode (v3.20), ChatSidebar+RightSidebar (v3.21), ChatContextManagement (v3.22), AnthropicProviderSwitch (v3.23), DashboardV2 (v3.24), RouteGroups (v3.25), MorningBriefingBackend (v3.26) |
 | Skills | 5 (document: 4, research: 1) |
 | Agents | 1 (ben) |
 | Профессоры | 2 (planning, task-review) |
@@ -1084,6 +1108,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_BR1_BriefingBackend/](_archive/TZ_BR1_BriefingBackend/) — ТЗ-BR1 Morning Briefing Backend
 - [_archive/TZ_RG_RouteGroups/](_archive/TZ_RG_RouteGroups/) — ТЗ-RG Route Groups
 - [_archive/TZ_DV2_DashboardV2/](_archive/TZ_DV2_DashboardV2/) — ТЗ-DV2 Dashboard V2
 - [_archive/TZ_C4_AnthropicProvider/](_archive/TZ_C4_AnthropicProvider/) — ТЗ-C4 Anthropic Provider Switch
@@ -1123,4 +1148,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-18
+**Обновлено:** 2026-02-19
