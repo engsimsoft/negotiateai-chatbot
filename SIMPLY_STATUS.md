@@ -326,21 +326,34 @@ components/projects/
 
 ## План развития
 
+### ТЗ-A1: Briefing Landing — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Лендинг /briefing** — продающая страница (hero, демо выпуска, CTA "Настроить мой брифинг")
+- **Заглушка /briefing/setup** — страница "Скоро" (для ТЗ-А2)
+- **Очистка** — удалены 5 старых UI-компонентов JSON-карточек (content, block, item, empty, generate-button)
+- **Адаптация** — briefing-header упрощён, briefing-page переписан в лендинг
+
+**Ключевые файлы:**
+- `components/briefing/briefing-page.tsx` — лендинг (hero + демо + CTA)
+- `components/briefing/briefing-header.tsx` — header (← Dashboard, заголовок, UserMenu)
+- `components/briefing/briefing-card.tsx` — карточка на дашборде (без изменений)
+- `app/(dashboard)/briefing/page.tsx` — страница /briefing (auth guard, лендинг)
+- `app/(dashboard)/briefing/setup/page.tsx` — заглушка
+
+**Детали:** [_archive/TZ_A1_BriefingLanding/](_archive/TZ_A1_BriefingLanding/)
+
 ### ТЗ-BR2: Briefing UI — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
 - **BriefingCard** — карточка на /dashboard в секции "Инструменты" (3 состояния: пустое/готов/генерируется)
-- **Страница /briefing** — полноценная страница с рендером брифинга, генерацией, empty state
-- **BriefingContent** — рендер BriefingJSON: мердж блоков, блок "Главное" (high items), тематические блоки
-- **BriefingGenerateButton** — кнопка генерации (POST /api/briefing/generate, loading, toast)
 - **GET /api/briefing/latest** — endpoint для получения последнего брифинга
 - **briefing-types.ts** — shared TypeScript types (client-safe)
 
 **Ключевые файлы:**
 - `lib/briefing/briefing-types.ts` — shared types (BriefingJSON, BriefingBlock, BriefingItem)
-- `components/briefing/` — UI компоненты (card, page, header, content, block, item, empty, generate-button)
+- `components/briefing/briefing-card.tsx` — карточка на дашборде
 - `components/glavnaya/tools-section.tsx` — секция "Инструменты" на дашборде
-- `app/(dashboard)/briefing/page.tsx` — страница /briefing
 - `app/(chat)/api/briefing/latest/route.ts` — GET API
 
 **Детали:** [_archive/TZ_BR2_BriefingUI/](_archive/TZ_BR2_BriefingUI/)

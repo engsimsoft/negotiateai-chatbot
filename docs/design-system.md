@@ -67,7 +67,10 @@ Root Layout (app/layout.tsx)
 │   ├── /create → ListDetailPage (← Dashboard + "Создание" + UserMenu)
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │
-│   ├── /briefing → BriefingHeader (← Dashboard + "☀️ Утренний брифинг" + ⚙️ + UserMenu)
+│   ├── /briefing → BriefingHeader (← Dashboard + "☀️ Утренний брифинг" + UserMenu) — лендинг
+│   │   User Menu: ✅   Theme Toggle: ✅
+│   │
+│   ├── /briefing/setup → Заглушка "Скоро" (← Briefing + "Настройка брифинга" + UserMenu)
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │
 │   └── /projects/new → создание проекта (header + UserMenu)

@@ -12,6 +12,29 @@
 
 ---
 
+## [3.28.0] - 2026-02-19 - Briefing Landing (ТЗ-A1)
+
+**MINOR RELEASE**: Лендинг `/briefing` вместо JSON-карточного рендера. Продающая страница (hero, демо выпуска, CTA). Заглушка `/briefing/setup`. Очистка старых UI-компонентов.
+
+### Added
+- **Лендинг /briefing** — hero ("Ваш персональный утренний брифинг"), демо-блок с 3 темами, CTA-кнопка "Настроить мой брифинг"
+- **Заглушка /briefing/setup** — страница "Скоро" с кнопкой назад (для ТЗ-А2)
+
+### Removed
+- **briefing-content.tsx** — рендер BriefingJSON (заменён лендингом)
+- **briefing-block.tsx** — тематический блок JSON
+- **briefing-item.tsx** — карточка новости
+- **briefing-empty.tsx** — empty state с кнопкой генерации
+- **briefing-generate-button.tsx** — кнопка генерации брифинга
+
+### Changed
+- **briefing-page.tsx** — полная перезапись: лендинг вместо JSON-рендера
+- **briefing-header.tsx** — упрощён: убраны счётчики BriefingJSON и кнопка Settings
+- **briefing/page.tsx** — упрощён: убран fetch данных, всегда рендерит лендинг
+- **briefing/index.ts** — убраны экспорты удалённых компонентов
+
+---
+
 ## [3.27.1] - 2026-02-19 - Prompt Integration (ТЗ-BR3)
 
 **PATCH RELEASE**: Интеграция промпта аналитика от PE. Промпт загружается из .md файла, tier источника передаётся аналитику, блок "Главное" рендерится из topicId "top".
