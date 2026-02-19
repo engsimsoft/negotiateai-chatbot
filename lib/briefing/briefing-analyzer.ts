@@ -125,11 +125,6 @@ ${content ? `Content: ${content}` : ""}`;
       schema: briefingJsonSchema,
       system: buildAnalyzerPrompt(language, maxItems, topicRef, today, totalSourcesChecked, candidates.length),
       prompt: candidatesText,
-      providerOptions: {
-        google: {
-          thinkingConfig: { thinkingBudget: 0 },
-        },
-      },
     });
     object = result.object;
     tokensUsed = result.usage?.totalTokens ?? 0;

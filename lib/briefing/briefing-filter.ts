@@ -70,11 +70,6 @@ Rules:
 
 Output JSON with "candidates" array.`,
     prompt: `Filter these ${items.length} articles:\n\n${articlesText}`,
-    providerOptions: {
-      google: {
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    },
   });
 
   return {
