@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.26.0
+**Версия:** 3.27.0
 **Дата:** 2026-02-19
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -325,6 +325,25 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-BR2: Briefing UI — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **BriefingCard** — карточка на /dashboard в секции "Инструменты" (3 состояния: пустое/готов/генерируется)
+- **Страница /briefing** — полноценная страница с рендером брифинга, генерацией, empty state
+- **BriefingContent** — рендер BriefingJSON: мердж блоков, блок "Главное" (high items), тематические блоки
+- **BriefingGenerateButton** — кнопка генерации (POST /api/briefing/generate, loading, toast)
+- **GET /api/briefing/latest** — endpoint для получения последнего брифинга
+- **briefing-types.ts** — shared TypeScript types (client-safe)
+
+**Ключевые файлы:**
+- `lib/briefing/briefing-types.ts` — shared types (BriefingJSON, BriefingBlock, BriefingItem)
+- `components/briefing/` — UI компоненты (card, page, header, content, block, item, empty, generate-button)
+- `components/glavnaya/tools-section.tsx` — секция "Инструменты" на дашборде
+- `app/(dashboard)/briefing/page.tsx` — страница /briefing
+- `app/(chat)/api/briefing/latest/route.ts` — GET API
+
+**Детали:** [_archive/TZ_BR2_BriefingUI/](_archive/TZ_BR2_BriefingUI/)
 
 ### ТЗ-BR1: Morning Briefing Backend — ✅ ЗАВЕРШЁН
 

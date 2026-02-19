@@ -12,6 +12,29 @@
 
 ---
 
+## [3.27.0] - 2026-02-19 - Briefing UI (ТЗ-BR2)
+
+**MINOR RELEASE**: UI для утреннего брифинга. Карточка на дашборде, полноценная страница /briefing с рендером новостей, генерацией, empty state. GET API endpoint.
+
+### Added
+- **BriefingCard** — карточка на /dashboard (3 состояния: пустое/готов/генерируется) в новой секции "Инструменты"
+- **ToolsSection** — секция "Инструменты" на дашборде (SectionTitle + grid карточек)
+- **Страница /briefing** — полноценная страница брифинга (Server Component, auth guard)
+- **BriefingHeader** — header по паттерну dashboard (← Dashboard, заголовок, дата, счётчики, ⚙️ заглушка, UserMenu)
+- **BriefingContent** — рендер BriefingJSON: мердж блоков с одинаковым topicId, блок "Главное" (high items) с bg-primary/5
+- **BriefingBlock** — тематический блок (emoji + topicName + items)
+- **BriefingItem** — новость (ссылка, summary, sourceName, бейдж EN→RU, relative time)
+- **BriefingEmpty** — empty state с кнопкой генерации
+- **BriefingGenerateButton** — Client Component (POST /api/briefing/generate, loading, toast, router.refresh)
+- **GET /api/briefing/latest** — endpoint (auth, latest briefing + settings)
+- **briefing-types.ts** — shared TypeScript types (BriefingJSON, BriefingBlock, BriefingItem), client-safe
+
+### Changed
+- **briefing-analyzer.ts** — типы вынесены в briefing-types.ts, re-export сохранён
+- **design-system.md** — добавлена /briefing в карту страниц (раздел 1.2)
+
+---
+
 ## [3.26.0] - 2026-02-19 - Morning Briefing Backend (ТЗ-BR1)
 
 **MINOR RELEASE**: Backend-система утреннего новостного брифинга. 3 таблицы в БД, 3 фетчера источников (RSS, Telegram, Web), двухэтапный AI-пайплайн (Gemini Flash фильтрация + Gemini Pro анализ), API endpoint и seed-скрипт.

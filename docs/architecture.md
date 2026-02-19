@@ -26,7 +26,7 @@
 │  │  Business Logic (lib/)                               │  │
 │  │  ├── ai/providers.ts   - AI Provider config          │  │
 │  │  ├── ai/tools/         - AI-инструменты              │  │
-│  │  ├── briefing/         - Briefing pipeline (v3.26)   │  │
+│  │  ├── briefing/         - Briefing pipeline + types (v3.27) │
 │  │  ├── prompts/          - Skills + Agents system      │  │
 │  │  ├── db/queries.ts     - Database queries            │  │
 │  │  └── db/schema.ts      - Database schema             │  │
