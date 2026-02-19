@@ -12,6 +12,20 @@
 
 ---
 
+## [3.27.1] - 2026-02-19 - Prompt Integration (ТЗ-BR3)
+
+**PATCH RELEASE**: Интеграция промпта аналитика от PE. Промпт загружается из .md файла, tier источника передаётся аналитику, блок "Главное" рендерится из topicId "top".
+
+### Changed
+- **briefing-analyzer.ts** — промпт загружается из `lib/prompts/briefing/briefing-analyst.md` вместо inline-строки. Tier источника передаётся через Map и отображается в данных кандидатов
+- **route.ts** — собирает `tierMap` (Map<sourceName, tier>) из пользовательских и дефолтных источников
+- **briefing-content.tsx** — блок "Главное" рендерится из `topicId: "top"` (если присутствует), fallback на старую логику для legacy-брифингов
+
+### Added
+- **briefing-analyst.md** — промпт аналитика от PE с style guide, правилами дедупликации, tier-приоритетами и блоком "top"
+
+---
+
 ## [3.27.0] - 2026-02-19 - Briefing UI (ТЗ-BR2)
 
 **MINOR RELEASE**: UI для утреннего брифинга. Карточка на дашборде, полноценная страница /briefing с рендером новостей, генерацией, empty state. GET API endpoint.
