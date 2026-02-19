@@ -1,4 +1,4 @@
-# ADR 016: Архитектура Briefing Backend — Gemini для AI-пайплайна
+# ADR 016: Архитектура Briefing — Gemini-пайплайн + Landing-first UI
 
 **Дата:** 2026-02-19
 **Статус:** Принято
@@ -132,12 +132,36 @@ Web  → @mozilla/readability + jsdom → RawContent[]
 
 ---
 
+## UI-архитектура (v3.28.0 — Landing-first)
+
+До онбординга (ТЗ-А2) у пользователей нет настроек. `/briefing` показывает лендинг — продающую страницу с демо выпуска и CTA на `/briefing/setup`.
+
+**Маршрутизация (текущая):**
+```
+/briefing → всегда лендинг (hero + демо + CTA)
+/briefing/setup → заглушка "Скоро"
+```
+
+**Маршрутизация (после ТЗ-А2):**
+```
+/briefing → роутер:
+  есть выпуск → /briefing/[date]
+  есть настройки, нет выпуска → промежуточное состояние
+  нет настроек → лендинг
+/briefing/setup → онбординг (выбор тем, источников)
+```
+
+**Решение:** JSON-карточки (briefing-content, block, item, empty, generate-button) удалены в v3.28.0. Они рендерили BriefingJSON напрямую — это была временная визуализация для тестирования backend. Финальный UI выпуска будет в ТЗ-А4 (статья-формат, не карточки).
+
+---
+
 ## Файловая структура
 
 ```
 lib/briefing/
 ├── briefing-config.ts          # Константы (лимиты, таймауты, модели)
-├── topics-catalog.ts           # 10 тем × 3-4 источника
+├── briefing-types.ts           # Shared типы (BriefingJSON, BriefingBlock, BriefingItem)
+├── topics-catalog.ts           # 10 тем × 3-4 источника (fallback до ТЗ-А2)
 ├── briefing-filter.ts          # Gemini Flash: фильтрация
 ├── briefing-analyzer.ts        # Gemini Pro: анализ
 └── source-fetchers/
@@ -147,13 +171,24 @@ lib/briefing/
     ├── web-fetcher.ts          # @mozilla/readability + jsdom
     └── index.ts                # fetchSource() dispatcher
 
+components/briefing/
+├── briefing-card.tsx           # Карточка на дашборде (3 состояния)
+├── briefing-page.tsx           # Лендинг (hero + демо + CTA)
+├── briefing-header.tsx         # Header (← Dashboard, заголовок, UserMenu)
+└── index.ts                    # Barrel exports
+
+app/(dashboard)/briefing/
+├── page.tsx                    # /briefing (auth guard → лендинг)
+└── setup/page.tsx              # /briefing/setup (заглушка)
+
 app/(chat)/api/briefing/
-└── generate/route.ts           # POST endpoint
+├── generate/route.ts           # POST endpoint
+└── latest/route.ts             # GET endpoint
 
 lib/db/
 ├── schema.ts                   # +3 таблицы
 ├── queries.ts                  # +7 CRUD queries
-└── seed-briefing.ts            # Seed-скрипт
+└── seed-briefing.ts            # Seed-скрипт (для тестов)
 ```
 
 ---
@@ -170,3 +205,4 @@ lib/db/
 ## История изменений
 
 - **2026-02-19** — ADR создан. Briefing Backend v3.26.0
+- **2026-02-19** — Обновлён: UI-архитектура (landing-first). JSON-карточки удалены, лендинг + заглушка setup. v3.28.0
