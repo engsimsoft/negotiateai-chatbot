@@ -1,5 +1,4 @@
 import type {
-  BriefingBlock as BriefingBlockType,
   BriefingItem as BriefingItemType,
   BriefingJSON,
 } from "@/lib/briefing/briefing-types";
@@ -29,8 +28,12 @@ export function BriefingContent({ briefing }: BriefingContentProps) {
     }
   }
 
-  // 2. Extract high-importance items into "Главное"
-  const highItems: BriefingItemType[] = [];
+  // 2. Check if analyst sent a "top" block (ТЗ-BR3)
+  const topBlock = mergedMap.get("top");
+  const hasTopBlock = topBlock !== undefined && topBlock.items.length > 0;
+
+  // 3. Build highlight and topic blocks
+  let highlightItems: BriefingItemType[] = [];
   const topicBlocks: {
     topicId: string;
     topicName: string;
@@ -38,25 +41,36 @@ export function BriefingContent({ briefing }: BriefingContentProps) {
     items: BriefingItemType[];
   }[] = [];
 
-  for (const [topicId, data] of mergedMap) {
-    const high = data.items.filter((item) => item.importance === "high");
-    const rest = data.items.filter((item) => item.importance !== "high");
+  if (hasTopBlock) {
+    // New path: analyst explicitly grouped "Главное" into topicId "top"
+    highlightItems = topBlock.items;
 
-    highItems.push(...high);
+    for (const [topicId, data] of mergedMap) {
+      if (topicId === "top") continue;
+      topicBlocks.push({ topicId, ...data });
+    }
+  } else {
+    // Fallback: old briefings without "top" — extract high-importance items
+    for (const [topicId, data] of mergedMap) {
+      const high = data.items.filter((item) => item.importance === "high");
+      const rest = data.items.filter((item) => item.importance !== "high");
 
-    if (rest.length > 0) {
-      topicBlocks.push({ topicId, ...data, items: rest });
+      highlightItems.push(...high);
+
+      if (rest.length > 0) {
+        topicBlocks.push({ topicId, ...data, items: rest });
+      }
     }
   }
 
   return (
     <div className="space-y-4">
-      {/* "Главное" block — only if there are high items */}
-      {highItems.length > 0 && (
+      {/* "Главное" block */}
+      {highlightItems.length > 0 && (
         <BriefingBlock
-          emoji="⚡"
+          emoji={hasTopBlock ? topBlock.emoji : "⚡"}
           topicName="Главное"
-          items={highItems}
+          items={highlightItems}
           isHighlight
         />
       )}
