@@ -4,7 +4,8 @@
 > Передавай этот файл вместе с новым ТЗ: `@specs/WORKFLOW.md`
 
 **Связанные документы:**
-- [ROADMAP_GUIDE.md](ROADMAP_GUIDE.md) — как создавать Roadmap с валидацией
+- [ROADMAP_GUIDE.md](ROADMAP_GUIDE.md) — шаблон и правила создания ROADMAP.md (Фаза 2)
+- [DOCUMENTATION_GUIDE.md](../DOCUMENTATION_GUIDE.md) — чеклист обновления документации (Фаза 4)
 
 ---
 
@@ -312,10 +313,11 @@ specs/TZ_XX_Name/
 
 **Триггер:** Есть ответы на вопросы
 **Действия:**
-1. Создать `ROADMAP.md` с этапами
-2. Создать пустой `CHANGELOG.md`
-3. Создать `HANDOFF.md` с начальным статусом
-4. Показать план пользователю
+1. **⛔ Прочитать [ROADMAP_GUIDE.md](ROADMAP_GUIDE.md)** — шаблон и правила создания Roadmap
+2. Создать `ROADMAP.md` **по шаблону из ROADMAP_GUIDE.md** (структура этапов, валидация, критерии)
+3. Создать пустой `CHANGELOG.md`
+4. Создать `HANDOFF.md` с начальным статусом
+5. Показать план пользователю
 
 **Выход:** Пользователь одобрил план
 
@@ -353,6 +355,9 @@ specs/TZ_XX_Name/
 ### Фаза 4: Финализация
 
 **Триггер:** Разработка завершена, тесты пройдены
+
+**⛔ ПЕРВЫМ ДЕЛОМ:** Прочитать [DOCUMENTATION_GUIDE.md](../DOCUMENTATION_GUIDE.md) — это чеклист всех документов, которые нужно обновить. Не полагайся на память — каждый раз перечитывай.
+
 **Действия:**
 
 **1. Проверка БД (Claude делает):**
@@ -376,14 +381,19 @@ WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = 'ИмяТаблиц
 **2. Мануальные тесты (пользователь делает):**
 - Список конкретных тестов из ROADMAP.md
 
-**3. Документация:**
+**3. Документация (по чеклисту [DOCUMENTATION_GUIDE.md](../DOCUMENTATION_GUIDE.md)):**
+- ⛔ **Прочитать DOCUMENTATION_GUIDE.md** — пройти по каждому пункту
 - Перенести `CHANGELOG.md` → главный `CHANGELOG.md`
 - Обновить `SIMPLY_STATUS.md`
 - Обновить `CLAUDE.md`
 - Обновить `package.json` (версия)
+- Обновить `docs/ai-chats-map.md` (если затронуты AI-модели, чаты, провайдеры)
+- Обновить `docs/architecture.md` (если новые модули, таблицы, сервисы)
+- Создать ADR в `docs/decisions/` (если значимое архитектурное решение)
+- Обновить другие docs/ по чеклисту DOCUMENTATION_GUIDE.md
 - Переместить папку: `mv specs/TZ_XX/ _archive/`
 
-**Выход:** БД проверена, тесты пройдены, ТЗ в архиве, документация актуальна
+**Выход:** БД проверена, тесты пройдены, ТЗ в архиве, документация актуальна по DOCUMENTATION_GUIDE.md
 
 ---
 
@@ -395,7 +405,8 @@ WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = 'ИмяТаблиц
 - [ ] Изучены затронутые файлы в кодовой базе
 - [ ] Создан `ANALYSIS.md` с вопросами + код-ревью ТЗ
 - [ ] Получены ответы на вопросы, рекомендации согласованы
-- [ ] Создан `ROADMAP.md`
+- [ ] Прочитан `ROADMAP_GUIDE.md`
+- [ ] Создан `ROADMAP.md` (по шаблону ROADMAP_GUIDE)
 - [ ] Создан `CHANGELOG.md` (пустой)
 - [ ] Создан `HANDOFF.md`
 
@@ -419,10 +430,12 @@ WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = 'ИмяТаблиц
 - [ ] Все этапы ROADMAP выполнены
 - [ ] **Claude:** SQL-проверка БД (таблицы, колонки, FK)
 - [ ] **Пользователь:** Мануальное тестирование пройдено
+- [ ] ⛔ **Прочитан DOCUMENTATION_GUIDE.md** — чеклист документации
 - [ ] `CHANGELOG.md` → главный CHANGELOG
 - [ ] Обновлён `SIMPLY_STATUS.md`
 - [ ] Обновлён `CLAUDE.md`
 - [ ] Обновлён `package.json` (версия)
+- [ ] Обновлены docs/ по чеклисту DOCUMENTATION_GUIDE.md (ai-chats-map, architecture, ADR и др.)
 - [ ] Папка перемещена в `_archive/`
 
 ---
@@ -473,6 +486,6 @@ WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = 'ИмяТаблиц
 
 ---
 
-**Версия:** 1.4
+**Версия:** 1.5
 **Создано:** 2026-02-04
-**Обновлено:** 2026-02-11 — Фаза 1: добавлен Код-ревью ТЗ (Senior Dev Review). Разработчик анализирует ТЗ на совместимость с реальным кодом и предлагает улучшения архитектору.
+**Обновлено:** 2026-02-19 — Фаза 2: явная ссылка на ROADMAP_GUIDE.md как шаблон. Фаза 4: явная ссылка на DOCUMENTATION_GUIDE.md как чеклист (ADR, ai-chats-map, architecture и др.).
