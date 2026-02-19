@@ -34,22 +34,31 @@ export async function POST() {
     // 2. Get user sources (or defaults)
     const userSources = await getBriefingSources({ userId });
 
+    // ТЗ-BR3: Build tierMap alongside sourcesToFetch
+    const tierMap = new Map<string, string>();
+
     const sourcesToFetch =
       userSources.length > 0
-        ? userSources.map((s) => ({
-            fetchMethod: s.fetchMethod as "rss" | "jina" | "telegram_parse",
-            url: s.sourceUrl,
-            rssUrl: s.rssUrl ?? undefined,
-            sourceName: s.sourceName,
-            sourceLanguage: s.sourceLanguage ?? "ru",
-          }))
-        : getDefaultSources().map((d) => ({
-            fetchMethod: d.source.fetchMethod,
-            url: d.source.url,
-            rssUrl: d.source.rss,
-            sourceName: d.source.name,
-            sourceLanguage: d.source.language,
-          }));
+        ? userSources.map((s) => {
+            tierMap.set(s.sourceName, s.tier ?? "unknown");
+            return {
+              fetchMethod: s.fetchMethod as "rss" | "jina" | "telegram_parse",
+              url: s.sourceUrl,
+              rssUrl: s.rssUrl ?? undefined,
+              sourceName: s.sourceName,
+              sourceLanguage: s.sourceLanguage ?? "ru",
+            };
+          })
+        : getDefaultSources().map((d) => {
+            tierMap.set(d.source.name, d.source.tier);
+            return {
+              fetchMethod: d.source.fetchMethod,
+              url: d.source.url,
+              rssUrl: d.source.rss,
+              sourceName: d.source.name,
+              sourceLanguage: d.source.language,
+            };
+          });
 
     // 3. Create initial history record (status: generating)
     const historyRecord = await saveBriefingHistory({
@@ -112,6 +121,7 @@ export async function POST() {
     const { briefing, tokensUsed: analyzerTokens } = await analyzeContent({
       candidates,
       fullTexts: fullTextsMap,
+      tierMap,
       language,
       maxItems,
       totalSourcesChecked: sourcesToFetch.length,

@@ -1,12 +1,14 @@
 // ТЗ-BR1: Stage 2 — Analyze & group using Gemini 3 Pro
+// ТЗ-BR3: Load prompt from .md file, pass tier data
 
+import fs from "fs";
+import path from "path";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
 import {
   ANALYZER_MODEL,
   ANALYZER_MODEL_FALLBACK,
-  MAX_BRIEFING_ITEMS,
 } from "./briefing-config";
 import type { FilteredItem } from "./briefing-filter";
 import type { RawContent } from "./source-fetchers/types";
@@ -14,6 +16,10 @@ import type { BriefingJSON } from "./briefing-types";
 import { TOPICS_CATALOG } from "./topics-catalog";
 
 export type { BriefingItem, BriefingBlock, BriefingJSON } from "./briefing-types";
+
+// Load prompt template from .md file (once at module init)
+const PROMPT_PATH = path.join(process.cwd(), "lib", "prompts", "briefing", "briefing-analyst.md");
+const PROMPT_TEMPLATE = fs.readFileSync(PROMPT_PATH, "utf-8");
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
@@ -49,6 +55,8 @@ interface AnalyzerInput {
   candidates: FilteredItem[];
   /** Full texts for candidates that have them */
   fullTexts: Map<string, RawContent>;
+  /** Source name → tier mapping */
+  tierMap: Map<string, string>;
   language: string;
   maxItems: number;
   totalSourcesChecked: number;
@@ -60,12 +68,12 @@ interface AnalyzerInput {
  * - Writes summaries as "why it matters", not "what happened"
  * - Groups by topic
  * - Translates to user language
- * - "Key stories" (importance: high) go first
+ * - "Key stories" (importance: high) go into topicId "top" block
  */
 export async function analyzeContent(
   input: AnalyzerInput,
 ): Promise<{ briefing: BriefingJSON; tokensUsed: number }> {
-  const { candidates, fullTexts, language, maxItems, totalSourcesChecked } =
+  const { candidates, fullTexts, tierMap, language, maxItems, totalSourcesChecked } =
     input;
 
   if (candidates.length === 0) {
@@ -85,12 +93,14 @@ export async function analyzeContent(
     .map(([id, t]) => `${id}: ${t.emoji} ${t.name}`)
     .join("\n");
 
-  // Build candidates text with full content where available
+  // Build candidates text with full content and tier where available
   const candidatesText = candidates
     .map((c, i) => {
       const full = fullTexts.get(c.url);
       const content = full ? full.content : "";
-      return `[${i + 1}] ${c.sourceName}
+      const tier = tierMap.get(c.sourceName) ?? "unknown";
+      const lang = full?.sourceLanguage ?? "unknown";
+      return `[${i + 1}] ${c.sourceName} (${lang}) [Tier: ${tier}]
 Topic: ${c.topicId}
 Title: ${c.title}
 URL: ${c.url}
@@ -101,6 +111,10 @@ ${content ? `Content: ${content}` : ""}`;
 
   const today = new Date().toISOString().split("T")[0];
 
+  const systemPrompt = buildAnalyzerPrompt(
+    language, maxItems, topicRef, today, totalSourcesChecked, candidates.length,
+  );
+
   let object: BriefingJSON;
   let tokensUsed = 0;
 
@@ -108,7 +122,7 @@ ${content ? `Content: ${content}` : ""}`;
     const result = await generateObject({
       model: google(ANALYZER_MODEL),
       schema: briefingJsonSchema,
-      system: buildAnalyzerPrompt(language, maxItems, topicRef, today, totalSourcesChecked, candidates.length),
+      system: systemPrompt,
       prompt: candidatesText,
     });
     object = result.object;
@@ -122,7 +136,7 @@ ${content ? `Content: ${content}` : ""}`;
     const result = await generateObject({
       model: google(ANALYZER_MODEL_FALLBACK),
       schema: briefingJsonSchema,
-      system: buildAnalyzerPrompt(language, maxItems, topicRef, today, totalSourcesChecked, candidates.length),
+      system: systemPrompt,
       prompt: candidatesText,
     });
     object = result.object;
@@ -140,23 +154,11 @@ function buildAnalyzerPrompt(
   totalSourcesChecked: number,
   totalCandidates: number,
 ): string {
-  return `You are an expert news analyst and editor for a morning briefing.
-Your role: select the most important and interesting news, then write analytical summaries.
-
-OUTPUT LANGUAGE: ${language === "ru" ? "Russian" : language}
-
-Topic categories:
-${topicRef}
-
-Rules:
-1. From the candidates, select the ${maxItems} most important and interesting items
-2. Write summary as a smart colleague would: "why this matters" and "what it means", NOT just "what happened"
-3. Group items by topic (topicId). Use emoji and topicName from the reference above
-4. If a source is in a different language than the output language, translate the title and summary
-5. Mark 2-3 items as importance "high" — these are the day's key stories
-6. The "high" importance block should appear first in the output
-7. Keep summaries to 1-2 sentences maximum
-8. Set date to "${today}", totalSourcesChecked to ${totalSourcesChecked}, totalCandidates to ${totalCandidates}
-
-Output a valid JSON matching the schema.`;
+  return PROMPT_TEMPLATE
+    .replace(/\{\{LANGUAGE\}\}/g, language === "ru" ? "Russian" : language)
+    .replace(/\{\{MAX_ITEMS\}\}/g, String(maxItems))
+    .replace(/\{\{TOPIC_REFERENCE\}\}/g, topicRef)
+    .replace(/\{\{DATE\}\}/g, today)
+    .replace(/\{\{TOTAL_SOURCES_CHECKED\}\}/g, String(totalSourcesChecked))
+    .replace(/\{\{TOTAL_CANDIDATES\}\}/g, String(totalCandidates));
 }
