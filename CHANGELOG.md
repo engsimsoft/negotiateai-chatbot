@@ -12,6 +12,28 @@
 
 ---
 
+## [3.35.0] - 2026-02-21 - Jina Reader API + Cascading Fallback (ТЗ-WS2)
+
+**MINOR RELEASE**: Jina Reader API как каскадный fallback в fetchPage(). Если Readability возвращает <5000 символов — автоматически подключается Jina Reader (headless Chrome). Покрытие русскоязычных источников: ~40-50% → ~70-80%.
+
+### Added
+- **Jina Reader API** — `lib/ai/tools/jina-reader.ts`, headless Chrome на стороне Jina для JS-heavy страниц и SPA
+- **Source tracking** — `FetchPageResult.source: 'readability' | 'semantic' | 'jina'` для отладки и метрик
+- **`forceJina` option** — пропустить Readability и сразу использовать Jina (для briefing источников с `fetchMethod: "jina"`)
+- **`JINA_READER_TIMEOUT`** — константа в briefing-config.ts (10s)
+
+### Changed
+- **fetchPage() refactored** — позиционные параметры заменены на `FetchPageOptions` object (breaking change для internal callers, обновлены)
+- **Cascade logic** — Readability (8s) → semantic → Jina (10s) → graceful degradation
+- **MIN_CONTENT_LENGTH** — поднят с 200 до 5000 для агрессивного fallback на Jina (user satisfaction > cost)
+- **fetchUrl tool timeout** — увеличен с 20s до 30s для бюджета каскада
+- **Briefing dispatcher** — `case "jina"` теперь использует реальный Jina Reader API через `forceJina: true` (ранее был placeholder)
+
+### Fixed
+- JS-heavy сайты (vc.ru, f1-world.ru) теперь корректно извлекают контент через Jina Reader
+
+---
+
 ## [3.34.0] - 2026-02-21 - Charset Detection + Web Fetcher Unification (ТЗ-WS1)
 
 **MINOR RELEASE**: fetchPage() теперь корректно читает windows-1251, koi8-r и другие не-UTF-8 кодировки. Дублирование логики между fetch-page.ts и web-fetcher.ts устранено.

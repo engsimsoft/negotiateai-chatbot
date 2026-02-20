@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.34.0
+**Версия:** 3.35.0
 **Дата:** 2026-02-21
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -53,7 +53,7 @@
 - ✅ Anthropic Claude (Sonnet / Haiku / Opus) через @ai-sdk/anthropic
 - ✅ Web Search (Brave API)
 - ✅ Deep Research (Perplexity Sonar API — Pro/Deep)
-- ✅ Fetch URL (Readability + JSDOM + charset detection: windows-1251, koi8-r)
+- ✅ Fetch URL (Readability + JSDOM + charset detection + Jina Reader API fallback)
 - ✅ Weather (Open-Meteo)
 - ✅ Get Current Date
 

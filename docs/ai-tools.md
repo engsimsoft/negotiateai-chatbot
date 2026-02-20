@@ -1,8 +1,8 @@
 # Инструменты AI-агентов
 
-**Версия:** 3.34.0
+**Версия:** 3.35.0
 **Последнее обновление:** 2026-02-21
-**Статус:** 13 инструментов (deepResearch + fetchUrl добавлены в v3.29.0, charset detection в v3.34.0)
+**Статус:** 13 инструментов (deepResearch + fetchUrl добавлены в v3.29.0, Jina Reader fallback в v3.35.0)
 
 ---
 
@@ -22,7 +22,7 @@
 |------------|----------|--------|
 | `webSearch` | Поиск в интернете (Brave API) | Все агенты (кроме chat) |
 | `deepResearch` | Глубокое исследование (Perplexity Sonar API) | Все агенты (кроме chat) |
-| `fetchUrl` | Чтение веб-страниц по URL (Readability) | Все агенты (кроме chat) |
+| `fetchUrl` | Чтение веб-страниц по URL (Readability + Jina Reader fallback) | Все агенты (кроме chat) |
 | `getWeather` | Погода по городу | Все агенты |
 | `getCurrentDate` | Текущая дата | Все агенты |
 | `readDocument` | Чтение из knowledge/ | Только обычные чаты |
@@ -137,7 +137,7 @@ Factory-pattern — `deepResearch({ defaultDepth })` возвращает tool �
 
 ## Fetch URL
 
-Чтение веб-страниц по URL через Readability + JSDOM. Добавлен в v3.29.0 (ТЗ-FU). Charset detection добавлен в v3.34.0 (ТЗ-WS1).
+Чтение веб-страниц по URL через каскад Readability → Jina Reader API. Добавлен в v3.29.0 (ТЗ-FU). Charset detection в v3.34.0 (ТЗ-WS1). Jina Reader fallback в v3.35.0 (ТЗ-WS2).
 
 ### Доступность
 
@@ -149,11 +149,13 @@ Factory-pattern — `deepResearch({ defaultDepth })` возвращает tool �
 | Проектный чат | Да |
 
 ### Возможности
-- Извлечение текста из веб-страниц (@mozilla/readability + jsdom)
+- **Каскад извлечения**: Readability (8s) → semantic fallback → Jina Reader API (10s) → graceful degradation
+- **Jina Reader API** — headless Chrome на стороне Jina, рендерит JS, обрабатывает SPA и сложные layouts
 - **Charset detection** — windows-1251, koi8-r, ISO-8859-5 и другие кодировки (chardet + iconv-lite)
+- **Source tracking** — `source: 'readability' | 'semantic' | 'jina'` для отладки
 - Автоматическая обрезка по `maxLength`
-- Improved fallback: JSDOM `querySelectorAll('p, h1-h6, li')` при неудаче Readability
-- Timeout 15 сек на fetch
+- Timeout 30 сек (бюджет каскада: 8s Readability + 10s Jina)
+- **forceJina** — опция для пропуска Readability (используется в briefing dispatcher)
 
 ### Параметры
 
@@ -172,17 +174,28 @@ fetchUrl({
   title: string | null,
   content: string,
   originalLength: number,
+  source: 'readability' | 'semantic' | 'jina',
   truncated: boolean,
 }
 ```
 
 ### Архитектура
 
-Shared utility `fetch-page.ts` — единый entry point для извлечения веб-контента. Используется в `fetchUrl` tool и briefing `web-fetcher.ts`. Charset detection pipeline: HTTP Content-Type header → `<meta charset>` regex → chardet auto-detection → UTF-8 fallback.
+Shared utility `fetch-page.ts` — единый entry point для извлечения веб-контента. Используется в `fetchUrl` tool и briefing `web-fetcher.ts`.
+
+**Каскад (v3.35.0):**
+1. `forceJina?` → сразу Jina Reader → return
+2. Readability (8s timeout) → если content ≥ 5000 chars → return (source: 'readability')
+3. Semantic fallback (JSDOM DOM API) → если content ≥ 5000 chars → return (source: 'semantic')
+4. Jina Reader API (10s timeout) → если контент есть → return (source: 'jina')
+5. Graceful degradation: вернуть лучшее что есть
+
+**Charset detection:** HTTP Content-Type header → `<meta charset>` regex → chardet auto-detection → UTF-8 fallback.
 
 ### Файл
 - [lib/ai/tools/fetch-url.ts](../lib/ai/tools/fetch-url.ts) — tool definition
-- [lib/ai/tools/fetch-page.ts](../lib/ai/tools/fetch-page.ts) — shared utility
+- [lib/ai/tools/fetch-page.ts](../lib/ai/tools/fetch-page.ts) — shared utility (cascade + charset)
+- [lib/ai/tools/jina-reader.ts](../lib/ai/tools/jina-reader.ts) — Jina Reader API utility
 
 ### Пример использования
 ```
