@@ -6,7 +6,13 @@ import {
   getBriefingHistory,
 } from "@/lib/db/queries";
 import { BriefingPage } from "@/components/briefing/briefing-page";
-import { BriefingActivePage } from "@/components/briefing/briefing-active-page";
+import { BriefingIssueHeader } from "@/components/briefing/briefing-issue-header";
+import { BriefingPlayerPlaceholder } from "@/components/briefing/briefing-player-placeholder";
+import {
+  BriefingArticleView,
+  NoBriefingsYet,
+} from "@/components/briefing/briefing-article-view";
+import type { BriefingArticle } from "@/lib/briefing/briefing-types";
 
 export default async function BriefingRoute() {
   const session = await auth();
@@ -26,5 +32,30 @@ export default async function BriefingRoute() {
   const historyRows = await getBriefingHistory({ userId, limit: 1 });
   const latestBriefing = historyRows.find((h) => h.status === "ready") ?? null;
 
-  return <BriefingActivePage briefing={latestBriefing} />;
+  // ТЗ-А4: parse article, guard against old format
+  const article = latestBriefing
+    ? (latestBriefing.briefingJson as unknown as BriefingArticle)
+    : null;
+  const hasValidArticle = article?.sections && article.sections.length > 0;
+
+  return (
+    <div className="flex min-h-svh flex-col bg-muted/30">
+      <BriefingIssueHeader
+        title={hasValidArticle ? article.title : "☀️ Утренний брифинг"}
+      />
+
+      {hasValidArticle ? (
+        <>
+          <BriefingPlayerPlaceholder />
+          <main className="flex-1">
+            <BriefingArticleView article={article} />
+          </main>
+        </>
+      ) : (
+        <main className="flex-1">
+          <NoBriefingsYet />
+        </main>
+      )}
+    </div>
+  );
 }
