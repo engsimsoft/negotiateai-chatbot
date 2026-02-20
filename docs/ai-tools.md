@@ -1,8 +1,8 @@
 # Инструменты AI-агентов
 
-**Версия:** 3.29.0
-**Последнее обновление:** 2026-02-20
-**Статус:** 13 инструментов (deepResearch + fetchUrl добавлены в v3.29.0)
+**Версия:** 3.34.0
+**Последнее обновление:** 2026-02-21
+**Статус:** 13 инструментов (deepResearch + fetchUrl добавлены в v3.29.0, charset detection в v3.34.0)
 
 ---
 
@@ -137,7 +137,7 @@ Factory-pattern — `deepResearch({ defaultDepth })` возвращает tool �
 
 ## Fetch URL
 
-Чтение веб-страниц по URL через Readability + JSDOM. Добавлен в v3.29.0 (ТЗ-FU).
+Чтение веб-страниц по URL через Readability + JSDOM. Добавлен в v3.29.0 (ТЗ-FU). Charset detection добавлен в v3.34.0 (ТЗ-WS1).
 
 ### Доступность
 
@@ -150,8 +150,9 @@ Factory-pattern — `deepResearch({ defaultDepth })` возвращает tool �
 
 ### Возможности
 - Извлечение текста из веб-страниц (@mozilla/readability + jsdom)
+- **Charset detection** — windows-1251, koi8-r, ISO-8859-5 и другие кодировки (chardet + iconv-lite)
 - Автоматическая обрезка по `maxLength`
-- Fallback на HTML body если Readability не справляется
+- Improved fallback: JSDOM `querySelectorAll('p, h1-h6, li')` при неудаче Readability
 - Timeout 15 сек на fetch
 
 ### Параметры
@@ -177,7 +178,7 @@ fetchUrl({
 
 ### Архитектура
 
-Shared utility `fetch-page.ts` переиспользует логику из briefing `web-fetcher.ts`. Используется как tool `fetchUrl` и может быть повторно использован в других контекстах.
+Shared utility `fetch-page.ts` — единый entry point для извлечения веб-контента. Используется в `fetchUrl` tool и briefing `web-fetcher.ts`. Charset detection pipeline: HTTP Content-Type header → `<meta charset>` regex → chardet auto-detection → UTF-8 fallback.
 
 ### Файл
 - [lib/ai/tools/fetch-url.ts](../lib/ai/tools/fetch-url.ts) — tool definition
@@ -865,4 +866,4 @@ const CHAT_MODE_EXCLUDED_TOOLS = ["fetchUrl", "deepResearch"];
 
 ---
 
-**Обновлено:** 2026-02-20 (v3.29.0 — deepResearch + fetchUrl, chatMode-фильтрация)
+**Обновлено:** 2026-02-21 (v3.34.0 — charset detection в fetchPage, web-fetcher unification)

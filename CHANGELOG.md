@@ -12,6 +12,24 @@
 
 ---
 
+## [3.34.0] - 2026-02-21 - Charset Detection + Web Fetcher Unification (ТЗ-WS1)
+
+**MINOR RELEASE**: fetchPage() теперь корректно читает windows-1251, koi8-r и другие не-UTF-8 кодировки. Дублирование логики между fetch-page.ts и web-fetcher.ts устранено.
+
+### Added
+- **Charset detection pipeline** — определение кодировки: HTTP Content-Type → meta charset → chardet auto-detection → UTF-8 fallback
+- **chardet + iconv-lite** — новые зависимости для определения и конвертации кодировок
+
+### Changed
+- **fetch-page.ts** — `response.text()` заменён на `Buffer.from(response.arrayBuffer())` + charset detection + iconv decode
+- **Improved fallback** — при неудаче Readability или результате <200 символов: JSDOM `querySelectorAll('p, h1-h6, li')` вместо regex strip-all-tags
+- **web-fetcher.ts** — убрана дублирующая Readability + JSDOM логика, заменена на вызов shared `fetchPage()` (-42 строки, +14 строк)
+
+### Fixed
+- Русскоязычные сайты на windows-1251/koi8-r теперь возвращают читаемый текст вместо кракозябр
+
+---
+
 ## [3.33.1] - 2026-02-20 - Briefing PE Update (ТЗ-HF1)
 
 **PATCH RELEASE**: Обновление промптов онбординга (v6) и автора (v3), добавление briefingStyle для персонализации секций брифинга, увеличение maxSteps, исправление бага с историей в сайдбаре.
