@@ -6,10 +6,7 @@ import {
   getBriefingHistory,
 } from "@/lib/db/queries";
 import { BriefingPage } from "@/components/briefing/briefing-page";
-import { BriefingIssueHeader } from "@/components/briefing/briefing-issue-header";
-import { NoBriefingsYet } from "@/components/briefing/briefing-article-view";
-import { BriefingSidebarMobile } from "@/components/briefing/briefing-sidebar";
-import { BriefingIssueContent } from "@/components/briefing/briefing-issue-content";
+import { BriefingPageClient } from "@/components/briefing/briefing-page-client";
 import type { BriefingArticle } from "@/lib/briefing/briefing-types";
 import type { BriefingHistoryItem } from "@/components/briefing/briefing-sidebar";
 
@@ -55,7 +52,7 @@ export default async function BriefingRoute() {
   const article = latestBriefing
     ? (latestBriefing.briefingJson as unknown as BriefingArticle)
     : null;
-  const hasValidArticle = article?.sections && article.sections.length > 0;
+  const hasValidArticle = !!(article?.sections && article.sections.length > 0);
 
   // Prepare history items for sidebar (deduplicate by date — multiple per day possible)
   const seenDates = new Set<string>();
@@ -68,35 +65,13 @@ export default async function BriefingRoute() {
   }
   const currentDate = historyItems[0]?.date;
 
-  // Sidebar props (shared between desktop and mobile)
-  const sidebarProps = {
-    sections: hasValidArticle ? article.sections : [],
-    history: historyItems.slice(1), // exclude current issue
-    currentDate,
-  };
-
+  // ТЗ-А5: delegate rendering to client wrapper for generation state management
   return (
-    <div className="flex min-h-svh flex-col bg-muted/30">
-      <BriefingIssueHeader
-        title={hasValidArticle ? article.title : "☀️ Утренний брифинг"}
-        mobileTrigger={
-          hasValidArticle ? (
-            <BriefingSidebarMobile {...sidebarProps} />
-          ) : undefined
-        }
-      />
-
-      {hasValidArticle ? (
-        <BriefingIssueContent
-          article={article}
-          history={historyItems.slice(1)}
-          currentDate={currentDate}
-        />
-      ) : (
-        <main className="flex-1">
-          <NoBriefingsYet />
-        </main>
-      )}
-    </div>
+    <BriefingPageClient
+      article={article}
+      hasValidArticle={hasValidArticle}
+      historyItems={historyItems}
+      currentDate={currentDate}
+    />
   );
 }

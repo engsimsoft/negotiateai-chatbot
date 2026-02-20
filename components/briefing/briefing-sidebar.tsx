@@ -2,11 +2,9 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Settings,
   RefreshCw,
-  Loader2,
   Menu,
   BookOpen,
 } from "lucide-react";
@@ -37,6 +35,8 @@ interface BriefingSidebarProps {
   currentDate?: string;
   /** Active section id from scroll spy (Этап 3) */
   activeSectionId?: string | null;
+  /** ТЗ-А5: Callback to trigger generation (handled by parent) */
+  onGenerate?: () => void;
 }
 
 /**
@@ -48,6 +48,7 @@ export function BriefingSidebar({
   history,
   currentDate,
   activeSectionId,
+  onGenerate,
 }: BriefingSidebarProps) {
   return (
     <div className="flex h-full flex-col">
@@ -56,6 +57,7 @@ export function BriefingSidebar({
         history={history}
         currentDate={currentDate}
         activeSectionId={activeSectionId}
+        onGenerate={onGenerate}
       />
     </div>
   );
@@ -69,6 +71,7 @@ export function BriefingSidebarMobile({
   history,
   currentDate,
   activeSectionId,
+  onGenerate,
 }: BriefingSidebarProps) {
   const [open, setOpen] = useState(false);
 
@@ -100,6 +103,7 @@ export function BriefingSidebarMobile({
               currentDate={currentDate}
               activeSectionId={activeSectionId}
               onNavigate={() => setOpen(false)}
+              onGenerate={onGenerate}
             />
           </div>
         </SheetContent>
@@ -116,10 +120,8 @@ function SidebarContent({
   currentDate,
   activeSectionId,
   onNavigate,
+  onGenerate,
 }: BriefingSidebarProps & { onNavigate?: () => void }) {
-  const router = useRouter();
-  const [isGenerating, setIsGenerating] = useState(false);
-
   const handleScrollTo = useCallback(
     (id: string) => {
       const el = document.getElementById(id);
@@ -135,18 +137,6 @@ function SidebarContent({
     window.scrollTo({ top: 0, behavior: "smooth" });
     onNavigate?.();
   }, [onNavigate]);
-
-  const handleGenerate = useCallback(async () => {
-    if (isGenerating) return;
-    setIsGenerating(true);
-    try {
-      const res = await fetch("/api/briefing/generate", { method: "POST" });
-      if (!res.ok) throw new Error("Failed to generate");
-      router.refresh();
-    } catch {
-      setIsGenerating(false);
-    }
-  }, [isGenerating, router]);
 
   return (
     <>
@@ -209,16 +199,11 @@ function SidebarContent({
       <div className="shrink-0 border-t px-3 py-3 space-y-1">
         <button
           type="button"
-          onClick={handleGenerate}
-          disabled={isGenerating}
-          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60 disabled:opacity-50"
+          onClick={onGenerate}
+          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
         >
-          {isGenerating ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <RefreshCw className="size-4 text-muted-foreground" />
-          )}
-          <span>{isGenerating ? "Генерация..." : "Сгенерировать"}</span>
+          <RefreshCw className="size-4 text-muted-foreground" />
+          <span>Сгенерировать</span>
         </button>
 
         <Link

@@ -14,11 +14,13 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { generateUUID } from "@/lib/utils";
+import { useBriefingGeneration } from "@/hooks/use-briefing-generation";
+import { BriefingGenerationProgress } from "@/components/briefing/briefing-generation-progress";
 import {
   BriefingProfilePreview,
   type BriefingProfile,
@@ -117,7 +119,9 @@ export function BriefingSetupClient({
   const [input, setInput] = useState("");
   const [error, setError] = useState<Error | null>(null);
   const [isSaved, setIsSaved] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+
+  // ТЗ-А5: streaming generation progress
+  const generation = useBriefingGeneration();
 
   // Briefing profile state for live preview (edit mode: pre-loaded from DB)
   const [preview, setPreview] = useState<BriefingProfile>(
@@ -220,31 +224,31 @@ export function BriefingSetupClient({
     setInput("");
   }, [input, isLoading, sendMessage]);
 
-  // Handle generate first briefing
-  const handleGenerate = useCallback(async () => {
-    if (isGenerating) return;
+  // ТЗ-А5: auto-navigate on generation complete
+  useEffect(() => {
+    if (!generation.redirectUrl) return;
+    const timer = setTimeout(() => {
+      router.push(generation.redirectUrl!);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [generation.redirectUrl, router]);
 
-    setIsGenerating(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/briefing/generate", {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate briefing");
-      }
-
-      router.push("/briefing");
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error("Unknown error"));
-      setIsGenerating(false);
-    }
-  }, [isGenerating, router]);
-
-  // Success card after save
+  // Success card after save — show progress or card
   if (isSaved) {
+    // Show progress when generating
+    if (generation.isGenerating || generation.steps.length > 0) {
+      return (
+        <div className="flex min-h-dvh flex-col items-center justify-center bg-background p-4">
+          <BriefingGenerationProgress
+            steps={generation.steps}
+            isGenerating={generation.isGenerating}
+            error={generation.error}
+            onRetry={generation.startGeneration}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center bg-background p-4">
         <motion.div
@@ -254,7 +258,7 @@ export function BriefingSetupClient({
           className="w-full max-w-md rounded-xl border bg-card p-6 shadow-lg"
         >
           <div className="mb-4 text-center">
-            <div className="mb-2 text-4xl">☀️</div>
+            <div className="mb-2 text-4xl">{"\u{2600}\u{FE0F}"}</div>
             <h2 className="text-xl font-semibold">Брифинг настроен!</h2>
           </div>
 
@@ -272,17 +276,9 @@ export function BriefingSetupClient({
           <div className="flex flex-col gap-2">
             <Button
               className="w-full"
-              onClick={handleGenerate}
-              disabled={isGenerating}
+              onClick={generation.startGeneration}
             >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Генерация...
-                </>
-              ) : (
-                "☀️ Сгенерировать первый брифинг"
-              )}
+              {"\u{2600}\u{FE0F}"} Сгенерировать первый брифинг
             </Button>
             <Button
               className="w-full"

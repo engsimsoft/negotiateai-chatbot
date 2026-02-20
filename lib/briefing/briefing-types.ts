@@ -35,3 +35,22 @@ export interface BriefingArticle {
   outro: string;
   meta: BriefingArticleMeta;
 }
+
+// ТЗ-А5: Streaming progress events (client-safe)
+
+export type BriefingProgressStep =
+  | "connecting"
+  | "fetching"
+  | "filtering"
+  | "writing"
+  | "complete"
+  | "error";
+
+/** Event emitted by /api/briefing/generate streaming response */
+export interface BriefingProgressEvent {
+  step: BriefingProgressStep;
+  message: string;
+  done?: boolean;
+  detail?: string;
+  redirectUrl?: string;
+}

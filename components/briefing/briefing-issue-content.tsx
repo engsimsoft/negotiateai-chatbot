@@ -11,6 +11,8 @@ interface BriefingIssueContentProps {
   article: BriefingArticle;
   history: BriefingHistoryItem[];
   currentDate?: string;
+  /** ТЗ-А5: Callback to trigger generation (handled by parent) */
+  onGenerate?: () => void;
 }
 
 /**
@@ -21,6 +23,7 @@ export function BriefingIssueContent({
   article,
   history,
   currentDate,
+  onGenerate,
 }: BriefingIssueContentProps) {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
 
@@ -35,6 +38,7 @@ export function BriefingIssueContent({
             history={history}
             currentDate={currentDate}
             activeSectionId={activeSectionId}
+            onGenerate={onGenerate}
           />
         </aside>
         <main className="min-w-0 flex-1">

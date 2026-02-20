@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronDown, ArrowRight, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ChevronDown, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -154,27 +153,13 @@ function CollapsibleSources({
 
 interface NoBriefingsYetProps {
   className?: string;
+  onGenerate?: () => void;
 }
 
-export function NoBriefingsYet({ className }: NoBriefingsYetProps) {
-  const router = useRouter();
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  const handleGenerate = useCallback(async () => {
-    if (isGenerating) return;
-    setIsGenerating(true);
-    try {
-      const res = await fetch("/api/briefing/generate", { method: "POST" });
-      if (!res.ok) throw new Error("Failed to generate");
-      router.refresh();
-    } catch {
-      setIsGenerating(false);
-    }
-  }, [isGenerating, router]);
-
+export function NoBriefingsYet({ className, onGenerate }: NoBriefingsYetProps) {
   return (
     <div className={`py-16 text-center ${className ?? ""}`}>
-      <span className="mb-4 inline-block text-5xl">☀️</span>
+      <span className="mb-4 inline-block text-5xl">{"\u{2600}\u{FE0F}"}</span>
       <h2 className="mb-3 font-serif text-xl font-semibold">
         Выпусков пока нет
       </h2>
@@ -182,18 +167,9 @@ export function NoBriefingsYet({ className }: NoBriefingsYetProps) {
         Ваш профиль настроен. Сгенерируйте первый брифинг или дождитесь
         утреннего выпуска.
       </p>
-      <Button className="gap-2" onClick={handleGenerate} disabled={isGenerating}>
-        {isGenerating ? (
-          <>
-            <Loader2 className="size-4 animate-spin" />
-            Генерация...
-          </>
-        ) : (
-          <>
-            Сгенерировать сейчас
-            <ArrowRight className="size-4" />
-          </>
-        )}
+      <Button className="gap-2" onClick={onGenerate}>
+        Сгенерировать сейчас
+        <ArrowRight className="size-4" />
       </Button>
     </div>
   );
