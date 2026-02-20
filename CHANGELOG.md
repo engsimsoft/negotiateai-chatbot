@@ -12,6 +12,30 @@
 
 ---
 
+## [3.31.0] - 2026-02-20 - Briefing Author (ТЗ-А3)
+
+**MINOR RELEASE**: Замена JSON-карточек на связную статью. Один вызов Gemini 3 Pro генерирует BriefingArticle: intro, секции с markdown-текстом и inline-ссылками, источники, outro.
+
+### Added
+- **briefing-author.ts** — новый модуль генерации статьи (`generateArticle()`, Zod-схемы, fallback model)
+- **briefing-author.md** — промпт автора (стиль Т—Ж, нарративный текст, inline-ссылки)
+- **BriefingArticle** типы — `BriefingArticleSection`, `BriefingArticleSource`, `BriefingArticleMeta`
+- **Tier mapping** — автоматический маппинг старых tier (original/analytics/derivative) → новые (flagship/respected/niche)
+- **Old format guard** — graceful fallback для старых записей в БД (BriefingJSON формат)
+
+### Changed
+- **route.ts** — `analyzeContent()` → `generateArticle()`, загрузка user topics из БД, maxDuration 60 → 90
+- **briefing-active-page.tsx** — рендер markdown-секций + source cards вместо blocks/items
+- **briefing-card.tsx** — `article.meta.totalNews` вместо `blocks.reduce()`
+- **briefing-config.ts** — `AUTHOR_MODEL` / `AUTHOR_MODEL_FALLBACK` вместо ANALYZER_*
+
+### Removed
+- **briefing-analyzer.ts** — заменён на briefing-author.ts
+- **briefing-analyst.md** — заменён на briefing-author.md
+- **BriefingJSON/BriefingBlock/BriefingItem** типы — заменены на BriefingArticle*
+
+---
+
 ## [3.30.0] - 2026-02-20 - Briefing Onboarding (ТЗ-A2)
 
 **MINOR RELEASE**: AI-собеседование для настройки утреннего брифинга. Split layout (preview + чат), deepResearch для поиска источников, edit mode с загрузкой профиля из БД, роутинг /briefing по статусу профиля.

@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.30.0
+**Версия:** 3.31.0
 **Дата:** 2026-02-20
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -374,7 +374,7 @@ components/projects/
 - **briefing-types.ts** — shared TypeScript types (client-safe)
 
 **Ключевые файлы:**
-- `lib/briefing/briefing-types.ts` — shared types (BriefingJSON, BriefingBlock, BriefingItem)
+- `lib/briefing/briefing-types.ts` — shared types (BriefingArticle, BriefingArticleSection, BriefingArticleSource, BriefingArticleMeta)
 - `components/briefing/briefing-card.tsx` — карточка на дашборде
 - `components/glavnaya/tools-section.tsx` — секция "Инструменты" на дашборде
 - `app/(chat)/api/briefing/latest/route.ts` — GET API
@@ -399,7 +399,7 @@ components/projects/
 - `lib/briefing/topics-catalog.ts` — каталог тем с RSS
 - `lib/briefing/source-fetchers/` — 5 файлов (types, rss, telegram, web, index)
 - `lib/briefing/briefing-filter.ts` — AI фильтр (Gemini Flash)
-- `lib/briefing/briefing-analyzer.ts` — AI анализатор (Gemini Pro)
+- `lib/briefing/briefing-author.ts` — AI автор статьи (Gemini 3 Pro, generateArticle → BriefingArticle)
 - `app/(chat)/api/briefing/generate/route.ts` — API endpoint
 - `lib/db/seed-briefing.ts` — seed-скрипт
 

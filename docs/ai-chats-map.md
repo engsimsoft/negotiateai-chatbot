@@ -337,29 +337,30 @@ app/(chat)/api/service-chat/route.ts                        # API (context: brie
 | **Вход** | ~200 RawContent[] из 3 фетчеров (RSS, Telegram, Web) |
 | **Выход** | ~30 FilteredItem[] (дедуплицированные, с оценкой релевантности) |
 
-**Этап 2 — Анализатор:**
+**Этап 2 — Автор (v3.31.0):**
 
 | Параметр | Значение |
 |----------|----------|
 | **Модель** | Gemini 3 Pro (`gemini-3-pro-preview`) |
 | **Тип** | Backend (внутренний вызов в generate/route.ts) |
-| **Вход** | ~30 FilteredItem[] |
-| **Выход** | BriefingJSON (новости сгруппированные по темам, с impact, sentiment, links) |
+| **Вход** | ~30 FilteredItem[] + userTopics + settings |
+| **Выход** | BriefingArticle (связная статья с markdown-секциями, inline-ссылками, источниками) |
 
 **Полный flow:**
 1. Endpoint получает POST с auth
-2. Загружает настройки и источники пользователя из БД
+2. Загружает настройки, темы и источники пользователя из БД
 3. Параллельный fetch всех источников → RawContent[]
 4. Gemini Flash: фильтрация, дедупликация → FilteredItem[]
-5. Gemini Pro: анализ, группировка → BriefingJSON
+5. Gemini Pro: генерация статьи → BriefingArticle (intro, sections, sources, outro, meta)
 6. Сохранение в BriefingHistory
 
 **Файлы:**
 ```
 app/(chat)/api/briefing/generate/route.ts    # POST endpoint (auth, orchestration)
 lib/briefing/briefing-filter.ts              # Gemini Flash: filterAndDeduplicate()
-lib/briefing/briefing-analyzer.ts            # Gemini Pro: analyzeBriefing()
+lib/briefing/briefing-author.ts              # Gemini Pro: generateArticle()
 lib/briefing/briefing-config.ts              # Константы (модели, лимиты)
+lib/prompts/briefing/briefing-author.md      # Промпт автора (стиль Т—Ж)
 lib/briefing/source-fetchers/index.ts        # fetchSource() dispatcher
 lib/briefing/source-fetchers/rss-fetcher.ts  # RSS через rss-parser
 lib/briefing/source-fetchers/telegram-fetcher.ts # Telegram через cheerio

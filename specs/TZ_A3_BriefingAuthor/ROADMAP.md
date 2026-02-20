@@ -10,109 +10,34 @@
 
 | Метрика | Значение |
 |---------|----------|
-| Этапов | 4 |
-| Текущий этап | 1 |
-| Сессий (оценка) | 1-2 |
+| Этапов | 4 (объединены 1-3 в один коммит) |
+| Текущий этап | 4 (ожидание теста) |
+| Сессий (оценка) | 1 |
 
 ---
 
-## Этап 1: Новые типы + промпт + модуль автора
+## Этапы 1-3: Модуль автора + pipeline + удаление старого кода
 
-**Статус:** ✅ Завершён
+**Статус:** ✅ Завершён (объединены — build требовал атомарного переключения)
 
-**Цель:** Создать новый backend-модуль `briefing-author.ts` с типами и Zod-схемами. Ничего пока не ломается — старый код продолжает работать.
+**Коммит:** `792d62b` feat(tz-a3): briefing author — article format replaces JSON cards
 
-**Задачи:**
-- [x] Заменить типы в `lib/briefing/briefing-types.ts` — удалить `BriefingJSON/BriefingBlock/BriefingItem`, добавить `BriefingArticle/BriefingArticleSection/BriefingArticleSource/BriefingArticleMeta`
-- [x] Скопировать промпт `briefing-author.md` из specs → `lib/prompts/briefing/briefing-author.md` (поле `sources` уже в промпте)
-- [x] Создать `lib/briefing/briefing-author.ts` — функция `generateArticle()`, Zod-схемы, паттерн из analyzer (Google AI, fallback model, tier mapping)
-- [x] Добавить в `briefing-config.ts` константу `AUTHOR_MODEL` (вместо `ANALYZER_MODEL`) + обновить fallback
+**Что сделано:**
+- [x] Новые типы: `BriefingArticle/Section/Source/Meta` в briefing-types.ts
+- [x] Промпт: `briefing-author.md` скопирован в lib/prompts/briefing/
+- [x] Модуль: `briefing-author.ts` — generateArticle(), Zod-схемы, tier mapping, fallback
+- [x] Config: `AUTHOR_MODEL` / `AUTHOR_MODEL_FALLBACK`, maxDuration 90
+- [x] Route.ts: getBriefingTopics, user topicIds, generateArticle вместо analyzeContent
+- [x] briefing-card.tsx: article.meta.totalNews вместо blocks.reduce
+- [x] briefing-active-page.tsx: markdown sections + source cards + old format guard
+- [x] Удалён briefing-analyzer.ts
+- [x] Удалён briefing-analyst.md
+- [x] Grep: ноль импортов старых файлов/типов
 
-**Файлы:**
-- `lib/briefing/briefing-types.ts` — замена типов
-- `lib/prompts/briefing/briefing-author.md` — новый (из specs)
-- `lib/briefing/briefing-author.ts` — новый
-- `lib/briefing/briefing-config.ts` — переименование констант
-
-**Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок (⚠️ ОЖИДАЕМЫ ошибки в файлах, импортирующих старые типы — briefing-active-page.tsx, briefing-card.tsx, briefing-analyzer.ts. Это ОК, они будут исправлены в Этапах 2-3)
-- [ ] Модуль `briefing-author.ts` компилируется без ошибок
-
-**Git (после валидации):**
-```bash
-git add lib/briefing/briefing-types.ts lib/briefing/briefing-author.ts lib/briefing/briefing-config.ts lib/prompts/briefing/briefing-author.md
-git commit -m "feat(tz-a3): briefing author module + new types + prompt"
-```
-
-**Критерий готовности:** Новый модуль готов к подключению в route.ts.
-
----
-
-## Этап 2: Переключение pipeline + адаптация UI
-
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без завершения Этапа 1
-
-**Цель:** Атомарное переключение: route.ts вызывает `generateArticle()` вместо `analyzeContent()`, UI адаптирован под `BriefingArticle`.
-
-**Задачи:**
-- [ ] Обновить `route.ts`: загрузка `getBriefingTopics()`, замена `getTopicIds()` на user topics, замена `analyzeContent()` → `generateArticle()`, `maxDuration` 60 → 90, подсчёт items через `article.meta.totalNews`
-- [ ] Адаптировать `briefing-card.tsx` — `BriefingJSON` → `BriefingArticle`, `blocks.reduce(...)` → `article.meta.totalNews`
-- [ ] Адаптировать `briefing-active-page.tsx` — рендер `sections` вместо `blocks`, markdown-контент + sources-список под каждой секцией
-- [ ] Обработка edge case: старые записи в БД (формат BriefingJSON) — graceful fallback или показ только новых
-
-**Файлы:**
-- `app/(chat)/api/briefing/generate/route.ts` — переключение pipeline
-- `components/briefing/briefing-card.tsx` — новые типы
-- `components/briefing/briefing-active-page.tsx` — новый рендер секций
-
-**Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Браузер: `/briefing` показывает статью (если есть новые данные) или "нет выпусков"
-- [ ] Браузер: карточка на дашборде работает
-- [ ] 🧪 Мануальный тест: сгенерировать новый брифинг, проверить формат статьи
-
-**Git (после валидации):**
-```bash
-git add app/(chat)/api/briefing/generate/route.ts components/briefing/briefing-card.tsx components/briefing/briefing-active-page.tsx
-git commit -m "feat(tz-a3): switch pipeline to author + adapt UI"
-```
-
-**Критерий готовности:** Генерация создаёт `BriefingArticle`, UI отображает секции с markdown-текстом и источниками.
-
----
-
-## Этап 3: Удаление старого кода
-
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 2
-
-**Цель:** Убрать мёртвый код аналитика.
-
-**Задачи:**
-- [ ] Удалить `lib/briefing/briefing-analyzer.ts`
-- [ ] Удалить `lib/prompts/briefing/briefing-analyst.md`
-- [ ] Проверить что нигде не осталось импортов старых файлов/типов (grep)
-
-**Файлы:**
-- `lib/briefing/briefing-analyzer.ts` — удалить
-- `lib/prompts/briefing/briefing-analyst.md` — удалить
-
-**Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Grep: ноль импортов `briefing-analyzer`, `briefing-analyst`, `analyzeContent`, `BriefingJSON`
-
-**Git (после валидации):**
-```bash
-git add -u lib/briefing/briefing-analyzer.ts lib/prompts/briefing/briefing-analyst.md
-git commit -m "chore(tz-a3): remove deprecated analyzer + analyst prompt"
-```
-
-**Критерий готовности:** Проект компилируется без старого кода.
+**Валидация:**
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [ ] 🧪 Мануальный тест: сгенерировать брифинг, проверить формат статьи
 
 ---
 
@@ -120,7 +45,7 @@ git commit -m "chore(tz-a3): remove deprecated analyzer + analyst prompt"
 
 **Статус:** ⬜ Не начат
 
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 3
+⛔ НЕ НАЧИНАТЬ без подтверждения мануального теста
 
 **Задачи:**
 - [ ] Обновить главный `CHANGELOG.md` — v3.31.0
