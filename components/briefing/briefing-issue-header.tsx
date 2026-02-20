@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -5,14 +6,19 @@ import { UserMenu } from "@/components/user-menu";
 
 interface BriefingIssueHeaderProps {
   title: string;
+  /** Optional slot for mobile sidebar trigger (rendered before title) */
+  mobileTrigger?: ReactNode;
 }
 
 /**
  * ТЗ-А4: Header for briefing issue page.
- * Shows ← Dashboard, article title, ⚙️ settings, UserMenu.
+ * Shows ← Dashboard, [mobile trigger], article title, ⚙️ settings, UserMenu.
  * Separate from BriefingHeader (used by landing page).
  */
-export function BriefingIssueHeader({ title }: BriefingIssueHeaderProps) {
+export function BriefingIssueHeader({
+  title,
+  mobileTrigger,
+}: BriefingIssueHeaderProps) {
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
       <div className="flex min-w-0 items-center gap-3">
@@ -21,6 +27,7 @@ export function BriefingIssueHeader({ title }: BriefingIssueHeaderProps) {
             <ArrowLeft className="size-5" />
           </Button>
         </Link>
+        {mobileTrigger}
         <h1 className="truncate font-serif text-lg font-semibold">{title}</h1>
       </div>
 
