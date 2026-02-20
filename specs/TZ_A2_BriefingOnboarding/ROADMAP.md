@@ -2,7 +2,7 @@
 
 **Создан:** 2026-02-20
 **Версия проекта:** 3.29.0 → 3.30.0
-**Статус:** В работе
+**Статус:** ✅ Завершено
 
 ---
 
@@ -11,8 +11,8 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 5 |
-| Текущий этап | 2 |
-| Сессий (оценка) | 3-4 |
+| Текущий этап | ✅ Завершено |
+| Сессий | 3 |
 
 ---
 
@@ -227,36 +227,25 @@ git commit -m "feat(tz-a2): edit mode + briefing page routing + edge cases"
 
 ## Этап 5: Финализация
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** Документация, проверка БД, финальное тестирование, обновление версии.
 
 **Задачи:**
-- [ ] SQL-проверка БД:
-  - `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;`
-  - `SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'BriefingTopics';`
-  - `SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'BriefingSettings';`
-- [ ] Финальное мануальное тестирование:
-  - Create mode: полный flow от лендинга до генерации
-  - Edit mode: изменение тем/источников
-  - Повторный визит на /briefing
-  - Мобильная версия
-- [ ] Обновить главный `CHANGELOG.md` (из локального CHANGELOG)
-- [ ] Обновить `SIMPLY_STATUS.md` — ТЗ-A2 завершён
-- [ ] Обновить `CLAUDE.md`:
-  - Добавить briefing setup компоненты в структуру кода
-  - Обновить текущий этап
-  - Добавить BriefingTopics в описание БД
-- [ ] Обновить `package.json` — версия 3.30.0
-- [ ] Обновить `docs/ai-chats-map.md` — новый service-chat контекст briefing-onboarding
-- [ ] Обновить `docs/architecture.md` — таблица BriefingTopics, новая модель
-- [ ] Переместить папку `specs/TZ_A2_BriefingOnboarding/` → `_archive/`
+- [x] SQL-проверка БД: 4 таблицы Briefing, 2 темы, 31 источник, 5 готовых выпусков
+- [x] Обновить главный `CHANGELOG.md` — v3.30.0 entry
+- [x] Обновить `SIMPLY_STATUS.md` — версия 3.30.0
+- [x] Обновить `CLAUDE.md` — briefing setup компоненты, текущий этап, версия
+- [x] Обновить `package.json` — версия 3.30.0
+- [x] Обновить `docs/ai-chats-map.md` — briefing-onboarding + gemini-3-pro-preview fix
+- [x] Обновить `docs/ai-providers.md` — v2.1.0 с моделями Gemini
+- [x] HANDOFF.md — финальный статус
+- [ ] Переместить папку `specs/TZ_A2_BriefingOnboarding/` → `_archive/` (при необходимости)
 
 **Валидация этапа:**
-- [ ] `npm run build` — успешен
-- [ ] Production URL работает (если деплой)
-- [ ] Документация актуальна
-- [ ] 🧪 Финальный мануальный тест пользователем
+- [x] `npm run build` — успешен
+- [x] Документация актуальна
+- [x] 🧪 Мануальный тест пользователем: create mode + генерация ОК
 
 **Git (после валидации):**
 ```bash

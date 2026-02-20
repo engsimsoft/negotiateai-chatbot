@@ -12,6 +12,28 @@
 
 ---
 
+## [3.30.0] - 2026-02-20 - Briefing Onboarding (ТЗ-A2)
+
+**MINOR RELEASE**: AI-собеседование для настройки утреннего брифинга. Split layout (preview + чат), deepResearch для поиска источников, edit mode с загрузкой профиля из БД, роутинг /briefing по статусу профиля.
+
+### Added
+- **Briefing Onboarding** — AI-интервью для настройки тем и источников (Claude Sonnet 4.6)
+- **Split layout** `/briefing/setup` — preview (темы, источники, tier badges) + чат-панель
+- **BriefingTopics** — новая таблица БД (userId, topicId, topicName, emoji, orderIndex)
+- **Service-chat context** `"briefing-onboarding"` — prompt builder, mode injection, 4 tools
+- **Tools**: `updateBriefingPreview` (live preview) + `saveBriefingProfile` (save to DB) + deepResearch + fetchUrl
+- **Edit mode** — загрузка сохранённых topics/sources при повторном визите на /briefing/setup
+- **BriefingActivePage** — отображение последнего выпуска + кнопка "Настройки брифинга"
+- **configs/briefing-onboarding.ts** — reference config для service-chat
+
+### Changed
+- **/briefing** — роутинг: `isActive` → выпуск/заглушка, `!isActive` → лендинг
+- **service-chat/route.ts** — maxDuration 60→120, stepCountIs динамический (8 для briefing)
+- **briefing-config.ts** — ANALYZER_MODEL `gemini-3-pro` → `gemini-3-pro-preview`
+- **ai-providers.md** v2.1.0 — добавлены модели Gemini с правильными ID
+
+---
+
 ## [3.29.0] - 2026-02-19 - Deep Research + Fetch URL (ТЗ-PX + ТЗ-FU)
 
 **MINOR RELEASE**: Два новых инструмента — deepResearch (Perplexity Sonar API, два режима: Pro/Deep) и fetchUrl (чтение веб-страниц через Readability). ChatMode-фильтрация инструментов. Dev-mode переключатель глубины исследования.

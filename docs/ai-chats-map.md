@@ -2,12 +2,14 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-02-19
+**Обновлено:** 2026-02-20
 
 ---
 
 ## Быстрый обзор
 
+> **v3.30.0:** Briefing Onboarding — AI-собеседование для настройки брифинга (Claude Sonnet 4.6, split layout, deepResearch, edit mode).
+>
 > **v3.26.0:** Morning Briefing Backend — двухэтапный AI-пайплайн на Gemini (Flash + Pro) для генерации новостных сводок.
 >
 > **v3.24.0:** Дашборд V2 — три режима чатов (chat/expertise/create), удалены помощники, ListDetailPage.
@@ -31,8 +33,9 @@
 | **Ревьюер задач** | Claude Opus | ✅ Работает | Профессор — ревью завершённой задачи (v3.17) |
 | **Клерк-анализатор** | Claude Haiku | ✅ Работает | Автоматический анализ файлов проекта |
 | **Snapshot Creator** | Claude Haiku | ✅ Работает | Fallback-клерк создания snapshot при заполнении контекста (v3.18) |
+| **Briefing: Онбординг** | Claude Sonnet 4.6 | ✅ Работает | AI-интервью для настройки брифинга (v3.30) |
 | **Briefing: Фильтр** | Gemini 2.0 Flash | ✅ Работает | Фильтрация и дедупликация новостей (v3.26) |
-| **Briefing: Анализатор** | Gemini 3 Pro | ✅ Работает | Анализ и группировка новостей по темам (v3.26) |
+| **Briefing: Анализатор** | Gemini 3 Pro Preview | ✅ Работает | Анализ и группировка новостей по темам (v3.26) |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
 
 ---
@@ -292,6 +295,34 @@ lib/ai/context-limits.ts                   # Конфиг бюджетов
 lib/prompts/clerks/snapshot-creator.md     # Промпт клерка
 ```
 
+#### Briefing Onboarding (ТЗ-A2, v3.30)
+**Где:** `/briefing/setup` (split layout: preview + chat)
+
+| Параметр | Значение |
+|----------|----------|
+| **Модель** | Claude Sonnet 4.6 (`claude-sonnet-4-6`) |
+| **Оболочка** | Full-page (split layout: aside 400px preview + main chat) |
+| **Промпт** | `lib/prompts/service-chats/briefing-onboarding.md` + mode injection |
+| **Инструменты** | `updateBriefingPreview`, `saveBriefingProfile`, `deepResearch`, `fetchUrl` |
+
+**Как работает:**
+1. Server Component определяет mode (create/edit), загружает userProfile + topics/sources
+2. AI проводит интервью: узнаёт интересы, ищет источники через deepResearch
+3. `updateBriefingPreview` обновляет live preview в реальном времени
+4. `saveBriefingProfile` записывает финальный профиль в БД (settings + topics + sources)
+5. Success card с кнопкой "Сгенерировать первый брифинг"
+6. Edit mode: загружает сохранённый профиль, greeting адаптирован
+
+**Файлы:**
+```
+app/(dashboard)/briefing/setup/page.tsx                    # Server Component (auth, mode, profile)
+app/(dashboard)/briefing/setup/briefing-setup-client.tsx    # Client (split layout, useChat)
+app/(dashboard)/briefing/setup/components/                  # Preview + chat panel
+components/service-chat/configs/briefing-onboarding.ts      # Reference config
+lib/prompts/service-chats/briefing-onboarding.md            # Промпт
+app/(chat)/api/service-chat/route.ts                        # API (context: briefing-onboarding)
+```
+
 #### Briefing: AI-пайплайн (v3.26)
 **Где:** `POST /api/briefing/generate` (backend-only, без интерактивного UI)
 
@@ -310,7 +341,7 @@ lib/prompts/clerks/snapshot-creator.md     # Промпт клерка
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 3 Pro (`gemini-3-pro`) |
+| **Модель** | Gemini 3 Pro (`gemini-3-pro-preview`) |
 | **Тип** | Backend (внутренний вызов в generate/route.ts) |
 | **Вход** | ~30 FilteredItem[] |
 | **Выход** | BriefingJSON (новости сгруппированные по темам, с impact, sentiment, links) |
@@ -514,7 +545,8 @@ const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_
 | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | $1 | $5 | 200K | Бен, Менеджер, Исполнитель, Клерки (анализатор, суммаризатор, snapshot) |
 | Claude Opus 4.6 (`claude-opus-4-6`) | $5 | $25 | 200K | Профессоры (планирование, ревью задач) |
 | Gemini 2.0 Flash (`gemini-2.0-flash`) | ~$0.10 | ~$0.40 | 1M | Briefing: фильтрация и дедупликация (v3.26) |
-| Gemini 3 Pro (`gemini-3-pro`) | ~$1.25 | ~$10 | 1M | Briefing: анализ и группировка (v3.26) |
+| Gemini 3 Pro (`gemini-3-pro-preview`) | ~$1.25 | ~$10 | 1M | Briefing: анализ и группировка (v3.26) |
+| Claude Sonnet 4.6 (`claude-sonnet-4-6`) | — | — | — | Briefing: онбординг (v3.30) |
 
 *Цены за 1M токенов*
 
@@ -547,7 +579,9 @@ lib/prompts/
 │   └── snapshot-creator.md # Клерк-создатель snapshot'ов (v3.18)
 ├── service-chats/         # Промпты сервисных чатов (v3.11+)
 │   ├── project-creation.md # Промпт Секретаря
-│   └── project-manager.md  # Промпт Менеджера
+│   ├── project-manager.md  # Промпт Менеджера
+│   ├── briefing-onboarding.md # Промпт Briefing Onboarding (v3.30)
+│   └── briefing-onboarding-mode-injection.md # Справочный документ для edit mode
 ├── core/
 │   ├── base.md            # Базовый промпт
 │   ├── safety.md          # Безопасность
@@ -568,7 +602,8 @@ components/service-chat/   # ServiceChat система (v3.8)
 └── configs/
     ├── ben.ts                 # Конфиг Бена
     ├── project-creation.ts    # Конфиг создания проекта
-    └── project-manager.ts     # Конфиг менеджера
+    ├── project-manager.ts     # Конфиг менеджера
+    └── briefing-onboarding.ts # Конфиг Briefing Onboarding (v3.30)
 ```
 
 ---
