@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.32.0
+**Версия:** 3.33.0
 **Дата:** 2026-02-20
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -328,6 +328,26 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-А5: Briefing Generation Progress — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Streaming progress** — `POST /api/briefing/generate` конвертирован из `Response.json()` в `ReadableStream` (JSON Lines, `application/x-ndjson`)
+- **4 шага pipeline** — подключение → сбор новостей → фильтрация → написание статьи, с реальными данными от сервера
+- **useBriefingGeneration** — custom hook (streaming fetch + parse + state + AbortController)
+- **BriefingGenerationProgress** — компонент с framer-motion анимацией, emoji-иконками, error state с retry
+- **BriefingPageClient** — клиентская обёртка для управления состоянием генерации на /briefing
+- **Централизация триггеров** — sidebar, NoBriefingsYet, setup success card используют единый хук
+- **Авто-перезагрузка** — `window.location.href` после завершения генерации
+
+**Ключевые файлы:**
+- `hooks/use-briefing-generation.ts` — custom hook (streaming fetch + parse)
+- `components/briefing/briefing-generation-progress.tsx` — UI прогресса
+- `components/briefing/briefing-page-client.tsx` — клиентская обёртка /briefing
+- `app/(chat)/api/briefing/generate/route.ts` — streaming endpoint
+- `lib/briefing/briefing-types.ts` — +BriefingProgressStep/Event типы
+
+**Детали:** [_archive/TZ_A5_BriefingProgress/](_archive/TZ_A5_BriefingProgress/)
 
 ### ТЗ-А4: Briefing Issue Page — ✅ ЗАВЕРШЁН
 

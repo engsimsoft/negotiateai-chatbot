@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.32.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.33.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -103,20 +103,23 @@
 - `components/glavnaya/mode-cards-section.tsx` — 3 карточки-лаунчера (Экспертиза 🔍, Создать ✨, Проекты 📁) (v3.24.0)
 - `components/glavnaya/tools-section.tsx` — Секция "Инструменты" на дашборде (v3.27.0)
 
-**Briefing UI (v3.28.0 — Landing, v3.30.0 — Onboarding, v3.32.0 — Issue Page):**
-- `lib/briefing/briefing-types.ts` — Shared типы BriefingArticle/Section/Source/Meta (client-safe)
-- `app/(dashboard)/briefing/page.tsx` — Страница /briefing (Server Component, роутинг: isActive → выпуск с sidebar, !isActive → лендинг)
+**Briefing UI (v3.28.0 — Landing, v3.30.0 — Onboarding, v3.32.0 — Issue Page, v3.33.0 — Progress):**
+- `lib/briefing/briefing-types.ts` — Shared типы BriefingArticle/Section/Source/Meta + BriefingProgressStep/Event (client-safe)
+- `app/(dashboard)/briefing/page.tsx` — Страница /briefing (Server Component → BriefingPageClient, роутинг: isActive → выпуск с sidebar, !isActive → лендинг)
 - `app/(dashboard)/briefing/[date]/page.tsx` — Маршрут конкретного выпуска по дате (YYYY-MM-DD), graceful fallback для старого формата
 - `app/(dashboard)/briefing/setup/page.tsx` — Server Component: auth, mode detection (create/edit), загрузка topics/sources
-- `app/(dashboard)/briefing/setup/briefing-setup-client.tsx` — Split layout (preview + chat), useChat, live preview, edit mode
+- `app/(dashboard)/briefing/setup/briefing-setup-client.tsx` — Split layout (preview + chat), useChat, live preview, edit mode, progress при генерации
 - `app/(dashboard)/briefing/setup/components/` — BriefingProfilePreview (темы, источники, tier) + BriefingChatPanel
 - `app/(chat)/api/briefing/latest/route.ts` — GET API (latest briefing + settings)
+- `hooks/use-briefing-generation.ts` — Custom hook: streaming fetch → parse JSON Lines → state (steps, isGenerating, error, redirectUrl)
 - `components/briefing/briefing-card.tsx` — Карточка на дашборде (3 состояния: пустое/готов/генерируется)
 - `components/briefing/briefing-page.tsx` — Лендинг (hero + демо выпуска + CTA)
+- `components/briefing/briefing-page-client.tsx` — Клиентская обёртка /briefing (управление состоянием генерации, авто-перезагрузка)
+- `components/briefing/briefing-generation-progress.tsx` — UI прогресса генерации (4 шага, framer-motion, error/retry)
 - `components/briefing/briefing-issue-header.tsx` — Header выпуска (title, ← Dashboard, ⚙️, UserMenu, mobileTrigger)
 - `components/briefing/briefing-article-view.tsx` — Рендер статьи (intro, sections + MarkdownViewer + Collapsible sources, outro, meta) + IntersectionObserver scroll spy
-- `components/briefing/briefing-sidebar.tsx` — Sidebar (topic nav с active state, history, generate, settings) + BriefingSidebarMobile (Sheet)
-- `components/briefing/briefing-issue-content.tsx` — Клиентская обёртка (activeSectionId state, связь scroll spy → sidebar)
+- `components/briefing/briefing-sidebar.tsx` — Sidebar (topic nav с active state, history, onGenerate callback, settings) + BriefingSidebarMobile (Sheet)
+- `components/briefing/briefing-issue-content.tsx` — Клиентская обёртка (activeSectionId state, связь scroll spy → sidebar, onGenerate passthrough)
 - `components/briefing/briefing-player-placeholder.tsx` — Sticky заглушка аудиоплеера
 - `components/briefing/briefing-source-card.tsx` — Карточка источника (tier badges на русском)
 - `components/briefing/briefing-header.tsx` — Header лендинга (← Dashboard, заголовок, UserMenu)
@@ -247,7 +250,7 @@
 - `lib/briefing/source-fetchers/` — Фетчеры: types.ts, rss-fetcher.ts, telegram-fetcher.ts, web-fetcher.ts, index.ts (dispatcher)
 - `lib/briefing/briefing-filter.ts` — AI фильтр (Gemini 2.0 Flash, дедупликация → FilteredItem[])
 - `lib/briefing/briefing-author.ts` — AI автор статьи (Gemini 3 Pro, generateArticle → BriefingArticle)
-- `app/(chat)/api/briefing/generate/route.ts` — POST endpoint (auth, fetch, filter, analyze, save)
+- `app/(chat)/api/briefing/generate/route.ts` — POST endpoint, streaming (ReadableStream JSON Lines: connecting → fetching → filtering → writing → complete)
 - `lib/db/seed-briefing.ts` — Seed-скрипт (20 источников для тестового юзера)
 
 **Auth/DB:**
@@ -270,7 +273,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-А4 (v3.32.0 — BriefingIssuePage), ТЗ-А3 (v3.31.0 — BriefingAuthor), ТЗ-A2 (v3.30.0 — BriefingOnboarding), ТЗ-PX+FU (v3.29.0 — DeepResearch + FetchUrl), ТЗ-A1 (v3.28.0 — BriefingLanding), ТЗ-BR3 (v3.27.1 — PromptIntegration), ТЗ-BR2 (v3.27.0 — BriefingUI), ТЗ-BR1 (v3.26.0 — MorningBriefingBackend), ТЗ-RG (v3.25.0 — RouteGroups), ТЗ-DV2 (v3.24.0 — DashboardV2), ТЗ-C4 (v3.23.0 — AnthropicProviderSwitch), ТЗ-C3 (v3.22.0 — ChatContextManagement), ТЗ-08CS (v3.21.0 — ChatSidebar + RightSidebar), ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-А5 (v3.33.0 — BriefingProgress), ТЗ-А4 (v3.32.0 — BriefingIssuePage), ТЗ-А3 (v3.31.0 — BriefingAuthor), ТЗ-A2 (v3.30.0 — BriefingOnboarding), ТЗ-PX+FU (v3.29.0 — DeepResearch + FetchUrl), ТЗ-A1 (v3.28.0 — BriefingLanding), ТЗ-BR3 (v3.27.1 — PromptIntegration), ТЗ-BR2 (v3.27.0 — BriefingUI), ТЗ-BR1 (v3.26.0 — MorningBriefingBackend), ТЗ-RG (v3.25.0 — RouteGroups), ТЗ-DV2 (v3.24.0 — DashboardV2), ТЗ-C4 (v3.23.0 — AnthropicProviderSwitch), ТЗ-C3 (v3.22.0 — ChatContextManagement), ТЗ-08CS (v3.21.0 — ChatSidebar + RightSidebar), ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**

@@ -12,6 +12,27 @@
 
 ---
 
+## [3.33.0] - 2026-02-20 - Briefing Generation Progress (ТЗ-А5)
+
+**MINOR RELEASE**: Живой прогресс генерации брифинга. Streaming progress через JSON Lines заменяет слепой спиннер. 4 шага pipeline (подключение → сбор → фильтрация → написание) с реальными данными от сервера.
+
+### Added
+- **Streaming route** — `POST /api/briefing/generate` конвертирован из `Response.json()` в `ReadableStream` (JSON Lines, `application/x-ndjson`)
+- **useBriefingGeneration** — хук для streaming fetch + parse + state management (`hooks/use-briefing-generation.ts`)
+- **BriefingGenerationProgress** — компонент прогресса с framer-motion анимацией, emoji-иконками, error state с retry
+- **BriefingPageClient** — клиентская обёртка `/briefing` для управления состоянием генерации
+- **BriefingProgressStep / BriefingProgressEvent** — типы streaming-событий
+
+### Changed
+- **briefing-sidebar.tsx** — `onGenerate` prop вместо локальной генерации (fetch + router.refresh)
+- **briefing-article-view.tsx** — NoBriefingsYet получил `onGenerate` prop
+- **briefing-setup-client.tsx** — прогресс в success card вместо Loader2
+
+### Fixed
+- Авто-перезагрузка после генерации: `window.location.href` вместо `router.refresh()` (сброс клиентского стейта)
+
+---
+
 ## [3.32.0] - 2026-02-20 - Briefing Issue Page (ТЗ-А4)
 
 **MINOR RELEASE**: Полноценная страница выпуска брифинга. Sidebar с навигацией по темам и историей выпусков, scroll spy для active state, маршрут `/briefing/[date]` для прошлых выпусков.
