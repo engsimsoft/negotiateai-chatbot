@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.31.0
+**Версия:** 3.32.0
 **Дата:** 2026-02-20
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -328,6 +328,27 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-А4: Briefing Issue Page — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Страница выпуска** — полноценный article reader (intro, sections с MarkdownViewer + Collapsible sources, outro, meta)
+- **Sidebar** — навигация по темам с active state (IntersectionObserver scroll spy), история выпусков, кнопка генерации
+- **`/briefing/[date]`** — маршрут для просмотра конкретного прошлого выпуска по дате
+- **Responsive** — Sheet sidebar на мобильных, гамбургер-кнопка в header
+- **getBriefingByDate()** — timezone-aware query (AT TIME ZONE, fallback Europe/Moscow)
+- **Graceful fallback** — старый формат выпусков показывает сообщение вместо ошибки
+- **Cleanup** — удалён устаревший `briefing-active-page.tsx`
+
+**Ключевые файлы:**
+- `components/briefing/briefing-issue-header.tsx` — header (title, ← Dashboard, ⚙️, UserMenu, mobileTrigger)
+- `components/briefing/briefing-article-view.tsx` — рендер статьи + IntersectionObserver scroll spy
+- `components/briefing/briefing-sidebar.tsx` — sidebar (topic nav, history, generate, settings) + mobile Sheet
+- `components/briefing/briefing-issue-content.tsx` — клиентская обёртка (activeSectionId state)
+- `components/briefing/briefing-player-placeholder.tsx` — sticky заглушка плеера
+- `components/briefing/briefing-source-card.tsx` — карточка источника (tier badges)
+- `app/(dashboard)/briefing/[date]/page.tsx` — маршрут конкретного выпуска
+- `app/(dashboard)/briefing/page.tsx` — обновлён (двухколоночный layout)
 
 ### ТЗ-PX + ТЗ-FU: Deep Research + Fetch URL — ✅ ЗАВЕРШЁН
 

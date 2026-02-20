@@ -12,6 +12,29 @@
 
 ---
 
+## [3.32.0] - 2026-02-20 - Briefing Issue Page (ТЗ-А4)
+
+**MINOR RELEASE**: Полноценная страница выпуска брифинга. Sidebar с навигацией по темам и историей выпусков, scroll spy для active state, маршрут `/briefing/[date]` для прошлых выпусков.
+
+### Added
+- **briefing-issue-header.tsx** — header для страницы выпуска (title, ← Dashboard, ⚙️, UserMenu, mobileTrigger)
+- **briefing-player-placeholder.tsx** — sticky заглушка аудиоплеера ("Скоро: аудиоподкаст")
+- **briefing-source-card.tsx** — карточка источника с tier badges на русском
+- **briefing-article-view.tsx** — полный рендер статьи (intro, sections с MarkdownViewer + Collapsible sources, outro, meta) + IntersectionObserver scroll spy
+- **briefing-sidebar.tsx** — sidebar (topic nav с active state, history, generate, settings) + BriefingSidebarMobile (Sheet)
+- **briefing-issue-content.tsx** — клиентская обёртка (activeSectionId state, связывает scroll spy с sidebar)
+- **`/briefing/[date]`** — маршрут для конкретного выпуска по дате (YYYY-MM-DD), graceful fallback для старого формата
+- **getBriefingByDate()** — timezone-aware query (AT TIME ZONE, fallback Europe/Moscow)
+
+### Changed
+- **/briefing** — двухколоночный layout (sidebar + article) вместо BriefingActivePage
+- **History** — дедупликация по дате, limit 10, фильтрация только ready
+
+### Removed
+- **briefing-active-page.tsx** — полностью заменён новыми компонентами (issue-header, article-view, sidebar)
+
+---
+
 ## [3.31.0] - 2026-02-20 - Briefing Author (ТЗ-А3)
 
 **MINOR RELEASE**: Замена JSON-карточек на связную статью. Один вызов Gemini 3 Pro генерирует BriefingArticle: intro, секции с markdown-текстом и inline-ссылками, источники, outro.
