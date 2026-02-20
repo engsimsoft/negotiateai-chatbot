@@ -1,13 +1,15 @@
-// ТЗ-BR1: Web page fetcher using Readability + JSDOM
+// ТЗ-BR1 + ТЗ-WS1: Web page fetcher — delegates to shared fetchPage() utility
 
-import { Readability } from "@mozilla/readability";
-import { JSDOM } from "jsdom";
+import { fetchPage } from "@/lib/ai/tools/fetch-page";
 import { FETCH_TIMEOUT_MS, MAX_CONTENT_LENGTH } from "../briefing-config";
 import type { FetchResult, RawContent } from "./types";
 
 /**
- * Fetches a web page and extracts readable content via Readability + JSDOM.
+ * Fetches a web page and extracts readable content via shared fetchPage().
  * Used for sources without RSS feeds.
+ *
+ * ТЗ-WS1: Unified to use fetchPage() instead of duplicating Readability + JSDOM logic.
+ * Inherits charset detection (windows-1251, koi8-r) and improved fallback from fetchPage().
  */
 export async function fetchWeb(
   pageUrl: string,
@@ -18,45 +20,15 @@ export async function fetchWeb(
   const items: RawContent[] = [];
 
   try {
-    const response = await fetch(pageUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    const result = await fetchPage(pageUrl, MAX_CONTENT_LENGTH, FETCH_TIMEOUT_MS);
+
+    items.push({
+      title: result.title || sourceName,
+      url: result.url,
+      content: result.content,
+      sourceName,
+      sourceLanguage,
     });
-
-    if (!response.ok) {
-      errors.push(
-        `Web fetch failed [${sourceName}]: HTTP ${response.status}`,
-      );
-      return { items, errors };
-    }
-
-    const html = await response.text();
-    const dom = new JSDOM(html, { url: pageUrl });
-    const reader = new Readability(dom.window.document);
-    const article = reader.parse();
-
-    if (article && article.textContent) {
-      const content = article.textContent
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, MAX_CONTENT_LENGTH);
-
-      items.push({
-        title: article.title || sourceName,
-        url: pageUrl,
-        content,
-        sourceName,
-        sourceLanguage,
-      });
-    } else {
-      errors.push(
-        `Web fetch [${sourceName}]: Readability could not extract content`,
-      );
-    }
   } catch (err) {
     errors.push(
       `Web fetch failed [${sourceName}]: ${err instanceof Error ? err.message : String(err)}`,
