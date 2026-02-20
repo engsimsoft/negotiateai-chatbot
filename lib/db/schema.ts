@@ -433,6 +433,7 @@ export const briefingTopics = pgTable(
     topicName: varchar("topicName", { length: 100 }).notNull(),
     emoji: varchar("emoji", { length: 10 }).notNull(),
     orderIndex: integer("orderIndex").notNull().default(0),
+    briefingStyle: text("briefing_style"), // ТЗ-HF1: инструкция автору по стилю (1-3 предложения), nullable
     createdAt: timestamp("createdAt").notNull(),
   },
   (table) => ({

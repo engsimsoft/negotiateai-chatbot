@@ -42,10 +42,9 @@ export default async function BriefingRoute() {
     return <BriefingPage />;
   }
 
-  // ТЗ-А4: load history for sidebar (limit 10)
+  // ТЗ-А4: load history for sidebar (limit 10, only ready — ТЗ-HF1 fix)
   const timezone = settings.timezone || "Europe/Moscow";
-  const historyRows = await getBriefingHistory({ userId, limit: 10 });
-  const readyBriefings = historyRows.filter((h) => h.status === "ready");
+  const readyBriefings = await getBriefingHistory({ userId, limit: 10, status: "ready" });
   const latestBriefing = readyBriefings[0] ?? null;
 
   // Parse article, guard against old format

@@ -2910,15 +2910,23 @@ export async function saveBriefingHistory({
 export async function getBriefingHistory({
   userId,
   limit = 10,
+  status,
 }: {
   userId: string;
   limit?: number;
+  /** Filter by status (e.g. "ready"). If omitted, returns all statuses. */
+  status?: string;
 }) {
   try {
+    const conditions = [eq(briefingHistory.userId, userId)];
+    if (status) {
+      conditions.push(eq(briefingHistory.status, status));
+    }
+
     return await db
       .select()
       .from(briefingHistory)
-      .where(eq(briefingHistory.userId, userId))
+      .where(and(...conditions))
       .orderBy(desc(briefingHistory.generatedAt))
       .limit(limit);
   } catch (_error) {
@@ -2998,12 +3006,14 @@ export async function addBriefingTopic({
   topicName,
   emoji,
   orderIndex,
+  briefingStyle,
 }: {
   userId: string;
   topicId: string;
   topicName: string;
   emoji: string;
   orderIndex?: number;
+  briefingStyle?: string | null;
 }) {
   try {
     const [created] = await db
@@ -3014,6 +3024,7 @@ export async function addBriefingTopic({
         topicName,
         emoji,
         orderIndex: orderIndex ?? 0,
+        briefingStyle: briefingStyle ?? null,
         createdAt: new Date(),
       })
       .returning();

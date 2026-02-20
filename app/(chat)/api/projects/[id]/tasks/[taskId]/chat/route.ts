@@ -34,7 +34,7 @@ export const maxDuration = 180;
 // Task chat schema
 const textPartSchema = z.object({
   type: z.enum(["text"]),
-  text: z.string().min(1).max(2000),
+  text: z.string().min(1).max(16000),
 });
 
 const filePartSchema = z.object({

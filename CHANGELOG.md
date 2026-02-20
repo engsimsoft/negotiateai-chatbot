@@ -12,6 +12,27 @@
 
 ---
 
+## [3.33.1] - 2026-02-20 - Briefing PE Update (ТЗ-HF1)
+
+**PATCH RELEASE**: Обновление промптов онбординга (v6) и автора (v3), добавление briefingStyle для персонализации секций брифинга, увеличение maxSteps, исправление бага с историей в сайдбаре.
+
+### Added
+- **briefingStyle** — поле в `BriefingTopics` (text, nullable) для инструкций автору по стилю каждой темы
+- **Status filter** — параметр `status?` в `getBriefingHistory()` для SQL-фильтрации
+
+### Changed
+- **Промпт онбординга** — v4 → v6 (обязательная верификация fetchUrl, параллельные вызовы, приоритет тем в briefingStyle)
+- **Промпт автора** — v2 → v3 (приоритет тем из briefingStyle, дефолтное поведение для крупных событий)
+- **maxSteps** — 8 → 30 (поддержка множественных параллельных fetchUrl при онбординге)
+- **Edit mode** — briefingStyle отображается в preview и передаётся в контекст онбординга
+- **saveBriefingProfile** — передаёт briefingStyle в addBriefingTopic
+- **briefing-author.ts** — buildUserMessage форматирует topics с briefingStyle
+
+### Fixed
+- **Sidebar history bug** — после множественных генераций в один день прошлые выпуски исчезали из сайдбара (`generating`-строки заполняли `limit: 10`)
+
+---
+
 ## [3.33.0] - 2026-02-20 - Briefing Generation Progress (ТЗ-А5)
 
 **MINOR RELEASE**: Живой прогресс генерации брифинга. Streaming progress через JSON Lines заменяет слепой спиннер. 4 шага pipeline (подключение → сбор → фильтрация → написание) с реальными данными от сервера.

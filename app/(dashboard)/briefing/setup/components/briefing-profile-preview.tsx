@@ -16,6 +16,7 @@ export interface BriefingTopic {
   topicId: string;
   topicName: string;
   emoji: string;
+  briefingStyle?: string;
 }
 
 export interface BriefingSource {
@@ -102,13 +103,20 @@ export function BriefingProfilePreview({
                 className="animate-in fade-in duration-300"
               >
                 {/* Topic header */}
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="text-base">{topic.emoji}</span>
-                  <span className="text-sm font-medium">{topic.topicName}</span>
-                  {topicSources.length > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      ({topicSources.length})
-                    </span>
+                <div className="mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{topic.emoji}</span>
+                    <span className="text-sm font-medium">{topic.topicName}</span>
+                    {topicSources.length > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        ({topicSources.length})
+                      </span>
+                    )}
+                  </div>
+                  {topic.briefingStyle && (
+                    <p className="ml-7 mt-0.5 text-xs text-muted-foreground leading-snug">
+                      {topic.briefingStyle}
+                    </p>
                   )}
                 </div>
 

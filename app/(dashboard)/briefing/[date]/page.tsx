@@ -70,9 +70,8 @@ export default async function BriefingDateRoute({
   const article = briefing.briefingJson as unknown as BriefingArticle;
   const hasValidArticle = article?.sections && article.sections.length > 0;
 
-  // Load history for sidebar (limit 10, deduplicate by date)
-  const historyRows = await getBriefingHistory({ userId, limit: 10 });
-  const readyBriefings = historyRows.filter((h) => h.status === "ready");
+  // Load history for sidebar (limit 10, only ready — ТЗ-HF1 fix)
+  const readyBriefings = await getBriefingHistory({ userId, limit: 10, status: "ready" });
 
   const seenDates = new Set<string>();
   const historyItems: BriefingHistoryItem[] = [];

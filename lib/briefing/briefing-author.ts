@@ -173,9 +173,12 @@ function buildUserMessage(
   const dayOfWeek = RUSSIAN_DAYS[dateObj.getUTCDay()];
   const dateFormatted = `${date} (${dayOfWeek})`;
 
-  // Format topics
+  // Format topics with briefingStyle
   const topicsFormatted = userTopics
-    .map((t) => `${t.emoji} ${t.topicName} (id: ${t.topicId})`)
+    .map((t) => {
+      const base = `- ${t.emoji} ${t.topicName} (id: ${t.topicId})`;
+      return t.briefingStyle ? `${base}: "${t.briefingStyle}"` : base;
+    })
     .join("\n");
 
   // Format candidates

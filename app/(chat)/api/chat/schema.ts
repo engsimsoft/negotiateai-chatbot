@@ -3,7 +3,7 @@ import { chatModeSchema } from "@/lib/ai/chat-mode-config";
 
 const textPartSchema = z.object({
   type: z.enum(["text"]),
-  text: z.string().min(1).max(2000),
+  text: z.string().min(1).max(16000),
 });
 
 const filePartSchema = z.object({

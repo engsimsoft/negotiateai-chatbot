@@ -48,6 +48,7 @@ export default async function BriefingSetupRoute() {
         topicId: t.topicId,
         topicName: t.topicName,
         emoji: t.emoji,
+        briefingStyle: t.briefingStyle ?? undefined,
       })),
       sources: sources.map((s) => ({
         topicId: s.topicId,

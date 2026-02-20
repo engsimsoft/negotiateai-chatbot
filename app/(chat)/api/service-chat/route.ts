@@ -249,7 +249,10 @@ async function buildBriefingEditModeInjection(userId: string): Promise<string> {
   settingsLines.push(`- Количество новостей: ${settings?.maxItems ?? 15}`);
 
   const topicsLines = topics.length > 0
-    ? topics.map(t => `- ${t.emoji} ${t.topicName} (id: ${t.topicId})`).join("\n")
+    ? topics.map(t => {
+        const base = `- ${t.emoji} ${t.topicName} (id: ${t.topicId})`;
+        return t.briefingStyle ? `${base}: "${t.briefingStyle}"` : base;
+      }).join("\n")
     : "- (нет тем)";
 
   const sourcesLines = sources.length > 0
@@ -648,6 +651,7 @@ export async function POST(request: Request) {
           topicId: z.string().describe("Латиница, slug, lowercase"),
           topicName: z.string().describe("Название темы на русском"),
           emoji: z.string().describe("Одна emoji для темы"),
+          briefingStyle: z.string().optional().describe("Инструкция автору: глубина, фокус, стиль подачи по этой теме (1-3 предложения)"),
         })).describe("Список тем брифинга (макс. 8)"),
         sources: z.array(z.object({
           topicId: z.string().describe("ID темы к которой относится источник"),
@@ -696,6 +700,7 @@ export async function POST(request: Request) {
               topicName: t.topicName,
               emoji: t.emoji,
               orderIndex: i,
+              briefingStyle: t.briefingStyle ?? null,
             });
           }
 
@@ -759,8 +764,8 @@ export async function POST(request: Request) {
       content: extractMessageContent(msg),
     }));
 
-    // Dynamic step count: briefing-onboarding needs more steps for multiple deepResearch calls
-    const maxSteps = context === "briefing-onboarding" ? 8 : 3;
+    // Dynamic step count: briefing-onboarding needs many steps for deepResearch + fetchUrl + updatePreview per topic
+    const maxSteps = context === "briefing-onboarding" ? 30 : 3;
 
     // Stream response
     const result = streamText({

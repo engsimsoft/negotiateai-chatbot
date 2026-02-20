@@ -12,11 +12,11 @@ export async function GET() {
   const userId = session.user.id;
 
   const [historyRows, settings] = await Promise.all([
-    getBriefingHistory({ userId, limit: 1 }),
+    getBriefingHistory({ userId, limit: 1, status: "ready" }),
     getBriefingSettings({ userId }),
   ]);
 
-  const briefing = historyRows.find((h) => h.status === "ready") ?? null;
+  const briefing = historyRows[0] ?? null;
 
   return Response.json({ briefing, settings });
 }

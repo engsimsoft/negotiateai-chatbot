@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.33.0
+**Версия:** 3.33.1
 **Дата:** 2026-02-20
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -328,6 +328,24 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-HF1: Briefing PE Update — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **briefingStyle** — новое поле в `BriefingTopics` (text, nullable) для персонализированных инструкций автору
+- **Промпты обновлены** — onboarding v6 (обязательная верификация fetchUrl, приоритет тем), author v3 (приоритет тем, крупные события)
+- **maxSteps: 30** — увеличен лимит tool-шагов для поддержки параллельных fetchUrl
+- **Edit mode** — briefingStyle отображается в preview и передаётся в контекст
+- **Sidebar history fix** — `getBriefingHistory()` фильтрует по `status='ready'` в SQL
+
+**Ключевые файлы:**
+- `lib/db/schema.ts` — +briefingStyle
+- `lib/db/queries.ts` — обновлён addBriefingTopic, getBriefingHistory (status filter)
+- `app/(chat)/api/service-chat/route.ts` — Zod schema, saveBriefingProfile, maxSteps
+- `lib/prompts/service-chats/briefing-onboarding.md` — v6
+- `lib/prompts/briefing/briefing-author.md` — v3
+
+**Детали:** [_archive/TZ_HF1_BriefingSetupUpdate/](_archive/TZ_HF1_BriefingSetupUpdate/)
 
 ### ТЗ-А5: Briefing Generation Progress — ✅ ЗАВЕРШЁН
 
@@ -1204,6 +1222,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_HF1_BriefingSetupUpdate/](_archive/TZ_HF1_BriefingSetupUpdate/) — ТЗ-HF1 Briefing PE Update
 - [_archive/TZ_PX_DeepResearch/](_archive/TZ_PX_DeepResearch/) — ТЗ-PX + ТЗ-FU Deep Research + Fetch URL
 - [_archive/TZ_BR1_BriefingBackend/](_archive/TZ_BR1_BriefingBackend/) — ТЗ-BR1 Morning Briefing Backend
 - [_archive/TZ_RG_RouteGroups/](_archive/TZ_RG_RouteGroups/) — ТЗ-RG Route Groups

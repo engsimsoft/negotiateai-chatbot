@@ -232,6 +232,13 @@
       "when": 1771545600000,
       "tag": "0032_briefing-topics",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1771632000000,
+      "tag": "0033_add-briefing-style",
+      "breakpoints": true
     }
   ]
 }
