@@ -4,10 +4,9 @@ import { auth } from "@/app/(auth)/auth";
 import {
   getBriefingSettings,
   getBriefingHistory,
+  getBriefingByDate,
 } from "@/lib/db/queries";
-import { BriefingPage } from "@/components/briefing/briefing-page";
 import { BriefingIssueHeader } from "@/components/briefing/briefing-issue-header";
-import { NoBriefingsYet } from "@/components/briefing/briefing-article-view";
 import { BriefingSidebarMobile } from "@/components/briefing/briefing-sidebar";
 import { BriefingIssueContent } from "@/components/briefing/briefing-issue-content";
 import type { BriefingArticle } from "@/lib/briefing/briefing-types";
@@ -18,46 +17,63 @@ const RUSSIAN_MONTHS_GENITIVE = [
   "июля", "августа", "сентября", "октября", "ноября", "декабря",
 ];
 
-/** Convert Date to YYYY-MM-DD in user timezone */
 function formatDateForUrl(date: Date, timezone: string): string {
   return date.toLocaleDateString("en-CA", { timeZone: timezone });
 }
 
-/** Format "YYYY-MM-DD" → "20 февраля" */
 function formatDateLabel(dateStr: string): string {
   const [, month, day] = dateStr.split("-");
   const monthIdx = parseInt(month, 10) - 1;
   return `${parseInt(day, 10)} ${RUSSIAN_MONTHS_GENITIVE[monthIdx]}`;
 }
 
-export default async function BriefingRoute() {
+/**
+ * ТЗ-А4 Этап 3: Route for a specific briefing issue by date.
+ * /briefing/2026-02-20 → shows that day's briefing with sidebar.
+ * Redirects to /briefing if date is invalid or no briefing found.
+ */
+export default async function BriefingDateRoute({
+  params,
+}: {
+  params: Promise<{ date: string }>;
+}) {
   const session = await auth();
+  if (!session?.user?.id) redirect("/login");
 
-  if (!session?.user?.id) {
-    redirect("/login");
+  const { date } = await params;
+
+  // Validate date format (YYYY-MM-DD)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    redirect("/briefing");
+  }
+
+  // Validate it's a real date
+  const parsed = new Date(`${date}T00:00:00`);
+  if (isNaN(parsed.getTime())) {
+    redirect("/briefing");
   }
 
   const userId = session.user.id;
   const settings = await getBriefingSettings({ userId });
 
-  // ТЗ-А2: профиль активен → показываем выпуск / заглушку, нет → лендинг
   if (!settings?.isActive) {
-    return <BriefingPage />;
+    redirect("/briefing");
   }
 
-  // ТЗ-А4: load history for sidebar (limit 10)
   const timezone = settings.timezone || "Europe/Moscow";
-  const historyRows = await getBriefingHistory({ userId, limit: 10 });
-  const readyBriefings = historyRows.filter((h) => h.status === "ready");
-  const latestBriefing = readyBriefings[0] ?? null;
+  const briefing = await getBriefingByDate({ userId, date, timezone });
 
-  // Parse article, guard against old format
-  const article = latestBriefing
-    ? (latestBriefing.briefingJson as unknown as BriefingArticle)
-    : null;
+  if (!briefing) {
+    redirect("/briefing");
+  }
+
+  const article = briefing.briefingJson as unknown as BriefingArticle;
   const hasValidArticle = article?.sections && article.sections.length > 0;
 
-  // Prepare history items for sidebar (deduplicate by date — multiple per day possible)
+  // Load history for sidebar (limit 10, deduplicate by date)
+  const historyRows = await getBriefingHistory({ userId, limit: 10 });
+  const readyBriefings = historyRows.filter((h) => h.status === "ready");
+
   const seenDates = new Set<string>();
   const historyItems: BriefingHistoryItem[] = [];
   for (const h of readyBriefings) {
@@ -66,35 +82,42 @@ export default async function BriefingRoute() {
     seenDates.add(dateStr);
     historyItems.push({ date: dateStr, label: formatDateLabel(dateStr) });
   }
-  const currentDate = historyItems[0]?.date;
 
-  // Sidebar props (shared between desktop and mobile)
+  // Exclude current date from history list
+  const historyForSidebar = historyItems.filter((item) => item.date !== date);
+
   const sidebarProps = {
     sections: hasValidArticle ? article.sections : [],
-    history: historyItems.slice(1), // exclude current issue
-    currentDate,
+    history: historyForSidebar,
+    currentDate: date,
   };
 
   return (
     <div className="flex min-h-svh flex-col bg-muted/30">
       <BriefingIssueHeader
-        title={hasValidArticle ? article.title : "☀️ Утренний брифинг"}
+        title={hasValidArticle ? article.title : `☀️ Выпуск · ${formatDateLabel(date)}`}
         mobileTrigger={
           hasValidArticle ? (
             <BriefingSidebarMobile {...sidebarProps} />
           ) : undefined
         }
       />
-
       {hasValidArticle ? (
         <BriefingIssueContent
           article={article}
-          history={historyItems.slice(1)}
-          currentDate={currentDate}
+          history={historyForSidebar}
+          currentDate={date}
         />
       ) : (
-        <main className="flex-1">
-          <NoBriefingsYet />
+        <main className="flex-1 py-16 text-center">
+          <span className="mb-4 inline-block text-5xl">📰</span>
+          <h2 className="mb-3 font-serif text-xl font-semibold">
+            Старый формат выпуска
+          </h2>
+          <p className="mx-auto max-w-sm text-muted-foreground">
+            Этот выпуск был создан в предыдущей версии и не может быть
+            отображён в новом формате статьи.
+          </p>
         </main>
       )}
     </div>

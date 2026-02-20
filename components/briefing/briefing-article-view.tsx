@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,13 +18,57 @@ import type {
 
 interface BriefingArticleViewProps {
   article: BriefingArticle;
+  /** Scroll spy callback — fires with active section topicId */
+  onActiveSectionChange?: (id: string | null) => void;
 }
 
 /**
  * ТЗ-А4: Full article reader — intro, sections (markdown + collapsible sources), outro, meta.
- * Each section has id={topicId} for scroll-to from sidebar (Этап 3).
+ * Each section has id={topicId} for scroll-to from sidebar.
+ * IntersectionObserver scroll spy updates activeSectionId in parent.
  */
-export function BriefingArticleView({ article }: BriefingArticleViewProps) {
+export function BriefingArticleView({
+  article,
+  onActiveSectionChange,
+}: BriefingArticleViewProps) {
+  const callbackRef = useRef(onActiveSectionChange);
+  callbackRef.current = onActiveSectionChange;
+
+  useEffect(() => {
+    if (!callbackRef.current) return;
+
+    const topicIds = article.sections.map((s) => s.topicId);
+    const sectionEls = topicIds
+      .map((id) => document.getElementById(id))
+      .filter(Boolean) as HTMLElement[];
+
+    if (sectionEls.length === 0) return;
+
+    const visibleIds = new Set<string>();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            visibleIds.add(entry.target.id);
+          } else {
+            visibleIds.delete(entry.target.id);
+          }
+        }
+        // Pick first visible section in document order
+        const active = topicIds.find((id) => visibleIds.has(id)) ?? null;
+        callbackRef.current?.(active);
+      },
+      {
+        // Header 56px + player ~60px = 116px from top; bottom 40% ignored
+        rootMargin: "-116px 0px -40% 0px",
+      }
+    );
+
+    sectionEls.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [article.sections]);
+
   return (
     <article className="mx-auto w-full max-w-2xl px-4 py-6 lg:px-6">
       {/* Meta */}
