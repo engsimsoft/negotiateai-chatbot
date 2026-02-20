@@ -1,7 +1,7 @@
-// ТЗ-BR1: POST /api/briefing/generate — generate morning briefing
+// ТЗ-А3: POST /api/briefing/generate — generate morning briefing (article format)
 
 import { auth } from "@/app/(auth)/auth";
-import { analyzeContent } from "@/lib/briefing/briefing-analyzer";
+import { generateArticle } from "@/lib/briefing/briefing-author";
 import { MAX_BRIEFING_ITEMS } from "@/lib/briefing/briefing-config";
 import { filterContent } from "@/lib/briefing/briefing-filter";
 import { fetchSource } from "@/lib/briefing/source-fetchers";
@@ -10,11 +10,12 @@ import { getDefaultSources, getTopicIds } from "@/lib/briefing/topics-catalog";
 import {
   getBriefingSettings,
   getBriefingSources,
+  getBriefingTopics,
   saveBriefingHistory,
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
 
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 export async function POST() {
   const session = await auth();
@@ -26,15 +27,18 @@ export async function POST() {
   const userId = session.user.id;
 
   try {
-    // 1. Get user settings
-    const settings = await getBriefingSettings({ userId });
+    // 1. Get user settings + topics
+    const [settings, userTopics] = await Promise.all([
+      getBriefingSettings({ userId }),
+      getBriefingTopics({ userId }),
+    ]);
     const language = settings?.language ?? "ru";
     const maxItems = settings?.maxItems ?? MAX_BRIEFING_ITEMS;
 
     // 2. Get user sources (or defaults)
     const userSources = await getBriefingSources({ userId });
 
-    // ТЗ-BR3: Build tierMap alongside sourcesToFetch
+    // Build tierMap alongside sourcesToFetch
     const tierMap = new Map<string, string>();
 
     const sourcesToFetch =
@@ -61,7 +65,7 @@ export async function POST() {
           });
 
     // 3. Create initial history record (status: generating)
-    const historyRecord = await saveBriefingHistory({
+    await saveBriefingHistory({
       userId,
       briefingJson: {},
       sourcesChecked: sourcesToFetch.length,
@@ -90,7 +94,6 @@ export async function POST() {
     }
 
     if (allItems.length === 0) {
-      // No content fetched — mark as failed
       await saveBriefingHistory({
         userId,
         briefingJson: { error: "No content fetched", errors: allErrors },
@@ -106,58 +109,60 @@ export async function POST() {
     }
 
     // 5. Stage 1: Filter (Gemini Flash)
-    const topicIds = getTopicIds();
+    // Use user topics if available, fallback to catalog topics
+    const topicIds =
+      userTopics.length > 0
+        ? userTopics.map((t) => t.topicId)
+        : getTopicIds();
+
     const { candidates, tokensUsed: filterTokens } = await filterContent(
       allItems,
       topicIds,
     );
 
-    // 6. Stage 2: Analyze (Gemini Pro)
+    // 6. Stage 2: Author (Gemini Pro) — generate article
     const fullTextsMap = new Map<string, RawContent>();
     for (const item of allItems) {
       fullTextsMap.set(item.url, item);
     }
 
-    const { briefing, tokensUsed: analyzerTokens } = await analyzeContent({
+    const today = new Date().toISOString().split("T")[0];
+
+    const { article, tokensUsed: authorTokens } = await generateArticle({
       candidates,
       fullTexts: fullTextsMap,
       tierMap,
+      userTopics,
       language,
       maxItems,
-      totalSourcesChecked: sourcesToFetch.length,
+      date: today,
     });
-
-    const totalItems = briefing.blocks.reduce(
-      (sum, block) => sum + block.items.length,
-      0,
-    );
 
     // 7. Save final result
     await saveBriefingHistory({
       userId,
-      briefingJson: briefing,
+      briefingJson: article,
       sourcesChecked: sourcesToFetch.length,
-      itemsIncluded: totalItems,
+      itemsIncluded: article.meta.totalNews,
       duplicatesRemoved: allItems.length - candidates.length,
-      tokensUsed: filterTokens + analyzerTokens,
+      tokensUsed: filterTokens + authorTokens,
       status: "ready",
     });
 
     return Response.json({
-      briefingJson: briefing,
+      briefingJson: article,
       meta: {
         sourcesChecked: sourcesToFetch.length,
         rawItems: allItems.length,
         candidates: candidates.length,
-        finalItems: totalItems,
-        tokensUsed: filterTokens + analyzerTokens,
+        finalItems: article.meta.totalNews,
+        tokensUsed: filterTokens + authorTokens,
         errors: allErrors.length,
       },
     });
   } catch (err) {
     console.error("[Briefing] Generation failed:", err);
 
-    // Save failure record
     await saveBriefingHistory({
       userId,
       briefingJson: {

@@ -19,15 +19,15 @@ export const MAX_CONTENT_LENGTH = 1000;
 export const FRESHNESS_HOURS = 24;
 
 /** API route max duration (seconds) */
-export const ROUTE_MAX_DURATION = 60;
+export const ROUTE_MAX_DURATION = 90;
 
 // --- AI Models ---
 
 /** Stage 1: Filter — cheap & fast */
 export const FILTER_MODEL = "gemini-2.0-flash";
 
-/** Stage 2: Analyzer — smart & quality */
-export const ANALYZER_MODEL = "gemini-3-pro-preview";
+/** Stage 2: Author — article generation */
+export const AUTHOR_MODEL = "gemini-3-pro-preview";
 
-/** Fallback analyzer if primary is unavailable */
-export const ANALYZER_MODEL_FALLBACK = "gemini-2.5-pro";
+/** Fallback author if primary is unavailable */
+export const AUTHOR_MODEL_FALLBACK = "gemini-2.5-pro";

@@ -1,26 +1,37 @@
-// ТЗ-BR2: Shared BriefingJSON types (client-safe)
-// Extracted from briefing-analyzer.ts for use in UI components
+// ТЗ-А3: Shared BriefingArticle types (client-safe)
+// Replaces old BriefingJSON/BriefingBlock/BriefingItem (v3.30.0)
 
-export interface BriefingItem {
+/** Source card within an article section */
+export interface BriefingArticleSource {
   title: string;
-  summary: string;
-  importance: "high" | "medium" | "low";
-  sourceUrl: string;
+  url: string;
   sourceName: string;
-  sourceLanguage: string;
-  publishedAt?: string;
+  tier: string;
+  summary: string;
 }
 
-export interface BriefingBlock {
+/** Article section (one topic) */
+export interface BriefingArticleSection {
   topicId: string;
   topicName: string;
   emoji: string;
-  items: BriefingItem[];
+  content: string;
+  newsCount: number;
+  sources: BriefingArticleSource[];
 }
 
-export interface BriefingJSON {
-  date: string;
-  totalSourcesChecked: number;
-  totalCandidates: number;
-  blocks: BriefingBlock[];
+/** Article metadata */
+export interface BriefingArticleMeta {
+  totalNews: number;
+  topicsCount: number;
+  readingTimeMinutes: number;
+}
+
+/** Full briefing article (one issue) */
+export interface BriefingArticle {
+  title: string;
+  intro: string;
+  sections: BriefingArticleSection[];
+  outro: string;
+  meta: BriefingArticleMeta;
 }

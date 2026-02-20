@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowRight, Loader2, Sun } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import type { BriefingHistory } from "@/lib/db/schema";
-import type { BriefingJSON } from "@/lib/briefing/briefing-types";
+import type { BriefingArticle } from "@/lib/briefing/briefing-types";
 
 interface BriefingCardProps {
   latestBriefing: BriefingHistory | null;
@@ -26,11 +26,10 @@ export function BriefingCard({ latestBriefing }: BriefingCardProps) {
 
   // State: ready — show counters
   if (latestBriefing?.status === "ready") {
-    const briefingJson = latestBriefing.briefingJson as BriefingJSON;
-    const totalItems = briefingJson.blocks?.reduce(
-      (sum, block) => sum + block.items.length,
-      0,
-    ) ?? 0;
+    const article = latestBriefing.briefingJson as BriefingArticle | null;
+    const totalItems = article?.meta?.totalNews
+      ?? article?.sections?.reduce((s: number, sec: { newsCount?: number }) => s + (sec.newsCount ?? 0), 0)
+      ?? 0;
 
     return (
       <Link

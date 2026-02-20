@@ -3,19 +3,24 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Settings, Loader2 } from "lucide-react";
+import { ArrowRight, Settings, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MarkdownViewer } from "@/components/markdown-viewer";
 import { BriefingHeader } from "./briefing-header";
 import type { BriefingHistory } from "@/lib/db/schema";
-import type { BriefingJSON, BriefingBlock } from "@/lib/briefing/briefing-types";
+import type {
+  BriefingArticle,
+  BriefingArticleSection,
+  BriefingArticleSource,
+} from "@/lib/briefing/briefing-types";
 
 interface BriefingActivePageProps {
   briefing: BriefingHistory | null;
 }
 
 /**
- * ТЗ-A2: Active briefing page — shows latest issue or "no issues yet" state.
- * Displayed when user has an active briefing profile (isActive=true).
+ * ТЗ-А3: Active briefing page — shows latest article or "no issues yet" state.
+ * Temporary UI until ТЗ-А4 (full article reader).
  */
 export function BriefingActivePage({ briefing }: BriefingActivePageProps) {
   return (
@@ -43,65 +48,125 @@ export function BriefingActivePage({ briefing }: BriefingActivePageProps) {
   );
 }
 
-/* --- Latest briefing issue --- */
+/* --- Latest briefing issue (article format) --- */
 
 function BriefingIssue({ briefing }: { briefing: BriefingHistory }) {
-  const data = briefing.briefingJson as unknown as BriefingJSON;
-  const date = new Date(briefing.generatedAt).toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const article = briefing.briefingJson as unknown as BriefingArticle;
+
+  // Guard: old format or malformed data
+  if (!article?.sections) {
+    return (
+      <div className="py-16 text-center">
+        <span className="mb-4 inline-block text-5xl">☀️</span>
+        <h2 className="mb-3 font-serif text-xl font-semibold">
+          Выпуск доступен в старом формате
+        </h2>
+        <p className="text-muted-foreground">
+          Сгенерируйте новый брифинг для просмотра в формате статьи.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
+      {/* Title + meta */}
       <div className="mb-6 text-center">
         <span className="mb-2 inline-block text-4xl">☀️</span>
-        <h2 className="font-serif text-xl font-semibold">Выпуск за {date}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {data.blocks.reduce((sum, b) => sum + b.items.length, 0)} новостей из{" "}
-          {data.totalSourcesChecked} источников
-        </p>
+        <h2 className="font-serif text-xl font-semibold">{article.title}</h2>
+        {article.meta && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {article.meta.totalNews} новостей · {article.meta.topicsCount} тем
+            · {article.meta.readingTimeMinutes} мин чтения
+          </p>
+        )}
       </div>
 
+      {/* Intro */}
+      {article.intro && (
+        <div className="mb-6 rounded-xl border bg-background p-5">
+          <p className="text-foreground leading-relaxed">{article.intro}</p>
+        </div>
+      )}
+
+      {/* Sections */}
       <div className="space-y-4">
-        {data.blocks.map((block) => (
-          <IssueBlock key={block.topicId} block={block} />
+        {article.sections.map((section) => (
+          <ArticleSection key={section.topicId} section={section} />
         ))}
       </div>
+
+      {/* Outro */}
+      {article.outro && (
+        <div className="mt-6 text-center">
+          <p className="text-sm text-muted-foreground italic">
+            {article.outro}
+          </p>
+        </div>
+      )}
     </>
   );
 }
 
-function IssueBlock({ block }: { block: BriefingBlock }) {
+/* --- Article section with content + sources --- */
+
+function ArticleSection({ section }: { section: BriefingArticleSection }) {
   return (
     <div className="rounded-xl border bg-background p-5">
       <h3 className="mb-3 flex items-center gap-2 font-semibold">
-        <span>{block.emoji}</span>
-        <span>{block.topicName}</span>
+        <span>{section.emoji}</span>
+        <span>{section.topicName}</span>
         <span className="text-xs font-normal text-muted-foreground">
-          ({block.items.length})
+          ({section.newsCount})
         </span>
       </h3>
-      <div className="space-y-3">
-        {block.items.map((item) => (
-          <div key={item.sourceUrl}>
-            <a
-              href={item.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-foreground hover:underline"
-            >
-              {item.title}
-            </a>
-            <p className="mt-1 text-sm text-muted-foreground">{item.summary}</p>
-            <p className="mt-1 text-xs text-muted-foreground/70">
-              {item.sourceName}
-            </p>
+
+      {/* Markdown content */}
+      <MarkdownViewer content={section.content} className="text-sm" />
+
+      {/* Sources */}
+      {section.sources?.length > 0 && (
+        <div className="mt-4 border-t pt-3">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Источники
+          </p>
+          <div className="space-y-2">
+            {section.sources.map((source) => (
+              <SourceCard key={source.url} source={source} />
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+/* --- Source card --- */
+
+function SourceCard({ source }: { source: BriefingArticleSource }) {
+  return (
+    <a
+      href={source.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex items-start gap-2 rounded-lg p-2 transition-colors hover:bg-muted/60"
+    >
+      <ExternalLink className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary" />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium text-foreground group-hover:underline">
+          {source.title}
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">{source.summary}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground/70">
+          {source.sourceName}
+          {source.tier && source.tier !== "unknown" && (
+            <span className="ml-1.5 rounded bg-muted px-1 py-0.5 text-[10px]">
+              {source.tier}
+            </span>
+          )}
+        </p>
+      </div>
+    </a>
   );
 }
 
