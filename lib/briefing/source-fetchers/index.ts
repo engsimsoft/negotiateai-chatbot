@@ -1,4 +1,4 @@
-// ТЗ-BR1: Source fetcher dispatcher
+// ТЗ-BR1 + ТЗ-WS2: Source fetcher dispatcher
 
 import { fetchRSS } from "./rss-fetcher";
 import { fetchTelegram } from "./telegram-fetcher";
@@ -20,7 +20,7 @@ interface SourceInfo {
 /**
  * Dispatches to the correct fetcher based on fetchMethod.
  * For 'rss' — uses rssUrl if available, otherwise url.
- * For 'jina' — uses web fetcher (Readability + JSDOM).
+ * For 'jina' — uses Jina Reader API via forceJina (ТЗ-WS2).
  * For 'telegram_parse' — uses Telegram web preview parser.
  */
 export async function fetchSource(source: SourceInfo): Promise<FetchResult> {
@@ -36,7 +36,9 @@ export async function fetchSource(source: SourceInfo): Promise<FetchResult> {
         source.sourceLanguage,
       );
     case "jina":
-      return fetchWeb(source.url, source.sourceName, source.sourceLanguage);
+      return fetchWeb(source.url, source.sourceName, source.sourceLanguage, {
+        forceJina: true,
+      });
     default:
       return {
         items: [],

@@ -21,6 +21,9 @@ export const FRESHNESS_HOURS = 24;
 /** API route max duration (seconds) */
 export const ROUTE_MAX_DURATION = 90;
 
+/** Jina Reader API timeout (ms) */
+export const JINA_READER_TIMEOUT = 10_000;
+
 // --- AI Models ---
 
 /** Stage 1: Filter — cheap & fast */

@@ -1,5 +1,5 @@
 /**
- * ТЗ-FU + ТЗ-WS1: Shared utility for fetching and extracting web page content.
+ * ТЗ-FU + ТЗ-WS1 + ТЗ-WS2: Shared utility for fetching and extracting web page content.
  *
  * Extracted from lib/briefing/source-fetchers/web-fetcher.ts to avoid
  * duplication between the briefing fetcher and the fetchUrl tool.
@@ -7,6 +7,9 @@
  *
  * ТЗ-WS1: Added charset detection (windows-1251, koi8-r, etc.)
  * and improved fallback via JSDOM DOM API for semantic tags.
+ *
+ * ТЗ-WS2: Jina Reader API as cascading fallback + options object + source tracking.
+ * Cascade: Readability (8s) → semantic → Jina (10s) → graceful degradation.
  */
 
 import { Readability } from "@mozilla/readability";
@@ -14,16 +17,28 @@ import { detect } from "chardet";
 import * as iconv from "iconv-lite";
 import { JSDOM } from "jsdom";
 
+import { jinaReader } from "./jina-reader";
+
+export type FetchPageSource = "readability" | "semantic" | "jina";
+
 export interface FetchPageResult {
   title: string;
   content: string;
   url: string;
   originalLength: number;
+  source: FetchPageSource;
+}
+
+export interface FetchPageOptions {
+  maxLength?: number;
+  timeoutMs?: number;
+  forceJina?: boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 15_000;
+const CASCADE_TIMEOUT_MS = 8_000;
 const DEFAULT_MAX_LENGTH = 10_000;
-const MIN_CONTENT_LENGTH = 200;
+const MIN_CONTENT_LENGTH = 5_000;
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -92,66 +107,119 @@ function extractSemanticText(document: Document): string {
 }
 
 /**
- * Fetch a URL and extract readable text via Readability + JSDOM.
+ * Fetch a URL and extract readable text via cascading strategy:
+ * 1. forceJina → skip Readability, go directly to Jina Reader
+ * 2. Readability (8s timeout in cascade) → if >= 200 chars → done
+ * 3. Semantic fallback (JSDOM DOM API) → if >= 200 chars → done
+ * 4. Jina Reader API (10s timeout) → if content → done
+ * 5. Graceful degradation: return whatever we have
+ *
  * Supports non-UTF-8 encodings (windows-1251, koi8-r, etc.).
  *
  * @param pageUrl - URL to fetch
- * @param maxLength - Max characters of extracted text (default 10 000)
- * @param timeoutMs - Fetch timeout in ms (default 15 000)
+ * @param options - Optional configuration
  * @returns Extracted page content or throws on failure
  */
 export async function fetchPage(
   pageUrl: string,
-  maxLength: number = DEFAULT_MAX_LENGTH,
-  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  options?: FetchPageOptions,
 ): Promise<FetchPageResult> {
-  const response = await fetch(pageUrl, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      Accept: "text/html,application/xhtml+xml",
-    },
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  const maxLength = options?.maxLength ?? DEFAULT_MAX_LENGTH;
+  const forceJina = options?.forceJina ?? false;
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  // ТЗ-WS2: forceJina — skip Readability, go directly to Jina
+  if (forceJina) {
+    const jinaResult = await jinaReader(pageUrl);
+    if (jinaResult && jinaResult.content.length > 0) {
+      return {
+        title: pageUrl,
+        content: jinaResult.content.slice(0, maxLength),
+        url: pageUrl,
+        originalLength: jinaResult.content.length,
+        source: "jina",
+      };
+    }
+    // forceJina failed — fall through to Readability as last resort
   }
 
-  // ТЗ-WS1: Read as binary buffer, detect charset, decode
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const contentType = response.headers.get("content-type");
-  const charset = detectCharset(buffer, contentType);
-  const html = decodeBuffer(buffer, charset);
+  // ТЗ-WS2: Use shorter timeout (8s) when cascade is active, full timeout otherwise
+  const timeoutMs = options?.timeoutMs ?? (forceJina ? DEFAULT_TIMEOUT_MS : CASCADE_TIMEOUT_MS);
 
-  const dom = new JSDOM(html, { url: pageUrl });
-  const reader = new Readability(dom.window.document);
-  const article = reader.parse();
+  let readabilityText: string | undefined;
+  let articleTitle: string | undefined;
+  let semanticText: string | undefined;
 
-  const readabilityText = article?.textContent?.replace(/\s+/g, " ").trim();
+  try {
+    const response = await fetch(pageUrl, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "text/html,application/xhtml+xml",
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
 
-  // If Readability extracted enough content — use it
-  if (readabilityText && readabilityText.length >= MIN_CONTENT_LENGTH) {
-    return {
-      title: article?.title || pageUrl,
-      content: readabilityText.slice(0, maxLength),
-      url: pageUrl,
-      originalLength: readabilityText.length,
-    };
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+
+    // ТЗ-WS1: Read as binary buffer, detect charset, decode
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const contentType = response.headers.get("content-type");
+    const charset = detectCharset(buffer, contentType);
+    const html = decodeBuffer(buffer, charset);
+
+    const dom = new JSDOM(html, { url: pageUrl });
+    const reader = new Readability(dom.window.document);
+    const article = reader.parse();
+
+    readabilityText = article?.textContent?.replace(/\s+/g, " ").trim();
+    articleTitle = article?.title ?? undefined;
+
+    // If Readability extracted enough content — use it
+    if (readabilityText && readabilityText.length >= MIN_CONTENT_LENGTH) {
+      return {
+        title: articleTitle || pageUrl,
+        content: readabilityText.slice(0, maxLength),
+        url: pageUrl,
+        originalLength: readabilityText.length,
+        source: "readability",
+      };
+    }
+
+    // ТЗ-WS1: Improved fallback — extract from semantic tags via JSDOM DOM API
+    semanticText = extractSemanticText(dom.window.document);
+
+    if (semanticText.length >= MIN_CONTENT_LENGTH) {
+      return {
+        title: articleTitle || pageUrl,
+        content: semanticText.slice(0, maxLength),
+        url: pageUrl,
+        originalLength: semanticText.length,
+        source: "semantic",
+      };
+    }
+  } catch (error) {
+    // Readability/fetch failed — continue to Jina fallback
+    console.warn(
+      `[fetchPage] Readability failed for ${pageUrl}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
-  // ТЗ-WS1: Improved fallback — extract from semantic tags via JSDOM DOM API
-  const semanticText = extractSemanticText(dom.window.document);
-
-  if (semanticText.length >= MIN_CONTENT_LENGTH) {
-    return {
-      title: article?.title || pageUrl,
-      content: semanticText.slice(0, maxLength),
-      url: pageUrl,
-      originalLength: semanticText.length,
-    };
+  // ТЗ-WS2: Jina Reader as final fallback (only if not already tried via forceJina)
+  if (!forceJina) {
+    const jinaResult = await jinaReader(pageUrl);
+    if (jinaResult && jinaResult.content.length > 0) {
+      return {
+        title: articleTitle || pageUrl,
+        content: jinaResult.content.slice(0, maxLength),
+        url: pageUrl,
+        originalLength: jinaResult.content.length,
+        source: "jina",
+      };
+    }
   }
 
-  // Last resort: use whatever we have (Readability partial or semantic partial)
+  // Graceful degradation: return whatever partial content we have
   const bestText = readabilityText || semanticText;
 
   if (!bestText) {
@@ -159,9 +227,10 @@ export async function fetchPage(
   }
 
   return {
-    title: article?.title || pageUrl,
+    title: articleTitle || pageUrl,
     content: bestText.slice(0, maxLength),
     url: pageUrl,
     originalLength: bestText.length,
+    source: readabilityText ? "readability" : "semantic",
   };
 }

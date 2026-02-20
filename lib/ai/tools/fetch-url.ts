@@ -35,19 +35,20 @@ export const fetchUrl = tool({
   execute: wrapToolExecution(
     {
       name: "fetchUrl",
-      timeout: 20000, // 20 seconds
+      timeout: 30000, // 30 seconds (Readability 8s + Jina 10s cascade)
       enableLogging: true,
     },
     async ({ url, maxLength = 10000 }) => {
       console.log("[fetchUrl] Fetching:", url, { maxLength });
 
       try {
-        const result = await fetchPage(url, maxLength);
+        const result = await fetchPage(url, { maxLength });
 
         console.log("[fetchUrl] Success:", {
           title: result.title,
           contentLength: result.content.length,
           originalLength: result.originalLength,
+          source: result.source,
           truncated: result.originalLength > maxLength,
         });
 
@@ -56,6 +57,7 @@ export const fetchUrl = tool({
           title: result.title,
           content: result.content,
           originalLength: result.originalLength,
+          source: result.source,
           truncated: result.originalLength > maxLength,
         };
       } catch (error) {
