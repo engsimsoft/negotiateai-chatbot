@@ -43,17 +43,15 @@
 
 ## Этап 4: Финализация
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения мануального теста
+**Статус:** ✅ Завершён
 
 **Задачи:**
-- [ ] Обновить главный `CHANGELOG.md` — v3.31.0
-- [ ] Обновить `SIMPLY_STATUS.md`
-- [ ] Обновить `CLAUDE.md` (briefing-author вместо briefing-analyzer)
-- [ ] Обновить `package.json` — версия 3.31.0
-- [ ] Обновить `docs/ai-chats-map.md` — автор вместо аналитика
-- [ ] Финальная валидация: `npm run build`
+- [x] Обновить главный `CHANGELOG.md` — v3.31.0
+- [x] Обновить `SIMPLY_STATUS.md`
+- [x] Обновить `CLAUDE.md` (briefing-author вместо briefing-analyzer)
+- [x] Обновить `package.json` — версия 3.31.0
+- [x] Обновить `docs/ai-chats-map.md` — автор вместо аналитика
+- [x] Финальная валидация: `npm run build`
 
 **Git (после валидации):**
 ```bash
