@@ -45,6 +45,8 @@ import {
   projectFolder,
   type ProjectTask,
   projectTask,
+  type SavedBriefingTopic,
+  savedBriefingTopics,
   type SnapshotMeta,
   type Suggestion,
   stream,
@@ -3078,6 +3080,129 @@ export async function deleteAllBriefingSourcesByUser({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to delete briefing sources"
+    );
+  }
+}
+
+// ============================================================================
+// Saved Briefing Topics (ТЗ-BF1)
+// ============================================================================
+
+/**
+ * Save a topic from a briefing issue
+ */
+export async function saveBriefingTopic({
+  userId,
+  topicId,
+  topicName,
+  emoji,
+  title,
+  content,
+  sources,
+  briefingGeneratedAt,
+}: {
+  userId: string;
+  topicId: string;
+  topicName: string;
+  emoji: string;
+  title: string;
+  content: string;
+  sources: unknown;
+  briefingGeneratedAt: Date;
+}) {
+  try {
+    const [created] = await db
+      .insert(savedBriefingTopics)
+      .values({
+        userId,
+        topicId,
+        topicName,
+        emoji,
+        title,
+        content,
+        sources,
+        briefingGeneratedAt,
+        savedAt: new Date(),
+      })
+      .returning();
+
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to save briefing topic"
+    );
+  }
+}
+
+/**
+ * Get all saved topics for a user (most recent first)
+ */
+export async function getSavedBriefingTopics({
+  userId,
+}: {
+  userId: string;
+}) {
+  try {
+    return await db
+      .select()
+      .from(savedBriefingTopics)
+      .where(eq(savedBriefingTopics.userId, userId))
+      .orderBy(desc(savedBriefingTopics.savedAt));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get saved briefing topics"
+    );
+  }
+}
+
+/**
+ * Delete a saved topic (with ownership check)
+ */
+export async function deleteSavedBriefingTopic({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    const [deleted] = await db
+      .delete(savedBriefingTopics)
+      .where(
+        and(
+          eq(savedBriefingTopics.id, id),
+          eq(savedBriefingTopics.userId, userId)
+        )
+      )
+      .returning();
+
+    return deleted ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete saved briefing topic"
+    );
+  }
+}
+
+/**
+ * ТЗ-BF1 TTL: Delete all briefing history for a user (before new generation)
+ */
+export async function deleteOldBriefingHistory({
+  userId,
+}: {
+  userId: string;
+}) {
+  try {
+    await db
+      .delete(briefingHistory)
+      .where(eq(briefingHistory.userId, userId));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete old briefing history"
     );
   }
 }

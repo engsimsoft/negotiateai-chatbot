@@ -9,6 +9,7 @@ import { fetchSource } from "@/lib/briefing/source-fetchers";
 import type { RawContent } from "@/lib/briefing/source-fetchers/types";
 import { getDefaultSources, getTopicIds } from "@/lib/briefing/topics-catalog";
 import {
+  deleteOldBriefingHistory,
   getBriefingSettings,
   getBriefingSources,
   getBriefingTopics,
@@ -78,6 +79,9 @@ export async function POST() {
                   sourceLanguage: d.source.language,
                 };
               });
+
+        // ТЗ-BF1 TTL: delete all old briefings before creating new one
+        await deleteOldBriefingHistory({ userId });
 
         await saveBriefingHistory({
           userId,

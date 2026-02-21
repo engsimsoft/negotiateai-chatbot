@@ -474,3 +474,26 @@ export const briefingHistory = pgTable(
 );
 
 export type BriefingHistory = InferSelectModel<typeof briefingHistory>;
+
+export const savedBriefingTopics = pgTable(
+  "SavedBriefingTopics",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    topicId: text("topicId").notNull(),
+    topicName: text("topicName").notNull(),
+    emoji: text("emoji").notNull(),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    sources: jsonb("sources").notNull(),
+    briefingGeneratedAt: timestamp("briefingGeneratedAt").notNull(),
+    savedAt: timestamp("savedAt").notNull(),
+  },
+  (table) => ({
+    userIdx: index("saved_briefing_topics_user_idx").on(table.userId),
+  })
+);
+
+export type SavedBriefingTopic = InferSelectModel<typeof savedBriefingTopics>;

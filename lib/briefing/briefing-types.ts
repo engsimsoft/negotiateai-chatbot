@@ -36,6 +36,21 @@ export interface BriefingArticle {
   meta: BriefingArticleMeta;
 }
 
+// ТЗ-BF1: Saved briefing topic (client-safe)
+
+/** A topic saved by the user from a briefing issue */
+export interface SavedBriefingTopicClient {
+  id: string;
+  topicId: string;
+  topicName: string;
+  emoji: string;
+  title: string;
+  content: string;
+  sources: BriefingArticleSource[];
+  briefingGeneratedAt: string; // ISO string
+  savedAt: string; // ISO string
+}
+
 // ТЗ-А5: Streaming progress events (client-safe)
 
 export type BriefingProgressStep =
