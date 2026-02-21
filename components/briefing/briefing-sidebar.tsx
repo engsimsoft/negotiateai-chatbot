@@ -7,6 +7,8 @@ import {
   RefreshCw,
   Menu,
   BookOpen,
+  Bookmark,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,49 +18,72 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import type { BriefingArticleSection } from "@/lib/briefing/briefing-types";
+import type {
+  BriefingArticleSection,
+  SavedBriefingTopicClient,
+} from "@/lib/briefing/briefing-types";
 
 /* --- Types --- */
 
+/** @deprecated Will be removed in Etap 4 (cleanup) */
 export interface BriefingHistoryItem {
   date: string; // YYYY-MM-DD
   label: string; // "20 февраля"
 }
 
-interface BriefingSidebarProps {
+export interface BriefingSidebarProps {
   /** Sections from current article (for topic navigation) */
   sections: BriefingArticleSection[];
-  /** Past issues for history list */
-  history: BriefingHistoryItem[];
-  /** Currently viewed date (YYYY-MM-DD) for highlight */
-  currentDate?: string;
-  /** Active section id from scroll spy (Этап 3) */
+  /** Active section id from scroll spy */
   activeSectionId?: string | null;
+  /** ТЗ-BF1: Saved topics for sidebar display */
+  savedTopics?: SavedBriefingTopicClient[];
+  /** ТЗ-BF1: Currently selected saved topic id (for highlight) */
+  selectedSavedTopicId?: string | null;
+  /** ТЗ-BF1: Callback when user clicks a saved topic */
+  onSelectSavedTopic?: (topic: SavedBriefingTopicClient) => void;
+  /** ТЗ-BF1: Callback to return to current article view */
+  onBackToArticle?: () => void;
+  /** ТЗ-BF1: Callback to delete a saved topic */
+  onDeleteSavedTopic?: (savedId: string) => void;
   /** ТЗ-А5: Callback to trigger generation (handled by parent) */
   onGenerate?: () => void;
+  /** Whether there's an existing article (for confirm dialog) */
+  hasArticle?: boolean;
+}
+
+/* --- Short date formatter: ISO → "21 фев" --- */
+
+const MONTHS_SHORT = [
+  "янв", "фев", "мар", "апр", "мая", "июн",
+  "июл", "авг", "сен", "окт", "ноя", "дек",
+];
+
+function formatShortDate(isoString: string): string {
+  const date = new Date(isoString);
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}`;
 }
 
 /**
- * ТЗ-А4: Briefing sidebar — topic navigation, history, settings, generate.
- * Desktop: static left column. Mobile: Sheet via BriefingSidebarTrigger.
+ * ТЗ-BF1: Briefing sidebar — topic navigation, saved topics, settings, generate.
+ * Desktop: static left column. Mobile: Sheet via BriefingSidebarMobile.
  */
-export function BriefingSidebar({
-  sections,
-  history,
-  currentDate,
-  activeSectionId,
-  onGenerate,
-}: BriefingSidebarProps) {
+export function BriefingSidebar(props: BriefingSidebarProps) {
   return (
     <div className="flex h-full flex-col">
-      <SidebarContent
-        sections={sections}
-        history={history}
-        currentDate={currentDate}
-        activeSectionId={activeSectionId}
-        onGenerate={onGenerate}
-      />
+      <SidebarContent {...props} />
     </div>
   );
 }
@@ -66,13 +91,7 @@ export function BriefingSidebar({
 /**
  * Mobile trigger button — renders in header, opens Sheet with sidebar.
  */
-export function BriefingSidebarMobile({
-  sections,
-  history,
-  currentDate,
-  activeSectionId,
-  onGenerate,
-}: BriefingSidebarProps) {
+export function BriefingSidebarMobile(props: BriefingSidebarProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -94,16 +113,12 @@ export function BriefingSidebarMobile({
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Навигация по брифингу</SheetTitle>
-            <SheetDescription>Темы и история выпусков</SheetDescription>
+            <SheetDescription>Темы и сохранённые материалы</SheetDescription>
           </SheetHeader>
           <div className="flex h-full flex-col">
             <SidebarContent
-              sections={sections}
-              history={history}
-              currentDate={currentDate}
-              activeSectionId={activeSectionId}
+              {...props}
               onNavigate={() => setOpen(false)}
-              onGenerate={onGenerate}
             />
           </div>
         </SheetContent>
@@ -116,40 +131,67 @@ export function BriefingSidebarMobile({
 
 function SidebarContent({
   sections,
-  history,
-  currentDate,
   activeSectionId,
-  onNavigate,
+  savedTopics = [],
+  selectedSavedTopicId,
+  onSelectSavedTopic,
+  onBackToArticle,
+  onDeleteSavedTopic,
   onGenerate,
+  hasArticle,
+  onNavigate,
 }: BriefingSidebarProps & { onNavigate?: () => void }) {
   const handleScrollTo = useCallback(
     (id: string) => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth" });
-        onNavigate?.();
+      // If viewing saved topic, go back to article first
+      if (selectedSavedTopicId) {
+        onBackToArticle?.();
       }
+      // Use requestAnimationFrame to let React re-render before scrolling
+      requestAnimationFrame(() => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth" });
+          onNavigate?.();
+        }
+      });
     },
-    [onNavigate]
+    [onNavigate, selectedSavedTopicId, onBackToArticle]
   );
 
   const handleScrollToTop = useCallback(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    onNavigate?.();
-  }, [onNavigate]);
+    if (selectedSavedTopicId) {
+      onBackToArticle?.();
+    }
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      onNavigate?.();
+    });
+  }, [onNavigate, selectedSavedTopicId, onBackToArticle]);
+
+  const handleSelectSaved = useCallback(
+    (topic: SavedBriefingTopicClient) => {
+      onSelectSavedTopic?.(topic);
+      onNavigate?.();
+    },
+    [onSelectSavedTopic, onNavigate]
+  );
 
   return (
     <>
       {/* Topic navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-4">
         <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Сегодня
+          Текущий выпуск
         </p>
 
         <button
           type="button"
           onClick={handleScrollToTop}
-          className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
+          className={cn(
+            "mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
+            !selectedSavedTopicId && !activeSectionId && "bg-primary/10 font-medium text-primary"
+          )}
         >
           <BookOpen className="size-4 text-muted-foreground" />
           <span>Полный брифинг</span>
@@ -162,7 +204,8 @@ function SidebarContent({
             onClick={() => handleScrollTo(section.topicId)}
             className={cn(
               "mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
-              activeSectionId === section.topicId &&
+              !selectedSavedTopicId &&
+                activeSectionId === section.topicId &&
                 "bg-primary/10 font-medium text-primary"
             )}
           >
@@ -171,25 +214,45 @@ function SidebarContent({
           </button>
         ))}
 
-        {/* History */}
-        {history.length > 0 && (
+        {/* Saved topics */}
+        {savedTopics.length > 0 && (
           <div className="mt-6">
             <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Прошлые выпуски
+              <Bookmark className="mr-1 inline size-3" />
+              Сохранённые
             </p>
-            {history.map((item) => (
-              <Link
-                key={item.date}
-                href={`/briefing/${item.date}`}
-                onClick={onNavigate}
+            {savedTopics.map((topic) => (
+              <div
+                key={topic.id}
                 className={cn(
-                  "mb-0.5 flex w-full items-center rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
-                  currentDate === item.date &&
+                  "group mb-0.5 flex w-full items-center rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
+                  selectedSavedTopicId === topic.id &&
                     "bg-primary/10 font-medium text-primary"
                 )}
               >
-                {item.label}
-              </Link>
+                <button
+                  type="button"
+                  onClick={() => handleSelectSaved(topic)}
+                  className="flex min-w-0 flex-1 items-center gap-2"
+                >
+                  <span className="shrink-0">{topic.emoji}</span>
+                  <span className="truncate">{topic.topicName}</span>
+                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                    {formatShortDate(topic.savedAt)}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteSavedTopic?.(topic.id);
+                  }}
+                  className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                  title="Удалить из сохранённых"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
             ))}
           </div>
         )}
@@ -197,14 +260,42 @@ function SidebarContent({
 
       {/* Footer: Generate + Settings */}
       <div className="shrink-0 border-t px-3 py-3 space-y-1">
-        <button
-          type="button"
-          onClick={onGenerate}
-          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
-        >
-          <RefreshCw className="size-4 text-muted-foreground" />
-          <span>Сгенерировать</span>
-        </button>
+        {hasArticle ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
+              >
+                <RefreshCw className="size-4 text-muted-foreground" />
+                <span>Сгенерировать</span>
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Сгенерировать новый брифинг?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Текущий брифинг будет заменён. Сохранённые темы останутся.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Отмена</AlertDialogCancel>
+                <AlertDialogAction onClick={onGenerate}>
+                  Сгенерировать
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : (
+          <button
+            type="button"
+            onClick={onGenerate}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
+          >
+            <RefreshCw className="size-4 text-muted-foreground" />
+            <span>Сгенерировать</span>
+          </button>
+        )}
 
         <Link
           href="/briefing/setup"
@@ -217,4 +308,3 @@ function SidebarContent({
     </>
   );
 }
-

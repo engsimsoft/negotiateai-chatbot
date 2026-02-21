@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bookmark, ChevronDown, ArrowRight } from "lucide-react";
+import { Bookmark, ChevronDown, ArrowRight, ArrowLeft, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -215,5 +215,58 @@ export function NoBriefingsYet({ className, onGenerate }: NoBriefingsYetProps) {
         <ArrowRight className="size-4" />
       </Button>
     </div>
+  );
+}
+
+/* --- ТЗ-BF1: Saved topic view (replaces main area) --- */
+
+interface SavedTopicViewProps {
+  topic: SavedBriefingTopicClient;
+  onBack: () => void;
+  onDelete: (savedId: string) => void;
+}
+
+export function SavedTopicView({ topic, onBack, onDelete }: SavedTopicViewProps) {
+  return (
+    <article className="mx-auto w-full max-w-2xl px-4 py-6 lg:px-6">
+      {/* Back button */}
+      <button
+        type="button"
+        onClick={onBack}
+        className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" />
+        <span>Назад к выпуску</span>
+      </button>
+
+      {/* Topic card */}
+      <section className="rounded-xl border bg-background p-5">
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
+          <span>{topic.emoji}</span>
+          <span className="flex-1">{topic.topicName}</span>
+        </h2>
+
+        {/* Markdown content */}
+        <MarkdownViewer content={topic.content} className="text-sm" />
+
+        {/* Sources */}
+        {topic.sources?.length > 0 && (
+          <CollapsibleSources sources={topic.sources} />
+        )}
+
+        {/* Delete button */}
+        <div className="mt-6 border-t pt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => onDelete(topic.id)}
+          >
+            <Trash2 className="size-4" />
+            Удалить из сохранённых
+          </Button>
+        </div>
+      </section>
+    </article>
   );
 }

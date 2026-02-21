@@ -1,34 +1,99 @@
-// ТЗ-А5: Client wrapper for /briefing page — manages generation state
+// ТЗ-А5 + ТЗ-BF1: Client wrapper for /briefing page — manages generation + saved topics state
 
 "use client";
 
-import { useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import { useBriefingGeneration } from "@/hooks/use-briefing-generation";
 import { BriefingGenerationProgress } from "./briefing-generation-progress";
 import { BriefingIssueHeader } from "./briefing-issue-header";
 import { BriefingIssueContent } from "./briefing-issue-content";
 import { BriefingSidebarMobile } from "./briefing-sidebar";
 import { NoBriefingsYet } from "./briefing-article-view";
-import type { BriefingArticle, SavedBriefingTopicClient } from "@/lib/briefing/briefing-types";
-import type { BriefingHistoryItem } from "./briefing-sidebar";
+import type {
+  BriefingArticle,
+  BriefingArticleSection,
+  SavedBriefingTopicClient,
+} from "@/lib/briefing/briefing-types";
 
 interface BriefingPageClientProps {
   article: BriefingArticle | null;
   hasValidArticle: boolean;
-  historyItems: BriefingHistoryItem[];
-  currentDate?: string;
   initialSavedTopics?: SavedBriefingTopicClient[];
 }
 
 export function BriefingPageClient({
   article,
   hasValidArticle,
-  historyItems,
-  currentDate,
   initialSavedTopics = [],
 }: BriefingPageClientProps) {
   const { steps, isGenerating, error, redirectUrl, startGeneration } =
     useBriefingGeneration();
+
+  // ТЗ-BF1: Saved topics state (lifted from BriefingIssueContent for sidebar sharing)
+  const [savedTopics, setSavedTopics] =
+    useState<SavedBriefingTopicClient[]>(initialSavedTopics);
+  const [selectedSavedTopic, setSelectedSavedTopic] =
+    useState<SavedBriefingTopicClient | null>(null);
+
+  // ТЗ-BF1: Save a topic
+  const handleSaveTopic = useCallback(
+    async (section: BriefingArticleSection) => {
+      try {
+        const res = await fetch("/api/briefing/topics/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            topicId: section.topicId,
+            topicName: section.topicName,
+            emoji: section.emoji,
+            title: section.topicName,
+            content: section.content,
+            sources: section.sources,
+            briefingGeneratedAt: new Date().toISOString(),
+          }),
+        });
+
+        if (!res.ok) throw new Error("Failed to save");
+
+        const saved: SavedBriefingTopicClient = await res.json();
+        setSavedTopics((prev) => [saved, ...prev]);
+        toast.success("Тема сохранена");
+      } catch {
+        toast.error("Не удалось сохранить тему");
+      }
+    },
+    []
+  );
+
+  // ТЗ-BF1: Delete a saved topic (used by sidebar ✕, article bookmark, and SavedTopicView)
+  const handleDeleteTopic = useCallback(async (savedId: string) => {
+    try {
+      const res = await fetch(`/api/briefing/topics/save?id=${savedId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) throw new Error("Failed to delete");
+
+      setSavedTopics((prev) => prev.filter((t) => t.id !== savedId));
+      // If viewing this topic, go back to article
+      setSelectedSavedTopic((prev) => (prev?.id === savedId ? null : prev));
+      toast.success("Тема удалена");
+    } catch {
+      toast.error("Не удалось удалить тему");
+    }
+  }, []);
+
+  const handleSelectSavedTopic = useCallback(
+    (topic: SavedBriefingTopicClient) => {
+      setSelectedSavedTopic(topic);
+    },
+    []
+  );
+
+  const handleBackToArticle = useCallback(() => {
+    setSelectedSavedTopic(null);
+  }, []);
 
   // Auto-navigate on completion — full reload clears client state and loads fresh server data
   useEffect(() => {
@@ -39,11 +104,16 @@ export function BriefingPageClient({
     return () => clearTimeout(timer);
   }, [redirectUrl]);
 
+  // Sidebar props shared between desktop (inside BriefingIssueContent) and mobile (in header)
   const sidebarProps = {
     sections: hasValidArticle && article ? article.sections : [],
-    history: historyItems.slice(1),
-    currentDate,
+    savedTopics,
+    selectedSavedTopicId: selectedSavedTopic?.id ?? null,
+    onSelectSavedTopic: handleSelectSavedTopic,
+    onBackToArticle: handleBackToArticle,
+    onDeleteSavedTopic: handleDeleteTopic,
     onGenerate: startGeneration,
+    hasArticle: hasValidArticle,
   };
 
   // Show progress UI when generating
@@ -76,10 +146,13 @@ export function BriefingPageClient({
       {hasValidArticle && article ? (
         <BriefingIssueContent
           article={article}
-          history={historyItems.slice(1)}
-          currentDate={currentDate}
           onGenerate={startGeneration}
-          initialSavedTopics={initialSavedTopics}
+          savedTopics={savedTopics}
+          onSaveTopic={handleSaveTopic}
+          onDeleteTopic={handleDeleteTopic}
+          selectedSavedTopic={selectedSavedTopic}
+          onSelectSavedTopic={handleSelectSavedTopic}
+          onBackToArticle={handleBackToArticle}
         />
       ) : (
         <main className="flex-1">

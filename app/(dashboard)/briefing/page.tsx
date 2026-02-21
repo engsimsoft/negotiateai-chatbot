@@ -9,24 +9,6 @@ import {
 import { BriefingPage } from "@/components/briefing/briefing-page";
 import { BriefingPageClient } from "@/components/briefing/briefing-page-client";
 import type { BriefingArticle, SavedBriefingTopicClient } from "@/lib/briefing/briefing-types";
-import type { BriefingHistoryItem } from "@/components/briefing/briefing-sidebar";
-
-const RUSSIAN_MONTHS_GENITIVE = [
-  "января", "февраля", "марта", "апреля", "мая", "июня",
-  "июля", "августа", "сентября", "октября", "ноября", "декабря",
-];
-
-/** Convert Date to YYYY-MM-DD in user timezone */
-function formatDateForUrl(date: Date, timezone: string): string {
-  return date.toLocaleDateString("en-CA", { timeZone: timezone });
-}
-
-/** Format "YYYY-MM-DD" → "20 февраля" */
-function formatDateLabel(dateStr: string): string {
-  const [, month, day] = dateStr.split("-");
-  const monthIdx = parseInt(month, 10) - 1;
-  return `${parseInt(day, 10)} ${RUSSIAN_MONTHS_GENITIVE[monthIdx]}`;
-}
 
 export default async function BriefingRoute() {
   const session = await auth();
@@ -43,11 +25,9 @@ export default async function BriefingRoute() {
     return <BriefingPage />;
   }
 
-  // ТЗ-А4: load history for sidebar (limit 10, only ready — ТЗ-HF1 fix)
-  // ТЗ-BF1: load saved topics for bookmark state
-  const timezone = settings.timezone || "Europe/Moscow";
+  // Load latest briefing + saved topics in parallel
   const [readyBriefings, savedTopicsRaw] = await Promise.all([
-    getBriefingHistory({ userId, limit: 10, status: "ready" }),
+    getBriefingHistory({ userId, limit: 1, status: "ready" }),
     getSavedBriefingTopics({ userId }),
   ]);
   const latestBriefing = readyBriefings[0] ?? null;
@@ -57,17 +37,6 @@ export default async function BriefingRoute() {
     ? (latestBriefing.briefingJson as unknown as BriefingArticle)
     : null;
   const hasValidArticle = !!(article?.sections && article.sections.length > 0);
-
-  // Prepare history items for sidebar (deduplicate by date — multiple per day possible)
-  const seenDates = new Set<string>();
-  const historyItems: BriefingHistoryItem[] = [];
-  for (const h of readyBriefings) {
-    const dateStr = formatDateForUrl(h.generatedAt, timezone);
-    if (seenDates.has(dateStr)) continue;
-    seenDates.add(dateStr);
-    historyItems.push({ date: dateStr, label: formatDateLabel(dateStr) });
-  }
-  const currentDate = historyItems[0]?.date;
 
   // ТЗ-BF1: serialize saved topics for client (Date → ISO string)
   const savedTopics: SavedBriefingTopicClient[] = savedTopicsRaw.map((t) => ({
@@ -87,8 +56,6 @@ export default async function BriefingRoute() {
     <BriefingPageClient
       article={article}
       hasValidArticle={hasValidArticle}
-      historyItems={historyItems}
-      currentDate={currentDate}
       initialSavedTopics={savedTopics}
     />
   );

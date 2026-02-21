@@ -2943,43 +2943,6 @@ export async function getBriefingHistory({
   }
 }
 
-/**
- * ТЗ-А4: Get a single briefing by date (timezone-aware).
- * Filters by generatedAt within the given date in user's timezone.
- * Returns latest if multiple exist for the same day.
- */
-export async function getBriefingByDate({
-  userId,
-  date,
-  timezone = "Europe/Moscow",
-}: {
-  userId: string;
-  date: string; // YYYY-MM-DD
-  timezone?: string;
-}) {
-  try {
-    const rows = await db
-      .select()
-      .from(briefingHistory)
-      .where(
-        and(
-          eq(briefingHistory.userId, userId),
-          eq(briefingHistory.status, "ready"),
-          sql`${briefingHistory.generatedAt} >= (${date}::date AT TIME ZONE ${timezone})`,
-          sql`${briefingHistory.generatedAt} < ((${date}::date + INTERVAL '1 day') AT TIME ZONE ${timezone})`
-        )
-      )
-      .orderBy(desc(briefingHistory.generatedAt))
-      .limit(1);
-
-    return rows[0] ?? null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get briefing by date"
-    );
-  }
-}
 
 // ============================================================================
 // Briefing Topics (ТЗ-A2)
