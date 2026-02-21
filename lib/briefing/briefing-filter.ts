@@ -11,6 +11,7 @@ const google = createGoogleGenerativeAI({
 });
 
 export const filteredItemSchema = z.object({
+  sourceItemId: z.string(),
   title: z.string(),
   url: z.string(),
   sourceName: z.string(),
@@ -42,8 +43,8 @@ export async function filterContent(
   // Prepare articles for the prompt
   const articlesText = items
     .map(
-      (item, i) =>
-        `[${i + 1}] ${item.sourceName} (${item.sourceLanguage})
+      (item) =>
+        `[${item.itemId}] ${item.sourceName} (${item.sourceLanguage})
 Title: ${item.title}
 URL: ${item.url}
 Published: ${item.publishedAt?.toISOString() || "unknown"}
@@ -67,6 +68,7 @@ Rules:
 5. Assign each candidate to the most relevant topicId from the available list
 6. Prefer original reporting over derivative content
 7. Return up to ${MAX_FILTER_CANDIDATES} candidates, sorted by importance
+8. sourceItemId is REQUIRED. Return the EXACT itemId from the square brackets [src-N] of the source article the news was extracted from. For example, if the news comes from [src-3], set sourceItemId to "src-3".
 
 Output JSON with "candidates" array.`,
     prompt: `Filter these ${items.length} articles:\n\n${articlesText}`,

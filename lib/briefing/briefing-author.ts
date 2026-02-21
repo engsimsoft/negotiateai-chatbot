@@ -187,7 +187,7 @@ function buildUserMessage(
   // Format candidates
   const candidatesFormatted = candidates
     .map((c, i) => {
-      const full = fullTexts.get(c.url);
+      const full = fullTexts.get(c.sourceItemId);
       const content = full?.content ?? "";
       const rawTier = tierMap.get(c.sourceName) ?? "unknown";
       const tier = normalizeTier(rawTier);

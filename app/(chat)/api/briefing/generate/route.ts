@@ -139,6 +139,11 @@ export async function POST() {
           return;
         }
 
+        // Assign unique itemId to each item for reliable lookup
+        allItems.forEach((item, i) => {
+          item.itemId = `src-${i}`;
+        });
+
         emit({
           step: "fetching",
           message: "Собираем новости...",
@@ -177,8 +182,11 @@ export async function POST() {
 
         const fullTextsMap = new Map<string, RawContent>();
         for (const item of allItems) {
-          fullTextsMap.set(item.url, item);
+          fullTextsMap.set(item.itemId!, item);
         }
+
+        const hits = candidates.filter(c => fullTextsMap.has(c.sourceItemId)).length;
+        console.log(`[Briefing] Full text hit: ${hits}/${candidates.length} candidates`);
 
         const today = new Date().toISOString().split("T")[0];
 

@@ -8,6 +8,8 @@ export interface RawContent {
   publishedAt?: Date;
   sourceName: string;
   sourceLanguage: string;
+  /** Unique ID for lookup (assigned in route.ts at collection time) */
+  itemId?: string;
 }
 
 export interface FetchResult {
