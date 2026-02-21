@@ -94,6 +94,14 @@ interface AuthorInput {
   date: string;
 }
 
+// --- Max output tokens by volume (detailed needs room for 3000-6000 words) ---
+
+const MAX_TOKENS_BY_VOLUME: Record<string, number> = {
+  compact: 8192, // 3-5 min, default is enough
+  standard: 16384, // 8-12 min
+  detailed: 32768, // 15-25 min, with headroom for structured JSON
+};
+
 /**
  * Stage 2: Generate briefing article using Gemini 3 Pro.
  * System prompt = persona + rules (from .md file).
@@ -129,6 +137,8 @@ export async function generateArticle(
     date,
   );
 
+  const maxTokens = MAX_TOKENS_BY_VOLUME[volume ?? "standard"] ?? MAX_TOKENS_BY_VOLUME.standard;
+
   let object: BriefingArticle;
   let tokensUsed = 0;
 
@@ -138,9 +148,12 @@ export async function generateArticle(
       schema: briefingArticleSchema,
       system: SYSTEM_PROMPT,
       prompt: userMessage,
+      maxOutputTokens: maxTokens,
     });
     object = result.object;
     tokensUsed = result.usage?.totalTokens ?? 0;
+    console.log(`[Briefing Author] model=${AUTHOR_MODEL} maxOutputTokens=${maxTokens} usage:`, JSON.stringify(result.usage));
+    console.log(`[Briefing Author] finishReason=${result.finishReason}`);
   } catch (err) {
     console.warn(
       `[Briefing] Primary model ${AUTHOR_MODEL} failed, trying ${AUTHOR_MODEL_FALLBACK}:`,
@@ -151,6 +164,7 @@ export async function generateArticle(
       schema: briefingArticleSchema,
       system: SYSTEM_PROMPT,
       prompt: userMessage,
+      maxOutputTokens: maxTokens,
     });
     object = result.object;
     tokensUsed = result.usage?.totalTokens ?? 0;

@@ -187,6 +187,7 @@ export async function POST() {
 
         const hits = candidates.filter(c => fullTextsMap.has(c.sourceItemId)).length;
         console.log(`[Briefing] Full text hit: ${hits}/${candidates.length} candidates`);
+        console.log(`[Briefing] volume: ${settings?.volume ?? "standard"} (raw: ${settings?.volume})`);
 
         const today = new Date().toISOString().split("T")[0];
 
