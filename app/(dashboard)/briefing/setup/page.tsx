@@ -63,6 +63,7 @@ export default async function BriefingSetupRoute() {
         ? {
             language: settings.language ?? undefined,
             maxItems: settings.maxItems ?? undefined,
+            volume: settings.volume ?? undefined,
           }
         : undefined,
     };

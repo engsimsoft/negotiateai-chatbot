@@ -189,6 +189,7 @@ export async function POST() {
           userTopics,
           language,
           maxItems,
+          volume: settings?.volume ?? "standard",
           date: today,
         });
 

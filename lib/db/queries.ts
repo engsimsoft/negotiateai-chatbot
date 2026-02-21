@@ -2717,6 +2717,7 @@ export async function upsertBriefingSettings({
   generationTime,
   language,
   maxItems,
+  volume,
 }: {
   userId: string;
   isActive?: boolean;
@@ -2724,6 +2725,7 @@ export async function upsertBriefingSettings({
   generationTime?: string;
   language?: string;
   maxItems?: number;
+  volume?: string;
 }) {
   try {
     const now = new Date();
@@ -2736,6 +2738,7 @@ export async function upsertBriefingSettings({
       if (generationTime !== undefined) updateData.generationTime = generationTime;
       if (language !== undefined) updateData.language = language;
       if (maxItems !== undefined) updateData.maxItems = maxItems;
+      if (volume !== undefined) updateData.volume = volume;
 
       const [updated] = await db
         .update(briefingSettings)
@@ -2755,6 +2758,7 @@ export async function upsertBriefingSettings({
         generationTime: generationTime ?? "07:00",
         language: language ?? "ru",
         maxItems: maxItems ?? 15,
+        volume: volume ?? "standard",
         createdAt: now,
         updatedAt: now,
       })

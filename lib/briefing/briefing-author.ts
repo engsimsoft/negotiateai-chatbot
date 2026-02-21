@@ -90,6 +90,7 @@ interface AuthorInput {
   userTopics: BriefingTopic[];
   language: string;
   maxItems: number;
+  volume?: string;
   date: string;
 }
 
@@ -101,7 +102,7 @@ interface AuthorInput {
 export async function generateArticle(
   input: AuthorInput,
 ): Promise<{ article: BriefingArticle; tokensUsed: number }> {
-  const { candidates, fullTexts, tierMap, userTopics, language, maxItems, date } =
+  const { candidates, fullTexts, tierMap, userTopics, language, maxItems, volume, date } =
     input;
 
   if (candidates.length === 0) {
@@ -124,6 +125,7 @@ export async function generateArticle(
     userTopics,
     language,
     maxItems,
+    volume,
     date,
   );
 
@@ -166,6 +168,7 @@ function buildUserMessage(
   userTopics: BriefingTopic[],
   language: string,
   maxItems: number,
+  volume: string | undefined,
   date: string,
 ): string {
   // Format date with Russian day of week
@@ -205,6 +208,7 @@ function buildUserMessage(
 ${dateFormatted}
 
 ## Настройки пользователя
+- Объём выпуска: ${volume ?? "standard"}
 - Темы:
 ${topicsFormatted}
 - Язык: ${language}

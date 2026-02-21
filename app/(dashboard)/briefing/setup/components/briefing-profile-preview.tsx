@@ -33,6 +33,7 @@ export interface BriefingSettings {
   timezone?: string;
   language?: string;
   maxItems?: number;
+  volume?: string;
 }
 
 export interface BriefingProfile {
@@ -46,6 +47,12 @@ const TIER_LABELS: Record<string, string> = {
   respected: "Авторитет",
   niche: "Нишевый",
   community: "Сообщество",
+};
+
+const VOLUME_LABELS: Record<string, string> = {
+  compact: "Компактный",
+  standard: "Стандартный",
+  detailed: "Подробный",
 };
 
 const FETCH_ICONS: Record<string, typeof Globe> = {
@@ -168,6 +175,11 @@ export function BriefingProfilePreview({
                   : settings.language === "en"
                     ? "английский"
                     : "русский"}
+              </div>
+            )}
+            {settings.volume && (
+              <div>
+                Объём: {VOLUME_LABELS[settings.volume] ?? settings.volume}
               </div>
             )}
             {settings.maxItems && <div>Новостей: до {settings.maxItems}</div>}

@@ -386,6 +386,7 @@ export const briefingSettings = pgTable(
     generationTime: varchar("generationTime", { length: 5 }).notNull().default("06:00"),
     language: varchar("language", { length: 10 }).notNull().default("ru"),
     maxItems: integer("maxItems").notNull().default(15),
+    volume: varchar("volume", { length: 20 }).notNull().default("standard"),
     createdAt: timestamp("createdAt").notNull(),
     updatedAt: timestamp("updatedAt").notNull(),
   },

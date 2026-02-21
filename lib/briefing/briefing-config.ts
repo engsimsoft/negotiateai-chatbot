@@ -13,7 +13,7 @@ export const MAX_BRIEFING_ITEMS = 15;
 export const MAX_FILTER_CANDIDATES = 30;
 
 /** Max content length per article (chars) */
-export const MAX_CONTENT_LENGTH = 1000;
+export const MAX_CONTENT_LENGTH = 6000;
 
 /** Hours to look back for fresh content */
 export const FRESHNESS_HOURS = 24;

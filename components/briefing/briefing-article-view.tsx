@@ -141,8 +141,8 @@ function CollapsibleSources({
         />
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-2 space-y-1">
-        {sources.map((source) => (
-          <BriefingSourceCard key={source.url} source={source} />
+        {sources.map((source, idx) => (
+          <BriefingSourceCard key={`${source.url}-${idx}`} source={source} />
         ))}
       </CollapsibleContent>
     </Collapsible>

@@ -243,9 +243,11 @@ async function buildBriefingEditModeInjection(userId: string): Promise<string> {
     getBriefingSources({ userId }),
   ]);
 
+  const volumeLabels: Record<string, string> = { compact: "компактный", standard: "стандартный", detailed: "подробный" };
   const settingsLines: string[] = [];
   settingsLines.push(`- Часовой пояс: ${settings?.timezone ?? "Europe/Moscow"}`);
   settingsLines.push(`- Язык источников: ${settings?.language ?? "ru"}`);
+  settingsLines.push(`- Объём: ${volumeLabels[settings?.volume ?? "standard"] ?? "стандартный"}`);
   settingsLines.push(`- Количество новостей: ${settings?.maxItems ?? 15}`);
 
   const topicsLines = topics.length > 0
@@ -666,6 +668,7 @@ export async function POST(request: Request) {
           timezone: z.string().default("Europe/Moscow").optional(),
           language: z.enum(["ru", "en", "both"]).default("ru").optional(),
           maxItems: z.number().min(5).max(30).default(15).optional(),
+          volume: z.enum(["compact", "standard", "detailed"]).default("standard").optional().describe("Объём брифинга: compact (3-5 мин), standard (8-12 мин), detailed (15-25 мин)"),
         }).optional().describe("Настройки брифинга"),
       });
 
@@ -688,6 +691,7 @@ export async function POST(request: Request) {
             timezone: input.settings?.timezone ?? "Europe/Moscow",
             language: input.settings?.language ?? "ru",
             maxItems: input.settings?.maxItems ?? 15,
+            volume: input.settings?.volume ?? "standard",
           });
 
           // 2. Replace all topics
