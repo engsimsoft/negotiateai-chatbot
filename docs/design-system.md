@@ -67,10 +67,7 @@ Root Layout (app/layout.tsx)
 │   ├── /create → ListDetailPage (← Dashboard + "Создание" + UserMenu)
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │
-│   ├── /briefing → BriefingIssueHeader + BriefingSidebar (лендинг или последний выпуск)
-│   │   User Menu: ✅   Theme Toggle: ✅
-│   │
-│   ├── /briefing/[date] → BriefingIssueHeader + BriefingSidebar (конкретный выпуск по дате)
+│   ├── /briefing → BriefingIssueHeader + BriefingSidebar (лендинг или последний выпуск + сохранённые темы)
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │
 │   ├── /briefing/setup → Split layout (preview + чат AI-настройки)

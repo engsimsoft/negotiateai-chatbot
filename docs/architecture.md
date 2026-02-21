@@ -129,6 +129,7 @@
 - `BriefingSettings` — настройки брифинга (timezone, language, maxItems)
 - `BriefingSources` — источники новостей (topicId, sourceUrl, fetchMethod, tier)
 - `BriefingHistory` — история генераций (briefingJson, stats, status)
+- `SavedBriefingTopics` — сохранённые темы брифинга (topicId, topicName, emoji, content, sources, briefingGeneratedAt)
 - `Vote_v2` — голосование за сообщения
 - NextAuth таблицы (Account, Session, VerificationToken)
 
@@ -239,4 +240,4 @@ lib/prompts/
 
 ---
 
-**Обновлено:** 2026-02-19 (v3.26.0 — Morning Briefing Backend)
+**Обновлено:** 2026-02-21 (v3.39.0 — BriefingUIRefactor)

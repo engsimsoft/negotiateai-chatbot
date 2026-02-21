@@ -71,9 +71,31 @@ const MONTHS_SHORT = [
   "июл", "авг", "сен", "окт", "ноя", "дек",
 ];
 
-function formatShortDate(isoString: string): string {
+function formatDateWithTime(isoString: string): string {
   const date = new Date(isoString);
-  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}`;
+  const day = date.getDate();
+  const month = MONTHS_SHORT[date.getMonth()];
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${day} ${month}, ${hours}:${minutes}`;
+}
+
+/** Group saved topics by briefingGeneratedAt, sorted newest-first */
+function groupByBriefing(topics: SavedBriefingTopicClient[]) {
+  const groups = new Map<string, SavedBriefingTopicClient[]>();
+  for (const topic of topics) {
+    const key = topic.briefingGeneratedAt;
+    const list = groups.get(key);
+    if (list) {
+      list.push(topic);
+    } else {
+      groups.set(key, [topic]);
+    }
+  }
+  // Sort groups newest-first
+  return [...groups.entries()].sort(
+    ([a], [b]) => new Date(b).getTime() - new Date(a).getTime()
+  );
 }
 
 /**
@@ -214,44 +236,48 @@ function SidebarContent({
           </button>
         ))}
 
-        {/* Saved topics */}
+        {/* Saved topics — grouped by briefing */}
         {savedTopics.length > 0 && (
           <div className="mt-6">
             <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <Bookmark className="mr-1 inline size-3" />
               Сохранённые
             </p>
-            {savedTopics.map((topic) => (
-              <div
-                key={topic.id}
-                className={cn(
-                  "group mb-0.5 flex w-full items-center rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
-                  selectedSavedTopicId === topic.id &&
-                    "bg-primary/10 font-medium text-primary"
-                )}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleSelectSaved(topic)}
-                  className="flex min-w-0 flex-1 items-center gap-2"
-                >
-                  <span className="shrink-0">{topic.emoji}</span>
-                  <span className="truncate">{topic.topicName}</span>
-                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                    {formatShortDate(topic.savedAt)}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteSavedTopic?.(topic.id);
-                  }}
-                  className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                  title="Удалить из сохранённых"
-                >
-                  <X className="size-3.5" />
-                </button>
+            {groupByBriefing(savedTopics).map(([briefingAt, topics]) => (
+              <div key={briefingAt} className="mb-3">
+                <p className="mb-1 px-2 text-[11px] text-muted-foreground/70">
+                  {formatDateWithTime(briefingAt)}
+                </p>
+                {topics.map((topic) => (
+                  <div
+                    key={topic.id}
+                    className={cn(
+                      "group mb-0.5 flex w-full items-center rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
+                      selectedSavedTopicId === topic.id &&
+                        "bg-primary/10 font-medium text-primary"
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSaved(topic)}
+                      className="flex min-w-0 flex-1 items-center gap-2"
+                    >
+                      <span className="shrink-0">{topic.emoji}</span>
+                      <span className="truncate">{topic.topicName}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteSavedTopic?.(topic.id);
+                      }}
+                      className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                      title="Удалить из сохранённых"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

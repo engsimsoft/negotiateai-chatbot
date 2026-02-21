@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.38.0
+**Версия:** 3.39.0
 **Дата:** 2026-02-21
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -329,6 +329,31 @@ components/projects/
 
 ## План развития
 
+### ТЗ-BF1: Briefing UI Refactor — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **SavedBriefingTopics** — новая таблица + CRUD API + TTL-логика при генерации
+- **Bookmark кнопка** — на каждой секции статьи (save/delete тему + toast)
+- **Copy кнопка** — копирование текста секции в буфер обмена
+- **Sidebar рефакторинг** — "Текущий выпуск" + "Сохранённые" (группировка по брифингу с датой+временем)
+- **SavedTopicView** — просмотр сохранённой темы в main area (← Назад, markdown, sources, удалить)
+- **AlertDialog** — подтверждение при генерации нового брифинга
+- **Markdown links** — открываются в новой вкладке (`target="_blank"`)
+- **Удалён `/briefing/[date]`** — маршрут мёртвый из-за TTL
+- **Удалён `getBriefingByDate()`** — query больше не используется
+
+**Ключевые файлы:**
+- `lib/db/schema.ts` — +таблица SavedBriefingTopics
+- `lib/db/queries.ts` — +saveBriefingTopic, getSavedBriefingTopics, deleteSavedBriefingTopic, deleteOldBriefingHistory
+- `app/(chat)/api/briefing/topics/save/route.ts` — POST/DELETE API
+- `app/(chat)/api/briefing/topics/saved/route.ts` — GET API
+- `components/briefing/briefing-sidebar.tsx` — рефакторинг (saved topics grouped by briefing)
+- `components/briefing/briefing-article-view.tsx` — +Bookmark, +Copy, +SavedTopicView
+- `components/briefing/briefing-page-client.tsx` — lifted state (savedTopics, selectedSavedTopic)
+- `components/markdown-viewer.tsx` — links open in new tab
+
+**Детали:** [_archive/TZ_BF1_BriefingUIRefactor/](_archive/TZ_BF1_BriefingUIRefactor/)
+
 ### ТЗ-BRIEFING-AUTHOR-CLAUDE: Briefing Author → Claude — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
@@ -387,22 +412,21 @@ components/projects/
 
 **Выполнено:**
 - **Страница выпуска** — полноценный article reader (intro, sections с MarkdownViewer + Collapsible sources, outro, meta)
-- **Sidebar** — навигация по темам с active state (IntersectionObserver scroll spy), история выпусков, кнопка генерации
-- **`/briefing/[date]`** — маршрут для просмотра конкретного прошлого выпуска по дате
+- **Sidebar** — навигация по темам с active state (IntersectionObserver scroll spy), кнопка генерации
 - **Responsive** — Sheet sidebar на мобильных, гамбургер-кнопка в header
-- **getBriefingByDate()** — timezone-aware query (AT TIME ZONE, fallback Europe/Moscow)
 - **Graceful fallback** — старый формат выпусков показывает сообщение вместо ошибки
 - **Cleanup** — удалён устаревший `briefing-active-page.tsx`
+- ~~`/briefing/[date]`~~ — удалён в v3.39.0 (ТЗ-BF1, TTL делает маршрут мёртвым)
+- ~~`getBriefingByDate()`~~ — удалён в v3.39.0 (ТЗ-BF1)
 
 **Ключевые файлы:**
 - `components/briefing/briefing-issue-header.tsx` — header (title, ← Dashboard, ⚙️, UserMenu, mobileTrigger)
-- `components/briefing/briefing-article-view.tsx` — рендер статьи + IntersectionObserver scroll spy
-- `components/briefing/briefing-sidebar.tsx` — sidebar (topic nav, history, generate, settings) + mobile Sheet
+- `components/briefing/briefing-article-view.tsx` — рендер статьи + IntersectionObserver scroll spy + Bookmark + Copy + SavedTopicView
+- `components/briefing/briefing-sidebar.tsx` — sidebar (topic nav, saved topics, generate, settings) + mobile Sheet
 - `components/briefing/briefing-issue-content.tsx` — клиентская обёртка (activeSectionId state)
 - `components/briefing/briefing-player-placeholder.tsx` — sticky заглушка плеера
 - `components/briefing/briefing-source-card.tsx` — карточка источника (tier badges)
-- `app/(dashboard)/briefing/[date]/page.tsx` — маршрут конкретного выпуска
-- `app/(dashboard)/briefing/page.tsx` — обновлён (двухколоночный layout)
+- `app/(dashboard)/briefing/page.tsx` — обновлён (двухколоночный layout + saved topics loading)
 
 ### ТЗ-PX + ТЗ-FU: Deep Research + Fetch URL — ✅ ЗАВЕРШЁН
 

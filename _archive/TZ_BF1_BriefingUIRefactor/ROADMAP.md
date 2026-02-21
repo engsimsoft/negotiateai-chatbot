@@ -2,7 +2,7 @@
 
 **Создан:** 2026-02-21
 **Версия проекта:** 3.38.0 → 3.39.0
-**Статус:** В работе
+**Статус:** ✅ Завершён
 
 ---
 
@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 5 |
-| Текущий этап | 3 🔄 |
+| Текущий этап | 5 ✅ |
 | Сессий (оценка) | 2-3 |
 
 **Скоуп (после анализа):**
@@ -192,32 +192,31 @@ git commit -m "feat(tz-bf1): sidebar refactor + saved topics view + remove [date
 
 ## Этап 5: Финализация
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4
+**Статус:** ✅ Завершён
 
 **Цель:** Документация, версия, архив.
 
 **Задачи:**
-- [ ] ⛔ Прочитать [DOCUMENTATION_GUIDE.md](../DOCUMENTATION_GUIDE.md) — чеклист
-- [ ] Финальное мануальное тестирование (пользователь): полный flow
-- [ ] SQL проверка БД:
-  - `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;`
-  - `SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'SavedBriefingTopics';`
-- [ ] Обновить главный `CHANGELOG.md`
-- [ ] Обновить `SIMPLY_STATUS.md`
-- [ ] Обновить `CLAUDE.md` (структура кода — новые файлы, убрать [date])
-- [ ] Обновить `package.json` → 3.39.0
-- [ ] Обновить `docs/architecture.md` (если нужно — новая таблица)
-- [ ] ⛔ Верификация docs против кода (Правило 5):
-  - `CLAUDE.md` → пути файлов актуальны (убрать briefing/[date], добавить topics/save)
-  - `docs/design-system.md` → карта страниц (убрать /briefing/[date])
-- [ ] Переместить `specs/TZ_BF1_BriefingUIRefactor/` → `_archive/`
+- [x] ⛔ Прочитать [DOCUMENTATION_GUIDE.md](../DOCUMENTATION_GUIDE.md) — чеклист
+- [x] Финальное мануальное тестирование (пользователь): полный flow — подтверждено
+- [x] SQL проверка БД:
+  - `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;` — ✅ SavedBriefingTopics присутствует
+  - `SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'SavedBriefingTopics';` — ✅ 10 колонок
+- [x] Обновить главный `CHANGELOG.md`
+- [x] Обновить `SIMPLY_STATUS.md`
+- [x] Обновить `CLAUDE.md` (структура кода — новые файлы, убрать [date])
+- [x] Обновить `package.json` → 3.39.0
+- [x] Обновить `docs/architecture.md` (новая таблица SavedBriefingTopics)
+- [x] ⛔ Верификация docs против кода (Правило 5):
+  - `CLAUDE.md` → пути файлов актуальны (убран briefing/[date], добавлены topics/save, topics/saved)
+  - `docs/design-system.md` → карта страниц (убран /briefing/[date])
+- [x] `npm run build` — успешен (после очистки .next cache)
+- [x] Переместить `specs/TZ_BF1_BriefingUIRefactor/` → `_archive/`
 
 **Валидация этапа:**
-- [ ] `npm run build` — успешен
-- [ ] Документация актуальна и верифицирована
-- [ ] Все функции работают в браузере
+- [x] `npm run build` — успешен
+- [x] Документация актуальна и верифицирована
+- [x] Все функции работают в браузере (подтверждено пользователем)
 
 **Git (после валидации):**
 ```bash

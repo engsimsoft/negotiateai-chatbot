@@ -12,6 +12,35 @@
 
 ---
 
+## [3.39.0] - 2026-02-21 - Briefing UI Refactor (ТЗ-BF1)
+
+**MINOR RELEASE**: Сохранение тем брифинга (SavedBriefingTopics), рефакторинг sidebar, TTL при генерации, UX-улучшения.
+
+### Added
+- **SavedBriefingTopics** — новая таблица (миграция 0035): пользователи могут сохранять темы из брифинга (id, userId, topicId, topicName, emoji, title, content, sources, briefingGeneratedAt, savedAt)
+- **CRUD API** — `POST/DELETE /api/briefing/topics/save`, `GET /api/briefing/topics/saved`
+- **Bookmark кнопка** — на каждой секции статьи (outline/fill-primary), save/delete через API + toast
+- **Copy кнопка** — копирование текста секции в буфер обмена (Copy → Check иконка + toast)
+- **SavedTopicView** — полноэкранный просмотр сохранённой темы (← Назад, markdown, sources, удалить)
+- **Группировка сохранённых** — в sidebar темы сгруппированы по брифингу (дата+время), newest-first
+- **AlertDialog** — подтверждение при генерации нового брифинга ("Текущий брифинг будет заменён. Сохранённые темы останутся.")
+- **TTL при генерации** — `deleteOldBriefingHistory()` удаляет старые записи BriefingHistory перед новой генерацией
+
+### Changed
+- **briefing-sidebar.tsx** — полный рефакторинг: "Сегодня" → "Текущий выпуск", убрана секция "Прошлые выпуски", добавлена секция "Сохранённые" (emoji + title + время)
+- **briefing-page-client.tsx** — state lifted (savedTopics, selectedSavedTopic) для sharing между desktop и mobile sidebar
+- **briefing-issue-content.tsx** — упрощён, получает state через props
+- **briefing-article-view.tsx** — bookmark matching по `topicId + briefingGeneratedAt` (новый брифинг = чистые закладки)
+- **markdown-viewer.tsx** — ссылки открываются в новой вкладке (`target="_blank"`)
+- **briefing/page.tsx** — загрузка saved topics (server-side), limit 1 вместо 10
+
+### Removed
+- **`/briefing/[date]`** — маршрут удалён (мёртвый из-за TTL, нет ссылок в sidebar)
+- **`getBriefingByDate()`** — query удалён (не используется)
+- **Секция "Прошлые выпуски"** — убрана из sidebar (заменена на "Сохранённые")
+
+---
+
 ## [3.38.0] - 2026-02-21 - Briefing Author → Claude Sonnet 4.6 (ТЗ-BRIEFING-AUTHOR-CLAUDE)
 
 **MINOR RELEASE**: Briefing Author переведён с Gemini 3 Pro на Claude Sonnet 4.6. Adaptive thinking (effort) настроен для 3 точек.
