@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-02-20
+**Обновлено:** 2026-02-21
 
 ---
 
@@ -35,7 +35,7 @@
 | **Snapshot Creator** | Claude Haiku | ✅ Работает | Fallback-клерк создания snapshot при заполнении контекста (v3.18) |
 | **Briefing: Онбординг** | Claude Sonnet 4.6 | ✅ Работает | AI-интервью для настройки брифинга (v3.30) |
 | **Briefing: Фильтр** | Gemini 2.0 Flash | ✅ Работает | Фильтрация и дедупликация новостей (v3.26) |
-| **Briefing: Анализатор** | Gemini 3 Pro Preview | ✅ Работает | Анализ и группировка новостей по темам (v3.26) |
+| **Briefing: Автор** | Gemini 3 Pro Preview | ✅ Работает | Генерация статьи из отфильтрованных новостей (v3.31) |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
 
 ---
@@ -518,11 +518,14 @@ export const myProvider = customProvider({
     "claude-sonnet": anthropic("claude-sonnet-4-5-20250929"),
     "claude-haiku": anthropic("claude-haiku-4-5-20251001"),
     "claude-opus": anthropic("claude-opus-4-6"),
+    "claude-sonnet-4-6": anthropic("claude-sonnet-4-6"),
     "title-model": anthropic("claude-haiku-4-5-20251001"),
     "artifact-model": anthropic("claude-sonnet-4-5-20250929"),
   },
 });
 ```
+
+> **Полный реестр конфигураций** (какая модель, где, с какими настройками) — см. [ai-providers.md](ai-providers.md#реестр-конфигураций-ssot)
 
 **API Key:** `ANTHROPIC_API_KEY`
 
@@ -542,12 +545,14 @@ const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_
 
 | Модель | Input | Output | Контекст | Используется в |
 |--------|-------|--------|----------|---------------|
+| Claude Sonnet 4.6 (`claude-sonnet-4-6`) | — | — | — | Briefing: онбординг (v3.30) |
 | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) | $3 | $15 | 200K | Основной чат (DEFAULT), Секретарь, Эксперт, артефакты |
 | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | $1 | $5 | 200K | Бен, Менеджер, Исполнитель, Клерки (анализатор, суммаризатор, snapshot) |
 | Claude Opus 4.6 (`claude-opus-4-6`) | $5 | $25 | 200K | Профессоры (планирование, ревью задач) |
 | Gemini 2.0 Flash (`gemini-2.0-flash`) | ~$0.10 | ~$0.40 | 1M | Briefing: фильтрация и дедупликация (v3.26) |
-| Gemini 3 Pro (`gemini-3-pro-preview`) | ~$1.25 | ~$10 | 1M | Briefing: анализ и группировка (v3.26) |
-| Claude Sonnet 4.6 (`claude-sonnet-4-6`) | — | — | — | Briefing: онбординг (v3.30) |
+| Gemini 2.5 Flash (`gemini-2.5-flash`) | — | — | 1M | Vision OCR: image + PDF |
+| Gemini 3 Pro (`gemini-3-pro-preview`) | ~$1.25 | ~$10 | 1M | Briefing: автор статьи (v3.31) |
+| Gemini 2.5 Pro (`gemini-2.5-pro`) | — | — | 1M | Briefing: fallback автор |
 
 *Цены за 1M токенов*
 
