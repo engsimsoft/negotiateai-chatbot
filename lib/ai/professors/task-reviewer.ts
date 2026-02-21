@@ -128,6 +128,13 @@ export async function reviewTask(
       system: REVIEWER_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.2,
+      // Adaptive thinking for Opus 4.6: critical analysis of completed work
+      providerOptions: {
+        anthropic: {
+          thinking: { type: "adaptive" as const },
+          effort: "high" as const,
+        },
+      },
     });
 
     // Extract XML tags from response

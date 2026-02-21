@@ -26,11 +26,11 @@ export const JINA_READER_TIMEOUT = 10_000;
 
 // --- AI Models ---
 
-/** Stage 1: Filter — cheap & fast */
+/** Stage 1: Filter — cheap & fast (Google Gemini) */
 export const FILTER_MODEL = "gemini-2.0-flash";
 
-/** Stage 2: Author — article generation */
-export const AUTHOR_MODEL = "gemini-3-pro-preview";
+/** Stage 2: Author — article generation (Anthropic Claude) */
+export const AUTHOR_MODEL = "claude-sonnet-4-6";
 
 /** Fallback author if primary is unavailable */
-export const AUTHOR_MODEL_FALLBACK = "gemini-2.5-pro";
+export const AUTHOR_MODEL_FALLBACK = "claude-sonnet-4-5-20250929";

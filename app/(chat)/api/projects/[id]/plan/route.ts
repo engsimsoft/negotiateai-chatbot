@@ -164,6 +164,13 @@ export async function POST(
       system: PROFESSOR_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.2,
+      // Adaptive thinking for Opus 4.6: document analysis, task decomposition, risk identification
+      providerOptions: {
+        anthropic: {
+          thinking: { type: "adaptive" as const },
+          effort: "high" as const,
+        },
+      },
     });
 
     // Extract XML tags from response

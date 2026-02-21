@@ -174,7 +174,7 @@ export async function POST() {
           detail: `${candidates.length} прошли отбор`,
         });
 
-        // Step 4: Writing (Gemini Pro)
+        // Step 4: Writing (Claude Sonnet)
         emit({
           step: "writing",
           message: "Пишем статью...",

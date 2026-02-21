@@ -1,9 +1,9 @@
-// ТЗ-А3: Stage 2 — Generate article using Gemini 3 Pro
+// ТЗ-BRIEFING-AUTHOR-CLAUDE: Stage 2 — Generate article using Claude Sonnet 4.6
 // Replaces briefing-analyzer.ts (JSON cards → narrative article)
 
 import fs from "fs";
 import path from "path";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { AUTHOR_MODEL, AUTHOR_MODEL_FALLBACK } from "./briefing-config";
@@ -22,8 +22,8 @@ const PROMPT_PATH = path.join(
 );
 const SYSTEM_PROMPT = fs.readFileSync(PROMPT_PATH, "utf-8");
 
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+const anthropic = createAnthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 // --- Zod schemas for BriefingArticle ---
@@ -103,7 +103,7 @@ const MAX_TOKENS_BY_VOLUME: Record<string, number> = {
 };
 
 /**
- * Stage 2: Generate briefing article using Gemini 3 Pro.
+ * Stage 2: Generate briefing article using Claude Sonnet 4.6.
  * System prompt = persona + rules (from .md file).
  * User message = formatted candidates + user settings + date.
  */
@@ -143,8 +143,10 @@ export async function generateArticle(
   let tokensUsed = 0;
 
   try {
+    // Note: thinking/effort not used here — Anthropic prohibits thinking when
+    // tool_choice is forced (generateObject uses tool_choice internally)
     const result = await generateObject({
-      model: google(AUTHOR_MODEL),
+      model: anthropic(AUTHOR_MODEL),
       schema: briefingArticleSchema,
       system: SYSTEM_PROMPT,
       prompt: userMessage,
@@ -160,7 +162,7 @@ export async function generateArticle(
       err instanceof Error ? err.message : err,
     );
     const result = await generateObject({
-      model: google(AUTHOR_MODEL_FALLBACK),
+      model: anthropic(AUTHOR_MODEL_FALLBACK),
       schema: briefingArticleSchema,
       system: SYSTEM_PROMPT,
       prompt: userMessage,

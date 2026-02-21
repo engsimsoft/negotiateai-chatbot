@@ -779,6 +779,15 @@ export async function POST(request: Request) {
       tools: Object.keys(tools).length > 0 ? tools : undefined,
       stopWhen: stepCountIs(maxSteps),
       temperature: context === "project-manager" ? 0.5 : 1.0,
+      // Adaptive thinking for briefing-onboarding (Sonnet 4.6): multi-step tool calling, source evaluation
+      ...(context === "briefing-onboarding" ? {
+        providerOptions: {
+          anthropic: {
+            thinking: { type: "adaptive" as const },
+            effort: "high" as const,
+          },
+        },
+      } : {}),
     });
 
     // ТЗ-A3: Save assistant response after streaming completes
