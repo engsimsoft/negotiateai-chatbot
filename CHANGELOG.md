@@ -29,9 +29,11 @@
 
 ### Changed
 - **briefing-card.tsx** — текстовый индикатор «1 новое» (primary color) вместо счётчика новостей при наличии непрочитанного
-- **briefing-page-client.tsx** — SimplyData тип, state management (selectedSimplyType, simplyNewsUnread), auto-mark-seen useEffect
-- **briefing-sidebar.tsx** — секция Simply с unread-индикатором (font-semibold + dot + primary color)
-- **briefing-issue-content.tsx** — третий view mode (article / savedTopic / simplyContent)
+- **briefing-page-client.tsx** — SimplyData тип, state management (selectedSimplyType, simplyNewsUnread), auto-mark-seen useEffect, `h-svh overflow-hidden` для fixed layout
+- **briefing-sidebar.tsx** — секция Simply с unread-индикатором (font-semibold + dot + primary color), `onScrollToTop` callback
+- **briefing-issue-content.tsx** — третий view mode (article / savedTopic / simplyContent), fixed scroll layout (sidebar не скроллится, `overflow-y-auto` только на main)
+- **briefing-issue-header.tsx** — кнопка «Скоро: подкаст» (Headphones icon, bg-primary, disabled) перенесена из контентной области в header
+- **briefing-article-view.tsx** — IntersectionObserver с кастомным `scrollRoot` ref (вместо window)
 - **dashboard/page.tsx** — загрузка `getBriefingSettings` для проверки isActive, hasSimplyUpdate только для активных пользователей
 - **briefing/page.tsx** — загрузка `getUserById` для сравнения версий, hasUnread в SimplyData
 

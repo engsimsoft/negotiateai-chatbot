@@ -103,7 +103,7 @@
 - `components/glavnaya/mode-cards-section.tsx` — 3 карточки-лаунчера (Экспертиза 🔍, Создать ✨, Проекты 📁) (v3.24.0)
 - `components/glavnaya/tools-section.tsx` — Секция "Инструменты" на дашборде (v3.27.0)
 
-**Briefing UI (v3.28.0 — Landing, v3.30.0 — Onboarding, v3.32.0 — Issue Page, v3.33.0 — Progress, v3.39.0 — SavedTopics):**
+**Briefing UI (v3.28.0 — Landing, v3.30.0 — Onboarding, v3.32.0 — Issue Page, v3.33.0 — Progress, v3.39.0 — SavedTopics, v3.40.0 — SimplyNews):**
 - `lib/briefing/briefing-types.ts` — Shared типы BriefingArticle/Section/Source/Meta + BriefingProgressStep/Event + SavedBriefingTopicClient (client-safe)
 - `app/(dashboard)/briefing/page.tsx` — Страница /briefing (Server Component → BriefingPageClient, роутинг: isActive → выпуск с sidebar, !isActive → лендинг, загрузка saved topics)
 - `app/(dashboard)/briefing/setup/page.tsx` — Server Component: auth, mode detection (create/edit), загрузка topics/sources
@@ -115,13 +115,13 @@
 - `hooks/use-briefing-generation.ts` — Custom hook: streaming fetch → parse JSON Lines → state (steps, isGenerating, error, redirectUrl)
 - `components/briefing/briefing-card.tsx` — Карточка на дашборде (3 состояния: пустое/готов/генерируется)
 - `components/briefing/briefing-page.tsx` — Лендинг (hero + демо выпуска + CTA)
-- `components/briefing/briefing-page-client.tsx` — Клиентская обёртка /briefing (управление генерацией, savedTopics state lifted для desktop+mobile sharing)
+- `components/briefing/briefing-page-client.tsx` — Клиентская обёртка /briefing (управление генерацией, savedTopics state, SimplyData state, h-svh fixed layout)
 - `components/briefing/briefing-generation-progress.tsx` — UI прогресса генерации (4 шага, framer-motion, error/retry)
-- `components/briefing/briefing-issue-header.tsx` — Header выпуска (title, ← Dashboard, ⚙️, UserMenu, mobileTrigger)
+- `components/briefing/briefing-issue-header.tsx` — Header выпуска (title, ← Dashboard, 🎧 подкаст (disabled), ⚙️, UserMenu, mobileTrigger)
 - `components/briefing/briefing-article-view.tsx` — Рендер статьи (intro, sections + MarkdownViewer + Collapsible sources, outro, meta) + IntersectionObserver scroll spy + Bookmark + Copy + SavedTopicView + SimplyContentView + NoBriefingsYet
 - `components/briefing/briefing-sidebar.tsx` — Sidebar (topic nav с active state, saved topics grouped by briefing, Simply section с unread indicator, AlertDialog confirm, onGenerate, settings) + BriefingSidebarMobile (Sheet)
-- `components/briefing/briefing-issue-content.tsx` — Клиентская обёртка (activeSectionId state, связь scroll spy → sidebar, switch article/savedTopic view)
-- `components/briefing/briefing-player-placeholder.tsx` — Sticky заглушка аудиоплеера
+- `components/briefing/briefing-issue-content.tsx` — Клиентская обёртка (activeSectionId state, связь scroll spy → sidebar, switch article/savedTopic/simplyContent view, fixed scroll layout)
+- `components/briefing/briefing-player-placeholder.tsx` — (не используется, подкаст-кнопка перенесена в briefing-issue-header)
 - `components/briefing/briefing-source-card.tsx` — Карточка источника (tier badges на русском)
 - `components/briefing/briefing-header.tsx` — Header лендинга (← Dashboard, заголовок, UserMenu)
 - `components/service-chat/configs/briefing-onboarding.ts` — Reference config для service-chat

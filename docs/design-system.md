@@ -67,7 +67,7 @@ Root Layout (app/layout.tsx)
 │   ├── /create → ListDetailPage (← Dashboard + "Создание" + UserMenu)
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │
-│   ├── /briefing → BriefingIssueHeader + BriefingSidebar (лендинг или последний выпуск + сохранённые темы)
+│   ├── /briefing → BriefingIssueHeader (🎧 подкаст, ⚙️, UserMenu) + BriefingSidebar (выпуск, сохранённые, Simply) + fixed scroll layout
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │
 │   ├── /briefing/setup → Split layout (preview + чат AI-настройки)

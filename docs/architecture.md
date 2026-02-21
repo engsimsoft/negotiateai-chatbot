@@ -119,7 +119,7 @@
 **PostgreSQL (Neon) + Drizzle ORM**
 
 **Основные таблицы:**
-- `User` — пользователи (displayName, pronouns, occupation, bio, theme, hasSeenBenIntro)
+- `User` — пользователи (displayName, pronouns, occupation, bio, theme, hasSeenBenIntro, lastSeenSimplyVersion)
 - `Chat` — чаты (title, summary, isStarred, projectId, chatMode)
 - `Message_v2` — сообщения
 - `Document` — артефакты

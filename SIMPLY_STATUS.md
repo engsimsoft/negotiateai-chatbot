@@ -329,6 +329,34 @@ components/projects/
 
 ## План развития
 
+### ТЗ-BF2: SimplyNews — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Simply News контент** — markdown-файлы с frontmatter (`simply-news.md`, `simply-overview.md`) + regex-парсер
+- **Секция «Simply» в sidebar** — «📋 Обзор платформы» (всегда), «🆕 Что нового» (при hasUpdate) с unread-индикатором (жирный шрифт + точка)
+- **SimplyContentView** — просмотр Simply-контента в article reader (паттерн SavedTopicView)
+- **Индикатор непрочитанного** — на дашборде «1 новое» (только для активных пользователей), в sidebar — font-semibold + dot
+- **PATCH API** — `/api/briefing/simply-news/seen` для отметки просмотра
+- **Инъекция в генерацию** — simply-news как последняя секция брифинга (topicId: `simply_news`, emoji: 🔔)
+- **Лендинг** — неактивные пользователи видят «Что нового» на странице онбординга
+- **DB миграция 0036** — поле `lastSeenSimplyVersion` в таблице `User`
+- **Scroll fix** — sidebar фиксирован, контент скроллится независимо (`h-svh overflow-hidden`)
+- **Подкаст-кнопка** — перенесена из контентной области в header (bg-primary, disabled)
+
+**Ключевые файлы:**
+- `lib/briefing/simply-news.md` — контент «Что нового» (frontmatter)
+- `lib/briefing/simply-overview.md` — контент обзора платформы
+- `lib/briefing/simply-news-utils.ts` — парсер frontmatter + утилиты
+- `app/(chat)/api/briefing/simply-news/seen/route.ts` — PATCH API
+- `lib/db/schema.ts` — +lastSeenSimplyVersion в User
+- `lib/db/queries.ts` — +updateLastSeenSimplyVersion
+- `components/briefing/briefing-sidebar.tsx` — +секция Simply, +unread indicator
+- `components/briefing/briefing-article-view.tsx` — +SimplyContentView
+- `components/briefing/briefing-page-client.tsx` — +SimplyData, +state management
+- `components/briefing/briefing-issue-header.tsx` — +кнопка подкаста
+
+**Детали:** [_archive/TZ_BF2_SimplyNews/](_archive/TZ_BF2_SimplyNews/)
+
 ### ТЗ-BF1: Briefing UI Refactor — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
@@ -1262,6 +1290,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_BF2_SimplyNews/](_archive/TZ_BF2_SimplyNews/) — ТЗ-BF2 SimplyNews
 - [_archive/TZ_HF1_BriefingSetupUpdate/](_archive/TZ_HF1_BriefingSetupUpdate/) — ТЗ-HF1 Briefing PE Update
 - [_archive/TZ_PX_DeepResearch/](_archive/TZ_PX_DeepResearch/) — ТЗ-PX + ТЗ-FU Deep Research + Fetch URL
 - [_archive/TZ_BR1_BriefingBackend/](_archive/TZ_BR1_BriefingBackend/) — ТЗ-BR1 Morning Briefing Backend
