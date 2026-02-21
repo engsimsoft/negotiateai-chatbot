@@ -12,6 +12,17 @@
 
 ---
 
+## [3.37.1] - 2026-02-21 - Briefing Volume Prompt Enforcement (PATCH-buildUserMessage-volume)
+
+**PATCH RELEASE**: Промптовые усиления для соблюдения объёма брифинга. Три точки давления на volume: system prompt начало → user message начало → system prompt конец.
+
+### Changed
+- **briefing-author.md v4 → v5** — усилена секция "Кто ты" (полноценные журналистские тексты, volume = жёсткое требование), убраны мягкие таблицы-ориентиры, добавлен блок CRITICAL в конце промпта (минимумы секций, самопроверка)
+- **buildUserMessage()** — заменена строка `Объём выпуска: detailed` на `getVolumeInstruction()` — развёрнутый блок `## ТРЕБОВАНИЕ К ОБЪЁМУ: DETAILED` с конкретными минимумами, вынесен в начало user message
+- **Результат прогона:** outputTokens 4047 → 5104 (+26%), finishReason=stop, 30/30 full text hit
+
+---
+
 ## [3.37.0] - 2026-02-21 - Briefing itemId Fix (ТЗ-BF1)
 
 **BUGFIX RELEASE**: Фикс lookup полного текста в briefing pipeline. Автор брифинга теперь получает полный текст для всех источников (web/jina), а не только RSS.

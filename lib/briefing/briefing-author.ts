@@ -173,6 +173,30 @@ export async function generateArticle(
   return { article: object, tokensUsed };
 }
 
+// --- Volume instruction block (pressure point #2: top of user message) ---
+
+function getVolumeInstruction(volume: string): string {
+  switch (volume) {
+    case "compact":
+      return `## ТРЕБОВАНИЕ К ОБЪЁМУ: COMPACT
+Общий объём: 600-1200 слов (3-5 минут чтения).
+Каждая секция: 80-150 слов (обычная), 150-250 слов (приоритетная).
+Стиль: кратко, только ключевые факты.`;
+
+    case "detailed":
+      return `## ТРЕБОВАНИЕ К ОБЪЁМУ: DETAILED
+Общий объём: 3000-6000 слов (15-25 минут чтения).
+Каждая секция: МИНИМУМ 400 слов (обычная), МИНИМУМ 700 слов (приоритетная).
+Используй ВСЕ факты и цифры из полных текстов. Пиши развёрнуто: контекст, сравнения, аналитика, цитаты.
+НЕ ОСТАНАВЛИВАЙСЯ пока не набрал минимум 3000 слов суммарно.`;
+
+    default: // standard
+      return `## ТРЕБОВАНИЕ К ОБЪЁМУ: STANDARD
+Общий объём: 1500-3000 слов (8-12 минут чтения).
+Каждая секция: 200-400 слов (обычная), 400-600 слов (приоритетная).`;
+  }
+}
+
 // --- Build user message with all data ---
 
 function buildUserMessage(
@@ -218,17 +242,18 @@ function buildUserMessage(
     })
     .join("\n\n---\n\n");
 
-  return `## Дата выпуска
-${dateFormatted}
+  return `${getVolumeInstruction(volume ?? "standard")}
 
-## Настройки пользователя
-- Объём выпуска: ${volume ?? "standard"}
-- Темы:
+Дата: ${dateFormatted}
+Язык: ${language}
+Целевое количество новостей: ${maxItems}
+
+Темы пользователя:
 ${topicsFormatted}
-- Язык: ${language}
-- Целевое количество: ${maxItems}
 
-## Кандидаты (${candidates.length} шт.)
+---
+
+Кандидаты (${candidates.length}):
 
 ${candidatesFormatted}`;
 }
