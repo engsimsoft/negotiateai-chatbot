@@ -1,9 +1,16 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MarkdownViewer } from "@/components/markdown-viewer";
 import { BriefingHeader } from "./briefing-header";
 
-export function BriefingPage() {
+interface BriefingPageProps {
+  /** ТЗ-BF2: Simply News content + title (shown when hasUpdate) */
+  simplyNewsTitle?: string | null;
+  simplyNewsContent?: string | null;
+}
+
+export function BriefingPage({ simplyNewsTitle, simplyNewsContent }: BriefingPageProps) {
   return (
     <div className="flex min-h-svh flex-col bg-muted/30">
       <BriefingHeader />
@@ -63,6 +70,19 @@ export function BriefingPage() {
             />
           </div>
         </section>
+
+        {/* ТЗ-BF2: Simply News section for inactive users */}
+        {simplyNewsTitle && simplyNewsContent && (
+          <section className="mb-12">
+            <div className="rounded-xl border bg-background p-5">
+              <h3 className="mb-3 flex items-center gap-2 font-semibold">
+                <span>🔔</span>
+                <span>{simplyNewsTitle}</span>
+              </h3>
+              <MarkdownViewer content={simplyNewsContent} className="text-sm" />
+            </div>
+          </section>
+        )}
 
         {/* CTA */}
         <section className="text-center">

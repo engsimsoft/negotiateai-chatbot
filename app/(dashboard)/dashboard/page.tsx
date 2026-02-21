@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
-import { getUserById, getGeneralChatsCount, getBriefingHistory } from "@/lib/db/queries";
+import { getUserById, getGeneralChatsCount, getBriefingHistory, getBriefingSettings } from "@/lib/db/queries";
+import { getSimplyNewsData } from "@/lib/briefing/simply-news-utils";
 import {
   GlavnayaHeader,
   GlavnayaGreeting,
@@ -20,12 +21,21 @@ export default async function DashboardPage() {
   }
 
   // Get user profile, chat count, and latest briefing from database
-  const [userProfile, generalChatsCount, briefingHistoryRows] = await Promise.all([
+  const [userProfile, generalChatsCount, briefingHistoryRows, briefingSettings] = await Promise.all([
     getUserById(session.user.id),
     getGeneralChatsCount({ userId: session.user.id }),
     getBriefingHistory({ userId: session.user.id, limit: 1 }),
+    getBriefingSettings({ userId: session.user.id }),
   ]);
   const latestBriefing = briefingHistoryRows[0] ?? null;
+
+  // ТЗ-BF2: Show unread Simply News only for active briefing users
+  const simplyNews = getSimplyNewsData();
+  const hasSimplyUpdate =
+    briefingSettings?.isActive &&
+    simplyNews.meta.hasUpdate &&
+    simplyNews.meta.version !== userProfile?.lastSeenSimplyVersion;
+
   // User was deleted from DB but JWT still valid — force re-auth
   if (!userProfile) {
     const cookieStore = await cookies();
@@ -56,7 +66,7 @@ export default async function DashboardPage() {
         <ModeCardsSection />
 
         {/* Tools */}
-        <ToolsSection latestBriefing={latestBriefing} />
+        <ToolsSection latestBriefing={latestBriefing} hasSimplyUpdate={hasSimplyUpdate} />
       </main>
     </div>
   );

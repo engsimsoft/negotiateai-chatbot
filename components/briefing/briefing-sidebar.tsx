@@ -43,6 +43,8 @@ export interface BriefingHistoryItem {
   label: string; // "20 февраля"
 }
 
+export type SimplyContentType = "overview" | "news";
+
 export interface BriefingSidebarProps {
   /** Sections from current article (for topic navigation) */
   sections: BriefingArticleSection[];
@@ -62,6 +64,18 @@ export interface BriefingSidebarProps {
   onGenerate?: () => void;
   /** Whether there's an existing article (for confirm dialog) */
   hasArticle?: boolean;
+  /** ТЗ-BF2: Simply News version (shown when hasUpdate) */
+  simplyNewsVersion?: string | null;
+  /** ТЗ-BF2: Simply News title */
+  simplyNewsTitle?: string | null;
+  /** ТЗ-BF2: Callback when user selects a Simply content item */
+  onSelectSimplyContent?: (type: SimplyContentType) => void;
+  /** ТЗ-BF2: Currently selected Simply content type */
+  selectedSimplyType?: SimplyContentType | null;
+  /** ТЗ-BF2: Whether Simply News is unread (shows indicator) */
+  simplyNewsUnread?: boolean;
+  /** Scroll content area to top (used instead of window.scrollTo) */
+  onScrollToTop?: () => void;
 }
 
 /* --- Short date formatter: ISO → "21 фев" --- */
@@ -161,12 +175,26 @@ function SidebarContent({
   onDeleteSavedTopic,
   onGenerate,
   hasArticle,
+  simplyNewsVersion,
+  simplyNewsTitle,
+  onSelectSimplyContent,
+  selectedSimplyType,
+  simplyNewsUnread,
+  onScrollToTop,
   onNavigate,
 }: BriefingSidebarProps & { onNavigate?: () => void }) {
+  const handleSelectSimply = useCallback(
+    (type: SimplyContentType) => {
+      onSelectSimplyContent?.(type);
+      onNavigate?.();
+    },
+    [onSelectSimplyContent, onNavigate]
+  );
+
   const handleScrollTo = useCallback(
     (id: string) => {
-      // If viewing saved topic, go back to article first
-      if (selectedSavedTopicId) {
+      // If viewing saved topic or simply content, go back to article first
+      if (selectedSavedTopicId || selectedSimplyType) {
         onBackToArticle?.();
       }
       // Use requestAnimationFrame to let React re-render before scrolling
@@ -182,14 +210,14 @@ function SidebarContent({
   );
 
   const handleScrollToTop = useCallback(() => {
-    if (selectedSavedTopicId) {
+    if (selectedSavedTopicId || selectedSimplyType) {
       onBackToArticle?.();
     }
     requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      onScrollToTop?.();
       onNavigate?.();
     });
-  }, [onNavigate, selectedSavedTopicId, onBackToArticle]);
+  }, [onNavigate, selectedSavedTopicId, selectedSimplyType, onBackToArticle, onScrollToTop]);
 
   const handleSelectSaved = useCallback(
     (topic: SavedBriefingTopicClient) => {
@@ -212,7 +240,7 @@ function SidebarContent({
           onClick={handleScrollToTop}
           className={cn(
             "mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
-            !selectedSavedTopicId && !activeSectionId && "bg-primary/10 font-medium text-primary"
+            !selectedSavedTopicId && !selectedSimplyType && !activeSectionId && "bg-primary/10 font-medium text-primary"
           )}
         >
           <BookOpen className="size-4 text-muted-foreground" />
@@ -227,6 +255,7 @@ function SidebarContent({
             className={cn(
               "mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
               !selectedSavedTopicId &&
+                !selectedSimplyType &&
                 activeSectionId === section.topicId &&
                 "bg-primary/10 font-medium text-primary"
             )}
@@ -282,6 +311,46 @@ function SidebarContent({
             ))}
           </div>
         )}
+
+        {/* ТЗ-BF2: Simply section — overview + what's new */}
+        <div className="mt-6">
+          <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Simply
+          </p>
+          <button
+            type="button"
+            onClick={() => handleSelectSimply("overview")}
+            className={cn(
+              "mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
+              selectedSimplyType === "overview" &&
+                "bg-primary/10 font-medium text-primary"
+            )}
+          >
+            <span>{"📋"}</span>
+            <span className="truncate">Обзор платформы</span>
+          </button>
+          {simplyNewsVersion && (
+            <button
+              type="button"
+              onClick={() => handleSelectSimply("news")}
+              className={cn(
+                "mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
+                selectedSimplyType === "news" &&
+                  "bg-primary/10 font-medium text-primary",
+                simplyNewsUnread && selectedSimplyType !== "news" &&
+                  "font-semibold text-primary"
+              )}
+            >
+              <span>{"🆕"}</span>
+              <span className="truncate">
+                {simplyNewsTitle ?? `Что нового в v${simplyNewsVersion}`}
+              </span>
+              {simplyNewsUnread && selectedSimplyType !== "news" && (
+                <span className="ml-auto size-2 shrink-0 rounded-full bg-primary" />
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Footer: Generate + Settings */}

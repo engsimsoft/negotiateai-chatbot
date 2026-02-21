@@ -5,9 +5,11 @@ import {
   getBriefingSettings,
   getBriefingHistory,
   getSavedBriefingTopics,
+  getUserById,
 } from "@/lib/db/queries";
+import { getSimplyNewsData, getSimplyOverviewContent } from "@/lib/briefing/simply-news-utils";
 import { BriefingPage } from "@/components/briefing/briefing-page";
-import { BriefingPageClient } from "@/components/briefing/briefing-page-client";
+import { BriefingPageClient, type SimplyData } from "@/components/briefing/briefing-page-client";
 import type { BriefingArticle, SavedBriefingTopicClient } from "@/lib/briefing/briefing-types";
 
 export default async function BriefingRoute() {
@@ -18,11 +20,36 @@ export default async function BriefingRoute() {
   }
 
   const userId = session.user.id;
-  const settings = await getBriefingSettings({ userId });
+  const [settings, userProfile] = await Promise.all([
+    getBriefingSettings({ userId }),
+    getUserById(userId),
+  ]);
+
+  // ТЗ-BF2: Load simply content data (sync fs reads, fast)
+  const simplyNews = getSimplyNewsData();
+  const simplyOverview = getSimplyOverviewContent();
+  const hasUnreadNews =
+    simplyNews.meta.hasUpdate &&
+    simplyNews.meta.version !== userProfile?.lastSeenSimplyVersion;
+  const simplyData: SimplyData = {
+    overviewContent: simplyOverview,
+    newsContent: simplyNews.meta.hasUpdate ? simplyNews.content : null,
+    newsMeta: {
+      version: simplyNews.meta.version,
+      title: simplyNews.meta.title,
+      hasUpdate: simplyNews.meta.hasUpdate,
+      hasUnread: hasUnreadNews,
+    },
+  };
 
   // ТЗ-А2: профиль активен → показываем выпуск / заглушку, нет → лендинг
   if (!settings?.isActive) {
-    return <BriefingPage />;
+    return (
+      <BriefingPage
+        simplyNewsTitle={simplyData.newsMeta?.hasUpdate ? simplyData.newsMeta.title : null}
+        simplyNewsContent={simplyData.newsContent}
+      />
+    );
   }
 
   // Load latest briefing + saved topics in parallel
@@ -59,6 +86,7 @@ export default async function BriefingRoute() {
       hasValidArticle={hasValidArticle}
       initialSavedTopics={savedTopics}
       briefingGeneratedAt={briefingGeneratedAt}
+      simplyData={simplyData}
     />
   );
 }

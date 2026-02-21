@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { BriefingPlayerPlaceholder } from "./briefing-player-placeholder";
-import { BriefingArticleView, SavedTopicView } from "./briefing-article-view";
+import { useState, useRef, useCallback } from "react";
+import {
+  BriefingArticleView,
+  SavedTopicView,
+  SimplyContentView,
+} from "./briefing-article-view";
 import { BriefingSidebar } from "./briefing-sidebar";
+import type { SimplyContentType } from "./briefing-sidebar";
 import type {
   BriefingArticle,
   BriefingArticleSection,
@@ -28,6 +32,20 @@ interface BriefingIssueContentProps {
   onBackToArticle: () => void;
   /** ISO timestamp of current briefing (for bookmark matching) */
   briefingGeneratedAt?: string | null;
+  /** ТЗ-BF2: Simply News version */
+  simplyNewsVersion?: string | null;
+  /** ТЗ-BF2: Simply News title */
+  simplyNewsTitle?: string | null;
+  /** ТЗ-BF2: Currently selected Simply content type */
+  selectedSimplyType?: SimplyContentType | null;
+  /** ТЗ-BF2: Select simply content */
+  onSelectSimplyContent?: (type: SimplyContentType) => void;
+  /** ТЗ-BF2: Simply content to render (title + markdown) */
+  simplyContentTitle?: string;
+  /** ТЗ-BF2: Simply content markdown body */
+  simplyContentBody?: string;
+  /** ТЗ-BF2: Whether Simply News is unread */
+  simplyNewsUnread?: boolean;
 }
 
 /**
@@ -45,46 +63,69 @@ export function BriefingIssueContent({
   onSelectSavedTopic,
   onBackToArticle,
   briefingGeneratedAt,
+  simplyNewsVersion,
+  simplyNewsTitle,
+  selectedSimplyType,
+  onSelectSimplyContent,
+  simplyContentTitle,
+  simplyContentBody,
+  simplyNewsUnread,
 }: BriefingIssueContentProps) {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
+
+  const handleScrollToTop = useCallback(() => {
+    mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   return (
-    <>
-      <BriefingPlayerPlaceholder />
-      <div className="flex flex-1">
-        {/* Desktop sidebar */}
-        <aside className="sticky top-[7rem] hidden h-[calc(100svh-7rem)] w-64 shrink-0 border-r md:block">
-          <BriefingSidebar
-            sections={article.sections}
-            activeSectionId={activeSectionId}
-            savedTopics={savedTopics}
-            selectedSavedTopicId={selectedSavedTopic?.id ?? null}
-            onSelectSavedTopic={onSelectSavedTopic}
-            onBackToArticle={onBackToArticle}
-            onDeleteSavedTopic={onDeleteTopic}
-            onGenerate={onGenerate}
-            hasArticle
+    <div className="flex min-h-0 flex-1">
+      {/* Desktop sidebar — fixed column, internal scroll */}
+      <aside className="hidden w-64 shrink-0 overflow-hidden border-r md:block">
+        <BriefingSidebar
+          sections={article.sections}
+          activeSectionId={activeSectionId}
+          savedTopics={savedTopics}
+          selectedSavedTopicId={selectedSavedTopic?.id ?? null}
+          onSelectSavedTopic={onSelectSavedTopic}
+          onBackToArticle={onBackToArticle}
+          onDeleteSavedTopic={onDeleteTopic}
+          onGenerate={onGenerate}
+          hasArticle
+          simplyNewsVersion={simplyNewsVersion}
+          simplyNewsTitle={simplyNewsTitle}
+          onSelectSimplyContent={onSelectSimplyContent}
+          selectedSimplyType={selectedSimplyType}
+          simplyNewsUnread={simplyNewsUnread}
+          onScrollToTop={handleScrollToTop}
+        />
+      </aside>
+      {/* Content area — scrolls independently */}
+      <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto">
+        {selectedSimplyType && simplyContentTitle && simplyContentBody ? (
+          <SimplyContentView
+            title={simplyContentTitle}
+            content={simplyContentBody}
+            onBack={onBackToArticle}
           />
-        </aside>
-        <main className="min-w-0 flex-1">
-          {selectedSavedTopic ? (
-            <SavedTopicView
-              topic={selectedSavedTopic}
-              onBack={onBackToArticle}
-              onDelete={onDeleteTopic}
-            />
-          ) : (
-            <BriefingArticleView
-              article={article}
-              onActiveSectionChange={setActiveSectionId}
-              savedTopics={savedTopics}
-              onSaveTopic={onSaveTopic}
-              onDeleteTopic={onDeleteTopic}
-              briefingGeneratedAt={briefingGeneratedAt}
-            />
-          )}
-        </main>
-      </div>
-    </>
+        ) : selectedSavedTopic ? (
+          <SavedTopicView
+            topic={selectedSavedTopic}
+            onBack={onBackToArticle}
+            onDelete={onDeleteTopic}
+          />
+        ) : (
+          <BriefingArticleView
+            article={article}
+            onActiveSectionChange={setActiveSectionId}
+            savedTopics={savedTopics}
+            onSaveTopic={onSaveTopic}
+            onDeleteTopic={onDeleteTopic}
+            briefingGeneratedAt={briefingGeneratedAt}
+            scrollRoot={mainRef}
+          />
+        )}
+      </main>
+    </div>
   );
 }

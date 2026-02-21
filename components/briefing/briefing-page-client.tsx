@@ -9,12 +9,26 @@ import { BriefingGenerationProgress } from "./briefing-generation-progress";
 import { BriefingIssueHeader } from "./briefing-issue-header";
 import { BriefingIssueContent } from "./briefing-issue-content";
 import { BriefingSidebarMobile } from "./briefing-sidebar";
-import { NoBriefingsYet } from "./briefing-article-view";
+import { NoBriefingsYet, SimplyContentView } from "./briefing-article-view";
 import type {
   BriefingArticle,
   BriefingArticleSection,
   SavedBriefingTopicClient,
 } from "@/lib/briefing/briefing-types";
+import type { SimplyContentType } from "./briefing-sidebar";
+
+/** ТЗ-BF2: Simply content data passed from server */
+export interface SimplyData {
+  overviewContent: string;
+  newsContent: string | null;
+  newsMeta: {
+    version: string;
+    title: string;
+    hasUpdate: boolean;
+    /** Whether current user hasn't seen this version yet */
+    hasUnread: boolean;
+  } | null;
+}
 
 interface BriefingPageClientProps {
   article: BriefingArticle | null;
@@ -22,6 +36,8 @@ interface BriefingPageClientProps {
   initialSavedTopics?: SavedBriefingTopicClient[];
   /** ISO timestamp of current briefing (for bookmark matching) */
   briefingGeneratedAt?: string | null;
+  /** ТЗ-BF2: Simply content data */
+  simplyData?: SimplyData | null;
 }
 
 export function BriefingPageClient({
@@ -29,6 +45,7 @@ export function BriefingPageClient({
   hasValidArticle,
   initialSavedTopics = [],
   briefingGeneratedAt,
+  simplyData,
 }: BriefingPageClientProps) {
   const { steps, isGenerating, error, redirectUrl, startGeneration } =
     useBriefingGeneration();
@@ -38,6 +55,14 @@ export function BriefingPageClient({
     useState<SavedBriefingTopicClient[]>(initialSavedTopics);
   const [selectedSavedTopic, setSelectedSavedTopic] =
     useState<SavedBriefingTopicClient | null>(null);
+
+  // ТЗ-BF2: Simply content state
+  const [selectedSimplyType, setSelectedSimplyType] =
+    useState<SimplyContentType | null>(null);
+
+  // ТЗ-BF2: Optimistic unread state (initialized from server, cleared on view)
+  const [simplyNewsUnread, setSimplyNewsUnread] =
+    useState(simplyData?.newsMeta?.hasUnread ?? false);
 
   // ТЗ-BF1: Save a topic
   const handleSaveTopic = useCallback(
@@ -90,13 +115,45 @@ export function BriefingPageClient({
   const handleSelectSavedTopic = useCallback(
     (topic: SavedBriefingTopicClient) => {
       setSelectedSavedTopic(topic);
+      setSelectedSimplyType(null);
     },
     []
   );
 
   const handleBackToArticle = useCallback(() => {
     setSelectedSavedTopic(null);
+    setSelectedSimplyType(null);
   }, []);
+
+  // ТЗ-BF2: Handle simply content selection (clear saved topic when selecting simply)
+  const handleSelectSimplyContent = useCallback(
+    (type: SimplyContentType) => {
+      setSelectedSimplyType(type);
+      setSelectedSavedTopic(null);
+    },
+    []
+  );
+
+  // ТЗ-BF2: Auto-mark simply-news as seen when user views it
+  useEffect(() => {
+    if (selectedSimplyType !== "news") return;
+    if (!simplyData?.newsMeta?.hasUpdate) return;
+    setSimplyNewsUnread(false);
+    fetch("/api/briefing/simply-news/seen", { method: "PATCH" }).catch(() => {});
+  }, [selectedSimplyType, simplyData?.newsMeta?.hasUpdate]);
+
+  // ТЗ-BF2: Compute simply content title + body for current selection
+  const simplyContentTitle = selectedSimplyType
+    ? selectedSimplyType === "overview"
+      ? "Simply — обзор платформы"
+      : simplyData?.newsMeta?.title ?? "Что нового"
+    : undefined;
+
+  const simplyContentBody = selectedSimplyType
+    ? selectedSimplyType === "overview"
+      ? simplyData?.overviewContent ?? ""
+      : simplyData?.newsContent ?? ""
+    : undefined;
 
   // Auto-navigate on completion — full reload clears client state and loads fresh server data
   useEffect(() => {
@@ -117,6 +174,12 @@ export function BriefingPageClient({
     onDeleteSavedTopic: handleDeleteTopic,
     onGenerate: startGeneration,
     hasArticle: hasValidArticle,
+    // ТЗ-BF2: Simply content props
+    simplyNewsVersion: simplyData?.newsMeta?.hasUpdate ? simplyData.newsMeta.version : null,
+    simplyNewsTitle: simplyData?.newsMeta?.title ?? null,
+    onSelectSimplyContent: handleSelectSimplyContent,
+    selectedSimplyType,
+    simplyNewsUnread,
   };
 
   // Show progress UI when generating
@@ -136,7 +199,7 @@ export function BriefingPageClient({
 
   // Normal content
   return (
-    <div className="flex min-h-svh flex-col bg-muted/30">
+    <div className={`flex flex-col bg-muted/30 ${hasValidArticle ? "h-svh overflow-hidden" : "min-h-svh"}`}>
       <BriefingIssueHeader
         title={hasValidArticle && article ? article.title : "Утренний брифинг"}
         mobileTrigger={
@@ -157,10 +220,53 @@ export function BriefingPageClient({
           onSelectSavedTopic={handleSelectSavedTopic}
           onBackToArticle={handleBackToArticle}
           briefingGeneratedAt={briefingGeneratedAt}
+          simplyNewsVersion={sidebarProps.simplyNewsVersion}
+          simplyNewsTitle={sidebarProps.simplyNewsTitle}
+          selectedSimplyType={selectedSimplyType}
+          onSelectSimplyContent={handleSelectSimplyContent}
+          simplyContentTitle={simplyContentTitle}
+          simplyContentBody={simplyContentBody}
+          simplyNewsUnread={simplyNewsUnread}
         />
       ) : (
         <main className="flex-1">
-          <NoBriefingsYet onGenerate={startGeneration} />
+          {selectedSimplyType && simplyContentTitle && simplyContentBody ? (
+            <SimplyContentView
+              title={simplyContentTitle}
+              content={simplyContentBody}
+              onBack={handleBackToArticle}
+            />
+          ) : (
+            <>
+              <NoBriefingsYet onGenerate={startGeneration} />
+              {/* ТЗ-BF2: Simply links even without generated briefing */}
+              {simplyData && (
+                <div className="mx-auto max-w-sm px-4 pb-12">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Simply
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectSimplyContent("overview")}
+                    className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
+                  >
+                    <span>📋</span>
+                    <span>Обзор платформы</span>
+                  </button>
+                  {simplyData.newsMeta?.hasUpdate && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSimplyContent("news")}
+                      className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60"
+                    >
+                      <span>🆕</span>
+                      <span>{simplyData.newsMeta.title ?? "Что нового"}</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </main>
       )}
     </div>

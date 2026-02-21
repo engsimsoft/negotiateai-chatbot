@@ -5,6 +5,7 @@ import { generateArticle } from "@/lib/briefing/briefing-author";
 import { MAX_BRIEFING_ITEMS } from "@/lib/briefing/briefing-config";
 import { filterContent } from "@/lib/briefing/briefing-filter";
 import type { BriefingProgressEvent } from "@/lib/briefing/briefing-types";
+import { getSimplyNewsData } from "@/lib/briefing/simply-news-utils";
 import { fetchSource } from "@/lib/briefing/source-fetchers";
 import type { RawContent } from "@/lib/briefing/source-fetchers/types";
 import { getDefaultSources, getTopicIds } from "@/lib/briefing/topics-catalog";
@@ -205,6 +206,20 @@ export async function POST() {
           volume: settings?.volume ?? "standard",
           date: today,
         });
+
+        // ТЗ-BF2: Inject simply-news as last section (if hasUpdate)
+        const simplyNews = getSimplyNewsData();
+        if (simplyNews.meta.hasUpdate) {
+          article.sections.push({
+            topicId: "simply_news",
+            topicName: simplyNews.meta.title,
+            emoji: "🔔",
+            content: simplyNews.content,
+            newsCount: 0,
+            sources: [],
+          });
+          article.meta.topicsCount += 1;
+        }
 
         emit({
           step: "writing",

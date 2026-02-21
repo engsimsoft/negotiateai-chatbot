@@ -29,6 +29,8 @@ interface BriefingArticleViewProps {
   onDeleteTopic?: (savedId: string) => void;
   /** ISO timestamp of current briefing (for bookmark matching) */
   briefingGeneratedAt?: string | null;
+  /** Scroll container ref for IntersectionObserver root */
+  scrollRoot?: React.RefObject<HTMLElement | null>;
 }
 
 /**
@@ -44,6 +46,7 @@ export function BriefingArticleView({
   onSaveTopic,
   onDeleteTopic,
   briefingGeneratedAt,
+  scrollRoot,
 }: BriefingArticleViewProps) {
   const callbackRef = useRef(onActiveSectionChange);
   callbackRef.current = onActiveSectionChange;
@@ -74,6 +77,7 @@ export function BriefingArticleView({
         callbackRef.current?.(active);
       },
       {
+        root: scrollRoot?.current ?? null,
         // Header 56px + player ~60px = 116px from top; bottom 40% ignored
         rootMargin: "-116px 0px -40% 0px",
       }
@@ -259,7 +263,11 @@ interface SavedTopicViewProps {
   onDelete: (savedId: string) => void;
 }
 
-export function SavedTopicView({ topic, onBack, onDelete }: SavedTopicViewProps) {
+export function SavedTopicView({
+  topic,
+  onBack,
+  onDelete,
+}: SavedTopicViewProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -324,6 +332,40 @@ export function SavedTopicView({ topic, onBack, onDelete }: SavedTopicViewProps)
             Удалить из сохранённых
           </Button>
         </div>
+      </section>
+    </article>
+  );
+}
+
+/* --- ТЗ-BF2: Simply content view (overview / news) --- */
+
+interface SimplyContentViewProps {
+  title: string;
+  content: string;
+  onBack: () => void;
+}
+
+export function SimplyContentView({
+  title,
+  content,
+  onBack,
+}: SimplyContentViewProps) {
+  return (
+    <article className="mx-auto w-full max-w-2xl px-4 py-6 lg:px-6">
+      {/* Back button */}
+      <button
+        type="button"
+        onClick={onBack}
+        className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" />
+        <span>Назад к выпуску</span>
+      </button>
+
+      {/* Content card */}
+      <section className="rounded-xl border bg-background p-5">
+        <h2 className="mb-4 text-lg font-semibold">{title}</h2>
+        <MarkdownViewer content={content} className="text-sm" />
       </section>
     </article>
   );

@@ -12,6 +12,31 @@
 
 ---
 
+## [3.40.0] - 2026-02-21 - SimplyNews (ТЗ-BF2)
+
+**MINOR RELEASE**: Встроенный канал коммуникации Simply News — новости платформы доставляются прямо в брифинг. Markdown-файлы с контентом, sidebar-секция, индикатор непрочитанного на дашборде, инъекция в генерацию.
+
+### Added
+- **Simply News контент** — `lib/briefing/simply-news.md` и `lib/briefing/simply-overview.md` — markdown-файлы с frontmatter (version, hasUpdate, title, date)
+- **simply-news-utils.ts** — парсер frontmatter (regex, без gray-matter), утилиты `getSimplyNewsData()` и `getSimplyOverviewContent()`
+- **SimplyContentView** — компонент просмотра Simply-контента в article reader (паттерн SavedTopicView)
+- **Секция «Simply» в sidebar** — два пункта: «📋 Обзор платформы» (всегда), «🆕 Что нового» (при hasUpdate)
+- **Индикатор непрочитанного** — на дашборде карточка показывает «1 новое» (только для активных пользователей), в sidebar — жирный шрифт + точка
+- **PATCH `/api/briefing/simply-news/seen`** — API отметки просмотра (обновляет `User.lastSeenSimplyVersion`)
+- **Инъекция в генерацию** — при `hasUpdate: true` simply-news добавляется как последняя секция брифинга (topicId: `simply_news`, emoji: 🔔)
+- **Simply News на лендинге** — неактивные пользователи видят секцию «Что нового» на странице онбординга
+- **DB миграция 0036** — поле `lastSeenSimplyVersion` в таблице `User`
+
+### Changed
+- **briefing-card.tsx** — текстовый индикатор «1 новое» (primary color) вместо счётчика новостей при наличии непрочитанного
+- **briefing-page-client.tsx** — SimplyData тип, state management (selectedSimplyType, simplyNewsUnread), auto-mark-seen useEffect
+- **briefing-sidebar.tsx** — секция Simply с unread-индикатором (font-semibold + dot + primary color)
+- **briefing-issue-content.tsx** — третий view mode (article / savedTopic / simplyContent)
+- **dashboard/page.tsx** — загрузка `getBriefingSettings` для проверки isActive, hasSimplyUpdate только для активных пользователей
+- **briefing/page.tsx** — загрузка `getUserById` для сравнения версий, hasUnread в SimplyData
+
+---
+
 ## [3.39.0] - 2026-02-21 - Briefing UI Refactor (ТЗ-BF1)
 
 **MINOR RELEASE**: Сохранение тем брифинга (SavedBriefingTopics), рефакторинг sidebar, TTL при генерации, UX-улучшения.

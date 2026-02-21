@@ -159,6 +159,28 @@ export async function updateUserBenIntro({
   }
 }
 
+// ТЗ-BF2: Update last seen Simply News version
+export async function updateLastSeenSimplyVersion({
+  userId,
+  version,
+}: {
+  userId: string;
+  version: string;
+}) {
+  try {
+    return await db
+      .update(user)
+      .set({ lastSeenSimplyVersion: version })
+      .where(eq(user.id, userId))
+      .returning();
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update last seen Simply version"
+    );
+  }
+}
+
 export async function saveChat({
   id,
   userId,

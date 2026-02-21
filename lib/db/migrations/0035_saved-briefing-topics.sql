@@ -14,4 +14,7 @@ CREATE TABLE IF NOT EXISTS "SavedBriefingTopics" (
 
 CREATE INDEX IF NOT EXISTS "saved_briefing_topics_user_idx" ON "SavedBriefingTopics" USING btree ("userId");
 
-ALTER TABLE "SavedBriefingTopics" ADD CONSTRAINT "SavedBriefingTopics_userId_User_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE no action ON UPDATE no action;
+DO $$ BEGIN
+  ALTER TABLE "SavedBriefingTopics" ADD CONSTRAINT "SavedBriefingTopics_userId_User_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE no action ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

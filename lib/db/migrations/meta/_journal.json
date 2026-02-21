@@ -246,6 +246,20 @@
       "when": 1771718400000,
       "tag": "0034_add-briefing-volume",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1771804800000,
+      "tag": "0035_saved-briefing-topics",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1771891200000,
+      "tag": "0036_add-last-seen-simply-version",
+      "breakpoints": true
     }
   ]
 }

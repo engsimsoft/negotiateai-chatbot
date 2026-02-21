@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, Settings } from "lucide-react";
+import { ArrowLeft, Headphones, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 
@@ -32,6 +32,10 @@ export function BriefingIssueHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        <Button variant="default" size="sm" className="gap-1.5 rounded-lg" disabled>
+          <Headphones className="size-4" />
+          <span className="hidden sm:inline">Скоро: подкаст</span>
+        </Button>
         <Link href="/briefing/setup">
           <Button size="icon" variant="ghost">
             <Settings className="size-4" />

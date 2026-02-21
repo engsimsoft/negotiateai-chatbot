@@ -33,6 +33,8 @@ export const user = pgTable("User", {
   theme: varchar("theme", { length: 20 }), // "light" | "dark" | "system"
   // ТЗ-NEW-01: Ben intro flag
   hasSeenBenIntro: boolean("has_seen_ben_intro").default(false),
+  // ТЗ-BF2: Last seen Simply News version (for unread indicator)
+  lastSeenSimplyVersion: varchar("lastSeenSimplyVersion", { length: 20 }),
 });
 
 export type User = InferSelectModel<typeof user>;

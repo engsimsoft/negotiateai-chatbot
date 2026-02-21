@@ -5,9 +5,11 @@ import type { BriefingArticle } from "@/lib/briefing/briefing-types";
 
 interface BriefingCardProps {
   latestBriefing: BriefingHistory | null;
+  /** ТЗ-BF2: Show unread Simply News indicator */
+  hasSimplyUpdate?: boolean;
 }
 
-export function BriefingCard({ latestBriefing }: BriefingCardProps) {
+export function BriefingCard({ latestBriefing, hasSimplyUpdate }: BriefingCardProps) {
   // State: generating
   if (latestBriefing?.status === "generating") {
     return (
@@ -40,7 +42,11 @@ export function BriefingCard({ latestBriefing }: BriefingCardProps) {
         <div className="min-w-0 flex-1">
           <div className="font-medium text-foreground">Утренний брифинг</div>
           <div className="text-xs text-muted-foreground">
-            {totalItems} {formatItemsWord(totalItems)} · Читать
+            {hasSimplyUpdate ? (
+              <span className="font-medium text-primary">1 новое</span>
+            ) : (
+              <>{totalItems} {formatItemsWord(totalItems)} · Читать</>
+            )}
           </div>
         </div>
         <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary" />
@@ -58,7 +64,11 @@ export function BriefingCard({ latestBriefing }: BriefingCardProps) {
       <div className="min-w-0 flex-1">
         <div className="font-medium text-foreground">Утренний брифинг</div>
         <div className="text-xs text-muted-foreground">
-          Дайджест новостей · Попробовать
+          {hasSimplyUpdate ? (
+            <span className="font-medium text-primary">1 новое</span>
+          ) : (
+            <>Дайджест новостей · Попробовать</>
+          )}
         </div>
       </div>
       <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary" />
