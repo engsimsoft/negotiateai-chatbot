@@ -3173,6 +3173,110 @@ export async function deleteSavedBriefingTopic({
 }
 
 /**
+ * ТЗ-BF4: Update a single section in the latest briefing (JSONB patch).
+ * Finds latest "ready" briefing, replaces the section matching topicId,
+ * recalculates meta, and saves back.
+ * Returns the updated section or null if no matching briefing/section found.
+ */
+export async function updateBriefingSection({
+  userId,
+  topicId,
+  newSection,
+}: {
+  userId: string;
+  topicId: string;
+  newSection: {
+    topicId: string;
+    topicName: string;
+    emoji: string;
+    content: string;
+    newsCount: number;
+    sources: Array<{
+      title: string;
+      url: string;
+      sourceName: string;
+      tier: string;
+      summary: string;
+    }>;
+  };
+}) {
+  try {
+    // 1. Get latest ready briefing
+    const [latest] = await db
+      .select()
+      .from(briefingHistory)
+      .where(
+        and(
+          eq(briefingHistory.userId, userId),
+          eq(briefingHistory.status, "ready"),
+        ),
+      )
+      .orderBy(desc(briefingHistory.generatedAt))
+      .limit(1);
+
+    if (!latest) return null;
+
+    // 2. Parse and patch
+    const article = latest.briefingJson as {
+      title: string;
+      intro: string;
+      sections: Array<{
+        topicId: string;
+        topicName: string;
+        emoji: string;
+        content: string;
+        newsCount: number;
+        sources: Array<{
+          title: string;
+          url: string;
+          sourceName: string;
+          tier: string;
+          summary: string;
+        }>;
+      }>;
+      outro: string;
+      meta: { totalNews: number; topicsCount: number; readingTimeMinutes: number };
+    };
+
+    const sectionIdx = article.sections.findIndex(
+      (s) => s.topicId === topicId,
+    );
+    if (sectionIdx === -1) return null;
+
+    // 3. Replace section
+    article.sections[sectionIdx] = newSection;
+
+    // 4. Recalculate meta
+    const totalNews = article.sections.reduce(
+      (sum, s) => sum + (s.newsCount || 0),
+      0,
+    );
+    const wordCount = article.sections.reduce(
+      (sum, s) => sum + s.content.split(/\s+/).length,
+      0,
+    );
+    article.meta = {
+      totalNews,
+      topicsCount: article.sections.length,
+      readingTimeMinutes: Math.max(1, Math.round(wordCount / 200)),
+    };
+
+    // 5. Save back
+    await db
+      .update(briefingHistory)
+      .set({ briefingJson: article })
+      .where(eq(briefingHistory.id, latest.id));
+
+    return newSection;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update briefing section",
+    );
+  }
+}
+
+/**
  * ТЗ-BF1 TTL: Delete all briefing history for a user (before new generation)
  */
 export async function deleteOldBriefingHistory({

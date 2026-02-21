@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   RefreshCw,
   Menu,
@@ -255,15 +255,17 @@ function SidebarContent({
   );
 
   // ТЗ-BF3: Collapsible topic folders state + localStorage persistence
-  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set<string>();
+  // Initialize empty to match server render, then hydrate from localStorage
+  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
     try {
       const stored = localStorage.getItem(EXPANDED_TOPICS_KEY);
-      return stored ? new Set<string>(JSON.parse(stored)) : new Set<string>();
-    } catch {
-      return new Set<string>();
-    }
-  });
+      if (stored) {
+        setExpandedTopics(new Set<string>(JSON.parse(stored)));
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   const toggleTopic = useCallback((topicId: string) => {
     setExpandedTopics((prev) => {

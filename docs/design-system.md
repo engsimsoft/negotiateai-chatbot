@@ -207,7 +207,61 @@ rounded-lg hover:bg-muted/60 transition-all duration-150
 
 ---
 
-## 6. Тени
+## 6. Tooltip
+
+ОБЯЗАТЕЛЬНО использовать Radix UI Tooltip (из `@/components/ui/tooltip`).
+
+ЗАПРЕЩЕНО использовать:
+- HTML-атрибут `title=""` — медленный, чёрный фон, нестандартный вид
+- Кастомные tooltip-реализации
+
+### Стандартный паттерн
+
+```tsx
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+// Одна кнопка:
+<TooltipProvider delayDuration={300}>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button>...</button>
+    </TooltipTrigger>
+    <TooltipContent>Подсказка</TooltipContent>
+  </Tooltip>
+</TooltipProvider>
+
+// Группа кнопок — один TooltipProvider:
+<TooltipProvider delayDuration={300}>
+  <Tooltip>
+    <TooltipTrigger asChild><button>A</button></TooltipTrigger>
+    <TooltipContent>Действие A</TooltipContent>
+  </Tooltip>
+  <Tooltip>
+    <TooltipTrigger asChild><button>B</button></TooltipTrigger>
+    <TooltipContent>Действие B</TooltipContent>
+  </Tooltip>
+</TooltipProvider>
+```
+
+### Правила
+- `delayDuration={300}` — стандартная задержка (быстрый отклик)
+- `asChild` на `TooltipTrigger` — обязательно (избежать лишнего `<button>`)
+- Для группы кнопок — один `<TooltipProvider>`, несколько `<Tooltip>`
+- Текст tooltip — краткий, на русском (1-3 слова)
+
+### Где применяется
+- Все icon-кнопки без видимого текста (Copy, Bookmark, Refresh, Delete)
+- Действия в header, toolbar, карточках
+- Любое место, где раньше использовался `title=""`
+
+---
+
+## 7. Тени
 
 ТОЛЬКО эти тени (определены в globals.css):
 - shadow-sm, shadow-md, shadow-lg, shadow-card
@@ -216,14 +270,14 @@ rounded-lg hover:bg-muted/60 transition-all duration-150
 
 ---
 
-## 7. Радиусы
+## 8. Радиусы
 
 Использовать стандартные: rounded-sm, rounded-md, rounded-lg, rounded-xl.
 Базовый --radius: 0.625rem.
 
 ---
 
-## 8. Статусы задач
+## 9. Статусы задач
 
 | Статус | Фон | Текст | Иконка |
 |--------|-----|-------|--------|
@@ -237,7 +291,7 @@ rounded-lg hover:bg-muted/60 transition-all duration-150
 
 ---
 
-## 9. Отступы карточек
+## 10. Отступы карточек
 
 - Карточки: p-4 или p-6 (выбрать один и придерживаться в контексте)
 - Между секциями: space-y-4 или gap-4
@@ -245,7 +299,7 @@ rounded-lg hover:bg-muted/60 transition-all duration-150
 
 ---
 
-## 10. Dark Mode
+## 11. Dark Mode
 
 Каждый компонент ОБЯЗАН корректно работать в dark mode.
 Не использовать bg-white — использовать bg-card.
@@ -257,7 +311,7 @@ rounded-lg hover:bg-muted/60 transition-all duration-150
 
 ---
 
-## 11. Правила при создании новых компонентов
+## 12. Правила при создании новых компонентов
 
 1. **Не создавать дубликаты.** Перед созданием нового компонента — проверить, нет ли существующего с аналогичной функциональностью (см. раздел 1.3).
 2. **Не добавлять фиксированные элементы (fixed/absolute) без анализа всех layout-ов.** Проверить, что элемент не конфликтует с существующей навигацией на ВСЕХ страницах, где он будет виден.
@@ -267,7 +321,7 @@ rounded-lg hover:bg-muted/60 transition-all duration-150
 
 ---
 
-## 12. Проверка перед коммитом
+## 13. Проверка перед коммитом
 
 Перед завершением работы выполнить:
 ```bash

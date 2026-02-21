@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bookmark, ChevronDown, ArrowRight, ArrowLeft, Trash2, Copy, Check } from "lucide-react";
+import { Bookmark, ChevronDown, ArrowRight, ArrowLeft, Trash2, Copy, Check, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +10,12 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { MarkdownViewer } from "@/components/markdown-viewer";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { BriefingSourceCard } from "./briefing-source-card";
 import type {
   BriefingArticle,
@@ -31,6 +37,10 @@ interface BriefingArticleViewProps {
   briefingGeneratedAt?: string | null;
   /** Scroll container ref for IntersectionObserver root */
   scrollRoot?: React.RefObject<HTMLElement | null>;
+  /** ТЗ-BF4: Refresh a single section */
+  onRefreshSection?: (topicId: string) => Promise<void>;
+  /** ТЗ-BF4: Currently refreshing topic id */
+  refreshingTopicId?: string | null;
 }
 
 /**
@@ -47,6 +57,8 @@ export function BriefingArticleView({
   onDeleteTopic,
   briefingGeneratedAt,
   scrollRoot,
+  onRefreshSection,
+  refreshingTopicId,
 }: BriefingArticleViewProps) {
   const callbackRef = useRef(onActiveSectionChange);
   callbackRef.current = onActiveSectionChange;
@@ -107,10 +119,13 @@ export function BriefingArticleView({
       {/* Sections */}
       <div className="space-y-6">
         {article.sections.map((section) => {
+          // ТЗ-BF4: Match by content too — after per-section refresh,
+          // content changes so bookmark auto-resets; old save stays in sidebar
           const saved = savedTopics.find(
             (t) =>
               t.topicId === section.topicId &&
-              t.briefingGeneratedAt === briefingGeneratedAt
+              t.briefingGeneratedAt === briefingGeneratedAt &&
+              t.content === section.content
           );
           return (
             <ArticleSection
@@ -124,6 +139,8 @@ export function BriefingArticleView({
                   onSaveTopic?.(section);
                 }
               }}
+              onRefresh={onRefreshSection ? () => onRefreshSection(section.topicId) : undefined}
+              isRefreshing={refreshingTopicId === section.topicId}
             />
           );
         })}
@@ -145,10 +162,16 @@ function ArticleSection({
   section,
   isSaved,
   onToggleBookmark,
+  onRefresh,
+  isRefreshing,
 }: {
   section: BriefingArticleSection;
   isSaved: boolean;
   onToggleBookmark: () => void;
+  /** ТЗ-BF4: Refresh this section */
+  onRefresh?: () => void;
+  /** ТЗ-BF4: Whether this section is currently refreshing */
+  isRefreshing?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -168,28 +191,61 @@ function ArticleSection({
       <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
         <span>{section.emoji}</span>
         <span className="flex-1">{section.topicName}</span>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-primary"
-          title="Скопировать"
-        >
-          {copied ? (
-            <Check className="size-5 text-primary" />
-          ) : (
-            <Copy className="size-5" />
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-primary"
+              >
+                {copied ? (
+                  <Check className="size-5 text-primary" />
+                ) : (
+                  <Copy className="size-5" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {copied ? "Скопировано" : "Скопировать"}
+            </TooltipContent>
+          </Tooltip>
+          {onRefresh && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  disabled={isRefreshing}
+                  className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`size-5 ${isRefreshing ? "animate-spin" : ""}`}
+                  />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isRefreshing ? "Обновляем..." : "Обновить тему"}
+              </TooltipContent>
+            </Tooltip>
           )}
-        </button>
-        <button
-          type="button"
-          onClick={onToggleBookmark}
-          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-primary"
-          title={isSaved ? "Удалить из сохранённых" : "Сохранить тему"}
-        >
-          <Bookmark
-            className={`size-5 ${isSaved ? "fill-primary text-primary" : ""}`}
-          />
-        </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onToggleBookmark}
+                className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-primary"
+              >
+                <Bookmark
+                  className={`size-5 ${isSaved ? "fill-primary text-primary" : ""}`}
+                />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isSaved ? "Удалить из сохранённых" : "Сохранить тему"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </h2>
 
       {/* Markdown content */}
@@ -298,18 +354,26 @@ export function SavedTopicView({
         <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
           <span>{topic.emoji}</span>
           <span className="flex-1">{topic.topicName}</span>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-primary"
-            title="Скопировать"
-          >
-            {copied ? (
-              <Check className="size-5 text-primary" />
-            ) : (
-              <Copy className="size-5" />
-            )}
-          </button>
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-primary"
+                >
+                  {copied ? (
+                    <Check className="size-5 text-primary" />
+                  ) : (
+                    <Copy className="size-5" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {copied ? "Скопировано" : "Скопировать"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </h2>
 
         {/* Markdown content */}

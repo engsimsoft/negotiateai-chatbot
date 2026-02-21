@@ -12,6 +12,25 @@
 
 ---
 
+## [3.42.0] - 2026-02-21 - PerSectionRefresh (ТЗ-BF4)
+
+**MINOR RELEASE**: Обновление отдельных тем брифинга — пользователь может обновить любую тему по кнопке ↻ без полной перегенерации.
+
+### Added
+- **Кнопка ↻ на каждой секции** — RefreshCw icon между Copy и Bookmark, animate-spin при загрузке, Radix UI Tooltip («Обновить тему» / «Обновляем...»)
+- **Section Author** — `lib/briefing/briefing-section-author.ts`: генерация одной секции (Claude Sonnet), упрощённый промпт с контекстом остальных тем
+- **POST `/api/briefing/refresh-section`** — API endpoint: auth → fetch sources (topicId only) → filter (Gemini Flash) → generate (Claude Sonnet) → JSONB patch DB → return section
+- **`updateBriefingSection()` в queries.ts** — JSONB patch: замена секции по topicId, пересчёт meta (totalNews, readingTimeMinutes, topicsCount)
+- **Content-based bookmark matching** — после refresh секции bookmark auto-reset (content mismatch), старый save остаётся в sidebar, новый можно добавить отдельно
+- **Раздел 6 «Tooltip» в design-system.md** — Radix UI Tooltip как обязательный стандарт, `title=""` запрещён
+
+### Changed
+- **briefing-article-view.tsx** — все icon-кнопки (Copy, Refresh, Bookmark) обёрнуты в Radix UI `<Tooltip>` с `delayDuration={300}` (ранее Copy/Bookmark использовали браузерный `title=""`)
+- **SavedTopicView** — Copy кнопка переведена на Radix UI Tooltip
+- **briefing-page-client.tsx** — `article` поднят из prop в state для мутации, `refreshingTopicId` state, `handleRefreshSection` callback с API call
+
+---
+
 ## [3.41.0] - 2026-02-21 - BriefingSidebarRedesign (ТЗ-BF3)
 
 **MINOR RELEASE**: Редизайн сайдбара брифинга — фирменный стиль Simply, collapsible папки по категориям, умное извлечение заголовков.

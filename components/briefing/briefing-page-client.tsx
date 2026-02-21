@@ -41,7 +41,7 @@ interface BriefingPageClientProps {
 }
 
 export function BriefingPageClient({
-  article,
+  article: initialArticle,
   hasValidArticle,
   initialSavedTopics = [],
   briefingGeneratedAt,
@@ -49,6 +49,12 @@ export function BriefingPageClient({
 }: BriefingPageClientProps) {
   const { steps, isGenerating, error, redirectUrl, startGeneration } =
     useBriefingGeneration();
+
+  // ТЗ-BF4: Article state (lifted from prop for per-section refresh mutation)
+  const [article, setArticle] = useState(initialArticle);
+
+  // ТЗ-BF4: Per-section refresh state
+  const [refreshingTopicId, setRefreshingTopicId] = useState<string | null>(null);
 
   // ТЗ-BF1: Saved topics state (lifted from BriefingIssueContent for sidebar sharing)
   const [savedTopics, setSavedTopics] =
@@ -131,6 +137,40 @@ export function BriefingPageClient({
     setSelectedSavedTopic(null);
     setSelectedSimplyType(null);
   }, []);
+
+  // ТЗ-BF4: Refresh a single section by topicId
+  const handleRefreshSection = useCallback(
+    async (topicId: string) => {
+      setRefreshingTopicId(topicId);
+      try {
+        const res = await fetch("/api/briefing/refresh-section", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topicId }),
+        });
+
+        if (!res.ok) throw new Error("Failed to refresh");
+
+        const updatedSection: BriefingArticleSection = await res.json();
+
+        setArticle((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            sections: prev.sections.map((s) =>
+              s.topicId === topicId ? updatedSection : s
+            ),
+          };
+        });
+        toast.success("Тема обновлена");
+      } catch {
+        toast.error("Не удалось обновить тему");
+      } finally {
+        setRefreshingTopicId(null);
+      }
+    },
+    []
+  );
 
   // ТЗ-BF2: Handle simply content selection (clear saved topic when selecting simply)
   const handleSelectSimplyContent = useCallback(
@@ -234,6 +274,8 @@ export function BriefingPageClient({
           simplyContentTitle={simplyContentTitle}
           simplyContentBody={simplyContentBody}
           simplyNewsUnread={simplyNewsUnread}
+          onRefreshSection={handleRefreshSection}
+          refreshingTopicId={refreshingTopicId}
         />
       ) : (
         <main className="flex-1">

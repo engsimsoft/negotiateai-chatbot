@@ -46,6 +46,10 @@ interface BriefingIssueContentProps {
   simplyContentBody?: string;
   /** ТЗ-BF2: Whether Simply News is unread */
   simplyNewsUnread?: boolean;
+  /** ТЗ-BF4: Refresh a single section */
+  onRefreshSection?: (topicId: string) => Promise<void>;
+  /** ТЗ-BF4: Currently refreshing topic id */
+  refreshingTopicId?: string | null;
 }
 
 /**
@@ -70,6 +74,8 @@ export function BriefingIssueContent({
   simplyContentTitle,
   simplyContentBody,
   simplyNewsUnread,
+  onRefreshSection,
+  refreshingTopicId,
 }: BriefingIssueContentProps) {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -123,6 +129,8 @@ export function BriefingIssueContent({
             onDeleteTopic={onDeleteTopic}
             briefingGeneratedAt={briefingGeneratedAt}
             scrollRoot={mainRef}
+            onRefreshSection={onRefreshSection}
+            refreshingTopicId={refreshingTopicId}
           />
         )}
       </main>

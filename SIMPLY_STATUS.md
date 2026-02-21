@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.41.0
+**Версия:** 3.42.0
 **Дата:** 2026-02-21
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -328,6 +328,27 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-BF4: PerSectionRefresh — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Кнопка ↻ на каждой секции** — RefreshCw icon (animate-spin при загрузке) между Copy и Bookmark с Radix UI Tooltip
+- **Section Author** — `briefing-section-author.ts`: генерация одной секции (Claude Sonnet) с контекстом остальных тем
+- **POST API** — `/api/briefing/refresh-section`: fetch sources → filter → generate → JSONB patch DB → return section
+- **`updateBriefingSection()`** — JSONB patch в queries.ts (замена секции, пересчёт meta)
+- **Content-based bookmark matching** — после refresh bookmark auto-reset, старый save в sidebar, новый добавляется отдельно
+- **Tooltip унификация** — все icon-кнопки переведены на Radix UI Tooltip, раздел 6 в design-system.md
+
+**Ключевые файлы:**
+- `lib/briefing/briefing-section-author.ts` — генерация одной секции
+- `app/(chat)/api/briefing/refresh-section/route.ts` — POST API endpoint
+- `lib/db/queries.ts` — +updateBriefingSection()
+- `components/briefing/briefing-article-view.tsx` — кнопка ↻ + Tooltip унификация
+- `components/briefing/briefing-page-client.tsx` — article state + handleRefreshSection
+- `components/briefing/briefing-issue-content.tsx` — props threading
+- `docs/design-system.md` — +раздел 6 «Tooltip»
+
+**Детали:** [_archive/TZ_BF4_PerSectionRefresh/](_archive/TZ_BF4_PerSectionRefresh/)
 
 ### ТЗ-BF2: SimplyNews — ✅ ЗАВЕРШЁН
 
@@ -1290,6 +1311,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_BF4_PerSectionRefresh/](_archive/TZ_BF4_PerSectionRefresh/) — ТЗ-BF4 PerSectionRefresh
 - [_archive/TZ_BF2_SimplyNews/](_archive/TZ_BF2_SimplyNews/) — ТЗ-BF2 SimplyNews
 - [_archive/TZ_HF1_BriefingSetupUpdate/](_archive/TZ_HF1_BriefingSetupUpdate/) — ТЗ-HF1 Briefing PE Update
 - [_archive/TZ_PX_DeepResearch/](_archive/TZ_PX_DeepResearch/) — ТЗ-PX + ТЗ-FU Deep Research + Fetch URL
