@@ -12,6 +12,29 @@
 
 ---
 
+## [3.41.0] - 2026-02-21 - BriefingSidebarRedesign (ТЗ-BF3)
+
+**MINOR RELEASE**: Редизайн сайдбара брифинга — фирменный стиль Simply, collapsible папки по категориям, умное извлечение заголовков.
+
+### Added
+- **Branded header «S Simply»** — фирменный header в сайдбаре (клик → /dashboard), визуальная консистентность с чатовым сайдбаром
+- **Collapsible папки по темам** — сохранённые темы группируются по категориям (emoji + topicName + count badge) с раскрытием/сворачиванием
+- **localStorage persistence** — состояние раскрытия папок сохраняется при перезагрузке (ключ `briefing-sidebar-expanded-topics`)
+- **Headline extraction** — `extractHeadline()` извлекает заголовок из markdown (## header или первая строка) вместо дублирования topicName
+- **`getDisplayTitle()` fallback** — для уже сохранённых тем извлекает headline из content
+
+### Changed
+- **Кнопка «Сгенерировать»** — `Button variant="default"` (primary терракотовая, full-width) вместо ghost link
+- **Стрелка ← в header** — скрыта на десктопе (`md:hidden`), видна на мобильном
+- **Группировка сохранённых тем** — по категориям (topicId) вместо по дате брифинга
+- **Short date format** — `21 фев` вместо полной даты с временем
+
+### Removed
+- **Кнопка «Настройки» из footer сайдбара** — убрано дублирование (остаётся только ⚙️ в header)
+- **`groupByBriefing()` и `formatDateWithTime()`** — заменены на `groupByTopic()` и `formatShortDate()`
+
+---
+
 ## [3.40.0] - 2026-02-21 - SimplyNews (ТЗ-BF2)
 
 **MINOR RELEASE**: Встроенный канал коммуникации Simply News — новости платформы доставляются прямо в брифинг. Markdown-файлы с контентом, sidebar-секция, индикатор непрочитанного на дашборде, инъекция в генерацию.
