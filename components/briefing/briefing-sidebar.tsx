@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import Link from "next/link";
 import {
   RefreshCw,
   Menu,
@@ -283,20 +282,6 @@ function SidebarContent({
 
   return (
     <>
-      {/* ТЗ-BF3: Branded header — matches app-sidebar.tsx */}
-      <div className="shrink-0 border-b px-3 py-3">
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/60"
-          onClick={() => onNavigate?.()}
-        >
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground font-semibold text-sm">
-            S
-          </div>
-          <span className="font-semibold text-lg">Simply</span>
-        </Link>
-      </div>
-
       {/* Topic navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-4">
         <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
