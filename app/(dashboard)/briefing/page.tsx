@@ -4,10 +4,11 @@ import { auth } from "@/app/(auth)/auth";
 import {
   getBriefingSettings,
   getBriefingHistory,
+  getSavedBriefingTopics,
 } from "@/lib/db/queries";
 import { BriefingPage } from "@/components/briefing/briefing-page";
 import { BriefingPageClient } from "@/components/briefing/briefing-page-client";
-import type { BriefingArticle } from "@/lib/briefing/briefing-types";
+import type { BriefingArticle, SavedBriefingTopicClient } from "@/lib/briefing/briefing-types";
 import type { BriefingHistoryItem } from "@/components/briefing/briefing-sidebar";
 
 const RUSSIAN_MONTHS_GENITIVE = [
@@ -43,8 +44,12 @@ export default async function BriefingRoute() {
   }
 
   // ТЗ-А4: load history for sidebar (limit 10, only ready — ТЗ-HF1 fix)
+  // ТЗ-BF1: load saved topics for bookmark state
   const timezone = settings.timezone || "Europe/Moscow";
-  const readyBriefings = await getBriefingHistory({ userId, limit: 10, status: "ready" });
+  const [readyBriefings, savedTopicsRaw] = await Promise.all([
+    getBriefingHistory({ userId, limit: 10, status: "ready" }),
+    getSavedBriefingTopics({ userId }),
+  ]);
   const latestBriefing = readyBriefings[0] ?? null;
 
   // Parse article, guard against old format
@@ -64,6 +69,19 @@ export default async function BriefingRoute() {
   }
   const currentDate = historyItems[0]?.date;
 
+  // ТЗ-BF1: serialize saved topics for client (Date → ISO string)
+  const savedTopics: SavedBriefingTopicClient[] = savedTopicsRaw.map((t) => ({
+    id: t.id,
+    topicId: t.topicId,
+    topicName: t.topicName,
+    emoji: t.emoji,
+    title: t.title,
+    content: t.content,
+    sources: (t.sources ?? []) as SavedBriefingTopicClient["sources"],
+    briefingGeneratedAt: t.briefingGeneratedAt.toISOString(),
+    savedAt: t.savedAt.toISOString(),
+  }));
+
   // ТЗ-А5: delegate rendering to client wrapper for generation state management
   return (
     <BriefingPageClient
@@ -71,6 +89,7 @@ export default async function BriefingRoute() {
       hasValidArticle={hasValidArticle}
       historyItems={historyItems}
       currentDate={currentDate}
+      initialSavedTopics={savedTopics}
     />
   );
 }

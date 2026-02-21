@@ -9,7 +9,7 @@ import { BriefingIssueHeader } from "./briefing-issue-header";
 import { BriefingIssueContent } from "./briefing-issue-content";
 import { BriefingSidebarMobile } from "./briefing-sidebar";
 import { NoBriefingsYet } from "./briefing-article-view";
-import type { BriefingArticle } from "@/lib/briefing/briefing-types";
+import type { BriefingArticle, SavedBriefingTopicClient } from "@/lib/briefing/briefing-types";
 import type { BriefingHistoryItem } from "./briefing-sidebar";
 
 interface BriefingPageClientProps {
@@ -17,6 +17,7 @@ interface BriefingPageClientProps {
   hasValidArticle: boolean;
   historyItems: BriefingHistoryItem[];
   currentDate?: string;
+  initialSavedTopics?: SavedBriefingTopicClient[];
 }
 
 export function BriefingPageClient({
@@ -24,6 +25,7 @@ export function BriefingPageClient({
   hasValidArticle,
   historyItems,
   currentDate,
+  initialSavedTopics = [],
 }: BriefingPageClientProps) {
   const { steps, isGenerating, error, redirectUrl, startGeneration } =
     useBriefingGeneration();
@@ -77,6 +79,7 @@ export function BriefingPageClient({
           history={historyItems.slice(1)}
           currentDate={currentDate}
           onGenerate={startGeneration}
+          initialSavedTopics={initialSavedTopics}
         />
       ) : (
         <main className="flex-1">

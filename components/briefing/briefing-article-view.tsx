@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ChevronDown, ArrowRight } from "lucide-react";
+import { Bookmark, ChevronDown, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -13,22 +13,33 @@ import { BriefingSourceCard } from "./briefing-source-card";
 import type {
   BriefingArticle,
   BriefingArticleSection,
+  SavedBriefingTopicClient,
 } from "@/lib/briefing/briefing-types";
 
 interface BriefingArticleViewProps {
   article: BriefingArticle;
   /** Scroll spy callback — fires with active section topicId */
   onActiveSectionChange?: (id: string | null) => void;
+  /** ТЗ-BF1: Saved topics for bookmark state */
+  savedTopics?: SavedBriefingTopicClient[];
+  /** ТЗ-BF1: Save a topic */
+  onSaveTopic?: (section: BriefingArticleSection) => void;
+  /** ТЗ-BF1: Delete a saved topic by its saved ID */
+  onDeleteTopic?: (savedId: string) => void;
 }
 
 /**
  * ТЗ-А4: Full article reader — intro, sections (markdown + collapsible sources), outro, meta.
  * Each section has id={topicId} for scroll-to from sidebar.
  * IntersectionObserver scroll spy updates activeSectionId in parent.
+ * ТЗ-BF1: Bookmark buttons on each section.
  */
 export function BriefingArticleView({
   article,
   onActiveSectionChange,
+  savedTopics = [],
+  onSaveTopic,
+  onDeleteTopic,
 }: BriefingArticleViewProps) {
   const callbackRef = useRef(onActiveSectionChange);
   callbackRef.current = onActiveSectionChange;
@@ -87,9 +98,23 @@ export function BriefingArticleView({
 
       {/* Sections */}
       <div className="space-y-6">
-        {article.sections.map((section) => (
-          <ArticleSection key={section.topicId} section={section} />
-        ))}
+        {article.sections.map((section) => {
+          const saved = savedTopics.find((t) => t.topicId === section.topicId);
+          return (
+            <ArticleSection
+              key={section.topicId}
+              section={section}
+              isSaved={!!saved}
+              onToggleBookmark={() => {
+                if (saved) {
+                  onDeleteTopic?.(saved.id);
+                } else {
+                  onSaveTopic?.(section);
+                }
+              }}
+            />
+          );
+        })}
       </div>
 
       {/* Outro */}
@@ -104,12 +129,30 @@ export function BriefingArticleView({
 
 /* --- Article section with markdown content + collapsible sources --- */
 
-function ArticleSection({ section }: { section: BriefingArticleSection }) {
+function ArticleSection({
+  section,
+  isSaved,
+  onToggleBookmark,
+}: {
+  section: BriefingArticleSection;
+  isSaved: boolean;
+  onToggleBookmark: () => void;
+}) {
   return (
     <section id={section.topicId} className="scroll-mt-32 rounded-xl border bg-background p-5">
       <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
         <span>{section.emoji}</span>
-        <span>{section.topicName}</span>
+        <span className="flex-1">{section.topicName}</span>
+        <button
+          type="button"
+          onClick={onToggleBookmark}
+          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-primary"
+          title={isSaved ? "Удалить из сохранённых" : "Сохранить тему"}
+        >
+          <Bookmark
+            className={`size-5 ${isSaved ? "fill-primary text-primary" : ""}`}
+          />
+        </button>
       </h2>
 
       {/* Markdown content */}
