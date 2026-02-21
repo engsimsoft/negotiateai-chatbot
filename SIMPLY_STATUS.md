@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.37.1
+**Версия:** 3.38.0
 **Дата:** 2026-02-21
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -29,7 +29,7 @@
 | **Сервисные помощники** | Бен (❓), Секретарь (➕), Менеджер (👤) | ✅ v3.13.0 |
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG/Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity ✅, Plus AI, Ideogram, AssemblyAI | 🔄 Фаза 1 |
-| **AI-провайдер** | Anthropic Claude — основной и единственный (Gemini только для vision-ocr) | ✅ v3.23.0 (@ai-sdk/anthropic) |
+| **AI-провайдер** | Anthropic Claude — основной и единственный (Gemini только для vision-ocr и briefing-фильтра) | ✅ v3.23.0 (@ai-sdk/anthropic) |
 | **Smart Routing** | Автовыбор модели для экономии без потери качества | 📋 |
 | **Оплата в рублях** | ЮKassa, Тинькофф, СБП | 📋 |
 
@@ -318,7 +318,7 @@ components/projects/
 | Слой | Технология |
 |------|------------|
 | Frontend | Next.js 15.3, React 18, TypeScript, Tailwind CSS |
-| AI | Vercel AI SDK (@ai-sdk/anthropic, @ai-sdk/google для vision-ocr) |
+| AI | Vercel AI SDK (@ai-sdk/anthropic, @ai-sdk/google для vision-ocr + briefing-фильтр) |
 | Auth | NextAuth 5.0-beta.25 |
 | Database | PostgreSQL (Neon) + Drizzle ORM |
 | Storage | Vercel Blob Storage |
@@ -328,6 +328,22 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-BRIEFING-AUTHOR-CLAUDE: Briefing Author → Claude — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Briefing Author** — провайдер заменён с Gemini 3 Pro на Claude Sonnet 4.6. Fallback: `claude-sonnet-4-5-20250929`
+- **Adaptive thinking (effort)** — настроен для 3 точек: briefing-onboarding (`high`), профессор планирования (`high`), ревьюер задач (`high`)
+- **Результат:** outputTokens 5104 → 10163 (+99%), качество статей значительно выше
+
+**Ключевые файлы:**
+- `lib/briefing/briefing-config.ts` — AUTHOR_MODEL → claude-sonnet-4-6
+- `lib/briefing/briefing-author.ts` — createAnthropic вместо createGoogleGenerativeAI
+- `app/(chat)/api/service-chat/route.ts` — providerOptions для онбординга
+- `app/(chat)/api/projects/[id]/plan/route.ts` — providerOptions для профессора
+- `lib/ai/professors/task-reviewer.ts` — providerOptions для ревьюера
+
+**Детали:** [specs/TZ_BRIEFING_AUTHOR_CLAUDE/](specs/TZ_BRIEFING_AUTHOR_CLAUDE/)
 
 ### ТЗ-HF1: Briefing PE Update — ✅ ЗАВЕРШЁН
 
@@ -446,7 +462,7 @@ components/projects/
 - **3 таблицы в БД** — BriefingSettings, BriefingSources, BriefingHistory (Drizzle ORM, миграция 0031)
 - **Конфигурация + Каталог тем** — `lib/briefing/briefing-config.ts`, `lib/briefing/topics-catalog.ts` (10 тем × 3-4 источника)
 - **3 фетчера** — RSS (rss-parser), Telegram (cheerio t.me/s/), Web (@mozilla/readability + jsdom) с единым dispatcher
-- **AI-пайплайн** — двухэтапный: Gemini 2.0 Flash (фильтрация, дедупликация) → Gemini 3 Pro (анализ, группировка)
+- **AI-пайплайн** — двухэтапный: Gemini 2.0 Flash (фильтрация, дедупликация) → Claude Sonnet 4.6 (генерация статьи) ← обновлено в v3.38.0
 - **API endpoint** — `POST /api/briefing/generate` (auth, fetch, filter, analyze, save)
 - **Seed-скрипт** — `lib/db/seed-briefing.ts` + `npm run db:seed-briefing`
 - **7 CRUD queries** — полный набор для briefing settings, sources, history

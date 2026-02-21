@@ -12,6 +12,23 @@
 
 ---
 
+## [3.38.0] - 2026-02-21 - Briefing Author → Claude Sonnet 4.6 (ТЗ-BRIEFING-AUTHOR-CLAUDE)
+
+**MINOR RELEASE**: Briefing Author переведён с Gemini 3 Pro на Claude Sonnet 4.6. Adaptive thinking (effort) настроен для 3 точек.
+
+### Changed
+- **briefing-author.ts** — провайдер `createGoogleGenerativeAI` → `createAnthropic`, модель `gemini-3-pro-preview` → `claude-sonnet-4-6`, fallback `gemini-2.5-pro` → `claude-sonnet-4-5-20250929`
+- **briefing-config.ts** — `AUTHOR_MODEL` и `AUTHOR_MODEL_FALLBACK` обновлены на модели Claude
+- **service-chat/route.ts** — добавлен `providerOptions` для briefing-onboarding: `thinking adaptive, effort high`
+- **plan/route.ts** — добавлен `providerOptions` для профессора планирования: `thinking adaptive, effort high`
+- **task-reviewer.ts** — добавлен `providerOptions` для ревьюера задач: `thinking adaptive, effort high`
+- **Результат:** outputTokens 5104 → 10163 (+99%), качество статей значительно выше ("другой уровень")
+
+### Known Limitations
+- `generateObject` + thinking несовместимы (Anthropic API: "Thinking may not be enabled when tool_choice forces tool use") — для briefing-author thinking недоступен
+
+---
+
 ## [3.37.1] - 2026-02-21 - Briefing Volume Prompt Enforcement (PATCH-buildUserMessage-volume)
 
 **PATCH RELEASE**: Промптовые усиления для соблюдения объёма брифинга. Три точки давления на volume: system prompt начало → user message начало → system prompt конец.
