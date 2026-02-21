@@ -7,8 +7,15 @@ import {
   Menu,
   BookOpen,
   Bookmark,
+  ChevronDown,
+  ChevronRight,
   X,
 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -84,20 +91,36 @@ const MONTHS_SHORT = [
   "июл", "авг", "сен", "окт", "ноя", "дек",
 ];
 
-function formatDateWithTime(isoString: string): string {
+/** ТЗ-BF3: Short date without time — "21 фев" */
+function formatShortDate(isoString: string): string {
   const date = new Date(isoString);
-  const day = date.getDate();
-  const month = MONTHS_SHORT[date.getMonth()];
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${day} ${month}, ${hours}:${minutes}`;
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}`;
 }
 
-/** Group saved topics by briefingGeneratedAt, sorted newest-first */
-function groupByBriefing(topics: SavedBriefingTopicClient[]) {
+/** ТЗ-BF3: Extract headline from markdown content (##/### header or first sentence) */
+function extractHeadline(content: string): string | null {
+  // 1. Try ## or ### markdown header
+  const headerMatch = content.match(/^#{2,3}\s+(.+)/m);
+  if (headerMatch) return headerMatch[1].trim();
+  // 2. First non-empty line as fallback (bold names like **Шарль Леклер** are unreliable as headlines)
+  const firstLine = content.split("\n").find((l) => l.trim().length > 0);
+  if (firstLine && firstLine.trim().length > 10) return firstLine.trim().slice(0, 80);
+  return null;
+}
+
+/** ТЗ-BF3: Get display title — use title if different from topicName, otherwise extract from content */
+function getDisplayTitle(topic: SavedBriefingTopicClient): string {
+  if (topic.title && topic.title !== topic.topicName) return topic.title;
+  // Fallback: extract headline from content for legacy saved topics
+  const headline = topic.content ? extractHeadline(topic.content) : null;
+  return headline || topic.title || topic.topicName;
+}
+
+/** ТЗ-BF3: Group saved topics by topicId, sorted by latest savedAt DESC */
+function groupByTopic(topics: SavedBriefingTopicClient[]) {
   const groups = new Map<string, SavedBriefingTopicClient[]>();
   for (const topic of topics) {
-    const key = topic.briefingGeneratedAt;
+    const key = topic.topicId;
     const list = groups.get(key);
     if (list) {
       list.push(topic);
@@ -105,11 +128,17 @@ function groupByBriefing(topics: SavedBriefingTopicClient[]) {
       groups.set(key, [topic]);
     }
   }
-  // Sort groups newest-first
+  // Sort each group by savedAt DESC (newest first)
+  for (const list of groups.values()) {
+    list.sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+  }
+  // Sort groups by latest savedAt DESC (most recently saved topic folder first)
   return [...groups.entries()].sort(
-    ([a], [b]) => new Date(b).getTime() - new Date(a).getTime()
+    ([, a], [, b]) => new Date(b[0].savedAt).getTime() - new Date(a[0].savedAt).getTime()
   );
 }
+
+const EXPANDED_TOPICS_KEY = "briefing-sidebar-expanded-topics";
 
 /**
  * ТЗ-BF1: Briefing sidebar — topic navigation, saved topics, settings, generate.
@@ -226,6 +255,32 @@ function SidebarContent({
     [onSelectSavedTopic, onNavigate]
   );
 
+  // ТЗ-BF3: Collapsible topic folders state + localStorage persistence
+  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set<string>();
+    try {
+      const stored = localStorage.getItem(EXPANDED_TOPICS_KEY);
+      return stored ? new Set<string>(JSON.parse(stored)) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  });
+
+  const toggleTopic = useCallback((topicId: string) => {
+    setExpandedTopics((prev) => {
+      const next = new Set(prev);
+      if (next.has(topicId)) {
+        next.delete(topicId);
+      } else {
+        next.add(topicId);
+      }
+      try {
+        localStorage.setItem(EXPANDED_TOPICS_KEY, JSON.stringify([...next]));
+      } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
   return (
     <>
       {/* ТЗ-BF3: Branded header — matches app-sidebar.tsx */}
@@ -278,50 +333,75 @@ function SidebarContent({
           </button>
         ))}
 
-        {/* Saved topics — grouped by briefing */}
+        {/* ТЗ-BF3: Saved topics — collapsible folders by topic */}
         {savedTopics.length > 0 && (
           <div className="mt-6">
             <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <Bookmark className="mr-1 inline size-3" />
               Сохранённые
             </p>
-            {groupByBriefing(savedTopics).map(([briefingAt, topics]) => (
-              <div key={briefingAt} className="mb-3">
-                <p className="mb-1 px-2 text-[11px] text-muted-foreground/70">
-                  {formatDateWithTime(briefingAt)}
-                </p>
-                {topics.map((topic) => (
-                  <div
-                    key={topic.id}
-                    className={cn(
-                      "group mb-0.5 flex w-full items-center rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
-                      selectedSavedTopicId === topic.id &&
-                        "bg-primary/10 font-medium text-primary"
+            {groupByTopic(savedTopics).map(([topicId, topics]) => {
+              const isExpanded = expandedTopics.has(topicId);
+              const { emoji, topicName } = topics[0];
+              return (
+                <Collapsible
+                  key={topicId}
+                  open={isExpanded}
+                  onOpenChange={() => toggleTopic(topicId)}
+                  className="mb-1"
+                >
+                  <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60">
+                    {isExpanded ? (
+                      <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
                     )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleSelectSaved(topic)}
-                      className="flex min-w-0 flex-1 items-center gap-2"
-                    >
-                      <span className="shrink-0">{topic.emoji}</span>
-                      <span className="truncate">{topic.topicName}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteSavedTopic?.(topic.id);
-                      }}
-                      className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                      title="Удалить из сохранённых"
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ))}
+                    <span className="shrink-0">{emoji}</span>
+                    <span className="min-w-0 truncate">{topicName}</span>
+                    <span className="ml-auto shrink-0 text-xs text-muted-foreground/70">
+                      {topics.length}
+                    </span>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="ml-3 space-y-0.5 border-l border-border/50 pl-2 pt-1">
+                      {topics.map((topic) => (
+                        <div
+                          key={topic.id}
+                          className={cn(
+                            "group flex w-full items-center rounded-lg px-2 py-1 text-sm transition-colors hover:bg-muted/60",
+                            selectedSavedTopicId === topic.id &&
+                              "bg-primary/10 font-medium text-primary"
+                          )}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleSelectSaved(topic)}
+                            className="flex min-w-0 flex-1 items-center gap-1.5"
+                          >
+                            <span className="shrink-0 text-[11px] text-muted-foreground/70">
+                              {formatShortDate(topic.savedAt)}
+                            </span>
+                            <span className="text-muted-foreground/50">·</span>
+                            <span className="truncate">{getDisplayTitle(topic)}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteSavedTopic?.(topic.id);
+                            }}
+                            className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                            title="Удалить из сохранённых"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
           </div>
         )}
 

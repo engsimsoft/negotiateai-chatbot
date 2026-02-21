@@ -64,10 +64,17 @@ export function BriefingPageClient({
   const [simplyNewsUnread, setSimplyNewsUnread] =
     useState(simplyData?.newsMeta?.hasUnread ?? false);
 
-  // ТЗ-BF1: Save a topic
+  // ТЗ-BF1 + ТЗ-BF3: Save a topic (extract headline from content as title)
   const handleSaveTopic = useCallback(
     async (section: BriefingArticleSection) => {
       try {
+        // ТЗ-BF3: Extract headline from content (## header or first line)
+        const headerMatch = section.content.match(/^#{2,3}\s+(.+)/m);
+        const firstLine = !headerMatch
+          ? section.content.split("\n").find((l) => l.trim().length > 10)
+          : null;
+        const headline = headerMatch?.[1]?.trim() ?? firstLine?.trim().slice(0, 80) ?? section.topicName;
+
         const res = await fetch("/api/briefing/topics/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -75,7 +82,7 @@ export function BriefingPageClient({
             topicId: section.topicId,
             topicName: section.topicName,
             emoji: section.emoji,
-            title: section.topicName,
+            title: headline,
             content: section.content,
             sources: section.sources,
             briefingGeneratedAt: briefingGeneratedAt ?? new Date().toISOString(),
