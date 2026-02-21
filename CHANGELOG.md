@@ -12,6 +12,30 @@
 
 ---
 
+## [3.36.0] - 2026-02-21 - Briefing Volume + MAX_CONTENT_LENGTH (ТЗ-BRIEFING-VOLUME)
+
+**MINOR RELEASE**: MAX_CONTENT_LENGTH поднят с 1000 до 6000 символов — автор брифинга получает в 6 раз больше контента. Добавлен briefingVolume (compact/standard/detailed) — пользователь выбирает объём выпуска: 3-5 мин / 8-12 мин / 15-25 мин.
+
+### Added
+- **briefingVolume** — новое поле `volume` в BriefingSettings (compact/standard/detailed)
+- **DB migration 0034** — `ALTER TABLE BriefingSettings ADD COLUMN volume VARCHAR(20) DEFAULT 'standard'`
+- **Промпт автора v4** — таблицы объёмов для каждого уровня, правила взаимодействия volume + briefingStyle
+- **Промпт онбординга v8** — шаг 8.5 (выбор volume), edit mode volume display, edge cases
+
+### Changed
+- **MAX_CONTENT_LENGTH** — 1000 → 6000 символов (фетчеры обрезают позже, автор получает больше контента)
+- **upsertBriefingSettings** — принимает и сохраняет volume
+- **briefingProfileSchema** — volume как Zod enum в service-chat tool
+- **generateArticle** — volume передаётся в buildUserMessage → Gemini Pro
+- **BriefingProfilePreview** — отображает volume в секции настроек (русские лейблы)
+- **buildBriefingEditModeInjection** — показывает текущий volume AI-агенту в edit mode
+
+### Fixed
+- **page.tsx initialProfile** — volume не передавался из settings в клиент при edit mode
+- **briefing-article-view.tsx** — React key uniqueness в CollapsibleSources
+
+---
+
 ## [3.35.0] - 2026-02-21 - Jina Reader API + Cascading Fallback (ТЗ-WS2)
 
 **MINOR RELEASE**: Jina Reader API как каскадный fallback в fetchPage(). Если Readability возвращает <5000 символов — автоматически подключается Jina Reader (headless Chrome). Покрытие русскоязычных источников: ~40-50% → ~70-80%.

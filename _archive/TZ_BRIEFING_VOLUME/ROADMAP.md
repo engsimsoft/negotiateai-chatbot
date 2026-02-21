@@ -56,7 +56,12 @@
 
 ---
 
-## Этап 7: Финализация ⬜
+## Этап 7: Финализация ✅
 
 - [x] 7.1 `npm run build` → успех
-- [ ] 7.2 Мануальный тест (запросить у пользователя)
+- [x] 7.2 Мануальный тест — диагностический прогон с 5 DIAG-точками
+  - DIAG-1: MAX_CONTENT_LENGTH = 6000 ✅
+  - DIAG-2: 13 items fetched, контент до 6000 chars ✅
+  - DIAG-3: 27 candidates after filter ✅
+  - DIAG-4: Volume = "detailed" доходит до автора ✅
+  - DIAG-5: 2 секции ~330 слов (мало для detailed) — выявлен баг fullText URL mismatch (pre-existing, отдельное ТЗ)
