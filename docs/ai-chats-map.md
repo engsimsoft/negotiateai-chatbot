@@ -10,7 +10,9 @@
 
 > **v3.30.0:** Briefing Onboarding — AI-собеседование для настройки брифинга (Claude Sonnet 4.6, split layout, deepResearch, edit mode).
 >
-> **v3.26.0:** Morning Briefing Backend — двухэтапный AI-пайплайн на Gemini (Flash + Pro) для генерации новостных сводок.
+> **v3.38.0:** Briefing Author → Claude Sonnet 4.6 (из Gemini). Effort для профессора и ревьюера.
+>
+> **v3.26.0:** Morning Briefing Backend — двухэтапный AI-пайплайн (Gemini Flash фильтр + Claude Sonnet автор) для генерации новостных сводок.
 >
 > **v3.24.0:** Дашборд V2 — три режима чатов (chat/expertise/create), удалены помощники, ListDetailPage.
 >
@@ -35,7 +37,7 @@
 | **Snapshot Creator** | Claude Haiku | ✅ Работает | Fallback-клерк создания snapshot при заполнении контекста (v3.18) |
 | **Briefing: Онбординг** | Claude Sonnet 4.6 | ✅ Работает | AI-интервью для настройки брифинга (v3.30) |
 | **Briefing: Фильтр** | Gemini 2.0 Flash | ✅ Работает | Фильтрация и дедупликация новостей (v3.26) |
-| **Briefing: Автор** | Gemini 3 Pro Preview | ✅ Работает | Генерация статьи из отфильтрованных новостей (v3.31) |
+| **Briefing: Автор** | Claude Sonnet 4.6 | ✅ Работает | Генерация статьи из отфильтрованных новостей (v3.31→v3.38) |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
 
 ---
@@ -326,7 +328,7 @@ app/(chat)/api/service-chat/route.ts                        # API (context: brie
 #### Briefing: AI-пайплайн (v3.26)
 **Где:** `POST /api/briefing/generate` (backend-only, без интерактивного UI)
 
-> **Особенность:** Единственный пайплайн в Simply, использующий Gemini вместо Claude. Причина: batch-обработка ~200 статей, разгрузка основного провайдера, экономия. [ADR 016](decisions/016-briefing-backend-architecture.md)
+> **v3.38.0:** Автор статей переведён на Claude Sonnet 4.6 (из Gemini 3 Pro). Фильтр остаётся на Gemini 2.0 Flash (batch-обработка ~200 статей, экономия). [ADR 016](decisions/016-briefing-backend-architecture.md)
 
 **Этап 1 — Фильтр:**
 
@@ -337,11 +339,11 @@ app/(chat)/api/service-chat/route.ts                        # API (context: brie
 | **Вход** | ~200 RawContent[] из 3 фетчеров (RSS, Telegram, Web) |
 | **Выход** | ~30 FilteredItem[] (дедуплицированные, с оценкой релевантности) |
 
-**Этап 2 — Автор (v3.31.0):**
+**Этап 2 — Автор (v3.31.0 → v3.38.0 Claude):**
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 3 Pro (`gemini-3-pro-preview`) |
+| **Модель** | Claude Sonnet 4.6 (`claude-sonnet-4-6`), fallback: `claude-sonnet-4-5-20250929` |
 | **Тип** | Backend (внутренний вызов в generate/route.ts) |
 | **Вход** | ~30 FilteredItem[] + userTopics + settings |
 | **Выход** | BriefingArticle (связная статья с markdown-секциями, inline-ссылками, источниками) |
@@ -351,14 +353,14 @@ app/(chat)/api/service-chat/route.ts                        # API (context: brie
 2. Загружает настройки, темы и источники пользователя из БД
 3. Параллельный fetch всех источников → RawContent[]
 4. Gemini Flash: фильтрация, дедупликация → FilteredItem[]
-5. Gemini Pro: генерация статьи → BriefingArticle (intro, sections, sources, outro, meta)
+5. Claude Sonnet 4.6: генерация статьи → BriefingArticle (intro, sections, sources, outro, meta)
 6. Сохранение в BriefingHistory
 
 **Файлы:**
 ```
 app/(chat)/api/briefing/generate/route.ts    # POST endpoint (auth, orchestration)
 lib/briefing/briefing-filter.ts              # Gemini Flash: filterAndDeduplicate()
-lib/briefing/briefing-author.ts              # Gemini Pro: generateArticle()
+lib/briefing/briefing-author.ts              # Claude Sonnet 4.6: generateArticle()
 lib/briefing/briefing-config.ts              # Константы (модели, лимиты)
 lib/prompts/briefing/briefing-author.md      # Промпт автора (стиль Т—Ж)
 lib/briefing/source-fetchers/index.ts        # fetchSource() dispatcher
@@ -529,7 +531,7 @@ export const myProvider = customProvider({
 
 **API Key:** `ANTHROPIC_API_KEY`
 
-### Google Gemini (vision-ocr + Briefing pipeline)
+### Google Gemini (vision-ocr + Briefing фильтр)
 
 ```typescript
 // lib/ai/vision-ocr.ts
@@ -537,7 +539,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
 ```
 
-**API Key:** `GOOGLE_GENERATIVE_AI_API_KEY` (vision-ocr + Briefing pipeline)
+**API Key:** `GOOGLE_GENERATIVE_AI_API_KEY` (vision-ocr + Briefing фильтр)
 
 ---
 
@@ -545,14 +547,12 @@ const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_
 
 | Модель | Input | Output | Контекст | Используется в |
 |--------|-------|--------|----------|---------------|
-| Claude Sonnet 4.6 (`claude-sonnet-4-6`) | — | — | — | Briefing: онбординг (v3.30) |
+| Claude Sonnet 4.6 (`claude-sonnet-4-6`) | — | — | — | Briefing: онбординг (v3.30), автор статьи (v3.38) |
 | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) | $3 | $15 | 200K | Основной чат (DEFAULT), Секретарь, Эксперт, артефакты |
 | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | $1 | $5 | 200K | Бен, Менеджер, Исполнитель, Клерки (анализатор, суммаризатор, snapshot) |
 | Claude Opus 4.6 (`claude-opus-4-6`) | $5 | $25 | 200K | Профессоры (планирование, ревью задач) |
 | Gemini 2.0 Flash (`gemini-2.0-flash`) | ~$0.10 | ~$0.40 | 1M | Briefing: фильтрация и дедупликация (v3.26) |
 | Gemini 2.5 Flash (`gemini-2.5-flash`) | — | — | 1M | Vision OCR: image + PDF |
-| Gemini 3 Pro (`gemini-3-pro-preview`) | ~$1.25 | ~$10 | 1M | Briefing: автор статьи (v3.31) |
-| Gemini 2.5 Pro (`gemini-2.5-pro`) | — | — | 1M | Briefing: fallback автор |
 
 *Цены за 1M токенов*
 
