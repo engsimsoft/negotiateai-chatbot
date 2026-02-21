@@ -12,6 +12,23 @@
 
 ---
 
+## [3.37.0] - 2026-02-21 - Briefing itemId Fix (ТЗ-BF1)
+
+**BUGFIX RELEASE**: Фикс lookup полного текста в briefing pipeline. Автор брифинга теперь получает полный текст для всех источников (web/jina), а не только RSS.
+
+### Fixed
+- **fullTextsMap lookup** — map строился по `item.url`, но фильтр (Gemini Flash) возвращал выдуманные URL для web/jina листингов → lookup всегда `undefined` → автор писал только по one-liner summary
+- **Решение:** каждый `RawContent` получает `itemId` при сборке (`src-0`, `src-1`, ...), фильтр возвращает `sourceItemId`, автор делает lookup по нему
+- **Результат:** hit rate 29/29 (было 0/29 для web/jina источников), качество статей значительно выросло
+
+### Changed
+- `RawContent` — добавлено опциональное поле `itemId`
+- `FilteredItem` — добавлено обязательное поле `sourceItemId`
+- Промпт фильтра — инструкция возвращать `sourceItemId` из `[src-N]`
+- Debug-лог `[Briefing] Full text hit: X/Y candidates` для мониторинга
+
+---
+
 ## [3.36.0] - 2026-02-21 - Briefing Volume + MAX_CONTENT_LENGTH (ТЗ-BRIEFING-VOLUME)
 
 **MINOR RELEASE**: MAX_CONTENT_LENGTH поднят с 1000 до 6000 символов — автор брифинга получает в 6 раз больше контента. Добавлен briefingVolume (compact/standard/detailed) — пользователь выбирает объём выпуска: 3-5 мин / 8-12 мин / 15-25 мин.
