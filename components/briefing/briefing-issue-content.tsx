@@ -26,6 +26,8 @@ interface BriefingIssueContentProps {
   onSelectSavedTopic: (topic: SavedBriefingTopicClient) => void;
   /** ТЗ-BF1: Return to article view */
   onBackToArticle: () => void;
+  /** ISO timestamp of current briefing (for bookmark matching) */
+  briefingGeneratedAt?: string | null;
 }
 
 /**
@@ -42,6 +44,7 @@ export function BriefingIssueContent({
   selectedSavedTopic,
   onSelectSavedTopic,
   onBackToArticle,
+  briefingGeneratedAt,
 }: BriefingIssueContentProps) {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
 
@@ -77,6 +80,7 @@ export function BriefingIssueContent({
               savedTopics={savedTopics}
               onSaveTopic={onSaveTopic}
               onDeleteTopic={onDeleteTopic}
+              briefingGeneratedAt={briefingGeneratedAt}
             />
           )}
         </main>

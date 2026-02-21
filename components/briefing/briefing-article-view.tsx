@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bookmark, ChevronDown, ArrowRight, ArrowLeft, Trash2 } from "lucide-react";
+import { Bookmark, ChevronDown, ArrowRight, ArrowLeft, Trash2, Copy, Check } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -26,6 +27,8 @@ interface BriefingArticleViewProps {
   onSaveTopic?: (section: BriefingArticleSection) => void;
   /** ТЗ-BF1: Delete a saved topic by its saved ID */
   onDeleteTopic?: (savedId: string) => void;
+  /** ISO timestamp of current briefing (for bookmark matching) */
+  briefingGeneratedAt?: string | null;
 }
 
 /**
@@ -40,6 +43,7 @@ export function BriefingArticleView({
   savedTopics = [],
   onSaveTopic,
   onDeleteTopic,
+  briefingGeneratedAt,
 }: BriefingArticleViewProps) {
   const callbackRef = useRef(onActiveSectionChange);
   callbackRef.current = onActiveSectionChange;
@@ -99,7 +103,11 @@ export function BriefingArticleView({
       {/* Sections */}
       <div className="space-y-6">
         {article.sections.map((section) => {
-          const saved = savedTopics.find((t) => t.topicId === section.topicId);
+          const saved = savedTopics.find(
+            (t) =>
+              t.topicId === section.topicId &&
+              t.briefingGeneratedAt === briefingGeneratedAt
+          );
           return (
             <ArticleSection
               key={section.topicId}
@@ -138,11 +146,36 @@ function ArticleSection({
   isSaved: boolean;
   onToggleBookmark: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(section.content);
+      setCopied(true);
+      toast.success("Скопировано");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Не удалось скопировать");
+    }
+  };
+
   return (
     <section id={section.topicId} className="scroll-mt-32 rounded-xl border bg-background p-5">
       <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
         <span>{section.emoji}</span>
         <span className="flex-1">{section.topicName}</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-primary"
+          title="Скопировать"
+        >
+          {copied ? (
+            <Check className="size-5 text-primary" />
+          ) : (
+            <Copy className="size-5" />
+          )}
+        </button>
         <button
           type="button"
           onClick={onToggleBookmark}
@@ -227,6 +260,19 @@ interface SavedTopicViewProps {
 }
 
 export function SavedTopicView({ topic, onBack, onDelete }: SavedTopicViewProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(topic.content);
+      setCopied(true);
+      toast.success("Скопировано");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Не удалось скопировать");
+    }
+  };
+
   return (
     <article className="mx-auto w-full max-w-2xl px-4 py-6 lg:px-6">
       {/* Back button */}
@@ -244,6 +290,18 @@ export function SavedTopicView({ topic, onBack, onDelete }: SavedTopicViewProps)
         <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
           <span>{topic.emoji}</span>
           <span className="flex-1">{topic.topicName}</span>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-primary"
+            title="Скопировать"
+          >
+            {copied ? (
+              <Check className="size-5 text-primary" />
+            ) : (
+              <Copy className="size-5" />
+            )}
+          </button>
         </h2>
 
         {/* Markdown content */}

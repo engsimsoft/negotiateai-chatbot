@@ -20,12 +20,15 @@ interface BriefingPageClientProps {
   article: BriefingArticle | null;
   hasValidArticle: boolean;
   initialSavedTopics?: SavedBriefingTopicClient[];
+  /** ISO timestamp of current briefing (for bookmark matching) */
+  briefingGeneratedAt?: string | null;
 }
 
 export function BriefingPageClient({
   article,
   hasValidArticle,
   initialSavedTopics = [],
+  briefingGeneratedAt,
 }: BriefingPageClientProps) {
   const { steps, isGenerating, error, redirectUrl, startGeneration } =
     useBriefingGeneration();
@@ -50,7 +53,7 @@ export function BriefingPageClient({
             title: section.topicName,
             content: section.content,
             sources: section.sources,
-            briefingGeneratedAt: new Date().toISOString(),
+            briefingGeneratedAt: briefingGeneratedAt ?? new Date().toISOString(),
           }),
         });
 
@@ -63,7 +66,7 @@ export function BriefingPageClient({
         toast.error("Не удалось сохранить тему");
       }
     },
-    []
+    [briefingGeneratedAt]
   );
 
   // ТЗ-BF1: Delete a saved topic (used by sidebar ✕, article bookmark, and SavedTopicView)
@@ -153,6 +156,7 @@ export function BriefingPageClient({
           selectedSavedTopic={selectedSavedTopic}
           onSelectSavedTopic={handleSelectSavedTopic}
           onBackToArticle={handleBackToArticle}
+          briefingGeneratedAt={briefingGeneratedAt}
         />
       ) : (
         <main className="flex-1">

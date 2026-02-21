@@ -37,6 +37,7 @@ export default async function BriefingRoute() {
     ? (latestBriefing.briefingJson as unknown as BriefingArticle)
     : null;
   const hasValidArticle = !!(article?.sections && article.sections.length > 0);
+  const briefingGeneratedAt = latestBriefing?.generatedAt.toISOString() ?? null;
 
   // ТЗ-BF1: serialize saved topics for client (Date → ISO string)
   const savedTopics: SavedBriefingTopicClient[] = savedTopicsRaw.map((t) => ({
@@ -57,6 +58,7 @@ export default async function BriefingRoute() {
       article={article}
       hasValidArticle={hasValidArticle}
       initialSavedTopics={savedTopics}
+      briefingGeneratedAt={briefingGeneratedAt}
     />
   );
 }
