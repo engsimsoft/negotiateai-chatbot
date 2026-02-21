@@ -22,7 +22,7 @@ export function BriefingIssueHeader({
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
       <div className="flex min-w-0 items-center gap-3">
-        <Link href="/dashboard">
+        <Link href="/dashboard" className="md:hidden">
           <Button size="icon" variant="ghost">
             <ArrowLeft className="size-5" />
           </Button>
