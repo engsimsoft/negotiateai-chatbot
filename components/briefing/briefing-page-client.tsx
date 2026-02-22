@@ -6,12 +6,15 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useBriefingGeneration } from "@/hooks/use-briefing-generation";
 import { usePodcastGeneration } from "@/hooks/use-podcast-generation";
+import { usePodcastPlayer } from "@/hooks/use-podcast-player";
 import { BriefingGenerationProgress } from "./briefing-generation-progress";
 import { BriefingIssueHeader } from "./briefing-issue-header";
 import { BriefingIssueContent } from "./briefing-issue-content";
 import { BriefingSidebarMobile } from "./briefing-sidebar";
 import { NoBriefingsYet, SimplyContentView } from "./briefing-article-view";
 import { PodcastButton } from "./podcast-button";
+import { BriefingModeToggle } from "./briefing-mode-toggle";
+import type { BriefingViewMode } from "./briefing-mode-toggle";
 import type {
   BriefingArticle,
   BriefingArticleSection,
@@ -73,6 +76,9 @@ export function BriefingPageClient({
   // ТЗ-Б2: Show/hide podcast progress banner
   const [showPodcastProgress, setShowPodcastProgress] = useState(false);
 
+  // ТЗ-Б2 Этап 3: View mode (read article vs listen to podcast)
+  const [viewMode, setViewMode] = useState<BriefingViewMode>("read");
+
   // ТЗ-Б2: Podcast generation hook
   const allTopicIds = article?.sections.map((s) => s.topicId) ?? [];
   const handlePodcastComplete = useCallback(
@@ -85,6 +91,15 @@ export function BriefingPageClient({
   );
   const podcast = usePodcastGeneration(allTopicIds, handlePodcastComplete);
 
+  // ТЗ-Б2 Этап 3: Podcast player hook
+  const trackInfos = (article?.sections ?? []).map((s) => ({
+    topicId: s.topicId,
+    emoji: s.emoji,
+    topicName: s.topicName,
+  }));
+  const player = usePodcastPlayer(audioUrls, audioDurations, trackInfos);
+  const hasAudio = audioStatus === "ready" || audioStatus === "partial";
+
   const handleStartPodcast = useCallback(
     (topicIds?: string[]) => {
       setShowPodcastProgress(true);
@@ -96,8 +111,12 @@ export function BriefingPageClient({
 
   const handleDismissPodcastProgress = useCallback(() => {
     setShowPodcastProgress(false);
+    // Auto-switch to listen mode if podcast was generated successfully
+    if (audioStatus === "ready" || audioStatus === "partial") {
+      setViewMode("listen");
+    }
     podcast.reset();
-  }, [podcast]);
+  }, [podcast, audioStatus]);
 
   // ТЗ-BF4: Per-section refresh state
   const [refreshingTopicId, setRefreshingTopicId] = useState<string | null>(null);
@@ -300,12 +319,16 @@ export function BriefingPageClient({
         title={hasValidArticle && article ? article.title : "Утренний брифинг"}
         podcastSlot={
           hasValidArticle && article ? (
-            <PodcastButton
-              audioStatus={audioStatus}
-              sections={article.sections}
-              isGenerating={podcast.isGenerating}
-              onGenerate={handleStartPodcast}
-            />
+            hasAudio ? (
+              <BriefingModeToggle mode={viewMode} onChange={setViewMode} />
+            ) : (
+              <PodcastButton
+                audioStatus={audioStatus}
+                sections={article.sections}
+                isGenerating={podcast.isGenerating}
+                onGenerate={handleStartPodcast}
+              />
+            )
           ) : undefined
         }
         mobileTrigger={
@@ -336,6 +359,24 @@ export function BriefingPageClient({
           onRefreshSection={handleRefreshSection}
           refreshingTopicId={refreshingTopicId}
           audioStatus={audioStatus}
+          viewMode={viewMode}
+          playerProps={hasAudio ? {
+            tracks: player.tracks,
+            currentTrackIndex: player.currentTrackIndex,
+            isPlaying: player.isPlaying,
+            currentTime: player.currentTime,
+            duration: player.duration,
+            speed: player.speed,
+            totalDuration: player.totalDuration,
+            onTogglePlay: player.togglePlay,
+            onSeekTo: player.seekTo,
+            onSetSpeed: player.setSpeed,
+            onNextTrack: player.nextTrack,
+            onPrevTrack: player.prevTrack,
+            onSkipForward: player.skipForward,
+            onSkipBackward: player.skipBackward,
+            briefingDate: briefingGeneratedAt ?? undefined,
+          } : undefined}
           podcastTopicStatuses={showPodcastProgress ? podcast.topicStatuses : undefined}
           podcastIsGenerating={showPodcastProgress ? podcast.isGenerating : undefined}
           podcastProgress={showPodcastProgress ? {

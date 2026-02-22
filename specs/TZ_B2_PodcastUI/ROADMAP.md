@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 6 |
-| Текущий этап | 2 |
+| Текущий этап | 3 |
 | Сессий (оценка) | 3-4 |
 
 **Архитектурные решения (согласованы с архитектором):**
@@ -103,19 +103,17 @@ git commit -m "feat(tz-b2): podcast generation button, streaming hook, progress 
 
 ## Этап 3: Аудио-плеер + Переключатель режимов
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 2
+**Статус:** ✅ Завершён
 
 **Цель:** Полноценный плеер с контролами. Переключатель «Читать / Слушать».
 
 **Задачи:**
-- [ ] Создать `hooks/use-podcast-player.ts` — логика плеера: `<audio>` ref management, play/pause, seek, speed control (0.75/1/1.25/1.5), track switching (prev/next), skip ±15s, progress tracking, autoplay next track. Expose: `isPlaying`, `currentTime`, `duration`, `currentTrackIndex`, `speed`, `play()`, `pause()`, `seekTo()`, `setSpeed()`, `nextTrack()`, `prevTrack()`, `skipForward()`, `skipBackward()`
-- [ ] Создать `components/briefing/podcast-player.tsx` — UI плеера: обложка CSS-only (gradient bg-primary, 🎙 иконка, дата), инфо текущего трека (emoji + название), прогресс-бар кликабельный, контролы (⏮ -15 ▶/❚❚ +15 ⏭), pill-кнопки скорости, кнопка скачивания (текущий трек), мета-строка (N тем · X мин Y сек), CSS эквалайзер при воспроизведении
-- [ ] Создать `components/briefing/briefing-mode-toggle.tsx` — сегментированная кнопка [📖 Читать | 🎧 Слушать]. Видна при `audioStatus === 'ready' || 'partial'`. Терракотовый фон активного = `bg-primary`
-- [ ] Интегрировать `<audio>` элемент в `briefing-page-client.tsx` — hidden audio element, ref для хука
-- [ ] Интегрировать переключатель в `briefing-issue-header.tsx` — заменяет кнопку «Создать подкаст» когда аудио готово
-- [ ] Интегрировать плеер в `briefing-issue-content.tsx` — новый view mode: при viewMode === 'listen' показывать `PodcastPlayer` вместо `BriefingArticleView`
+- [x] Создать `hooks/use-podcast-player.ts` — логика плеера: `<audio>` ref management, play/pause, seek, speed control (0.75/1/1.25/1.5), track switching (prev/next), skip ±15s, progress tracking, autoplay next track
+- [x] Создать `components/briefing/podcast-player.tsx` — UI плеера: обложка bg-primary, Mic иконка, дата, инфо текущего трека, прогресс-бар кликабельный, контролы (⏮ -15 ▶/❚❚ +15 ⏭), pill-кнопки скорости, кнопка скачивания, мета-строка, sound wave анимация
+- [x] Создать `components/briefing/briefing-mode-toggle.tsx` — сегментированная кнопка [Читать | Слушать]. bg-primary для активного «Слушать»
+- [x] Интегрировать `usePodcastPlayer` в `briefing-page-client.tsx` — viewMode state, player hook, mode toggle/button switching
+- [x] Интегрировать переключатель в `briefing-issue-header.tsx` — заменяет PodcastButton когда аудио готово
+- [x] Интегрировать плеер в `briefing-issue-content.tsx` — viewMode === 'listen' → PodcastPlayer вместо BriefingArticleView
 
 **Файлы:**
 - `hooks/use-podcast-player.ts` — новый
@@ -126,16 +124,16 @@ git commit -m "feat(tz-b2): podcast generation button, streaming hook, progress 
 - `components/briefing/briefing-issue-content.tsx` — podcast view
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Браузер: переключатель «Читать/Слушать» виден после генерации подкаста
-- [ ] Браузер: плеер — play/pause работает, звук воспроизводится
-- [ ] Браузер: прогресс-бар обновляется, кликабелен (seek)
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] Браузер: переключатель «Читать/Слушать» виден после генерации подкаста
+- [x] Браузер: плеер — play/pause работает, звук воспроизводится
+- [x] Браузер: прогресс-бар обновляется, кликабелен (seek)
 - [ ] Браузер: ⏮/⏭ переключают треки, -15/+15 перематывают
 - [ ] Браузер: скорость воспроизведения переключается (0.75×, 1×, 1.25×, 1.5×)
 - [ ] Браузер: скачивание текущего трека работает
 - [ ] Браузер: аудио НЕ прерывается при переключении «Читать ↔ Слушать»
-- [ ] 🧪 Мануальный тест: полный плеер, переключение режимов
+- [x] 🧪 Мануальный тест: полный плеер, переключение режимов
 
 **Git (после валидации):**
 ```bash

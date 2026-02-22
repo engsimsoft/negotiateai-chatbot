@@ -8,8 +8,10 @@ import {
 } from "./briefing-article-view";
 import { BriefingSidebar } from "./briefing-sidebar";
 import { PodcastProgress } from "./podcast-progress";
+import { PodcastPlayer } from "./podcast-player";
 import type { SimplyContentType } from "./briefing-sidebar";
 import type { PodcastTopicStatus } from "@/hooks/use-podcast-generation";
+import type { BriefingViewMode } from "./briefing-mode-toggle";
 import type {
   BriefingArticle,
   BriefingArticleSection,
@@ -55,6 +57,10 @@ interface BriefingIssueContentProps {
   refreshingTopicId?: string | null;
   /** ТЗ-Б2: Current audio/podcast status */
   audioStatus?: AudioStatus;
+  /** ТЗ-Б2 Этап 3: Current view mode (read article / listen to podcast) */
+  viewMode?: BriefingViewMode;
+  /** ТЗ-Б2 Этап 3: Player props (when audio is available) */
+  playerProps?: React.ComponentProps<typeof PodcastPlayer>;
   /** ТЗ-Б2: Podcast generation per-topic statuses (for sidebar) */
   podcastTopicStatuses?: PodcastTopicStatus[];
   /** ТЗ-Б2: Whether podcast is currently generating (for sidebar) */
@@ -97,6 +103,8 @@ export function BriefingIssueContent({
   onRefreshSection,
   refreshingTopicId,
   audioStatus,
+  viewMode,
+  playerProps,
   podcastTopicStatuses,
   podcastIsGenerating,
   podcastProgress,
@@ -137,6 +145,8 @@ export function BriefingIssueContent({
         {/* ТЗ-Б2: Podcast generation progress — full-screen view replaces article */}
         {podcastProgress ? (
           <PodcastProgress {...podcastProgress} />
+        ) : viewMode === "listen" && playerProps ? (
+          <PodcastPlayer {...playerProps} />
         ) : selectedSimplyType && simplyContentTitle && simplyContentBody ? (
           <SimplyContentView
             title={simplyContentTitle}
