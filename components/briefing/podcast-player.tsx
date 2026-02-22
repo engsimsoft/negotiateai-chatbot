@@ -113,11 +113,20 @@ export function PodcastPlayer({
     [duration, onSeekTo],
   );
 
-  const handleDownload = useCallback(() => {
-    const a = document.createElement("a");
-    a.href = currentTrack.url;
-    a.download = `${currentTrack.emoji} ${currentTrack.topicName}.mp3`;
-    a.click();
+  const handleDownload = useCallback(async () => {
+    try {
+      const res = await fetch(currentTrack.url);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${currentTrack.emoji} ${currentTrack.topicName}.mp3`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Fallback: open in new tab
+      window.open(currentTrack.url, "_blank");
+    }
   }, [currentTrack]);
 
   // Format date for artwork subtitle
