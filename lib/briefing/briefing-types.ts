@@ -51,6 +51,21 @@ export interface SavedBriefingTopicClient {
   savedAt: string; // ISO string
 }
 
+// ТЗ-Б2: Audio/Podcast types (client-safe)
+
+/** JSONB format: { "topicId": "https://blob.vercel-storage.com/...", ... } */
+export type AudioUrls = Record<string, string>;
+
+/** JSONB format: { "topicId": 134, ... } (seconds) */
+export type AudioDurations = Record<string, number>;
+
+export type AudioStatus =
+  | "none"
+  | "generating"
+  | "ready"
+  | "partial"
+  | "outdated";
+
 // ТЗ-А5: Streaming progress events (client-safe)
 
 export type BriefingProgressStep =

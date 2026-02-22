@@ -14,6 +14,9 @@ import type {
   BriefingArticle,
   BriefingArticleSection,
   SavedBriefingTopicClient,
+  AudioStatus,
+  AudioUrls,
+  AudioDurations,
 } from "@/lib/briefing/briefing-types";
 import type { SimplyContentType } from "./briefing-sidebar";
 
@@ -38,6 +41,10 @@ interface BriefingPageClientProps {
   briefingGeneratedAt?: string | null;
   /** ТЗ-BF2: Simply content data */
   simplyData?: SimplyData | null;
+  /** ТЗ-Б2: Audio/Podcast state from server */
+  initialAudioStatus?: AudioStatus;
+  initialAudioUrls?: AudioUrls;
+  initialAudioDurations?: AudioDurations;
 }
 
 export function BriefingPageClient({
@@ -46,12 +53,20 @@ export function BriefingPageClient({
   initialSavedTopics = [],
   briefingGeneratedAt,
   simplyData,
+  initialAudioStatus = "none",
+  initialAudioUrls = {},
+  initialAudioDurations = {},
 }: BriefingPageClientProps) {
   const { steps, isGenerating, error, redirectUrl, startGeneration } =
     useBriefingGeneration();
 
   // ТЗ-BF4: Article state (lifted from prop for per-section refresh mutation)
   const [article, setArticle] = useState(initialArticle);
+
+  // ТЗ-Б2: Audio/Podcast state (lifted from server props for mutation during generation)
+  const [audioStatus, setAudioStatus] = useState<AudioStatus>(initialAudioStatus);
+  const [audioUrls, setAudioUrls] = useState<AudioUrls>(initialAudioUrls);
+  const [audioDurations, setAudioDurations] = useState<AudioDurations>(initialAudioDurations);
 
   // ТЗ-BF4: Per-section refresh state
   const [refreshingTopicId, setRefreshingTopicId] = useState<string | null>(null);
@@ -249,6 +264,7 @@ export function BriefingPageClient({
     <div className={`flex flex-col bg-muted/30 ${hasValidArticle ? "h-svh overflow-hidden" : "min-h-svh"}`}>
       <BriefingIssueHeader
         title={hasValidArticle && article ? article.title : "Утренний брифинг"}
+        audioStatus={audioStatus}
         mobileTrigger={
           hasValidArticle ? (
             <BriefingSidebarMobile {...sidebarProps} />
@@ -276,6 +292,7 @@ export function BriefingPageClient({
           simplyNewsUnread={simplyNewsUnread}
           onRefreshSection={handleRefreshSection}
           refreshingTopicId={refreshingTopicId}
+          audioStatus={audioStatus}
         />
       ) : (
         <main className="flex-1">

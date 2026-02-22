@@ -12,6 +12,7 @@ import type {
   BriefingArticle,
   BriefingArticleSection,
   SavedBriefingTopicClient,
+  AudioStatus,
 } from "@/lib/briefing/briefing-types";
 
 interface BriefingIssueContentProps {
@@ -50,6 +51,8 @@ interface BriefingIssueContentProps {
   onRefreshSection?: (topicId: string) => Promise<void>;
   /** ТЗ-BF4: Currently refreshing topic id */
   refreshingTopicId?: string | null;
+  /** ТЗ-Б2: Current audio/podcast status */
+  audioStatus?: AudioStatus;
 }
 
 /**
@@ -76,6 +79,7 @@ export function BriefingIssueContent({
   simplyNewsUnread,
   onRefreshSection,
   refreshingTopicId,
+  audioStatus,
 }: BriefingIssueContentProps) {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const mainRef = useRef<HTMLElement>(null);

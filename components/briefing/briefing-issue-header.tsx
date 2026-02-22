@@ -3,11 +3,14 @@ import Link from "next/link";
 import { ArrowLeft, Headphones, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
+import type { AudioStatus } from "@/lib/briefing/briefing-types";
 
 interface BriefingIssueHeaderProps {
   title: string;
   /** Optional slot for mobile sidebar trigger (rendered before title) */
   mobileTrigger?: ReactNode;
+  /** ТЗ-Б2: Current audio/podcast status (controls podcast button rendering) */
+  audioStatus?: AudioStatus;
 }
 
 /**
@@ -18,6 +21,7 @@ interface BriefingIssueHeaderProps {
 export function BriefingIssueHeader({
   title,
   mobileTrigger,
+  audioStatus,
 }: BriefingIssueHeaderProps) {
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center border-b bg-background">

@@ -10,7 +10,7 @@ import {
 import { getSimplyNewsData, getSimplyOverviewContent } from "@/lib/briefing/simply-news-utils";
 import { BriefingPage } from "@/components/briefing/briefing-page";
 import { BriefingPageClient, type SimplyData } from "@/components/briefing/briefing-page-client";
-import type { BriefingArticle, SavedBriefingTopicClient } from "@/lib/briefing/briefing-types";
+import type { BriefingArticle, SavedBriefingTopicClient, AudioStatus, AudioUrls, AudioDurations } from "@/lib/briefing/briefing-types";
 
 export default async function BriefingRoute() {
   const session = await auth();
@@ -66,6 +66,11 @@ export default async function BriefingRoute() {
   const hasValidArticle = !!(article?.sections && article.sections.length > 0);
   const briefingGeneratedAt = latestBriefing?.generatedAt.toISOString() ?? null;
 
+  // ТЗ-Б2: Extract audio fields for podcast UI
+  const audioStatus = (latestBriefing?.audioStatus as AudioStatus) ?? "none";
+  const audioUrls = (latestBriefing?.audioUrls as AudioUrls) ?? {};
+  const audioDurations = (latestBriefing?.audioDurations as AudioDurations) ?? {};
+
   // ТЗ-BF1: serialize saved topics for client (Date → ISO string)
   const savedTopics: SavedBriefingTopicClient[] = savedTopicsRaw.map((t) => ({
     id: t.id,
@@ -87,6 +92,9 @@ export default async function BriefingRoute() {
       initialSavedTopics={savedTopics}
       briefingGeneratedAt={briefingGeneratedAt}
       simplyData={simplyData}
+      initialAudioStatus={audioStatus}
+      initialAudioUrls={audioUrls}
+      initialAudioDurations={audioDurations}
     />
   );
 }
