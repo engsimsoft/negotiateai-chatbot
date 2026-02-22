@@ -1,10 +1,29 @@
 // ТЗ-Б1: Audio Converter — PCM to MP3 using lamejs (pure JS, no ffmpeg)
+// lamejs is loaded via lame.all.js (self-contained bundle) to avoid
+// CJS/ESM bundler issues with webpack/turbopack.
 
-import { Mp3Encoder } from "lamejs";
+import fs from "fs";
+import path from "path";
 
 const DEFAULT_SAMPLE_RATE = 24000; // Gemini TTS output: 24kHz
 const DEFAULT_KBPS = 128; // MP3 bitrate
 const BLOCK_SIZE = 1152; // MPEG-1 frame size
+
+// Load lamejs self-contained bundle, bypassing bundler entirely
+const LAMEJS_PATH = path.join(
+  process.cwd(),
+  "node_modules",
+  "lamejs",
+  "lame.all.js",
+);
+
+// eslint-disable-next-line @typescript-eslint/no-implied-eval
+const loadLamejs = new Function(
+  fs.readFileSync(LAMEJS_PATH, "utf-8") +
+    "\nreturn { Mp3Encoder: lamejs.Mp3Encoder };",
+);
+
+const { Mp3Encoder } = loadLamejs();
 
 /**
  * Convert raw PCM buffer (16-bit, mono) to MP3.

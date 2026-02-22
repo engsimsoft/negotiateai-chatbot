@@ -16,7 +16,7 @@ const PROMPT_PATH = path.join(
 );
 const SYSTEM_PROMPT = fs.readFileSync(PROMPT_PATH, "utf-8");
 
-const SCRIPT_MODEL = "gemini-2.5-flash-preview-05-20";
+const SCRIPT_MODEL = "gemini-2.5-flash";
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
