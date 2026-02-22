@@ -10,6 +10,7 @@ import {
   gte,
   inArray,
   isNull,
+  notInArray,
   lt,
   sql,
   type SQL,
@@ -19,6 +20,7 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import ws from "ws";
 import type { ArtifactKind } from "@/components/artifact";
 import type { VisibilityType } from "@/components/visibility-selector";
+import type { BriefingArticle } from "../briefing/briefing-types";
 import { ChatSDKError } from "../errors";
 import type { AppUsage } from "../usage";
 import { estimateMessageTokens, generateUUID } from "../utils";
@@ -3340,23 +3342,52 @@ export async function updateBriefingAudio({
 }
 
 /**
- * ТЗ-BF1 TTL: Delete all briefing history for a user (before new generation)
+ * ТЗ-BF1 TTL: Delete old briefing history for a user (before new generation)
  * ТЗ-Б1: Also cleans up MP3 files from Vercel Blob
+ * ТЗ-BF5: keepLast — preserve last N ready briefings for dedup context
  */
 export async function deleteOldBriefingHistory({
   userId,
+  keepLast = 0,
 }: {
   userId: string;
+  /** Number of latest ready briefings to keep (default: 0 = delete all) */
+  keepLast?: number;
 }) {
   try {
-    // ТЗ-Б1: Read audio URLs before deletion for Blob cleanup
-    const records = await db
+    // ТЗ-BF5: Find IDs of ready records to keep
+    const keepIds: string[] = [];
+    if (keepLast > 0) {
+      const toKeep = await db
+        .select({ id: briefingHistory.id })
+        .from(briefingHistory)
+        .where(
+          and(
+            eq(briefingHistory.userId, userId),
+            eq(briefingHistory.status, "ready"),
+          ),
+        )
+        .orderBy(desc(briefingHistory.generatedAt))
+        .limit(keepLast);
+      keepIds.push(...toKeep.map((r) => r.id));
+    }
+
+    // Build delete condition: userId + exclude kept records
+    const deleteConditions: SQL[] = [eq(briefingHistory.userId, userId)];
+    if (keepIds.length > 0) {
+      deleteConditions.push(notInArray(briefingHistory.id, keepIds));
+    }
+
+    // ТЗ-Б1: Read audio URLs before deletion for Blob cleanup (only from records to be deleted)
+    const recordsToDelete = await db
       .select({ audioUrls: briefingHistory.audioUrls })
       .from(briefingHistory)
-      .where(eq(briefingHistory.userId, userId));
+      .where(and(...deleteConditions));
+
+    if (recordsToDelete.length === 0) return;
 
     const blobUrlsToDelete: string[] = [];
-    for (const record of records) {
+    for (const record of recordsToDelete) {
       if (record.audioUrls && typeof record.audioUrls === "object") {
         blobUrlsToDelete.push(
           ...Object.values(record.audioUrls as Record<string, string>),
@@ -3364,10 +3395,10 @@ export async function deleteOldBriefingHistory({
       }
     }
 
-    // Delete DB records
+    // Delete DB records (only those not kept)
     await db
       .delete(briefingHistory)
-      .where(eq(briefingHistory.userId, userId));
+      .where(and(...deleteConditions));
 
     // Cleanup Blob files (best-effort, don't block on failure)
     if (blobUrlsToDelete.length > 0) {
@@ -3386,5 +3417,33 @@ export async function deleteOldBriefingHistory({
       "bad_request:database",
       "Failed to delete old briefing history"
     );
+  }
+}
+
+/**
+ * ТЗ-BF5: Get previous ready briefing for dedup context.
+ * Returns the latest ready briefing article + generatedAt, or null if none exists.
+ */
+export async function getPreviousBriefing({
+  userId,
+}: {
+  userId: string;
+}): Promise<{ generatedAt: string; article: BriefingArticle } | null> {
+  try {
+    const rows = await getBriefingHistory({ userId, limit: 1, status: "ready" });
+    if (rows.length === 0) return null;
+
+    const row = rows[0];
+    const article = row.briefingJson as BriefingArticle;
+    if (!article || !article.sections) return null;
+
+    return {
+      generatedAt: row.generatedAt.toISOString(),
+      article,
+    };
+  } catch (_error) {
+    // Non-blocking: if we can't load previous briefing, dedup just won't happen
+    console.warn("[getPreviousBriefing] Failed to load, skipping dedup:", _error);
+    return null;
   }
 }

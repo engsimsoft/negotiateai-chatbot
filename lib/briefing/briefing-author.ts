@@ -83,6 +83,12 @@ const RUSSIAN_DAYS = [
   "суббота",
 ];
 
+/** ТЗ-BF5: Previous briefing data for dedup context */
+export interface PreviousBriefing {
+  generatedAt: string;
+  article: BriefingArticle;
+}
+
 interface AuthorInput {
   candidates: FilteredItem[];
   fullTexts: Map<string, RawContent>;
@@ -92,6 +98,8 @@ interface AuthorInput {
   maxItems: number;
   volume?: string;
   date: string;
+  /** ТЗ-BF5: Previous briefing for dedup (null = first generation) */
+  previousBriefing?: PreviousBriefing | null;
 }
 
 // --- Max output tokens by volume (detailed needs room for 3000-6000 words) ---
@@ -110,7 +118,7 @@ const MAX_TOKENS_BY_VOLUME: Record<string, number> = {
 export async function generateArticle(
   input: AuthorInput,
 ): Promise<{ article: BriefingArticle; tokensUsed: number }> {
-  const { candidates, fullTexts, tierMap, userTopics, language, maxItems, volume, date } =
+  const { candidates, fullTexts, tierMap, userTopics, language, maxItems, volume, date, previousBriefing } =
     input;
 
   if (candidates.length === 0) {
@@ -135,6 +143,7 @@ export async function generateArticle(
     maxItems,
     volume,
     date,
+    previousBriefing,
   );
 
   const maxTokens = MAX_TOKENS_BY_VOLUME[volume ?? "standard"] ?? MAX_TOKENS_BY_VOLUME.standard;
@@ -210,6 +219,7 @@ function buildUserMessage(
   maxItems: number,
   volume: string | undefined,
   date: string,
+  previousBriefing?: PreviousBriefing | null,
 ): string {
   // Format date with Russian day of week
   const dateObj = new Date(date);
@@ -244,6 +254,12 @@ function buildUserMessage(
     })
     .join("\n\n---\n\n");
 
+  // ТЗ-BF5: Build previous briefing block for dedup
+  const previousBlock =
+    previousBriefing && previousBriefing.article.sections.length > 0
+      ? `\n---\n\n## Предыдущий выпуск (${formatDateRussian(previousBriefing.generatedAt)})\n\nВчера читатель уже видел:\n${buildPreviousHeadlines(previousBriefing.article)}\n`
+      : "";
+
   return `${getVolumeInstruction(volume ?? "standard")}
 
 Дата: ${dateFormatted}
@@ -252,12 +268,31 @@ function buildUserMessage(
 
 Темы пользователя:
 ${topicsFormatted}
-
+${previousBlock}
 ---
 
 Кандидаты (${candidates.length}):
 
 ${candidatesFormatted}`;
+}
+
+// --- ТЗ-BF5: Format previous briefing headlines for dedup context ---
+
+/**
+ * Build a formatted list of headlines from the previous briefing.
+ * Uses sources[].title (structured data) with fallback to first 10 words of content.
+ * Exported for reuse in briefing-section-author.ts.
+ */
+export function buildPreviousHeadlines(article: BriefingArticle): string {
+  return article.sections
+    .map((s) => {
+      const headlines =
+        s.sources.length > 0
+          ? s.sources.map((src) => `«${src.title}»`).join(", ")
+          : `«${s.content.split(/\s+/).slice(0, 10).join(" ")}…»`;
+      return `- ${s.emoji} ${s.topicName}: ${headlines}`;
+    })
+    .join("\n");
 }
 
 // --- Format date in Russian ---
