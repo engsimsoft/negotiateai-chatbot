@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { PodcastSidebarTracklist } from "./podcast-sidebar";
+import type { FailedPodcastTopic } from "./podcast-sidebar";
 import type {
   BriefingArticleSection,
   SavedBriefingTopicClient,
@@ -102,6 +103,10 @@ export interface BriefingSidebarProps {
   podcastIsPlayerPlaying?: boolean;
   /** ТЗ-Б2 Этап 4: Callback when user clicks a track in sidebar */
   onSelectPodcastTrack?: (index: number) => void;
+  /** ТЗ-Б2 Этап 5: Topics that failed podcast generation (shown gray with retry) */
+  failedPodcastTopics?: FailedPodcastTopic[];
+  /** ТЗ-Б2 Этап 5: Retry a single failed topic */
+  onRetryPodcastTopic?: (topicId: string) => void;
 }
 
 /* --- Short date formatter: ISO → "21 фев" --- */
@@ -236,6 +241,8 @@ function SidebarContent({
   podcastCurrentTrackIndex,
   podcastIsPlayerPlaying,
   onSelectPodcastTrack,
+  failedPodcastTopics,
+  onRetryPodcastTopic,
   onNavigate,
 }: BriefingSidebarProps & { onNavigate?: () => void }) {
   const handleSelectSimply = useCallback(
@@ -324,6 +331,8 @@ function SidebarContent({
               onSelectPodcastTrack(index);
               onNavigate?.();
             }}
+            failedTopics={failedPodcastTopics}
+            onRetryTopic={onRetryPodcastTopic}
           />
         ) : /* ТЗ-Б2: Podcast generation sidebar — replaces topic nav during generation */
         podcastTopicStatuses && podcastTopicStatuses.length > 0 ? (

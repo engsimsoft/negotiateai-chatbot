@@ -33,6 +33,8 @@ interface PodcastPlayerProps {
   onSkipBackward: () => void;
   /** Briefing date for artwork subtitle */
   briefingDate?: string;
+  /** ТЗ-Б2 Этап 5: Podcast is outdated (article updated after generation) */
+  isOutdated?: boolean;
 }
 
 const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5];
@@ -91,6 +93,7 @@ export function PodcastPlayer({
   onSkipForward,
   onSkipBackward,
   briefingDate,
+  isOutdated,
 }: PodcastPlayerProps) {
   const progressRef = useRef<HTMLDivElement>(null);
 
@@ -127,6 +130,13 @@ export function PodcastPlayer({
 
   return (
     <div className="flex min-h-full flex-col items-center justify-center px-6 py-8">
+      {/* ТЗ-Б2 Этап 5: Outdated banner */}
+      {isOutdated && (
+        <div className="mb-4 w-full max-w-md rounded-lg bg-warning/10 px-4 py-2 text-center text-sm text-warning">
+          Текст обновлён, подкаст может быть неактуален
+        </div>
+      )}
+
       {/* Meta line */}
       <p className="mb-2 text-center text-[13px] text-muted-foreground">
         {tracks.length} {tracks.length === 1 ? "тема" : tracks.length < 5 ? "темы" : "тем"} · {formatDuration(totalDuration)}
@@ -195,12 +205,12 @@ export function PodcastPlayer({
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="mb-6 flex items-center gap-6">
+      {/* Controls — min 44px touch targets for mobile */}
+      <div className="mb-6 flex items-center gap-4 sm:gap-6">
         <button
           type="button"
           onClick={onPrevTrack}
-          className="text-muted-foreground transition-colors hover:text-foreground"
+          className="flex size-11 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
           title="Предыдущая тема"
         >
           <SkipBack className="size-5" />
@@ -209,7 +219,7 @@ export function PodcastPlayer({
         <button
           type="button"
           onClick={onSkipBackward}
-          className="text-lg font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          className="flex size-11 items-center justify-center text-lg font-semibold text-muted-foreground transition-colors hover:text-foreground"
         >
           -15
         </button>
@@ -229,7 +239,7 @@ export function PodcastPlayer({
         <button
           type="button"
           onClick={onSkipForward}
-          className="text-lg font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          className="flex size-11 items-center justify-center text-lg font-semibold text-muted-foreground transition-colors hover:text-foreground"
         >
           +15
         </button>
@@ -237,7 +247,7 @@ export function PodcastPlayer({
         <button
           type="button"
           onClick={onNextTrack}
-          className="text-muted-foreground transition-colors hover:text-foreground"
+          className="flex size-11 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
           title="Следующая тема"
         >
           <SkipForward className="size-5" />

@@ -1,17 +1,29 @@
-// ТЗ-Б2 Этап 4: Podcast tracklist section for sidebar
+// ТЗ-Б2 Этап 4+5: Podcast tracklist section for sidebar
 // Shows tracks with duration, current track highlight, equalizer animation
+// Этап 5: Failed topics shown gray with retry button
 
 "use client";
 
-import { Headphones } from "lucide-react";
+import { Headphones, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PodcastTrack } from "@/hooks/use-podcast-player";
+
+/** Topic that failed generation (shown gray in tracklist with retry) */
+export interface FailedPodcastTopic {
+  topicId: string;
+  emoji: string;
+  topicName: string;
+}
 
 export interface PodcastSidebarTracklistProps {
   tracks: PodcastTrack[];
   currentTrackIndex: number;
   isPlaying: boolean;
   onSelectTrack: (index: number) => void;
+  /** ТЗ-Б2 Этап 5: Topics that failed generation */
+  failedTopics?: FailedPodcastTopic[];
+  /** ТЗ-Б2 Этап 5: Retry a single failed topic */
+  onRetryTopic?: (topicId: string) => void;
 }
 
 function formatTrackDuration(seconds: number): string {
@@ -47,17 +59,20 @@ function MiniEqualizer() {
 }
 
 /**
- * ТЗ-Б2 Этап 4: Tracklist section for BriefingSidebar.
+ * ТЗ-Б2 Этап 4+5: Tracklist section for BriefingSidebar.
  * Shows when viewMode === "listen" and tracks are available.
  * Replaces "Текущий выпуск" topic navigation with playable track list.
+ * Этап 5: Failed topics shown gray with retry.
  */
 export function PodcastSidebarTracklist({
   tracks,
   currentTrackIndex,
   isPlaying,
   onSelectTrack,
+  failedTopics = [],
+  onRetryTopic,
 }: PodcastSidebarTracklistProps) {
-  if (tracks.length === 0) return null;
+  if (tracks.length === 0 && failedTopics.length === 0) return null;
 
   const totalDuration = tracks.reduce((sum, t) => sum + t.durationSeconds, 0);
 
@@ -78,7 +93,7 @@ export function PodcastSidebarTracklist({
         <span>{formatTotalDuration(totalDuration)}</span>
       </div>
 
-      {/* Track list */}
+      {/* Track list — ready tracks */}
       {tracks.map((track, index) => {
         const isCurrent = index === currentTrackIndex;
         return (
@@ -106,6 +121,32 @@ export function PodcastSidebarTracklist({
           </button>
         );
       })}
+
+      {/* ТЗ-Б2 Этап 5: Failed topics — gray with retry */}
+      {failedTopics.length > 0 && (
+        <>
+          {failedTopics.map((topic) => (
+            <div
+              key={topic.topicId}
+              className="mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground/60"
+            >
+              <span className="flex size-4 shrink-0 items-center justify-center opacity-50">
+                {topic.emoji}
+              </span>
+              <span className="min-w-0 truncate">{topic.topicName}</span>
+              {onRetryTopic && (
+                <button
+                  type="button"
+                  onClick={() => onRetryTopic(topic.topicId)}
+                  className="ml-auto shrink-0 rounded p-1 text-muted-foreground transition-colors hover:text-primary"
+                >
+                  <RefreshCw className="size-3" />
+                </button>
+              )}
+            </div>
+          ))}
+        </>
+      )}
     </>
   );
 }

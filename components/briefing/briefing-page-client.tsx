@@ -98,7 +98,7 @@ export function BriefingPageClient({
     topicName: s.topicName,
   }));
   const player = usePodcastPlayer(audioUrls, audioDurations, trackInfos);
-  const hasAudio = audioStatus === "ready" || audioStatus === "partial";
+  const hasAudio = audioStatus === "ready" || audioStatus === "partial" || audioStatus === "outdated";
 
   const handleStartPodcast = useCallback(
     (topicIds?: string[]) => {
@@ -276,6 +276,13 @@ export function BriefingPageClient({
     return () => clearTimeout(timer);
   }, [redirectUrl]);
 
+  // ТЗ-Б2 Этап 5: Failed topics (for partial state in sidebar tracklist)
+  const failedPodcastTopics = audioStatus === "partial" && article
+    ? article.sections
+        .filter((s) => !audioUrls[s.topicId])
+        .map((s) => ({ topicId: s.topicId, emoji: s.emoji, topicName: s.topicName }))
+    : [];
+
   // Sidebar props shared between desktop (inside BriefingIssueContent) and mobile (in header)
   const sidebarProps = {
     sections: hasValidArticle && article ? article.sections : [],
@@ -301,6 +308,9 @@ export function BriefingPageClient({
     podcastCurrentTrackIndex: hasAudio ? player.currentTrackIndex : undefined,
     podcastIsPlayerPlaying: hasAudio ? player.isPlaying : undefined,
     onSelectPodcastTrack: hasAudio ? player.setTrack : undefined,
+    // ТЗ-Б2 Этап 5: Failed topics for partial state
+    failedPodcastTopics: failedPodcastTopics.length > 0 ? failedPodcastTopics : undefined,
+    onRetryPodcastTopic: hasAudio ? (topicId: string) => handleStartPodcast([topicId]) : undefined,
   };
 
   // Show progress UI when generating
@@ -326,7 +336,7 @@ export function BriefingPageClient({
         podcastSlot={
           hasValidArticle && article ? (
             hasAudio ? (
-              <BriefingModeToggle mode={viewMode} onChange={setViewMode} />
+              <BriefingModeToggle mode={viewMode} onChange={setViewMode} isOutdated={audioStatus === "outdated"} />
             ) : (
               <PodcastButton
                 audioStatus={audioStatus}
@@ -382,8 +392,11 @@ export function BriefingPageClient({
             onSkipForward: player.skipForward,
             onSkipBackward: player.skipBackward,
             briefingDate: briefingGeneratedAt ?? undefined,
+            isOutdated: audioStatus === "outdated",
           } : undefined}
           onSelectPodcastTrack={hasAudio ? player.setTrack : undefined}
+          failedPodcastTopics={failedPodcastTopics.length > 0 ? failedPodcastTopics : undefined}
+          onRetryPodcastTopic={hasAudio ? (topicId: string) => handleStartPodcast([topicId]) : undefined}
           podcastTopicStatuses={showPodcastProgress ? podcast.topicStatuses : undefined}
           podcastIsGenerating={showPodcastProgress ? podcast.isGenerating : undefined}
           podcastProgress={showPodcastProgress ? {

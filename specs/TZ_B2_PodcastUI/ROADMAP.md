@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 6 |
-| Текущий этап | 4 |
+| Текущий этап | 5 |
 | Сессий (оценка) | 3-4 |
 
 **Архитектурные решения (согласованы с архитектором):**
@@ -183,18 +183,16 @@ git commit -m "feat(tz-b2): sidebar tracklist with player navigation"
 
 ## Этап 5: Edge Cases + Mobile
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4
+**Статус:** ✅ Завершён
 
 **Цель:** Обработка partial/outdated/error состояний, мобильная адаптация.
 
 **Задачи:**
-- [ ] **Partial state:** в треклисте упавшие темы — серые + кнопка «↻ Повторить» (вызов `POST /api/briefing/podcast/generate` с `{ topicIds: [failedId] }`). Плеер показывает только готовые треки
-- [ ] **Outdated state:** при `audioStatus === 'outdated'` — баннер в подкаст-экране «Текст обновлён, подкаст может быть неактуален» + кнопка «Пересоздать». В header переключатель с визуальным индикатором (точка/бейдж)
-- [ ] **Мобильная адаптация:** подкаст-экран на полную ширину, кнопки управления ≥ 44px touch targets, переключатель в header адаптивный, треклист в Sheet (через существующий `BriefingSidebarMobile`)
-- [ ] **Auto-transition:** после завершения генерации — автоматическое переключение на режим «Слушать» (обновить `audioStatus` state из streaming hook, переключить viewMode)
-- [ ] **Safari Audio Policy:** первый play только по user gesture, preload audio
+- [x] **Partial state:** в треклисте упавшие темы — серые + кнопка «↻ Повторить» (вызов `POST /api/briefing/podcast/generate` с `{ topicIds: [failedId] }`). Плеер показывает только готовые треки
+- [x] **Outdated state:** при `audioStatus === 'outdated'` — баннер в подкаст-экране «Текст обновлён, подкаст может быть неактуален» + кнопка «Пересоздать». В header переключатель с визуальным индикатором (точка/бейдж)
+- [x] **Мобильная адаптация:** подкаст-экран на полную ширину, кнопки управления ≥ 44px touch targets (size-11), переключатель в header адаптивный, треклист в Sheet (через существующий `BriefingSidebarMobile`)
+- [x] **Auto-transition:** после завершения генерации — автоматическое переключение на режим «Слушать» (handleDismissPodcastProgress уже переключает viewMode)
+- [x] **Safari Audio Policy:** первый play только по user gesture (play button click), preload audio (preload="auto"), lazy Audio() creation (SSR-safe)
 
 **Файлы:**
 - `components/briefing/podcast-sidebar.tsx` — partial state, retry
@@ -205,8 +203,8 @@ git commit -m "feat(tz-b2): sidebar tracklist with player navigation"
 - `hooks/use-podcast-generation.ts` — auto-transition callback
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер (desktop): outdated баннер виден при устаревшем подкасте
 - [ ] Браузер (desktop): «Пересоздать» запускает генерацию
 - [ ] Браузер (mobile): layout адаптивный, кнопки достаточного размера

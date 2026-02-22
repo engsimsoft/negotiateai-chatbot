@@ -67,6 +67,10 @@ interface BriefingIssueContentProps {
   podcastIsGenerating?: boolean;
   /** ТЗ-Б2 Этап 4: Callback when user clicks a track in sidebar tracklist */
   onSelectPodcastTrack?: (index: number) => void;
+  /** ТЗ-Б2 Этап 5: Failed podcast topics (for sidebar partial state) */
+  failedPodcastTopics?: { topicId: string; emoji: string; topicName: string }[];
+  /** ТЗ-Б2 Этап 5: Retry a single failed topic */
+  onRetryPodcastTopic?: (topicId: string) => void;
   /** ТЗ-Б2: Podcast generation progress (full-screen view replaces article) */
   podcastProgress?: {
     topicStatuses: PodcastTopicStatus[];
@@ -108,6 +112,8 @@ export function BriefingIssueContent({
   viewMode,
   playerProps,
   onSelectPodcastTrack,
+  failedPodcastTopics,
+  onRetryPodcastTopic,
   podcastTopicStatuses,
   podcastIsGenerating,
   podcastProgress,
@@ -146,6 +152,8 @@ export function BriefingIssueContent({
           podcastCurrentTrackIndex={playerProps?.currentTrackIndex}
           podcastIsPlayerPlaying={playerProps?.isPlaying}
           onSelectPodcastTrack={onSelectPodcastTrack}
+          failedPodcastTopics={failedPodcastTopics}
+          onRetryPodcastTopic={onRetryPodcastTopic}
         />
       </aside>
       {/* Content area — scrolls independently */}
