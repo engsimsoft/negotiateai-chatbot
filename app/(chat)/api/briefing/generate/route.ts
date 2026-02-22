@@ -14,6 +14,7 @@ import {
   getBriefingSettings,
   getBriefingSources,
   getBriefingTopics,
+  getPreviousBriefing,
   saveBriefingHistory,
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
@@ -81,8 +82,11 @@ export async function POST() {
                 };
               });
 
-        // ТЗ-BF1 TTL: delete all old briefings before creating new one
-        await deleteOldBriefingHistory({ userId });
+        // ТЗ-BF5: Load previous briefing for dedup BEFORE deleting old records
+        const previousBriefing = await getPreviousBriefing({ userId });
+
+        // ТЗ-BF5: Keep last ready briefing for dedup context (sliding window)
+        await deleteOldBriefingHistory({ userId, keepLast: 1 });
 
         await saveBriefingHistory({
           userId,
@@ -205,6 +209,7 @@ export async function POST() {
           maxItems,
           volume: settings?.volume ?? "standard",
           date: today,
+          previousBriefing,
         });
 
         // ТЗ-BF2: Inject simply-news as last section (if hasUpdate)

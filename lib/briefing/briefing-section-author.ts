@@ -77,6 +77,8 @@ interface SectionAuthorInput {
   topic: BriefingTopic;
   otherTopicNames: string[];
   volume?: string;
+  /** ТЗ-BF5: Headlines from previous briefing for this topic (formatted string) */
+  previousTopicHeadlines?: string | null;
 }
 
 /**
@@ -85,7 +87,7 @@ interface SectionAuthorInput {
 export async function generateSection(
   input: SectionAuthorInput,
 ): Promise<{ section: BriefingArticleSection; tokensUsed: number }> {
-  const { candidates, fullTexts, tierMap, topic, otherTopicNames, volume } = input;
+  const { candidates, fullTexts, tierMap, topic, otherTopicNames, volume, previousTopicHeadlines } = input;
 
   if (candidates.length === 0) {
     return {
@@ -108,6 +110,7 @@ export async function generateSection(
     topic,
     otherTopicNames,
     volume,
+    previousTopicHeadlines,
   );
 
   let object: BriefingArticleSection;
@@ -165,6 +168,7 @@ function buildSectionUserMessage(
   topic: BriefingTopic,
   otherTopicNames: string[],
   volume: string | undefined,
+  previousTopicHeadlines?: string | null,
 ): string {
   const candidatesFormatted = candidates
     .map((c, i) => {
@@ -188,13 +192,18 @@ function buildSectionUserMessage(
     ? `Стиль для этой темы: "${topic.briefingStyle}"`
     : "";
 
+  // ТЗ-BF5: Previous headlines block for dedup
+  const previousBlock = previousTopicHeadlines
+    ? `\nВ прошлом выпуске по этой теме было:\n${previousTopicHeadlines}\n`
+    : "";
+
   return `## Обнови секцию: ${topic.emoji} ${topic.topicName} (topicId: ${topic.topicId})
 
 ${getSectionVolumeInstruction(volume ?? "standard")}
 ${styleNote}
 
 Другие темы в брифинге: ${otherTopicNames.join(", ") || "нет"}
-
+${previousBlock}
 ---
 
 Кандидаты для этой темы (${candidates.length}):

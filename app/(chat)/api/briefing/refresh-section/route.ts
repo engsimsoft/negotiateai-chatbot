@@ -6,11 +6,14 @@ import { filterContent } from "@/lib/briefing/briefing-filter";
 import { fetchSource } from "@/lib/briefing/source-fetchers";
 import type { RawContent } from "@/lib/briefing/source-fetchers/types";
 import { getDefaultSources } from "@/lib/briefing/topics-catalog";
+import { buildPreviousHeadlines } from "@/lib/briefing/briefing-author";
+import type { BriefingArticle } from "@/lib/briefing/briefing-types";
 import {
   getBriefingHistory,
   getBriefingSettings,
   getBriefingSources,
   getBriefingTopics,
+  getPreviousBriefing,
   updateBriefingAudio,
   updateBriefingSection,
 } from "@/lib/db/queries";
@@ -131,6 +134,23 @@ export async function POST(request: Request) {
       fullTextsMap.set(item.itemId!, item);
     }
 
+    // ТЗ-BF5: Load previous briefing headlines for this topic (dedup)
+    let previousTopicHeadlines: string | null = null;
+    const prevBriefing = await getPreviousBriefing({ userId });
+    if (prevBriefing) {
+      const prevSection = prevBriefing.article.sections.find(
+        (s) => s.topicId === topicId,
+      );
+      if (prevSection) {
+        // Build headlines for just this one topic using the shared helper
+        const singleTopicArticle: BriefingArticle = {
+          ...prevBriefing.article,
+          sections: [prevSection],
+        };
+        previousTopicHeadlines = buildPreviousHeadlines(singleTopicArticle);
+      }
+    }
+
     const { section, tokensUsed } = await generateSection({
       candidates,
       fullTexts: fullTextsMap,
@@ -138,6 +158,7 @@ export async function POST(request: Request) {
       topic,
       otherTopicNames,
       volume: settings?.volume ?? "standard",
+      previousTopicHeadlines,
     });
 
     console.log(`[Refresh Section] generated section, tokens=${tokensUsed}`);
