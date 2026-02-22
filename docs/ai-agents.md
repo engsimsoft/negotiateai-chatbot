@@ -1,7 +1,7 @@
 # Simply — Система промптов и помощники
 
-**Версия:** 3.23.0
-**Последнее обновление:** 2026-02-16
+**Версия:** 3.43.0
+**Последнее обновление:** 2026-02-22
 **Статус:** Skills + Agents + Experts + Professors + Clerks Architecture
 
 ---
@@ -527,6 +527,8 @@ components/modal-assistants/
 | professor-planning | Claude Opus 4.6 (`claude-opus-4-6`) | Сложные аналитические задачи |
 | file-analyzer | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Быстрый анализ файлов |
 | snapshot-creator | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Автоматический snapshot контекста |
+| briefing-scriptwriter | Gemini 2.5 Flash (`gemini-2.5-flash`) | Podcast: генерация диалогового сценария |
+| briefing-tts | Gemini 2.5 Flash TTS (`gemini-2.5-flash-preview-tts`) | Podcast: озвучка (multi-speaker) |
 
 > **Источник правды:** [ai-providers.md](ai-providers.md) — полная информация о моделях и ценах.
 
@@ -602,4 +604,4 @@ components/modal-assistants/
 
 ---
 
-**Обновлено:** 2026-02-16
+**Обновлено:** 2026-02-22

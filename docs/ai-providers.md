@@ -1,15 +1,15 @@
 # AI-провайдеры и модели
 
-**Версия:** 3.0.0
-**Последнее обновление:** 2026-02-21
-**Статус:** 2 провайдера, 4 модели Anthropic + 2 модели Gemini
+**Версия:** 3.1.1
+**Последнее обновление:** 2026-02-22
+**Статус:** 3 провайдера, 4 модели Anthropic + 4 модели Gemini + 2 модели Perplexity
 
 ---
 
 ## О документе
 
 Этот документ — **единственный источник правды** для:
-- AI-провайдеров (Anthropic, Google)
+- AI-провайдеров (Anthropic, Google, Perplexity)
 - Моделей и их характеристик
 - **Реестра конфигураций** — какая модель где и с какими настройками
 - Цен на токены
@@ -40,15 +40,27 @@
 
 > **Важно:** Используем `@ai-sdk/anthropic@2.0.63` (не v3.x), т.к. v3 возвращает `LanguageModelV3`, несовместимый с текущим `ai@5.0.123` (ожидает `LanguageModelV2`).
 
-### Google AI (vision-ocr + Briefing фильтр)
+### Google AI (vision-ocr + Briefing фильтр + Podcast)
 
 | Параметр | Значение |
 |----------|----------|
-| SDK | `@ai-sdk/google` |
+| SDK (text) | `@ai-sdk/google` |
+| SDK (TTS) | `@google/genai` |
 | API Key | `GOOGLE_GENERATIVE_AI_API_KEY` |
 | Документация | https://ai.google.dev/ |
 
-> Google AI используется только для vision-ocr и Briefing фильтр (Stage 1). Все остальные AI-запросы — Anthropic.
+> Google AI используется для vision-ocr, Briefing фильтр (Stage 1), Podcast скрипт (Gemini Flash) и Podcast TTS (Gemini TTS). Все остальные AI-запросы — Anthropic.
+
+### Perplexity (Deep Research)
+
+| Параметр | Значение |
+|----------|----------|
+| SDK | REST API (fetch) |
+| API Key | `PERPLEXITY_API_KEY` |
+| Endpoint | `https://api.perplexity.ai/chat/completions` |
+| Документация | https://docs.perplexity.ai/ |
+
+> Perplexity используется для инструмента Deep Research (sonar-pro / sonar-deep-research). Доступен в режимах expertise, create и проектных чатах.
 
 ---
 
@@ -73,6 +85,15 @@
 |--------|-------------|---------------|--------|
 | **Gemini 2.5 Flash** | `gemini-2.5-flash` | Vision OCR (image, PDF) | `lib/ai/vision-ocr.ts` |
 | **Gemini 2.0 Flash** | `gemini-2.0-flash` | Briefing: фильтр (Stage 1) | `lib/briefing/briefing-config.ts` |
+| **Gemini 2.5 Flash** | `gemini-2.5-flash` | Podcast: генерация сценария | `lib/podcast/script-generator.ts` |
+| **Gemini 2.5 Flash TTS** | `gemini-2.5-flash-preview-tts` | Podcast: озвучка (multi-speaker) | `lib/podcast/tts-gemini.ts` |
+
+### Perplexity Sonar
+
+| Модель | Реальный ID | Использование | Конфиг |
+|--------|-------------|---------------|--------|
+| **Sonar Pro** | `sonar-pro` | Deep Research: быстрый мультишаговый поиск (5-15 сек) | `lib/ai/tools/deep-research.ts` |
+| **Sonar Deep Research** | `sonar-deep-research` | Deep Research: исчерпывающее исследование (30-120 сек) | `lib/ai/tools/deep-research.ts` |
 
 ---
 
@@ -126,6 +147,8 @@
 | Briefing: Фильтр | `lib/briefing/briefing-filter.ts` | `gemini-2.0-flash` | — | — | generateObject |
 | Vision OCR (Image) | `lib/ai/vision-ocr.ts` | `gemini-2.5-flash` | `thinkingBudget: 0` | — | Thinking выключен |
 | Vision OCR (PDF) | `lib/ai/vision-ocr.ts` | `gemini-2.5-flash` | `thinkingBudget: 0` | — | Thinking выключен |
+| **Podcast: Скрипт** | `lib/podcast/script-generator.ts` | `gemini-2.5-flash` | — | 2048 | `@ai-sdk/google` generateText |
+| **Podcast: TTS** | `lib/podcast/tts-gemini.ts` | `gemini-2.5-flash-preview-tts` | — | — | `@google/genai` SDK, multi-speaker (Kore + Puck) |
 
 ### Env-переменные для override моделей
 
@@ -225,8 +248,11 @@ const model = getClaudeModel('haiku');  // 'haiku' | 'sonnet' | 'opus'
 # Anthropic (обязательно — основной провайдер)
 ANTHROPIC_API_KEY=your_anthropic_api_key
 
-# Google AI (для vision-ocr + briefing фильтр)
+# Google AI (для vision-ocr + briefing фильтр + podcast)
 GOOGLE_GENERATIVE_AI_API_KEY=your_google_api_key
+
+# Perplexity (для Deep Research)
+PERPLEXITY_API_KEY=your_perplexity_api_key
 ```
 
 ### Где получить ключи
@@ -235,6 +261,7 @@ GOOGLE_GENERATIVE_AI_API_KEY=your_google_api_key
 |-----------|-----|
 | Anthropic | https://console.anthropic.com/settings/keys |
 | Google AI | https://aistudio.google.com/apikey |
+| Perplexity | https://www.perplexity.ai/settings/api |
 
 ---
 
@@ -252,6 +279,7 @@ GOOGLE_GENERATIVE_AI_API_KEY=your_google_api_key
 
 | Дата | Версия | Изменения |
 |------|--------|-----------|
+| 2026-02-22 | 3.1.1 | Добавлены Perplexity (sonar-pro, sonar-deep-research), Podcast модели (gemini-2.5-flash скрипт, gemini-2.5-flash-preview-tts TTS), `@google/genai` SDK для TTS |
 | 2026-02-21 | 3.1.0 | Briefing Author → Claude Sonnet 4.6 (из Gemini 3 Pro), effort для 3 точек (онбординг, профессор, ревьюер), Gemini остался только для фильтра + OCR |
 | 2026-02-21 | 3.0.0 | Добавлен Реестр конфигураций (SSOT), исправлены модели (claude-sonnet-4-6 для онбординга, gemini-2.5-flash для OCR), добавлен чеклист миграции |
 | 2026-02-20 | 2.1.0 | Добавлены модели Gemini для Briefing pipeline |
@@ -262,4 +290,4 @@ GOOGLE_GENERATIVE_AI_API_KEY=your_google_api_key
 
 ---
 
-**Обновлено:** 2026-02-21
+**Обновлено:** 2026-02-22

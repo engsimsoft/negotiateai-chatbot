@@ -2,12 +2,14 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-02-21
+**Обновлено:** 2026-02-22
 
 ---
 
 ## Быстрый обзор
 
+> **v3.43.0:** Podcast Engine — генерация подкастов из брифингов (Gemini 2.5 Flash скрипт + Gemini 2.5 Flash TTS озвучка, multi-speaker, MP3 → Vercel Blob).
+>
 > **v3.30.0:** Briefing Onboarding — AI-собеседование для настройки брифинга (Claude Sonnet 4.6, split layout, deepResearch, edit mode).
 >
 > **v3.38.0:** Briefing Author → Claude Sonnet 4.6 (из Gemini). Effort для профессора и ревьюера.
@@ -38,6 +40,8 @@
 | **Briefing: Онбординг** | Claude Sonnet 4.6 | ✅ Работает | AI-интервью для настройки брифинга (v3.30) |
 | **Briefing: Фильтр** | Gemini 2.0 Flash | ✅ Работает | Фильтрация и дедупликация новостей (v3.26) |
 | **Briefing: Автор** | Claude Sonnet 4.6 | ✅ Работает | Генерация статьи из отфильтрованных новостей (v3.31→v3.38) |
+| **Podcast: Скрипт** | Gemini 2.5 Flash | ✅ Работает | Генерация диалогового сценария из секции брифинга (v3.43) |
+| **Podcast: TTS** | Gemini 2.5 Flash TTS | ✅ Работает | Озвучка сценария (multi-speaker: Host + Expert) (v3.43) |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
 
 ---
@@ -369,6 +373,44 @@ lib/briefing/source-fetchers/telegram-fetcher.ts # Telegram через cheerio
 lib/briefing/source-fetchers/web-fetcher.ts  # Web через Readability + jsdom
 ```
 
+#### Podcast Engine (ТЗ-Б1, v3.43)
+**Где:** `POST /api/briefing/podcast/generate` (backend-only, streaming)
+
+**Этап 1 — Скрипт (Gemini 2.5 Flash):**
+
+| Параметр | Значение |
+|----------|----------|
+| **Модель** | Gemini 2.5 Flash (`gemini-2.5-flash`) |
+| **SDK** | `@ai-sdk/google` (`generateText`) |
+| **Вход** | BriefingArticleSection + ScriptContext |
+| **Выход** | Диалоговый сценарий (Host: / Expert:) |
+
+**Этап 2 — TTS (Gemini 2.5 Flash TTS):**
+
+| Параметр | Значение |
+|----------|----------|
+| **Модель** | Gemini 2.5 Flash TTS (`gemini-2.5-flash-preview-tts`) |
+| **SDK** | `@google/genai` (native multi-speaker) |
+| **Голоса** | Host → Kore, Expert → Puck |
+| **Выход** | PCM 24kHz mono → MP3 (lamejs) → Vercel Blob |
+
+**Полный flow:**
+1. Загружает последний готовый брифинг из БД
+2. Для каждой секции (p-limit(2)): скрипт → TTS → MP3 → Blob → DB
+3. Streaming JSON Lines: script → recording → done → complete
+4. При обновлении секции брифинга → audioStatus = 'outdated'
+
+**Файлы:**
+```
+app/(chat)/api/briefing/podcast/generate/route.ts  # Streaming POST endpoint
+lib/podcast/index.ts                                # Public API (generatePodcastSegment)
+lib/podcast/script-generator.ts                     # Gemini Flash: generateScript()
+lib/podcast/tts-gemini.ts                           # Gemini TTS: synthesizeSpeech()
+lib/podcast/audio-converter.ts                      # PCM → MP3 (lamejs)
+lib/podcast/types.ts                                # TypeScript типы
+lib/prompts/briefing/briefing-scriptwriter.md       # Промпт скриптрайтера
+```
+
 ---
 
 ## 🚧 Заглушки (не подключены к AI)
@@ -531,15 +573,19 @@ export const myProvider = customProvider({
 
 **API Key:** `ANTHROPIC_API_KEY`
 
-### Google Gemini (vision-ocr + Briefing фильтр)
+### Google Gemini (vision-ocr + Briefing фильтр + Podcast)
 
 ```typescript
-// lib/ai/vision-ocr.ts
+// lib/ai/vision-ocr.ts, lib/podcast/script-generator.ts
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
+
+// lib/podcast/tts-gemini.ts (native SDK for multi-speaker TTS)
+import { GoogleGenAI } from "@google/genai";
+const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
 ```
 
-**API Key:** `GOOGLE_GENERATIVE_AI_API_KEY` (vision-ocr + Briefing фильтр)
+**API Key:** `GOOGLE_GENERATIVE_AI_API_KEY` (vision-ocr + Briefing фильтр + Podcast)
 
 ---
 
@@ -547,12 +593,13 @@ const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_
 
 | Модель | Input | Output | Контекст | Используется в |
 |--------|-------|--------|----------|---------------|
-| Claude Sonnet 4.6 (`claude-sonnet-4-6`) | — | — | — | Briefing: онбординг (v3.30), автор статьи (v3.38) |
+| Claude Sonnet 4.6 (`claude-sonnet-4-6`) | — | — | — | Briefing: онбординг (v3.30), автор статьи (v3.38), секция (v3.42) |
 | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) | $3 | $15 | 200K | Основной чат (DEFAULT), Секретарь, Эксперт, артефакты |
 | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | $1 | $5 | 200K | Бен, Менеджер, Исполнитель, Клерки (анализатор, суммаризатор, snapshot) |
 | Claude Opus 4.6 (`claude-opus-4-6`) | $5 | $25 | 200K | Профессоры (планирование, ревью задач) |
 | Gemini 2.0 Flash (`gemini-2.0-flash`) | ~$0.10 | ~$0.40 | 1M | Briefing: фильтрация и дедупликация (v3.26) |
-| Gemini 2.5 Flash (`gemini-2.5-flash`) | — | — | 1M | Vision OCR: image + PDF |
+| Gemini 2.5 Flash (`gemini-2.5-flash`) | — | — | 1M | Vision OCR: image + PDF, Podcast: скрипт |
+| Gemini 2.5 Flash TTS (`gemini-2.5-flash-preview-tts`) | — | — | — | Podcast: озвучка (multi-speaker) |
 
 *Цены за 1M токенов*
 

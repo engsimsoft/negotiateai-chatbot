@@ -406,7 +406,7 @@ requestSuggestions({
 ```
 
 ### Модель
-Использует **Gemini 2.5 Pro** (более умная модель для анализа).
+Использует **`artifact-model`** → Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) через `myProvider`.
 
 ### Файл
 [lib/ai/tools/request-suggestions.ts](../lib/ai/tools/request-suggestions.ts)
@@ -879,4 +879,4 @@ const CHAT_MODE_EXCLUDED_TOOLS = ["fetchUrl", "deepResearch"];
 
 ---
 
-**Обновлено:** 2026-02-21 (v3.34.0 — charset detection в fetchPage, web-fetcher unification)
+**Обновлено:** 2026-02-22 (v3.43.0 — fix requestSuggestions model: Gemini → Claude artifact-model)
