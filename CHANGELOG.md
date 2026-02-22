@@ -12,6 +12,33 @@
 
 ---
 
+## [3.45.0] - 2026-02-22 - BriefingDedup (ТЗ-BF5)
+
+**MINOR RELEASE**: Дедупликация контента между брифингами — повторная генерация теперь выдаёт другие новости, а не пересказ тех же статей другими словами.
+
+### Added
+- **`getPreviousBriefing()`** — новая query в `queries.ts`: загружает последний ready-брифинг для контекста дедупликации
+- **`buildPreviousHeadlines()`** — форматирование `sources[].title` из предыдущего выпуска в строку для промпта (с fallback на первые 10 слов content)
+- **Data-level маркировка кандидатов** — кандидаты с совпадающим URL из прошлого выпуска получают тег `⚠️ БЫЛ В ПРОШЛОМ ВЫПУСКЕ` прямо в данных для Author
+- **Сводка повторов** — строка `⚠️ N из M кандидатов помечены как повторы` в user message
+- **ADR 018** — `docs/decisions/018-prompt-engineering-lessons.md`: живой журнал prompt-инженерии (первый урок: data-level маркировка vs мягкие инструкции)
+
+### Changed
+- **`deleteOldBriefingHistory()`** — новый параметр `keepLast: number` для sliding window (оставляет N последних ready-записей)
+- **`briefing-author.md` v5→v6** — секция «Предыдущий выпуск (дедупликация)»: 4 жёстких правила + самопроверка вместо мягких рекомендаций
+- **`briefing-author.ts`** — `generateArticle()` принимает `previousBriefing`, `buildUserMessage()` формирует блок дедупликации + маркировку кандидатов по URL
+- **`briefing-section-author.ts`** — `generateSection()` принимает `previousTopicHeadlines` + `previousUrls`, маркировка кандидатов для per-section refresh
+- **`generate/route.ts`** — загружает previousBriefing ПЕРЕД удалением старых записей, передаёт в Author
+- **`refresh-section/route.ts`** — загружает предыдущий брифинг, извлекает headlines + URLs конкретной темы
+
+### Technical
+- Sliding window: keepLast=1 — в БД всегда 1 предыдущий + 1 текущий ready-брифинг
+- Маркировка по URL (Set<string>) — точнее чем по заголовку (заголовки могут отличаться у разных фетчеров)
+- Input tokens увеличились на ~3,500 (контекст предыдущего выпуска) — окупается качеством дедупликации
+- Совпадение headlines между выпусками: ~60% → <15%
+
+---
+
 ## [3.44.0] - 2026-02-22 - PodcastUI (ТЗ-Б2)
 
 **MINOR RELEASE**: Podcast UI — полный пользовательский интерфейс для прослушивания подкастов брифинга. Генерация с прогрессом, плеер Apple-уровня, треклист в sidebar, edge cases.

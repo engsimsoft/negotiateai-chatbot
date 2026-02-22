@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.44.0
+**Версия:** 3.45.0
 **Дата:** 2026-02-22
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -328,6 +328,27 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-BF5: BriefingDedup — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Дедупликация контента** — повторная генерация брифинга выдаёт другие новости, а не пересказ тех же статей
+- **Sliding window** — `deleteOldBriefingHistory(keepLast: 1)` сохраняет предыдущий ready-брифинг для контекста
+- **`getPreviousBriefing()`** — загрузка последнего ready-брифинга из БД
+- **Data-level маркировка** — кандидаты с совпадающим URL помечаются `⚠️ БЫЛ В ПРОШЛОМ ВЫПУСКЕ`
+- **Промпт v6** — жёсткие правила дедупликации + самопроверка Author
+- **Per-section dedup** — refresh одной секции (↻) тоже получает контекст прошлого выпуска
+
+**Ключевые файлы:**
+- `lib/db/queries.ts` — +getPreviousBriefing(), расширен deleteOldBriefingHistory(keepLast)
+- `lib/briefing/briefing-author.ts` — +buildPreviousHeadlines(), маркировка кандидатов по URL
+- `lib/briefing/briefing-section-author.ts` — аналогичная маркировка для per-section
+- `lib/prompts/briefing/briefing-author.md` — v6: секция дедупликации
+- `app/(chat)/api/briefing/generate/route.ts` — интеграция pipeline
+- `app/(chat)/api/briefing/refresh-section/route.ts` — интеграция per-section
+- `docs/decisions/018-prompt-engineering-lessons.md` — ADR: уроки prompt-инженерии
+
+**Детали:** [_archive/TZ_BF5_BriefingDedup/](_archive/TZ_BF5_BriefingDedup/)
 
 ### ТЗ-Б2: PodcastUI — ✅ ЗАВЕРШЁН
 

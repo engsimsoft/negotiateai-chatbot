@@ -134,8 +134,9 @@ export async function POST(request: Request) {
       fullTextsMap.set(item.itemId!, item);
     }
 
-    // ТЗ-BF5: Load previous briefing headlines for this topic (dedup)
+    // ТЗ-BF5: Load previous briefing headlines + URLs for this topic (dedup)
     let previousTopicHeadlines: string | null = null;
+    let previousUrls: Set<string> | undefined;
     const prevBriefing = await getPreviousBriefing({ userId });
     if (prevBriefing) {
       const prevSection = prevBriefing.article.sections.find(
@@ -148,6 +149,8 @@ export async function POST(request: Request) {
           sections: [prevSection],
         };
         previousTopicHeadlines = buildPreviousHeadlines(singleTopicArticle);
+        // Collect URLs for candidate marking
+        previousUrls = new Set(prevSection.sources.map((src) => src.url).filter(Boolean));
       }
     }
 
@@ -159,6 +162,7 @@ export async function POST(request: Request) {
       otherTopicNames,
       volume: settings?.volume ?? "standard",
       previousTopicHeadlines,
+      previousUrls,
     });
 
     console.log(`[Refresh Section] generated section, tokens=${tokensUsed}`);

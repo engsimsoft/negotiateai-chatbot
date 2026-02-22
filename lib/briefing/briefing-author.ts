@@ -234,7 +234,18 @@ function buildUserMessage(
     })
     .join("\n");
 
-  // Format candidates
+  // ТЗ-BF5: Collect URLs from previous briefing to mark repeat candidates
+  const previousUrls = new Set<string>();
+  if (previousBriefing) {
+    for (const section of previousBriefing.article.sections) {
+      for (const src of section.sources) {
+        if (src.url) previousUrls.add(src.url);
+      }
+    }
+  }
+
+  // Format candidates (with repeat marking for dedup)
+  let repeatCount = 0;
   const candidatesFormatted = candidates
     .map((c, i) => {
       const full = fullTexts.get(c.sourceItemId);
@@ -245,19 +256,30 @@ function buildUserMessage(
         ? content.slice(0, 12000) + "..."
         : content;
 
+      const isRepeat = previousUrls.has(c.url);
+      if (isRepeat) repeatCount++;
+      const repeatTag = isRepeat ? "\n- ⚠️ БЫЛ В ПРОШЛОМ ВЫПУСКЕ — используй только если есть существенное развитие" : "";
+
       return `[${i + 1}]
 - Заголовок: ${c.title}
 - URL: ${c.url}
 - Источник: ${c.sourceName} (tier: ${tier})
 - Тема: ${c.topicId}
-- Краткое содержание: ${c.oneLinerSummary}${truncatedContent ? `\n- Полный текст: ${truncatedContent}` : ""}`;
+- Краткое содержание: ${c.oneLinerSummary}${repeatTag}${truncatedContent ? `\n- Полный текст: ${truncatedContent}` : ""}`;
     })
     .join("\n\n---\n\n");
 
+  if (repeatCount > 0) {
+    console.log(`[Briefing Author] Dedup: ${repeatCount}/${candidates.length} candidates marked as repeats`);
+  }
+
   // ТЗ-BF5: Build previous briefing block for dedup
+  const repeatSummary = repeatCount > 0
+    ? `\n⚠️ ${repeatCount} из ${candidates.length} кандидатов помечены как повторы (совпадение URL). Приоритет — оставшимся ${candidates.length - repeatCount} НОВЫМ кандидатам.\n`
+    : "";
   const previousBlock =
     previousBriefing && previousBriefing.article.sections.length > 0
-      ? `\n---\n\n## Предыдущий выпуск (${formatDateRussian(previousBriefing.generatedAt)})\n\nВчера читатель уже видел:\n${buildPreviousHeadlines(previousBriefing.article)}\n`
+      ? `\n---\n\n## Предыдущий выпуск (${formatDateRussian(previousBriefing.generatedAt)})\n\nВчера читатель уже видел:\n${buildPreviousHeadlines(previousBriefing.article)}\n${repeatSummary}`
       : "";
 
   return `${getVolumeInstruction(volume ?? "standard")}

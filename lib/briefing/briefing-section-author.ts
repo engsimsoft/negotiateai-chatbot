@@ -79,6 +79,8 @@ interface SectionAuthorInput {
   volume?: string;
   /** ТЗ-BF5: Headlines from previous briefing for this topic (formatted string) */
   previousTopicHeadlines?: string | null;
+  /** ТЗ-BF5: URLs from previous briefing section sources (for candidate marking) */
+  previousUrls?: Set<string>;
 }
 
 /**
@@ -87,7 +89,7 @@ interface SectionAuthorInput {
 export async function generateSection(
   input: SectionAuthorInput,
 ): Promise<{ section: BriefingArticleSection; tokensUsed: number }> {
-  const { candidates, fullTexts, tierMap, topic, otherTopicNames, volume, previousTopicHeadlines } = input;
+  const { candidates, fullTexts, tierMap, topic, otherTopicNames, volume, previousTopicHeadlines, previousUrls } = input;
 
   if (candidates.length === 0) {
     return {
@@ -111,6 +113,7 @@ export async function generateSection(
     otherTopicNames,
     volume,
     previousTopicHeadlines,
+    previousUrls,
   );
 
   let object: BriefingArticleSection;
@@ -169,6 +172,7 @@ function buildSectionUserMessage(
   otherTopicNames: string[],
   volume: string | undefined,
   previousTopicHeadlines?: string | null,
+  previousUrls?: Set<string>,
 ): string {
   const candidatesFormatted = candidates
     .map((c, i) => {
@@ -180,11 +184,14 @@ function buildSectionUserMessage(
         ? content.slice(0, 12000) + "..."
         : content;
 
+      const isRepeat = previousUrls?.has(c.url) ?? false;
+      const repeatTag = isRepeat ? "\n- ⚠️ БЫЛ В ПРОШЛОМ ВЫПУСКЕ — используй только если есть существенное развитие" : "";
+
       return `[${i + 1}]
 - Заголовок: ${c.title}
 - URL: ${c.url}
 - Источник: ${c.sourceName} (tier: ${tier})
-- Краткое содержание: ${c.oneLinerSummary}${truncatedContent ? `\n- Полный текст: ${truncatedContent}` : ""}`;
+- Краткое содержание: ${c.oneLinerSummary}${repeatTag}${truncatedContent ? `\n- Полный текст: ${truncatedContent}` : ""}`;
     })
     .join("\n\n---\n\n");
 
