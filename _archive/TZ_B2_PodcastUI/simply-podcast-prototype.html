@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simply — Подкаст-экран (Прототип)</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAF8F5;
+    --bg-sidebar: #FFFFFF;
+    --terracotta: #C4654A;
+    --terracotta-light: #F0DDD7;
+    --terracotta-hover: #B05A42;
+    --text-primary: #1A1A1A;
+    --text-secondary: #6B6B6B;
+    --text-muted: #9B9B9B;
+    --border: #E8E4DF;
+    --card-bg: #FFFFFF;
+    --sidebar-width: 260px;
+    --header-height: 64px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Source Sans 3', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* === LAYOUT === */
+  .layout {
+    display: flex;
+    height: 100vh;
+  }
+
+  /* === SIDEBAR === */
+  .sidebar {
+    width: var(--sidebar-width);
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .sidebar-logo {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+    height: var(--header-height);
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--terracotta);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 18px;
+  }
+
+  .logo-text {
+    font-family: 'Lora', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .sidebar-back {
+    padding: 4px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    border: none;
+    background: none;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+  }
+
+  .sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 0;
+  }
+
+  .sidebar-section-title {
+    padding: 0 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .sidebar-item {
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+    border-left: 3px solid transparent;
+  }
+
+  .sidebar-item:hover {
+    background: var(--terracotta-light);
+    color: var(--text-primary);
+  }
+
+  .sidebar-item.active {
+    background: var(--terracotta-light);
+    color: var(--terracotta);
+    border-left-color: var(--terracotta);
+    font-weight: 600;
+  }
+
+  .sidebar-item .icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+  }
+
+  /* Track duration in sidebar (podcast mode) */
+  .sidebar-item .track-duration {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .sidebar-item.active .track-duration {
+    color: var(--terracotta);
+  }
+
+  /* Now playing indicator */
+  .sidebar-item .now-playing {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .now-playing-bar {
+    width: 3px;
+    background: var(--terracotta);
+    border-radius: 1px;
+    animation: equalizer 0.8s ease-in-out infinite alternate;
+  }
+
+  .now-playing-bar:nth-child(1) { height: 8px; animation-delay: 0s; }
+  .now-playing-bar:nth-child(2) { height: 14px; animation-delay: 0.2s; }
+  .now-playing-bar:nth-child(3) { height: 10px; animation-delay: 0.4s; }
+
+  @keyframes equalizer {
+    0% { transform: scaleY(0.3); }
+    100% { transform: scaleY(1); }
+  }
+
+  /* === MAIN AREA === */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* === HEADER === */
+  .header {
+    height: var(--header-height);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    background: var(--bg-sidebar);
+    flex-shrink: 0;
+  }
+
+  .header-title {
+    font-family: 'Lora', serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .header-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+
+  .btn-create-podcast {
+    background: var(--terracotta);
+    color: white;
+  }
+
+  .btn-create-podcast:hover {
+    background: var(--terracotta-hover);
+  }
+
+  .btn-mode-toggle {
+    background: var(--terracotta-light);
+    color: var(--terracotta);
+    position: relative;
+  }
+
+  .btn-mode-toggle:hover {
+    background: #E8CCC3;
+  }
+
+  .btn-mode-toggle.active-listen {
+    background: var(--terracotta);
+    color: white;
+  }
+
+  .header-icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: var(--text-secondary);
+  }
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--terracotta);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  /* === CONTENT AREA === */
+  .content-area {
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+  }
+
+  /* === META LINE === */
+  .meta-line {
+    text-align: center;
+    padding: 16px 0 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* ============================== */
+  /* PODCAST SCREEN                 */
+  /* ============================== */
+  .podcast-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+    padding: 40px 32px;
+    animation: fadeIn 0.4s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Podcast artwork / visualization */
+  .podcast-artwork {
+    width: 280px;
+    height: 280px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #C4654A 0%, #D4876F 40%, #E8B4A0 70%, #F0DDD7 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 32px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(196, 101, 74, 0.25);
+  }
+
+  .podcast-artwork::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 40%, rgba(255,255,255,0.15) 0%, transparent 60%);
+  }
+
+  .artwork-icon {
+    font-size: 64px;
+    margin-bottom: 12px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .artwork-title {
+    font-family: 'Lora', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: white;
+    position: relative;
+    z-index: 1;
+  }
+
+  .artwork-subtitle {
+    font-size: 14px;
+    color: rgba(255,255,255,0.8);
+    position: relative;
+    z-index: 1;
+    margin-top: 4px;
+  }
+
+  /* Sound wave visualization */
+  .sound-wave {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    position: relative;
+    z-index: 1;
+    margin-top: 20px;
+    height: 40px;
+  }
+
+  .wave-bar {
+    width: 4px;
+    background: rgba(255,255,255,0.6);
+    border-radius: 2px;
+    animation: wave 1.2s ease-in-out infinite;
+  }
+
+  .wave-bar:nth-child(1) { height: 12px; animation-delay: 0.0s; }
+  .wave-bar:nth-child(2) { height: 20px; animation-delay: 0.1s; }
+  .wave-bar:nth-child(3) { height: 28px; animation-delay: 0.2s; }
+  .wave-bar:nth-child(4) { height: 36px; animation-delay: 0.3s; }
+  .wave-bar:nth-child(5) { height: 24px; animation-delay: 0.4s; }
+  .wave-bar:nth-child(6) { height: 32px; animation-delay: 0.5s; }
+  .wave-bar:nth-child(7) { height: 16px; animation-delay: 0.6s; }
+  .wave-bar:nth-child(8) { height: 28px; animation-delay: 0.7s; }
+  .wave-bar:nth-child(9) { height: 20px; animation-delay: 0.8s; }
+  .wave-bar:nth-child(10) { height: 12px; animation-delay: 0.9s; }
+
+  @keyframes wave {
+    0%, 100% { transform: scaleY(0.4); }
+    50% { transform: scaleY(1); }
+  }
+
+  .sound-wave.paused .wave-bar {
+    animation-play-state: paused;
+  }
+
+  /* Track info */
+  .podcast-track-info {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .track-title {
+    font-family: 'Lora', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .track-topic {
+    font-size: 15px;
+    color: var(--terracotta);
+    font-weight: 600;
+  }
+
+  /* Progress bar */
+  .podcast-progress {
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 24px;
+  }
+
+  .progress-bar-container {
+    width: 100%;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--terracotta);
+    border-radius: 3px;
+    width: 35%;
+    position: relative;
+    transition: width 0.3s;
+  }
+
+  .progress-bar-fill::after {
+    content: '';
+    position: absolute;
+    right: -6px;
+    top: -5px;
+    width: 16px;
+    height: 16px;
+    background: var(--terracotta);
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(196, 101, 74, 0.3);
+  }
+
+  .progress-times {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Controls */
+  .podcast-controls {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  .control-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 24px;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .control-btn:hover {
+    color: var(--text-primary);
+  }
+
+  .play-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--terracotta);
+    color: white;
+    font-size: 28px;
+    box-shadow: 0 4px 16px rgba(196, 101, 74, 0.3);
+    transition: all 0.2s;
+  }
+
+  .play-btn:hover {
+    background: var(--terracotta-hover);
+    color: white;
+    transform: scale(1.05);
+    box-shadow: 0 6px 24px rgba(196, 101, 74, 0.4);
+  }
+
+  /* Speed & Download */
+  .podcast-extras {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .speed-btn {
+    padding: 6px 14px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: white;
+    cursor: pointer;
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+  }
+
+  .speed-btn:hover, .speed-btn.active {
+    border-color: var(--terracotta);
+    color: var(--terracotta);
+  }
+
+  .download-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: white;
+    cursor: pointer;
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 13px;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+  }
+
+  .download-btn:hover {
+    border-color: var(--terracotta);
+    color: var(--terracotta);
+  }
+
+  /* ============================== */
+  /* GENERATION PROGRESS SCREEN     */
+  /* ============================== */
+  .progress-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+    padding: 40px 32px;
+    animation: fadeIn 0.4s ease;
+  }
+
+  .progress-artwork {
+    width: 200px;
+    height: 200px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #C4654A 0%, #D4876F 40%, #E8B4A0 70%, #F0DDD7 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 32px;
+    box-shadow: 0 20px 60px rgba(196, 101, 74, 0.2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .progress-artwork::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 40%, rgba(255,255,255,0.15) 0%, transparent 60%);
+  }
+
+  .progress-artwork .spinner {
+    width: 64px;
+    height: 64px;
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    position: relative;
+    z-index: 1;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .progress-title {
+    font-family: 'Lora', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .progress-subtitle {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+  }
+
+  .progress-steps {
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .progress-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    font-size: 15px;
+  }
+
+  .step-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .step-icon.done {
+    background: #E8F5E9;
+    color: #4CAF50;
+  }
+
+  .step-icon.active {
+    background: var(--terracotta-light);
+    color: var(--terracotta);
+    animation: pulse 1.5s infinite;
+  }
+
+  .step-icon.pending {
+    background: #F5F5F5;
+    color: var(--text-muted);
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(196, 101, 74, 0.2); }
+    50% { box-shadow: 0 0 0 8px rgba(196, 101, 74, 0); }
+  }
+
+  .step-label {
+    color: var(--text-primary);
+  }
+
+  .step-label.pending {
+    color: var(--text-muted);
+  }
+
+  .step-detail {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* ============================== */
+  /* DEMO CONTROLS (not part of UI) */
+  /* ============================== */
+  .demo-controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    background: #1A1A1A;
+    padding: 8px 16px;
+    border-radius: 12px;
+    z-index: 100;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+
+  .demo-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    background: #333;
+    color: #CCC;
+    transition: all 0.15s;
+  }
+
+  .demo-btn:hover {
+    background: #444;
+    color: white;
+  }
+
+  .demo-btn.active {
+    background: var(--terracotta);
+    color: white;
+  }
+
+  .demo-label {
+    font-size: 12px;
+    color: #888;
+    display: flex;
+    align-items: center;
+    padding-right: 8px;
+    border-right: 1px solid #444;
+    margin-right: 4px;
+  }
+
+  /* Hidden states */
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <button class="sidebar-back">←</button>
+      <div class="logo-icon">S</div>
+      <span class="logo-text">Simply</span>
+    </div>
+
+    <div class="sidebar-content">
+      <!-- Reading mode sidebar -->
+      <div id="sidebar-read">
+        <div class="sidebar-section-title">Текущий выпуск</div>
+        <div class="sidebar-item" style="padding-left:20px;">
+          <span class="icon">📋</span> Полный брифинг
+        </div>
+        <div class="sidebar-item active" style="padding-left:20px;">
+          <span class="icon">🏎</span> Формула-1
+        </div>
+        <div class="sidebar-item" style="padding-left:20px;">
+          <span class="icon">🤖</span> Разработки в области ИИ
+        </div>
+
+        <div style="height: 24px;"></div>
+        <div class="sidebar-section-title">🔖 Сохранённые</div>
+        <div class="sidebar-item" style="padding-left:20px; font-size: 13px;">
+          <span class="icon">🏎</span> Формула-1
+          <span style="margin-left:auto; font-size:12px; color:var(--text-muted);">4</span>
+        </div>
+        <div class="sidebar-item" style="padding-left:20px; font-size: 13px;">
+          <span class="icon">🤖</span> Разработки в обл. ИИ
+          <span style="margin-left:auto; font-size:12px; color:var(--text-muted);">3</span>
+        </div>
+      </div>
+
+      <!-- Podcast mode sidebar (tracklist) -->
+      <div id="sidebar-podcast" class="hidden">
+        <div class="sidebar-section-title">🎧 Треклист</div>
+        <div class="sidebar-item active" style="padding-left:20px;">
+          <span class="icon">🏎</span> Формула-1
+          <span class="now-playing">
+            <span class="now-playing-bar"></span>
+            <span class="now-playing-bar"></span>
+            <span class="now-playing-bar"></span>
+          </span>
+        </div>
+        <div class="sidebar-item" style="padding-left:20px;">
+          <span class="icon">🤖</span> Разработки в обл. ИИ
+          <span class="track-duration">2:18</span>
+        </div>
+
+        <div style="height: 16px;"></div>
+        <div style="padding: 0 20px;">
+          <div style="padding: 12px 16px; background: var(--terracotta-light); border-radius: 12px; font-size: 13px; color: var(--terracotta);">
+            <div style="font-weight: 600; margin-bottom: 4px;">Полный выпуск</div>
+            <div style="color: var(--text-secondary);">2 темы · 4 мин 32 сек</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress mode sidebar -->
+      <div id="sidebar-progress" class="hidden">
+        <div class="sidebar-section-title">🎙 Создаём подкаст</div>
+        <div class="sidebar-item" style="padding-left:20px;">
+          <span class="icon">✅</span> Формула-1
+          <span class="track-duration" style="color: #4CAF50;">Готово</span>
+        </div>
+        <div class="sidebar-item active" style="padding-left:20px;">
+          <span class="icon">⏳</span> Разработки в обл. ИИ
+          <span class="track-duration" style="color: var(--terracotta);">Запись...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- HEADER -->
+    <div class="header">
+      <div class="header-title">Утренний брифинг · 22 февраля</div>
+      <div class="header-right">
+        <!-- State 1: Create podcast button -->
+        <button class="header-btn btn-create-podcast" id="btn-create" onclick="showPopover()">
+          🎙 Создать подкаст
+        </button>
+
+        <!-- State 2: Mode toggle (shown after podcast is ready) -->
+        <div id="mode-toggles" class="hidden" style="display:none; gap: 4px; background: #F5F0ED; border-radius: 22px; padding: 3px;">
+          <button class="header-btn btn-mode-toggle" id="btn-read" onclick="switchMode('read')" style="border-radius: 20px; padding: 6px 14px;">
+            📖 Читать
+          </button>
+          <button class="header-btn btn-mode-toggle active-listen" id="btn-listen" onclick="switchMode('listen')" style="border-radius: 20px; padding: 6px 14px;">
+            🎧 Слушать
+          </button>
+        </div>
+
+        <button class="header-icon-btn">⚙</button>
+        <div class="avatar">V</div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content-area">
+      <!-- Reading mode content -->
+      <div id="content-read">
+        <div class="meta-line">18 новостей · 2 темы · 6 мин чтения</div>
+        <div style="max-width: 740px; margin: 0 auto; padding: 16px 32px;">
+          <div style="background: var(--card-bg); border-radius: 16px; padding: 32px; margin-bottom: 24px; border: 1px solid var(--border);">
+            <p style="font-family: 'Lora', serif; font-size: 16px; line-height: 1.7; color: var(--text-secondary);">
+              Субботнее утро, а новостей — как в разгар рабочей недели. Формула 1 завершила предсезонные тесты в Бахрейне, и вопросов теперь больше, чем ответов: Ferrari быстра или просто хитро выбрала шины? Red Bull в порядке или нет? В мире ИИ — Amazon публично свалил вину за 13-часовой аутаж на своего же AI-агента, OpenAI готовит умную колонку. Разбираемся.
+            </p>
+          </div>
+
+          <div style="background: var(--card-bg); border-radius: 16px; padding: 32px; border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">🏎</span>
+                <span style="font-weight: 600; font-size: 15px;">Формула-1</span>
+              </div>
+              <div style="display: flex; gap: 8px; color: var(--text-muted); font-size: 16px;">
+                <span style="cursor:pointer;">📋</span>
+                <span style="cursor:pointer;">🔄</span>
+                <span style="cursor:pointer; color: var(--terracotta);">🔖</span>
+              </div>
+            </div>
+            <h2 style="font-family: 'Lora', serif; font-size: 20px; font-weight: 600; margin-bottom: 16px; line-height: 1.3;">
+              Зимние тесты 2026: Ferrari летит, Aston Martin ползёт, Бриаторе ворчит
+            </h2>
+            <p style="font-size: 15px; line-height: 1.7; color: var(--text-secondary);">
+              Предсезонные тесты завершились — девять дней в Барселоне и Бахрейне, сотни кругов, тонны данных и одна очень неловкая ситуация с Aston Martin. По итогам обоих этапов быстрейшим оказался Шарль Леклер на Ferrari — почти секунда отрыва от поля. Но сразу важная оговорка...
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Podcast mode content -->
+      <div id="content-podcast" class="hidden">
+        <div class="podcast-screen">
+          <div class="meta-line" style="margin-bottom: 8px;">2 темы · 4 мин 32 сек</div>
+
+          <div class="podcast-artwork">
+            <div class="artwork-icon">🎙</div>
+            <div class="artwork-title">Утренний брифинг</div>
+            <div class="artwork-subtitle">22 февраля</div>
+            <div class="sound-wave">
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+            </div>
+          </div>
+
+          <div class="podcast-track-info">
+            <div class="track-topic">🏎 Формула-1</div>
+            <div class="track-title">Зимние тесты 2026</div>
+          </div>
+
+          <div class="podcast-progress">
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill"></div>
+            </div>
+            <div class="progress-times">
+              <span>1:34</span>
+              <span>4:32</span>
+            </div>
+          </div>
+
+          <div class="podcast-controls">
+            <button class="control-btn" title="Предыдущая тема">⏮</button>
+            <button class="control-btn" title="-15 сек" style="font-size: 18px;">-15</button>
+            <button class="control-btn play-btn" title="Пауза">❚❚</button>
+            <button class="control-btn" title="+15 сек" style="font-size: 18px;">+15</button>
+            <button class="control-btn" title="Следующая тема">⏭</button>
+          </div>
+
+          <div class="podcast-extras">
+            <button class="speed-btn">0.75×</button>
+            <button class="speed-btn active">1×</button>
+            <button class="speed-btn">1.25×</button>
+            <button class="speed-btn">1.5×</button>
+            <button class="download-btn">⬇ MP3</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Generation progress content -->
+      <div id="content-progress" class="hidden">
+        <div class="progress-screen" style="display: flex;">
+          <div class="progress-artwork">
+            <div class="spinner"></div>
+          </div>
+
+          <div class="progress-title">Создаём подкаст...</div>
+          <div class="progress-subtitle">Два ведущих готовятся к эфиру</div>
+
+          <div class="progress-steps">
+            <div class="progress-step">
+              <div class="step-icon done">✓</div>
+              <span class="step-label">Сценарий: Формула-1</span>
+              <span class="step-detail">12 реплик</span>
+            </div>
+            <div class="progress-step">
+              <div class="step-icon done">✓</div>
+              <span class="step-label">Запись: Формула-1</span>
+              <span class="step-detail">2:14</span>
+            </div>
+            <div class="progress-step">
+              <div class="step-icon active">🎙</div>
+              <span class="step-label">Запись: Разработки в обл. ИИ</span>
+              <span class="step-detail"></span>
+            </div>
+            <div class="progress-step">
+              <div class="step-icon pending">○</div>
+              <span class="step-label pending">Финальный монтаж</span>
+              <span class="step-detail"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DEMO CONTROLS -->
+<div class="demo-controls">
+  <span class="demo-label">Прототип:</span>
+  <button class="demo-btn active" onclick="showState('read')">📖 Статья</button>
+  <button class="demo-btn" onclick="showState('create')">🎙 Создать</button>
+  <button class="demo-btn" onclick="showState('progress')">⏳ Генерация</button>
+  <button class="demo-btn" onclick="showState('podcast')">🎧 Подкаст</button>
+</div>
+
+<!-- Popover -->
+<div id="popover" style="display:none; position:fixed; top: 56px; right: 120px; background: white; border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.15); padding: 20px; width: 280px; z-index: 50; animation: fadeIn 0.2s ease;">
+  <div style="font-weight: 600; font-size: 15px; margin-bottom: 16px;">Что озвучить?</div>
+
+  <label style="display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; font-size: 14px;">
+    <input type="radio" name="scope" value="full" checked style="accent-color: var(--terracotta);"> Полный выпуск
+  </label>
+  <label style="display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; font-size: 14px;">
+    <input type="radio" name="scope" value="select" style="accent-color: var(--terracotta);"> Выбрать темы
+  </label>
+
+  <div id="topic-checkboxes" style="padding-left: 28px; margin-top: 4px; opacity: 0.4; pointer-events: none;">
+    <label style="display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; font-size: 14px;">
+      <input type="checkbox" checked style="accent-color: var(--terracotta);"> 🏎 Формула-1
+    </label>
+    <label style="display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; font-size: 14px;">
+      <input type="checkbox" checked style="accent-color: var(--terracotta);"> 🤖 Разработки в обл. ИИ
+    </label>
+  </div>
+
+  <button onclick="startGeneration()" style="width: 100%; margin-top: 16px; padding: 10px; border-radius: 12px; border: none; background: var(--terracotta); color: white; font-family: 'Source Sans 3', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;">
+    Создать
+  </button>
+</div>
+
+<script>
+  // Popover logic
+  const radios = document.querySelectorAll('input[name="scope"]');
+  radios.forEach(r => r.addEventListener('change', () => {
+    const box = document.getElementById('topic-checkboxes');
+    if (r.value === 'select' && r.checked) {
+      box.style.opacity = '1';
+      box.style.pointerEvents = 'auto';
+    } else if (r.value === 'full' && r.checked) {
+      box.style.opacity = '0.4';
+      box.style.pointerEvents = 'none';
+    }
+  }));
+
+  function showPopover() {
+    document.getElementById('popover').style.display = 'block';
+  }
+
+  function startGeneration() {
+    document.getElementById('popover').style.display = 'none';
+    showState('progress');
+  }
+
+  function switchMode(mode) {
+    if (mode === 'read') {
+      document.getElementById('btn-read').classList.add('active-listen');
+      document.getElementById('btn-listen').classList.remove('active-listen');
+      document.getElementById('content-read').classList.remove('hidden');
+      document.getElementById('content-podcast').classList.add('hidden');
+      document.getElementById('sidebar-read').classList.remove('hidden');
+      document.getElementById('sidebar-podcast').classList.add('hidden');
+    } else {
+      document.getElementById('btn-listen').classList.add('active-listen');
+      document.getElementById('btn-read').classList.remove('active-listen');
+      document.getElementById('content-podcast').classList.remove('hidden');
+      document.getElementById('content-read').classList.add('hidden');
+      document.getElementById('sidebar-podcast').classList.remove('hidden');
+      document.getElementById('sidebar-read').classList.add('hidden');
+    }
+  }
+
+  // Demo state machine
+  function showState(state) {
+    // Update demo buttons
+    document.querySelectorAll('.demo-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+
+    // Hide popover
+    document.getElementById('popover').style.display = 'none';
+
+    // Reset all content
+    ['content-read', 'content-podcast', 'content-progress'].forEach(id => {
+      document.getElementById(id).classList.add('hidden');
+    });
+    ['sidebar-read', 'sidebar-podcast', 'sidebar-progress'].forEach(id => {
+      document.getElementById(id).classList.add('hidden');
+    });
+
+    // Header state
+    const btnCreate = document.getElementById('btn-create');
+    const modeToggles = document.getElementById('mode-toggles');
+
+    switch(state) {
+      case 'read':
+        document.getElementById('content-read').classList.remove('hidden');
+        document.getElementById('sidebar-read').classList.remove('hidden');
+        btnCreate.classList.remove('hidden');
+        btnCreate.style.display = '';
+        modeToggles.classList.add('hidden');
+        modeToggles.style.display = 'none';
+        break;
+
+      case 'create':
+        document.getElementById('content-read').classList.remove('hidden');
+        document.getElementById('sidebar-read').classList.remove('hidden');
+        btnCreate.classList.remove('hidden');
+        btnCreate.style.display = '';
+        modeToggles.classList.add('hidden');
+        modeToggles.style.display = 'none';
+        showPopover();
+        break;
+
+      case 'progress':
+        document.getElementById('content-progress').classList.remove('hidden');
+        document.getElementById('sidebar-progress').classList.remove('hidden');
+        btnCreate.classList.add('hidden');
+        btnCreate.style.display = 'none';
+        modeToggles.classList.add('hidden');
+        modeToggles.style.display = 'none';
+        break;
+
+      case 'podcast':
+        document.getElementById('content-podcast').classList.remove('hidden');
+        document.getElementById('sidebar-podcast').classList.remove('hidden');
+        btnCreate.classList.add('hidden');
+        btnCreate.style.display = 'none';
+        modeToggles.classList.remove('hidden');
+        modeToggles.style.display = 'flex';
+        document.getElementById('btn-listen').classList.add('active-listen');
+        document.getElementById('btn-read').classList.remove('active-listen');
+        break;
+    }
+  }
+</script>
+
+</body>
+</html>
