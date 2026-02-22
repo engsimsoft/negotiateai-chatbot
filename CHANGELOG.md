@@ -12,6 +12,28 @@
 
 ---
 
+## [3.43.0] - 2026-02-22 - PodcastEngine (ТЗ-Б1)
+
+**MINOR RELEASE**: Podcast Engine — генерация подкастов из брифингов. Двухэтапный pipeline: Gemini 2.5 Flash (скрипт) → Gemini 2.5 Flash TTS (озвучка, multi-speaker) → MP3 → Vercel Blob.
+
+### Added
+- **Podcast Engine модуль** — `lib/podcast/`: полный pipeline генерации подкастов (скрипт → TTS → MP3)
+- **Script Generator** — `script-generator.ts`: генерация диалогового сценария (Host/Expert) из секции брифинга через Gemini 2.5 Flash (`@ai-sdk/google`)
+- **TTS Gemini** — `tts-gemini.ts`: озвучка через Gemini 2.5 Flash TTS (`@google/genai`), нативный multi-speaker (Host → Kore, Expert → Puck), PCM 24kHz mono
+- **Audio Converter** — `audio-converter.ts`: PCM → MP3 через lamejs (CJS/ESM workaround через `new Function()`)
+- **POST `/api/briefing/podcast/generate`** — streaming endpoint (JSON Lines), p-limit(2), для каждой темы: script → tts → mp3 → Blob upload → DB update
+- **`updateBriefingAudio()` в queries.ts** — инкрементальное обновление audioUrls/audioStatus/audioDurations по JSONB patch
+- **Промпт скриптрайтера** — `lib/prompts/briefing/briefing-scriptwriter.md` + user template
+- **3 колонки в briefingHistory** — `audioUrls` (JSONB), `audioStatus` (TEXT), `audioDurations` (JSONB)
+- **NPM deps** — `@google/genai` (TTS SDK), `lamejs` (MP3 encoder), `p-limit` (concurrency)
+
+### Changed
+- **deleteOldBriefingHistory** — расширен: перед DELETE удаляет MP3 из Vercel Blob через `del()`
+- **refresh-section/route.ts** — добавлен hook: при обновлении секции audioStatus → 'outdated'
+- **next.config.ts** — `serverExternalPackages: ["lamejs"]` для production
+
+---
+
 ## [3.42.0] - 2026-02-21 - PerSectionRefresh (ТЗ-BF4)
 
 **MINOR RELEASE**: Обновление отдельных тем брифинга — пользователь может обновить любую тему по кнопке ↻ без полной перегенерации.

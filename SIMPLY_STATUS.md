@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.42.0
-**Дата:** 2026-02-21
+**Версия:** 3.43.0
+**Дата:** 2026-02-22
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -318,7 +318,7 @@ components/projects/
 | Слой | Технология |
 |------|------------|
 | Frontend | Next.js 15.3, React 18, TypeScript, Tailwind CSS |
-| AI | Vercel AI SDK (@ai-sdk/anthropic, @ai-sdk/google для vision-ocr + briefing-фильтр) |
+| AI | Vercel AI SDK (@ai-sdk/anthropic, @ai-sdk/google для vision-ocr + briefing-фильтр + podcast), @google/genai для TTS |
 | Auth | NextAuth 5.0-beta.25 |
 | Database | PostgreSQL (Neon) + Drizzle ORM |
 | Storage | Vercel Blob Storage |
@@ -328,6 +328,29 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-Б1: PodcastEngine — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Podcast Engine модуль** — `lib/podcast/`: полный pipeline генерации подкастов из брифингов
+- **Script Generator** — Gemini 2.5 Flash (`@ai-sdk/google`): генерация диалогового сценария (Host/Expert) из секции брифинга
+- **TTS** — Gemini 2.5 Flash TTS (`@google/genai`): нативный multi-speaker (Host → Kore, Expert → Puck), PCM 24kHz mono
+- **Audio Converter** — PCM → MP3 через lamejs (CJS/ESM workaround через `new Function()`)
+- **Streaming API** — `POST /api/briefing/podcast/generate`: p-limit(2), JSON Lines прогресс, Blob upload, DB update
+- **DB расширение** — 3 колонки в briefingHistory: audioUrls, audioStatus, audioDurations
+- **Outdated hook** — при refresh-section audioStatus → 'outdated'
+
+**Ключевые файлы:**
+- `lib/podcast/index.ts` — public API (generatePodcastSegment)
+- `lib/podcast/script-generator.ts` — Gemini Flash скрипт
+- `lib/podcast/tts-gemini.ts` — Gemini TTS озвучка
+- `lib/podcast/audio-converter.ts` — PCM → MP3
+- `lib/podcast/types.ts` — TypeScript типы
+- `app/(chat)/api/briefing/podcast/generate/route.ts` — streaming endpoint
+- `lib/prompts/briefing/briefing-scriptwriter.md` — промпт скриптрайтера
+- `lib/db/queries.ts` — +updateBriefingAudio(), расширен deleteOldBriefingHistory
+
+**Детали:** [specs/TZ_B1_PodcastEngine/](specs/TZ_B1_PodcastEngine/)
 
 ### ТЗ-BF4: PerSectionRefresh — ✅ ЗАВЕРШЁН
 

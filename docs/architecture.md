@@ -27,6 +27,7 @@
 │  │  ├── ai/providers.ts   - AI Provider config          │  │
 │  │  ├── ai/tools/         - AI-инструменты              │  │
 │  │  ├── briefing/         - Briefing pipeline + types (v3.27) │
+│  │  ├── podcast/          - Podcast Engine (v3.43)           │
 │  │  ├── prompts/          - Skills + Agents system      │  │
 │  │  ├── db/queries.ts     - Database queries            │  │
 │  │  └── db/schema.ts      - Database schema             │  │
@@ -38,7 +39,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │  External Services                                          │
 │  ├── AI Providers      - Anthropic Claude (@ai-sdk/anthropic) │
-│  ├── AI Providers      - Google Gemini (vision-ocr, Briefing) │
+│  ├── AI Providers      - Google Gemini (vision-ocr, Briefing, Podcast) │
 │  ├── Brave Search API  - Web search                        │
 │  ├── Deepgram          - Voice input (Nova-3)              │
 │  ├── CloudConvert API  - PPTX preview                      │
@@ -92,7 +93,7 @@
 #### providers.ts
 - Конфигурация AI-моделей
 - Anthropic Claude: Haiku, Sonnet, Opus (через @ai-sdk/anthropic)
-- Google Gemini: vision-ocr + Briefing pipeline (Flash, Pro)
+- Google Gemini: vision-ocr + Briefing pipeline + Podcast Engine (Flash, TTS)
 
 #### Prompt System (v3.3 — Skills + Agents)
 - `lib/prompts/` — Файловая система промптов
@@ -219,7 +220,7 @@ lib/prompts/
 **Anthropic Claude (основной — v3.23.0+):**
 - Три модели: Haiku (быстрый), Sonnet (баланс), Opus (качество)
 - Прямое подключение через @ai-sdk/anthropic
-- Google Gemini — vision-ocr + Briefing pipeline ([ADR 016](decisions/016-briefing-backend-architecture.md))
+- Google Gemini — vision-ocr + Briefing pipeline + Podcast Engine ([ADR 016](decisions/016-briefing-backend-architecture.md))
 
 **PostgreSQL + Drizzle:**
 - Type-safe queries
@@ -240,4 +241,4 @@ lib/prompts/
 
 ---
 
-**Обновлено:** 2026-02-21 (v3.39.0 — BriefingUIRefactor)
+**Обновлено:** 2026-02-22 (v3.43.0 — PodcastEngine)
