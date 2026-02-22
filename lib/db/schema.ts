@@ -465,6 +465,10 @@ export const briefingHistory = pgTable(
     status: varchar("status", { length: 20 }).notNull(),
     generatedAt: timestamp("generatedAt").notNull(),
     createdAt: timestamp("createdAt").notNull(),
+    // ТЗ-Б1: Podcast Engine audio columns
+    audioUrls: jsonb("audioUrls"),
+    audioStatus: text("audioStatus").default("none"),
+    audioDurations: jsonb("audioDurations"),
   },
   (table) => ({
     userIdx: index("briefing_history_user_idx").on(table.userId),
