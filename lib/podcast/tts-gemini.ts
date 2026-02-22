@@ -9,10 +9,10 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 });
 
-/** Default voice config: Host → Kore (firm), Expert → Puck (upbeat) */
+/** Default voice config: Host → Kore (firm), Expert → Iapetus (clear) */
 export const DEFAULT_VOICES: VoiceConfig[] = [
   { speaker: "Host", voiceName: "Kore" },
-  { speaker: "Expert", voiceName: "Puck" },
+  { speaker: "Expert", voiceName: "Iapetus" },
 ];
 
 /**
