@@ -12,6 +12,38 @@
 
 ---
 
+## [3.44.0] - 2026-02-22 - PodcastUI (ТЗ-Б2)
+
+**MINOR RELEASE**: Podcast UI — полный пользовательский интерфейс для прослушивания подкастов брифинга. Генерация с прогрессом, плеер Apple-уровня, треклист в sidebar, edge cases.
+
+### Added
+- **Podcast Generation UI** — кнопка «Создать подкаст» в header с Popover (toggle «Все темы / Выбрать» + checkboxes), потоковый прогресс с per-topic статусами
+- **Streaming Generation Hook** — `hooks/use-podcast-generation.ts`: fetch POST → JSON Lines → per-topic status tracking (idle → generating → done/error)
+- **Full-screen Progress** — `podcast-progress.tsx`: artwork с Mic icon, sound wave анимация, per-topic шаги (script → recording → done/error)
+- **Podcast Player** — `podcast-player.tsx`: full-screen centered плеер с artwork (bg-primary), контролы (⏮ -15 ▶/❚❚ +15 ⏭), кликабельный прогресс-бар с thumb, speed pills (0.75/1/1.25/1.5×), скачивание MP3
+- **Player Hook** — `hooks/use-podcast-player.ts`: `new Audio()` management, play/pause, seek, speed, track switching, skip ±15s, autoplay next, cleanup
+- **Mode Toggle** — `briefing-mode-toggle.tsx`: сегментированная кнопка [Читать | Слушать], bg-primary для активного «Слушать»
+- **Sidebar Tracklist** — `podcast-sidebar.tsx`: секция «Треклист» с MiniEqualizer анимацией для текущего трека, кликабельная навигация, общее время
+- **Podcast Button** — `podcast-button.tsx`: Popover с выбором тем для генерации
+- **Client-safe Audio Types** — `AudioStatus`, `AudioUrls`, `AudioDurations` в briefing-types.ts
+
+### Changed
+- **briefing-page-client.tsx** — orchestrator: usePodcastGeneration + usePodcastPlayer hooks, viewMode state (read/listen), auto-transition после генерации, failedTopics computation, isOutdated detection
+- **briefing-issue-header.tsx** — podcastSlot (ReactNode) для composition: PodcastButton или BriefingModeToggle
+- **briefing-issue-content.tsx** — view switching: article/player/progress + sidebar tracklist props threading
+- **briefing-sidebar.tsx** — три состояния: listen → tracklist, generating → per-topic statuses, read → topic navigation
+- **briefing-mode-toggle.tsx** — warning dot при isOutdated
+- **podcast-player.tsx** — outdated banner, 44px mobile touch targets (size-11)
+- **podcast-sidebar.tsx** — failed topics (gray) с retry button
+
+### Technical
+- Audio data pipeline: server component → page-client → issue-content/header/sidebar
+- CSS keyframes: `podcast-wave`, `podcast-equalizer` в globals.css
+- `<audio>` через `new Audio()` (lazy, SSR-safe), НЕ DOM-элемент
+- Sidebar generation state с per-topic progress (script/recording/done/error)
+
+---
+
 ## [3.43.0] - 2026-02-22 - PodcastEngine (ТЗ-Б1)
 
 **MINOR RELEASE**: Podcast Engine — генерация подкастов из брифингов. Двухэтапный pipeline: Gemini 2.5 Flash (скрипт) → Gemini 2.5 Flash TTS (озвучка, multi-speaker) → MP3 → Vercel Blob.

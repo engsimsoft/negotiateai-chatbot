@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.43.0
+**Версия:** 3.44.0
 **Дата:** 2026-02-22
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -328,6 +328,27 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-Б2: PodcastUI — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Podcast Generation UI** — кнопка «Создать подкаст» с Popover (выбор тем), потоковый full-screen прогресс с per-topic статусами
+- **Podcast Player** — Apple-level плеер: artwork, контролы (⏮ -15 ▶/❚❚ +15 ⏭), прогресс-бар, speed pills, скачивание MP3
+- **Mode Toggle** — сегментированная кнопка [Читать | Слушать] в header брифинга
+- **Sidebar Tracklist** — навигация по трекам, MiniEqualizer для текущего, синхронизация с плеером
+- **Edge Cases** — partial state (failed topics gray + retry), outdated banner/warning dot, 44px mobile touch targets
+- **Auto-transition** — автопереключение на «Слушать» после генерации
+
+**Ключевые файлы:**
+- `hooks/use-podcast-generation.ts` — streaming generation hook
+- `hooks/use-podcast-player.ts` — player hook (Audio management)
+- `components/briefing/podcast-player.tsx` — full-screen плеер
+- `components/briefing/podcast-progress.tsx` — full-screen прогресс
+- `components/briefing/podcast-button.tsx` — кнопка генерации
+- `components/briefing/podcast-sidebar.tsx` — sidebar треклист
+- `components/briefing/briefing-mode-toggle.tsx` — [Читать | Слушать]
+
+**Детали:** [specs/TZ_B2_PodcastUI/](specs/TZ_B2_PodcastUI/)
 
 ### ТЗ-Б1: PodcastEngine — ✅ ЗАВЕРШЁН
 
