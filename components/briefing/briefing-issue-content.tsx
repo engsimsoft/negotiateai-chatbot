@@ -55,7 +55,11 @@ interface BriefingIssueContentProps {
   refreshingTopicId?: string | null;
   /** ТЗ-Б2: Current audio/podcast status */
   audioStatus?: AudioStatus;
-  /** ТЗ-Б2: Podcast generation progress (shown as compact banner above content) */
+  /** ТЗ-Б2: Podcast generation per-topic statuses (for sidebar) */
+  podcastTopicStatuses?: PodcastTopicStatus[];
+  /** ТЗ-Б2: Whether podcast is currently generating (for sidebar) */
+  podcastIsGenerating?: boolean;
+  /** ТЗ-Б2: Podcast generation progress (full-screen view replaces article) */
   podcastProgress?: {
     topicStatuses: PodcastTopicStatus[];
     isGenerating: boolean;
@@ -93,6 +97,8 @@ export function BriefingIssueContent({
   onRefreshSection,
   refreshingTopicId,
   audioStatus,
+  podcastTopicStatuses,
+  podcastIsGenerating,
   podcastProgress,
 }: BriefingIssueContentProps) {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
@@ -122,15 +128,16 @@ export function BriefingIssueContent({
           selectedSimplyType={selectedSimplyType}
           simplyNewsUnread={simplyNewsUnread}
           onScrollToTop={handleScrollToTop}
+          podcastTopicStatuses={podcastTopicStatuses}
+          podcastIsGenerating={podcastIsGenerating}
         />
       </aside>
       {/* Content area — scrolls independently */}
       <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto">
-        {/* ТЗ-Б2: Podcast generation progress banner */}
-        {podcastProgress && (
+        {/* ТЗ-Б2: Podcast generation progress — full-screen view replaces article */}
+        {podcastProgress ? (
           <PodcastProgress {...podcastProgress} />
-        )}
-        {selectedSimplyType && simplyContentTitle && simplyContentBody ? (
+        ) : selectedSimplyType && simplyContentTitle && simplyContentBody ? (
           <SimplyContentView
             title={simplyContentTitle}
             content={simplyContentBody}

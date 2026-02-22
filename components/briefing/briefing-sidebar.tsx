@@ -9,6 +9,9 @@ import {
   ChevronDown,
   ChevronRight,
   X,
+  Mic,
+  Loader2,
+  Check,
 } from "lucide-react";
 import {
   Collapsible,
@@ -39,6 +42,7 @@ import type {
   BriefingArticleSection,
   SavedBriefingTopicClient,
 } from "@/lib/briefing/briefing-types";
+import type { PodcastTopicStatus } from "@/hooks/use-podcast-generation";
 
 /* --- Types --- */
 
@@ -81,6 +85,10 @@ export interface BriefingSidebarProps {
   simplyNewsUnread?: boolean;
   /** Scroll content area to top (used instead of window.scrollTo) */
   onScrollToTop?: () => void;
+  /** ТЗ-Б2: Podcast generation per-topic statuses (shows generation section when present) */
+  podcastTopicStatuses?: PodcastTopicStatus[];
+  /** ТЗ-Б2: Whether podcast is currently generating */
+  podcastIsGenerating?: boolean;
 }
 
 /* --- Short date formatter: ISO → "21 фев" --- */
@@ -208,6 +216,8 @@ function SidebarContent({
   selectedSimplyType,
   simplyNewsUnread,
   onScrollToTop,
+  podcastTopicStatuses,
+  podcastIsGenerating,
   onNavigate,
 }: BriefingSidebarProps & { onNavigate?: () => void }) {
   const handleSelectSimply = useCallback(
@@ -284,41 +294,88 @@ function SidebarContent({
 
   return (
     <>
-      {/* Topic navigation */}
+      {/* Topic navigation / Podcast generation status */}
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Текущий выпуск
-        </p>
+        {/* ТЗ-Б2: Podcast generation sidebar — replaces topic nav during generation */}
+        {podcastTopicStatuses && podcastTopicStatuses.length > 0 ? (
+          <>
+            <p className="mb-2 flex items-center gap-1.5 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <Mic className="size-3" />
+              {podcastIsGenerating ? "Создаём подкаст" : "Подкаст"}
+            </p>
+            {podcastTopicStatuses.map((topic) => {
+              const isActive = topic.step === "script" || topic.step === "recording";
+              return (
+                <div
+                  key={topic.topicId}
+                  className={cn(
+                    "mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-all duration-150",
+                    isActive && "bg-primary/10 text-primary font-medium"
+                  )}
+                >
+                  <span className="shrink-0">
+                    {topic.step === "pending" && (
+                      <Loader2 className="size-3.5 text-muted-foreground" />
+                    )}
+                    {(topic.step === "script" || topic.step === "recording") && (
+                      <Loader2 className="size-3.5 animate-spin text-primary" />
+                    )}
+                    {topic.step === "done" && (
+                      <Check className="size-3.5 text-success" />
+                    )}
+                    {topic.step === "error" && (
+                      <X className="size-3.5 text-destructive" />
+                    )}
+                  </span>
+                  <span className="min-w-0 truncate">{topic.message}</span>
+                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                    {topic.step === "pending" && "Ожидание"}
+                    {topic.step === "script" && "Сценарий..."}
+                    {topic.step === "recording" && "Запись..."}
+                    {topic.step === "done" && "Готово"}
+                    {topic.step === "error" && "Ошибка"}
+                  </span>
+                </div>
+              );
+            })}
+          </>
+        ) : (
+          <>
+            <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Текущий выпуск
+            </p>
 
-        <button
-          type="button"
-          onClick={handleScrollToTop}
-          className={cn(
-            "mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
-            !selectedSavedTopicId && !selectedSimplyType && !activeSectionId && "bg-primary/10 font-medium text-primary"
-          )}
-        >
-          <BookOpen className="size-4 text-muted-foreground" />
-          <span>Полный брифинг</span>
-        </button>
+            <button
+              type="button"
+              onClick={handleScrollToTop}
+              className={cn(
+                "mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
+                !selectedSavedTopicId && !selectedSimplyType && !activeSectionId && "bg-primary/10 font-medium text-primary"
+              )}
+            >
+              <BookOpen className="size-4 text-muted-foreground" />
+              <span>Полный брифинг</span>
+            </button>
 
-        {sections.map((section) => (
-          <button
-            key={section.topicId}
-            type="button"
-            onClick={() => handleScrollTo(section.topicId)}
-            className={cn(
-              "mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
-              !selectedSavedTopicId &&
-                !selectedSimplyType &&
-                activeSectionId === section.topicId &&
-                "bg-primary/10 font-medium text-primary"
-            )}
-          >
-            <span>{section.emoji}</span>
-            <span className="truncate">{section.topicName}</span>
-          </button>
-        ))}
+            {sections.map((section) => (
+              <button
+                key={section.topicId}
+                type="button"
+                onClick={() => handleScrollTo(section.topicId)}
+                className={cn(
+                  "mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted/60",
+                  !selectedSavedTopicId &&
+                    !selectedSimplyType &&
+                    activeSectionId === section.topicId &&
+                    "bg-primary/10 font-medium text-primary"
+                )}
+              >
+                <span>{section.emoji}</span>
+                <span className="truncate">{section.topicName}</span>
+              </button>
+            ))}
+          </>
+        )}
 
         {/* ТЗ-BF3: Saved topics — collapsible folders by topic */}
         {savedTopics.length > 0 && (

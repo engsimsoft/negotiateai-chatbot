@@ -273,6 +273,9 @@ export function BriefingPageClient({
     onSelectSimplyContent: handleSelectSimplyContent,
     selectedSimplyType,
     simplyNewsUnread,
+    // ТЗ-Б2: Podcast generation state for sidebar
+    podcastTopicStatuses: showPodcastProgress ? podcast.topicStatuses : undefined,
+    podcastIsGenerating: showPodcastProgress ? podcast.isGenerating : undefined,
   };
 
   // Show progress UI when generating
@@ -333,6 +336,8 @@ export function BriefingPageClient({
           onRefreshSection={handleRefreshSection}
           refreshingTopicId={refreshingTopicId}
           audioStatus={audioStatus}
+          podcastTopicStatuses={showPodcastProgress ? podcast.topicStatuses : undefined}
+          podcastIsGenerating={showPodcastProgress ? podcast.isGenerating : undefined}
           podcastProgress={showPodcastProgress ? {
             topicStatuses: podcast.topicStatuses,
             isGenerating: podcast.isGenerating,

@@ -34,13 +34,14 @@ export function PodcastButton({
     () => new Set(sections.map((s) => s.topicId)),
   );
 
-  // Don't render when audio is ready/partial (mode toggle will replace in Этап 3)
-  // or when currently generating (progress banner is shown)
-  if (audioStatus === "ready" || audioStatus === "partial" || audioStatus === "generating" || isGenerating) {
+  // Hide only during active generation (progress screen is shown)
+  // Note: when Этап 3 adds mode toggle [Читать|Слушать], it will replace this button for "ready"/"partial"
+  if (audioStatus === "generating" || isGenerating) {
     return null;
   }
 
-  const isOutdated = audioStatus === "outdated";
+  // Show "Пересоздать" when podcast already exists (ready/partial/outdated)
+  const isRegenerate = audioStatus === "ready" || audioStatus === "partial" || audioStatus === "outdated";
 
   const handleToggle = (id: string, checked: boolean) => {
     setSelectedIds((prev) => {
@@ -74,13 +75,13 @@ export function PodcastButton({
           size="sm"
           className="gap-1.5 rounded-lg"
         >
-          {isOutdated ? (
+          {isRegenerate ? (
             <Mic className="size-4" />
           ) : (
             <Headphones className="size-4" />
           )}
           <span className="hidden sm:inline">
-            {isOutdated ? "Пересоздать" : "Подкаст"}
+            {isRegenerate ? "Пересоздать" : "Подкаст"}
           </span>
         </Button>
       </PopoverTrigger>
@@ -152,7 +153,7 @@ export function PodcastButton({
             onClick={handleGenerate}
           >
             <Mic className="size-3.5" />
-            {isOutdated ? "Пересоздать" : "Создать"}
+            {isRegenerate ? "Пересоздать" : "Создать"}
             {selectionMode === "pick" && selectedIds.size > 0 && (
               <span className="text-primary-foreground/70">
                 ({selectedIds.size})

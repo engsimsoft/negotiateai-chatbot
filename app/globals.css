@@ -370,3 +370,15 @@
 .artifact-shimmer-glow {
   animation: shimmer-glow 2s ease-in-out infinite;
 }
+
+/* ТЗ-Б2: Sound wave animation for podcast progress artwork */
+@keyframes podcast-wave {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+/* ТЗ-Б2: Equalizer bars for sidebar now-playing indicator */
+@keyframes podcast-equalizer {
+  0% { transform: scaleY(0.3); }
+  100% { transform: scaleY(1); }
+}
