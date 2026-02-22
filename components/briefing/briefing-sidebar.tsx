@@ -38,11 +38,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { PodcastSidebarTracklist } from "./podcast-sidebar";
 import type {
   BriefingArticleSection,
   SavedBriefingTopicClient,
 } from "@/lib/briefing/briefing-types";
 import type { PodcastTopicStatus } from "@/hooks/use-podcast-generation";
+import type { PodcastTrack } from "@/hooks/use-podcast-player";
+import type { BriefingViewMode } from "./briefing-mode-toggle";
 
 /* --- Types --- */
 
@@ -89,6 +92,16 @@ export interface BriefingSidebarProps {
   podcastTopicStatuses?: PodcastTopicStatus[];
   /** ТЗ-Б2: Whether podcast is currently generating */
   podcastIsGenerating?: boolean;
+  /** ТЗ-Б2 Этап 4: Current view mode (read/listen) */
+  viewMode?: BriefingViewMode;
+  /** ТЗ-Б2 Этап 4: Podcast tracks (for tracklist in sidebar) */
+  podcastTracks?: PodcastTrack[];
+  /** ТЗ-Б2 Этап 4: Current track index in player */
+  podcastCurrentTrackIndex?: number;
+  /** ТЗ-Б2 Этап 4: Whether player is currently playing (for equalizer animation) */
+  podcastIsPlayerPlaying?: boolean;
+  /** ТЗ-Б2 Этап 4: Callback when user clicks a track in sidebar */
+  onSelectPodcastTrack?: (index: number) => void;
 }
 
 /* --- Short date formatter: ISO → "21 фев" --- */
@@ -218,6 +231,11 @@ function SidebarContent({
   onScrollToTop,
   podcastTopicStatuses,
   podcastIsGenerating,
+  viewMode,
+  podcastTracks,
+  podcastCurrentTrackIndex,
+  podcastIsPlayerPlaying,
+  onSelectPodcastTrack,
   onNavigate,
 }: BriefingSidebarProps & { onNavigate?: () => void }) {
   const handleSelectSimply = useCallback(
@@ -294,10 +312,21 @@ function SidebarContent({
 
   return (
     <>
-      {/* Topic navigation / Podcast generation status */}
+      {/* Topic navigation / Podcast tracklist / Generation status */}
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        {/* ТЗ-Б2: Podcast generation sidebar — replaces topic nav during generation */}
-        {podcastTopicStatuses && podcastTopicStatuses.length > 0 ? (
+        {/* ТЗ-Б2 Этап 4: Podcast tracklist — shown when viewMode === "listen" and tracks available */}
+        {viewMode === "listen" && podcastTracks && podcastTracks.length > 0 && onSelectPodcastTrack ? (
+          <PodcastSidebarTracklist
+            tracks={podcastTracks}
+            currentTrackIndex={podcastCurrentTrackIndex ?? 0}
+            isPlaying={podcastIsPlayerPlaying ?? false}
+            onSelectTrack={(index) => {
+              onSelectPodcastTrack(index);
+              onNavigate?.();
+            }}
+          />
+        ) : /* ТЗ-Б2: Podcast generation sidebar — replaces topic nav during generation */
+        podcastTopicStatuses && podcastTopicStatuses.length > 0 ? (
           <>
             <p className="mb-2 flex items-center gap-1.5 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <Mic className="size-3" />

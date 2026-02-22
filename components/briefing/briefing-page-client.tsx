@@ -295,6 +295,12 @@ export function BriefingPageClient({
     // ТЗ-Б2: Podcast generation state for sidebar
     podcastTopicStatuses: showPodcastProgress ? podcast.topicStatuses : undefined,
     podcastIsGenerating: showPodcastProgress ? podcast.isGenerating : undefined,
+    // ТЗ-Б2 Этап 4: Podcast tracklist for sidebar
+    viewMode,
+    podcastTracks: hasAudio ? player.tracks : undefined,
+    podcastCurrentTrackIndex: hasAudio ? player.currentTrackIndex : undefined,
+    podcastIsPlayerPlaying: hasAudio ? player.isPlaying : undefined,
+    onSelectPodcastTrack: hasAudio ? player.setTrack : undefined,
   };
 
   // Show progress UI when generating
@@ -377,6 +383,7 @@ export function BriefingPageClient({
             onSkipBackward: player.skipBackward,
             briefingDate: briefingGeneratedAt ?? undefined,
           } : undefined}
+          onSelectPodcastTrack={hasAudio ? player.setTrack : undefined}
           podcastTopicStatuses={showPodcastProgress ? podcast.topicStatuses : undefined}
           podcastIsGenerating={showPodcastProgress ? podcast.isGenerating : undefined}
           podcastProgress={showPodcastProgress ? {

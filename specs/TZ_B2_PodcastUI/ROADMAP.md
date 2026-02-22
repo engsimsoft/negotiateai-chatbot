@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 6 |
-| Текущий этап | 3 |
+| Текущий этап | 4 |
 | Сессий (оценка) | 3-4 |
 
 **Архитектурные решения (согласованы с архитектором):**
@@ -147,17 +147,15 @@ git commit -m "feat(tz-b2): audio player, mode toggle, read/listen switching"
 
 ## Этап 4: Sidebar треклист + навигация
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 3
+**Статус:** ✅ Завершён
 
 **Цель:** Треклист в sidebar, кликабельная навигация по трекам, синхронизация с плеером.
 
 **Задачи:**
-- [ ] Создать `components/briefing/podcast-sidebar.tsx` — секция «🎧 ТРЕКЛИСТ»: список тем (emoji + название + длительность), индикатор текущего трека (эквалайзер-анимация CSS), клик → плеер переключается, карточка «Полный выпуск» (кол-во тем + общее время)
-- [ ] Интегрировать в `components/briefing/briefing-sidebar.tsx` — добавить секцию треклиста наверху sidebar (перед «Текущий выпуск») когда `viewMode === 'listen'` и `audioStatus === 'ready' || 'partial'`. Остальные секции остаются
-- [ ] Связать sidebar с плеером: клик по треку → callback → `use-podcast-player.setTrack(index)` → плеер переключается
-- [ ] Синхронизация: текущий трек в плеере → подсветка в sidebar (через `currentTrackIndex`)
+- [x] Создать `components/briefing/podcast-sidebar.tsx` — секция «🎧 ТРЕКЛИСТ»: список тем (emoji + название + длительность), индикатор текущего трека (эквалайзер-анимация CSS), клик → плеер переключается, карточка «Полный выпуск» (кол-во тем + общее время)
+- [x] Интегрировать в `components/briefing/briefing-sidebar.tsx` — добавить секцию треклиста наверху sidebar (перед «Текущий выпуск») когда `viewMode === 'listen'` и `audioStatus === 'ready' || 'partial'`. Остальные секции остаются
+- [x] Связать sidebar с плеером: клик по треку → callback → `use-podcast-player.setTrack(index)` → плеер переключается
+- [x] Синхронизация: текущий трек в плеере → подсветка в sidebar (через `currentTrackIndex`)
 
 **Файлы:**
 - `components/briefing/podcast-sidebar.tsx` — новый
@@ -165,8 +163,8 @@ git commit -m "feat(tz-b2): audio player, mode toggle, read/listen switching"
 - `components/briefing/briefing-page-client.tsx` — пробросить player state в sidebar
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: при режиме «Слушать» в sidebar виден треклист
 - [ ] Браузер: клик по треку → плеер переключается на эту тему
 - [ ] Браузер: текущий трек подсвечен в sidebar (анимация эквалайзера)

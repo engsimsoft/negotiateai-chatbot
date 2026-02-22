@@ -65,6 +65,8 @@ interface BriefingIssueContentProps {
   podcastTopicStatuses?: PodcastTopicStatus[];
   /** ТЗ-Б2: Whether podcast is currently generating (for sidebar) */
   podcastIsGenerating?: boolean;
+  /** ТЗ-Б2 Этап 4: Callback when user clicks a track in sidebar tracklist */
+  onSelectPodcastTrack?: (index: number) => void;
   /** ТЗ-Б2: Podcast generation progress (full-screen view replaces article) */
   podcastProgress?: {
     topicStatuses: PodcastTopicStatus[];
@@ -105,6 +107,7 @@ export function BriefingIssueContent({
   audioStatus,
   viewMode,
   playerProps,
+  onSelectPodcastTrack,
   podcastTopicStatuses,
   podcastIsGenerating,
   podcastProgress,
@@ -138,6 +141,11 @@ export function BriefingIssueContent({
           onScrollToTop={handleScrollToTop}
           podcastTopicStatuses={podcastTopicStatuses}
           podcastIsGenerating={podcastIsGenerating}
+          viewMode={viewMode}
+          podcastTracks={playerProps?.tracks}
+          podcastCurrentTrackIndex={playerProps?.currentTrackIndex}
+          podcastIsPlayerPlaying={playerProps?.isPlaying}
+          onSelectPodcastTrack={onSelectPodcastTrack}
         />
       </aside>
       {/* Content area — scrolls independently */}
