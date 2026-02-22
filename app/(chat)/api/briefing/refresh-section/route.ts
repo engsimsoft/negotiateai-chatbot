@@ -7,9 +7,11 @@ import { fetchSource } from "@/lib/briefing/source-fetchers";
 import type { RawContent } from "@/lib/briefing/source-fetchers/types";
 import { getDefaultSources } from "@/lib/briefing/topics-catalog";
 import {
+  getBriefingHistory,
   getBriefingSettings,
   getBriefingSources,
   getBriefingTopics,
+  updateBriefingAudio,
   updateBriefingSection,
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
@@ -146,6 +148,15 @@ export async function POST(request: Request) {
       topicId,
       newSection: section,
     });
+
+    // 6b. ТЗ-Б1: Mark podcast as outdated if it exists
+    const latest = await getBriefingHistory({ userId, limit: 1, status: "ready" });
+    if (latest.length > 0) {
+      const audioStatus = latest[0].audioStatus as string | null;
+      if (audioStatus === "ready" || audioStatus === "partial") {
+        await updateBriefingAudio({ userId, audioStatus: "outdated" });
+      }
+    }
 
     // 7. Return updated section to client
     return new Response(JSON.stringify(section), {

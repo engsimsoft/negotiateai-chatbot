@@ -3277,7 +3277,71 @@ export async function updateBriefingSection({
 }
 
 /**
+ * ТЗ-Б1: Update audio fields for a briefing (incremental per-topic)
+ */
+export async function updateBriefingAudio({
+  userId,
+  audioUrls,
+  audioStatus,
+  audioDurations,
+}: {
+  userId: string;
+  audioUrls?: Record<string, string>;
+  audioStatus?: string;
+  audioDurations?: Record<string, number>;
+}) {
+  try {
+    const latest = await db
+      .select()
+      .from(briefingHistory)
+      .where(
+        and(
+          eq(briefingHistory.userId, userId),
+          eq(briefingHistory.status, "ready"),
+        ),
+      )
+      .orderBy(desc(briefingHistory.generatedAt))
+      .limit(1);
+
+    if (latest.length === 0) return null;
+
+    const record = latest[0];
+    const currentUrls =
+      (record.audioUrls as Record<string, string> | null) ?? {};
+    const currentDurations =
+      (record.audioDurations as Record<string, number> | null) ?? {};
+
+    const mergedUrls = audioUrls
+      ? { ...currentUrls, ...audioUrls }
+      : currentUrls;
+    const mergedDurations = audioDurations
+      ? { ...currentDurations, ...audioDurations }
+      : currentDurations;
+
+    const updateFields: Record<string, unknown> = {};
+    if (audioUrls) updateFields.audioUrls = mergedUrls;
+    if (audioDurations) updateFields.audioDurations = mergedDurations;
+    if (audioStatus) updateFields.audioStatus = audioStatus;
+
+    if (Object.keys(updateFields).length === 0) return record;
+
+    await db
+      .update(briefingHistory)
+      .set(updateFields)
+      .where(eq(briefingHistory.id, record.id));
+
+    return { ...record, ...updateFields };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update briefing audio",
+    );
+  }
+}
+
+/**
  * ТЗ-BF1 TTL: Delete all briefing history for a user (before new generation)
+ * ТЗ-Б1: Also cleans up MP3 files from Vercel Blob
  */
 export async function deleteOldBriefingHistory({
   userId,
@@ -3285,9 +3349,38 @@ export async function deleteOldBriefingHistory({
   userId: string;
 }) {
   try {
+    // ТЗ-Б1: Read audio URLs before deletion for Blob cleanup
+    const records = await db
+      .select({ audioUrls: briefingHistory.audioUrls })
+      .from(briefingHistory)
+      .where(eq(briefingHistory.userId, userId));
+
+    const blobUrlsToDelete: string[] = [];
+    for (const record of records) {
+      if (record.audioUrls && typeof record.audioUrls === "object") {
+        blobUrlsToDelete.push(
+          ...Object.values(record.audioUrls as Record<string, string>),
+        );
+      }
+    }
+
+    // Delete DB records
     await db
       .delete(briefingHistory)
       .where(eq(briefingHistory.userId, userId));
+
+    // Cleanup Blob files (best-effort, don't block on failure)
+    if (blobUrlsToDelete.length > 0) {
+      try {
+        const { del } = await import("@vercel/blob");
+        await del(blobUrlsToDelete);
+      } catch (blobErr) {
+        console.warn(
+          "[deleteOldBriefingHistory] Blob cleanup failed (non-blocking):",
+          blobErr,
+        );
+      }
+    }
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
