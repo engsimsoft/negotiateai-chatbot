@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 6 |
-| Текущий этап | 1 |
+| Текущий этап | 2 |
 | Сессий (оценка) | 3-4 |
 
 **Архитектурные решения (согласованы с архитектором):**
@@ -27,7 +27,7 @@
 
 ## Этап 1: Data Pipeline — аудио-данные на клиент
 
-**Статус:** 🔄 В работе
+**Статус:** ✅ Завершён
 
 **Цель:** Audio-поля (`audioStatus`, `audioUrls`, `audioDurations`) доступны в клиентских компонентах брифинга.
 
@@ -47,8 +47,8 @@
 **Валидация этапа:**
 - [x] `npx tsc --noEmit` — 0 ошибок
 - [x] `npm run build` — успешен
-- [ ] Браузер: `/briefing` загружается без ошибок, внешних изменений нет
-- [ ] 🧪 Мануальный тест: открыть /briefing — всё работает как раньше
+- [x] Браузер: `/briefing` загружается без ошибок, внешних изменений нет
+- [x] 🧪 Мануальный тест: открыть /briefing — всё работает как раньше
 
 **Git (после валидации):**
 ```bash
@@ -62,19 +62,17 @@ git commit -m "feat(tz-b2): wire audio data from server to client components"
 
 ## Этап 2: Кнопка генерации + Streaming Hook + Прогресс
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 1
+**Статус:** ✅ Завершён
 
 **Цель:** Пользователь нажимает кнопку, выбирает темы, видит компактный прогресс генерации.
 
 **Задачи:**
-- [ ] Создать `hooks/use-podcast-generation.ts` — streaming hook по паттерну `use-briefing-generation.ts`. Fetch `POST /api/briefing/podcast/generate`, парсинг JSON Lines, state machine (idle → generating → done/error). Адаптировать под `PodcastProgressEvent`
-- [ ] Создать `components/briefing/podcast-button.tsx` — кнопка «🎙 Создать подкаст» (при `audioStatus === 'none'`) / «🎙 Пересоздать» (при `audioStatus === 'outdated'`). Popover с toggle «Все темы / Выбрать» + чекбоксы тем + кнопка «Создать»
-- [ ] Создать `components/briefing/podcast-progress.tsx` — компактный прогресс-баннер (sticky наверху контентной области). Список тем со статусами: ○ ожидание, 🎙 скрипт/запись, ✅ готово, ❌ ошибка. Финальный шаг «Финальный монтаж»
-- [ ] Интегрировать в `briefing-issue-header.tsx` — заменить disabled кнопку на `PodcastButton` (при наличии статьи)
-- [ ] Интегрировать в `briefing-page-client.tsx` — подключить `usePodcastGeneration()`, управлять прогресс-баннером, обновлять `audioStatus` state после завершения
-- [ ] Интегрировать прогресс-баннер в `briefing-issue-content.tsx` — показать над контентной областью при `isGenerating`
+- [x] Создать `hooks/use-podcast-generation.ts` — streaming hook по паттерну `use-briefing-generation.ts`. Fetch `POST /api/briefing/podcast/generate`, парсинг JSON Lines, state machine (idle → generating → done/error). Адаптировать под `PodcastProgressEvent`
+- [x] Создать `components/briefing/podcast-button.tsx` — кнопка «🎙 Создать подкаст» (при `audioStatus === 'none'`) / «🎙 Пересоздать» (при `audioStatus === 'outdated'`). Popover с toggle «Все темы / Выбрать» + чекбоксы тем + кнопка «Создать»
+- [x] Создать `components/briefing/podcast-progress.tsx` — компактный прогресс-баннер (sticky наверху контентной области). Список тем со статусами: ○ ожидание, 🎙 скрипт/запись, ✅ готово, ❌ ошибка
+- [x] Интегрировать в `briefing-issue-header.tsx` — заменить disabled кнопку на `podcastSlot` (ReactNode slot для composition)
+- [x] Интегрировать в `briefing-page-client.tsx` — подключить `usePodcastGeneration()`, управлять прогресс-баннером, обновлять `audioStatus` state после завершения
+- [x] Интегрировать прогресс-баннер в `briefing-issue-content.tsx` — показать над контентной областью при `isGenerating`
 
 **Файлы:**
 - `hooks/use-podcast-generation.ts` — новый
@@ -85,13 +83,13 @@ git commit -m "feat(tz-b2): wire audio data from server to client components"
 - `components/briefing/briefing-issue-content.tsx` — прогресс-баннер
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Браузер: кнопка «Создать подкаст» видна в header при готовом брифинге
-- [ ] Браузер: клик → popover с темами, toggle работает
-- [ ] Браузер: «Создать» → прогресс-баннер появляется, статья остаётся видимой
-- [ ] Браузер: прогресс обновляется в реальном времени (шаги по каждой теме)
-- [ ] 🧪 Мануальный тест: полный цикл генерации с прогрессом
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] Браузер: кнопка «Создать подкаст» видна в header при готовом брифинге
+- [x] Браузер: клик → popover с темами, toggle работает
+- [x] Браузер: «Создать» → прогресс-баннер появляется, статья остаётся видимой
+- [x] Браузер: прогресс обновляется в реальном времени (шаги по каждой теме)
+- [x] 🧪 Мануальный тест: полный цикл генерации с прогрессом
 
 **Git (после валидации):**
 ```bash

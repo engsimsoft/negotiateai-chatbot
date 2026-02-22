@@ -321,7 +321,23 @@ import {
 
 ---
 
-## 13. Проверка перед коммитом
+## 13. Используемые UI-примитивы (shadcn/ui)
+
+Компоненты из `components/ui/` — shadcn/ui примитивы. При установке нового — зарегистрировать здесь.
+
+| Компонент | Файл | Где используется |
+|-----------|------|-----------------|
+| Button | `components/ui/button.tsx` | Повсеместно |
+| Dialog / AlertDialog | `components/ui/dialog.tsx`, `alert-dialog.tsx` | Модалки, подтверждения (sidebar delete) |
+| Tooltip | `components/ui/tooltip.tsx` | Icon-кнопки (см. раздел 6) |
+| Popover | `components/ui/popover.tsx` | PodcastButton (выбор тем для генерации) |
+| Checkbox | `components/ui/checkbox.tsx` | PodcastButton (чекбоксы выбора тем) |
+| Sheet | `components/ui/sheet.tsx` | Mobile sidebar (BriefingSidebarMobile) |
+| Collapsible | `components/ui/collapsible.tsx` | Источники в статье, sidebar folders |
+
+---
+
+## 14. Проверка перед коммитом
 
 Перед завершением работы выполнить:
 ```bash

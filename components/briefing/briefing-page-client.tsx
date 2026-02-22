@@ -5,11 +5,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useBriefingGeneration } from "@/hooks/use-briefing-generation";
+import { usePodcastGeneration } from "@/hooks/use-podcast-generation";
 import { BriefingGenerationProgress } from "./briefing-generation-progress";
 import { BriefingIssueHeader } from "./briefing-issue-header";
 import { BriefingIssueContent } from "./briefing-issue-content";
 import { BriefingSidebarMobile } from "./briefing-sidebar";
 import { NoBriefingsYet, SimplyContentView } from "./briefing-article-view";
+import { PodcastButton } from "./podcast-button";
 import type {
   BriefingArticle,
   BriefingArticleSection,
@@ -67,6 +69,35 @@ export function BriefingPageClient({
   const [audioStatus, setAudioStatus] = useState<AudioStatus>(initialAudioStatus);
   const [audioUrls, setAudioUrls] = useState<AudioUrls>(initialAudioUrls);
   const [audioDurations, setAudioDurations] = useState<AudioDurations>(initialAudioDurations);
+
+  // ТЗ-Б2: Show/hide podcast progress banner
+  const [showPodcastProgress, setShowPodcastProgress] = useState(false);
+
+  // ТЗ-Б2: Podcast generation hook
+  const allTopicIds = article?.sections.map((s) => s.topicId) ?? [];
+  const handlePodcastComplete = useCallback(
+    (newUrls: AudioUrls, newDurations: AudioDurations, ready: number, failed: number) => {
+      setAudioUrls((prev) => ({ ...prev, ...newUrls }));
+      setAudioDurations((prev) => ({ ...prev, ...newDurations }));
+      setAudioStatus(ready === 0 ? "none" : failed > 0 ? "partial" : "ready");
+    },
+    [],
+  );
+  const podcast = usePodcastGeneration(allTopicIds, handlePodcastComplete);
+
+  const handleStartPodcast = useCallback(
+    (topicIds?: string[]) => {
+      setShowPodcastProgress(true);
+      setAudioStatus("generating");
+      podcast.startGeneration(topicIds);
+    },
+    [podcast],
+  );
+
+  const handleDismissPodcastProgress = useCallback(() => {
+    setShowPodcastProgress(false);
+    podcast.reset();
+  }, [podcast]);
 
   // ТЗ-BF4: Per-section refresh state
   const [refreshingTopicId, setRefreshingTopicId] = useState<string | null>(null);
@@ -264,7 +295,16 @@ export function BriefingPageClient({
     <div className={`flex flex-col bg-muted/30 ${hasValidArticle ? "h-svh overflow-hidden" : "min-h-svh"}`}>
       <BriefingIssueHeader
         title={hasValidArticle && article ? article.title : "Утренний брифинг"}
-        audioStatus={audioStatus}
+        podcastSlot={
+          hasValidArticle && article ? (
+            <PodcastButton
+              audioStatus={audioStatus}
+              sections={article.sections}
+              isGenerating={podcast.isGenerating}
+              onGenerate={handleStartPodcast}
+            />
+          ) : undefined
+        }
         mobileTrigger={
           hasValidArticle ? (
             <BriefingSidebarMobile {...sidebarProps} />
@@ -293,6 +333,16 @@ export function BriefingPageClient({
           onRefreshSection={handleRefreshSection}
           refreshingTopicId={refreshingTopicId}
           audioStatus={audioStatus}
+          podcastProgress={showPodcastProgress ? {
+            topicStatuses: podcast.topicStatuses,
+            isGenerating: podcast.isGenerating,
+            error: podcast.error,
+            completionMessage: podcast.completionMessage,
+            readyCount: podcast.readyCount,
+            failedCount: podcast.failedCount,
+            onRetry: () => handleStartPodcast(),
+            onDismiss: handleDismissPodcastProgress,
+          } : undefined}
         />
       ) : (
         <main className="flex-1">

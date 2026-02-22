@@ -1,16 +1,15 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, Headphones, Settings } from "lucide-react";
+import { ArrowLeft, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
-import type { AudioStatus } from "@/lib/briefing/briefing-types";
 
 interface BriefingIssueHeaderProps {
   title: string;
   /** Optional slot for mobile sidebar trigger (rendered before title) */
   mobileTrigger?: ReactNode;
-  /** ТЗ-Б2: Current audio/podcast status (controls podcast button rendering) */
-  audioStatus?: AudioStatus;
+  /** ТЗ-Б2: Slot for podcast button/toggle (rendered in controls area) */
+  podcastSlot?: ReactNode;
 }
 
 /**
@@ -21,7 +20,7 @@ interface BriefingIssueHeaderProps {
 export function BriefingIssueHeader({
   title,
   mobileTrigger,
-  audioStatus,
+  podcastSlot,
 }: BriefingIssueHeaderProps) {
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center border-b bg-background">
@@ -62,10 +61,7 @@ export function BriefingIssueHeader({
 
         {/* Right: controls */}
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="default" size="sm" className="gap-1.5 rounded-lg" disabled>
-            <Headphones className="size-4" />
-            <span className="hidden sm:inline">Скоро: подкаст</span>
-          </Button>
+          {podcastSlot}
           <Link href="/briefing/setup">
             <Button size="icon" variant="ghost">
               <Settings className="size-4" />
