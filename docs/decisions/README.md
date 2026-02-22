@@ -26,6 +26,7 @@
 | [014](014-route-groups-per-chat-mode.md) | Route Groups по ChatMode | 2026-02-13 | Принято |
 | [015](015-neon-serverless-driver.md) | Neon Serverless Driver | 2026-02-17 | Принято |
 | [016](016-briefing-backend-architecture.md) | Архитектура Briefing — Gemini-пайплайн + Landing-first UI | 2026-02-19 | Принято |
+| [017](017-podcast-engine-architecture.md) | Архитектура Podcast Engine — двухэтапный Gemini-пайплайн | 2026-02-22 | Принято |
 
 ---
 
@@ -54,4 +55,4 @@
 
 ---
 
-**Обновлено:** 2026-02-19
+**Обновлено:** 2026-02-22
