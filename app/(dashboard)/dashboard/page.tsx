@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
@@ -38,10 +37,7 @@ export default async function DashboardPage() {
 
   // User was deleted from DB but JWT still valid — force re-auth
   if (!userProfile) {
-    const cookieStore = await cookies();
-    cookieStore.delete("authjs.session-token");
-    cookieStore.delete("__Secure-authjs.session-token");
-    redirect("/login");
+    redirect("/api/auth/signout");
   }
 
   const displayName = userProfile.displayName || session.user.email?.split("@")[0] || "друг";
