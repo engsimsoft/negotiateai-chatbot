@@ -29,6 +29,7 @@
 | [017](017-podcast-engine-architecture.md) | Архитектура Podcast Engine — двухэтапный Gemini-пайплайн | 2026-02-22 | Принято |
 | [018](018-prompt-engineering-lessons.md) | Prompt Engineering Lessons | 2026-02-22 | Принято |
 | [019](019-usage-logging-architecture.md) | Архитектура Usage Logging — fire-and-forget + numeric precision | 2026-02-25 | Принято |
+| [020](020-telegram-integration-strategy.md) | Telegram Integration Strategy — Shared Parser + фазовый подход | 2026-02-25 | Принято |
 
 ---
 
