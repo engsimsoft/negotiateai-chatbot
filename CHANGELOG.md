@@ -12,6 +12,27 @@
 
 ---
 
+## [3.49.0] - 2026-02-25 - TelegramBotInfrastructure
+
+**ТЗ-TG3**: Telegram Bot инфраструктура — привязка аккаунтов Simply ↔ Telegram через @GetSimplyBot. Фундамент для доставки брифингов (TG4) и чтения закрытых групп (TG5).
+
+### Added
+- **Telegram Bot** (`lib/telegram/bot.ts`) — grammY бот с обработчиками `/start` (deep link + cold + return после /stop), `/stop`, `/help`, unknown messages. Inline URL-кнопки во всех ответах. Тексты из `telegram-bot-messages.md`
+- **Webhook endpoint** (`app/api/telegram/webhook/route.ts`) — `webhookCallback("std/http")` с валидацией secret token
+- **Setup admin route** (`app/api/telegram/setup/route.ts`) — POST (setWebhook) + GET (getWebhookInfo), защита Bearer token
+- **Link API** (`app/(chat)/api/telegram/link/route.ts`) — POST (generate deep link URL), GET (connection status), DELETE (unlink). Все authenticated
+- **2 таблицы БД** — `TelegramConnection` (userId↔telegramUserId, unique constraints, isActive) + `TelegramLinkToken` (ephemeral, 10 min TTL)
+- **8 query functions** — getTelegramConnection, getByTelegramId, create, delete, setActive, createLinkToken, getLinkToken, deleteLinkToken
+- **UI "Подключения"** в настройках (`settings-page.tsx`) — connect/disconnect, QR-код (qrcode.react), polling (3s/2min), три состояния (loading/disconnected/connected)
+- **Drizzle migration** `0039_telegram-bot.sql`
+
+### Technical
+- grammY bot singleton pattern (module-level, warm invocations reuse)
+- Edge cases: token expired, Telegram linked to different Simply, re-linking (unlink old → link new)
+- Bot username: `@GetSimplyBot`, bot name: `Simply`
+
+---
+
 ## [3.48.0] - 2026-02-25 - OnboardingTelegram
 
 **ТЗ-TG2**: Telegram-каналы в онбординге брифинга — агент находит, валидирует и добавляет TG-каналы как источники.

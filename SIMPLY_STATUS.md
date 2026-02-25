@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.48.0
+**Версия:** 3.49.0
 **Дата:** 2026-02-25
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app

@@ -131,6 +131,8 @@
 - `BriefingSources` — источники новостей (topicId, sourceUrl, fetchMethod, tier)
 - `BriefingHistory` — история генераций (briefingJson, stats, status)
 - `SavedBriefingTopics` — сохранённые темы брифинга (topicId, topicName, emoji, content, sources, briefingGeneratedAt)
+- `TelegramConnection` — связка Simply ↔ Telegram (userId unique, telegramUserId bigint unique, isActive)
+- `TelegramLinkToken` — эфемерные токены линковки (token PK, userId FK, expiresAt = +10 min)
 - `Vote_v2` — голосование за сообщения
 - NextAuth таблицы (Account, Session, VerificationToken)
 
