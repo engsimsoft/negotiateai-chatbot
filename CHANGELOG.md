@@ -12,6 +12,42 @@
 
 ---
 
+## [3.46.0] - 2026-02-25 - UsageLogging + SonnetMigration
+
+**ТЗ-OPT1**: Логирование использования AI + миграция основной модели Sonnet.
+
+### Added
+- **Таблица `ai_usage_log`** — логирование каждого AI-запроса: modelId, токены (input/output/thinking/cache), costUsd (`numeric(10,6)`), chatMode, durationMs. Два индекса: `(userId, createdAt)`, `(chatMode, createdAt)`
+- **`saveAiUsageLog()`** — fire-and-forget функция записи (никогда не бросает, не блокирует стриминг)
+- **Интеграция в 3 эндпоинта**: `chat/route.ts` (основной чат + expertise + create), `task-chat/route.ts` (проекты), `professor-pipeline.ts` (3 фазы: analyze + execute + synthesize)
+- **Миграция** `0038_ai-usage-log.sql` — DDL для новой таблицы с FK и индексами
+
+### Changed
+- **Sonnet 4.5 → 4.6** — основная модель переключена с `claude-sonnet-4-5-20250929` на `claude-sonnet-4-6` в `providers.ts` (3 алиаса: claude-sonnet, artifact-model, claudeSonnet)
+
+### Technical
+- `costUsd` из TokenLens: `summary?.costUSD?.totalUSD` (task-chat без TokenLens → `null`)
+- `chatId` nullable FK — для будущих точек логирования без chatId (briefing, clerks)
+- Документация обновлена: ai-providers.md, ai-agents.md, ai-chats-map.md, ai-tools.md, SIMPLY_STATUS.md
+
+---
+
+## [3.45.1] - 2026-02-23 - PodcastFixes
+
+**PATCH RELEASE**: Исправление бага подкаста (Simply News попадал в список тем) + кнопка «Скачать весь подкаст одним файлом».
+
+### Fixed
+- **Simply News в подкасте** — секция `simply_news` (канал коммуникации платформы) больше не попадает в список тем для генерации подкаста. Отфильтрована во всех местах: PodcastButton, allTopicIds, trackInfos, failedPodcastTopics (`briefing-page-client.tsx`)
+
+### Added
+- **Кнопка «Всё»** — скачивание всего подкаста одним MP3-файлом в `podcast-player.tsx`. Client-side склейка (Buffer.concat) без серверных изменений. Появляется при 2+ треках, спиннер во время загрузки. Имя файла: `Утренний брифинг — {дата}.mp3`
+
+### Technical
+- MP3 — потоковый формат, простой concat ArrayBuffer даёт корректный файл
+- Нулевое влияние на серверную часть и хранилище Blob
+
+---
+
 ## [3.45.0] - 2026-02-22 - BriefingDedup (ТЗ-BF5)
 
 **MINOR RELEASE**: Дедупликация контента между брифингами — повторная генерация теперь выдаёт другие новости, а не пересказ тех же статей другими словами.

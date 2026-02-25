@@ -47,6 +47,7 @@ import {
   getProjectById,
   getUserById,
   resetChatContextState,
+  saveAiUsageLog,
   saveChat,
   saveMessages,
   updateChatContextState,
@@ -568,6 +569,8 @@ export async function POST(request: Request) {
               systemPrompt: systemPromptText,
               userMessage: userMessageText,
               messages: coreMessages,
+              chatId: id,
+              userId: session.user.id,
               onEvent: (event) => {
                 // Stream pipeline events to client using data- prefix for custom types
                 dataStream.write({
@@ -627,12 +630,14 @@ export async function POST(request: Request) {
             console.log(
               `[Performance] Chat ${id}: TTFT = ${firstTokenTime}ms, Total = ${totalTime}ms`
             );
+            let resolvedModelId: string | undefined;
+            let costUsd: number | null = null;
             try {
               const providers = await getTokenlensCatalog();
               const chatModelId = getModelForChatMode(chatMode);
-              const modelId =
+              resolvedModelId =
                 myProvider.languageModel(chatModelId).modelId;
-              if (!modelId) {
+              if (!resolvedModelId) {
                 finalMergedUsage = usage;
                 dataStream.write({
                   type: "data-usage",
@@ -650,14 +655,29 @@ export async function POST(request: Request) {
                 return;
               }
 
-              const summary = getUsage({ modelId, usage, providers });
-              finalMergedUsage = { ...usage, ...summary, modelId } as AppUsage;
+              const summary = getUsage({ modelId: resolvedModelId, usage, providers });
+              costUsd = summary?.costUSD?.totalUSD ?? null;
+              finalMergedUsage = { ...usage, ...summary, modelId: resolvedModelId } as AppUsage;
               dataStream.write({ type: "data-usage", data: finalMergedUsage });
             } catch (err) {
               console.warn("TokenLens enrichment failed", err);
               finalMergedUsage = usage;
               dataStream.write({ type: "data-usage", data: finalMergedUsage });
             }
+
+            // ТЗ-OPT1: Usage logging (fire-and-forget)
+            const logModelId = resolvedModelId || (isProjectChat ? `project:${tier}` : chatMode);
+            const logChatMode = isProjectChat ? `project:${tier}` : chatMode;
+            saveAiUsageLog({
+              chatId: id,
+              userId: session.user.id,
+              modelId: logModelId,
+              inputTokens: usage.inputTokens ?? 0,
+              outputTokens: usage.outputTokens ?? 0,
+              costUsd,
+              chatMode: logChatMode,
+              durationMs: totalTime,
+            }).catch(() => {});
           },
         });
 

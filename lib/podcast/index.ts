@@ -21,12 +21,21 @@ export async function generatePodcastSegment(
   // Step 1: Generate dialogue script
   const { script, replicaCount } = await generateScript(section, context);
 
+  const wordCount = script.split(/\s+/).length;
+  console.log(
+    `[podcast] ${section.topicId}: script ${wordCount} words, ${replicaCount} replicas, ${script.length} chars`,
+  );
+
   // Step 2: Generate speech (PCM) via Gemini TTS with retry
   const pcmBuffer = await generateSpeechWithRetry(script, DEFAULT_VOICES);
 
   // Step 3: Convert PCM → MP3
   const mp3Buffer = pcmToMp3(pcmBuffer);
   const durationSeconds = calculateDuration(pcmBuffer);
+
+  console.log(
+    `[podcast] ${section.topicId}: PCM ${pcmBuffer.length} bytes, MP3 ${mp3Buffer.length} bytes, ${durationSeconds}s`,
+  );
 
   return {
     topicId: section.topicId,

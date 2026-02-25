@@ -34,18 +34,18 @@ export const myProvider = isTestEnvironment
     })()
   : customProvider({
       languageModels: {
-        "claude-sonnet": anthropic("claude-sonnet-4-5-20250929"),
+        "claude-sonnet": anthropic("claude-sonnet-4-6"),
         "claude-haiku": anthropic("claude-haiku-4-5-20251001"),
         "claude-opus": anthropic("claude-opus-4-6"),
         "claude-sonnet-4-6": anthropic("claude-sonnet-4-6"),
         "title-model": anthropic("claude-haiku-4-5-20251001"),
-        "artifact-model": anthropic("claude-sonnet-4-5-20250929"),
+        "artifact-model": anthropic("claude-sonnet-4-6"),
       },
     });
 
 // Direct model exports for pipelines and clerks
 export const claudeHaiku = anthropic("claude-haiku-4-5-20251001");
-export const claudeSonnet = anthropic("claude-sonnet-4-5-20250929");
+export const claudeSonnet = anthropic("claude-sonnet-4-6");
 export const claudeOpus = anthropic("claude-opus-4-6");
 
 export function getClaudeModel(name: "haiku" | "sonnet" | "opus") {

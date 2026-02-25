@@ -10,6 +10,7 @@ import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { buildTaskExpertPrompt } from "@/lib/prompts/build-task-expert-prompt";
 import { getProjectModel, isValidModelTier, DEFAULT_PROJECT_MODEL } from "@/lib/ai/model-tiers";
+import { myProvider } from "@/lib/ai/providers";
 import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment } from "@/lib/constants";
 import {
@@ -21,6 +22,7 @@ import {
   getProjectById,
   getProjectTaskById,
   resetChatContextState,
+  saveAiUsageLog,
   saveMessages,
   updateChatContextState,
 } from "@/lib/db/queries";
@@ -305,6 +307,20 @@ export async function POST(
             console.log(
               `[TaskExpert] Task ${taskId}: TTFT = ${firstTokenTime}ms, Total = ${totalTime}ms, Usage = ${JSON.stringify(usage)}`
             );
+
+            // ТЗ-OPT1: Usage logging (fire-and-forget)
+            const TIER_ALIAS: Record<string, string> = { executor: "claude-haiku", expert: "claude-sonnet", professor: "claude-opus" };
+            const resolvedModelId = myProvider.languageModel(TIER_ALIAS[tier] || "claude-sonnet").modelId;
+            saveAiUsageLog({
+              chatId,
+              userId: session.user.id,
+              modelId: resolvedModelId,
+              inputTokens: usage.inputTokens ?? 0,
+              outputTokens: usage.outputTokens ?? 0,
+              costUsd: null,
+              chatMode: `project:${tier}`,
+              durationMs: totalTime,
+            }).catch(() => {});
           },
         });
 

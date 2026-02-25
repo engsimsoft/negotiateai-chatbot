@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.45.0
-**Дата:** 2026-02-22
+**Версия:** 3.46.0
+**Дата:** 2026-02-25
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -219,7 +219,7 @@ lib/prompts/
 | Уровень | Модель | Иконка | Назначение |
 |---------|--------|--------|------------|
 | **Исполнитель** | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`, $1/$5) | ⚡ | Быстрый, экономичный, простые задачи |
-| **Эксперт** | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`, $3/$15) | 🎯 | Баланс скорости и качества (по умолчанию) |
+| **Эксперт** | Claude Sonnet 4.6 (`claude-sonnet-4-6`, $3/$15) | 🎯 | Баланс скорости и качества (по умолчанию) |
 | **Профессор** | Claude Opus 4.6 (`claude-opus-4-6`, $5/$25) | 🎓 | Максимальное качество, сложный reasoning |
 
 ### Режим Профессор (Pipeline)
@@ -349,6 +349,25 @@ components/projects/
 - `docs/decisions/018-prompt-engineering-lessons.md` — ADR: уроки prompt-инженерии
 
 **Детали:** [_archive/TZ_BF5_BriefingDedup/](_archive/TZ_BF5_BriefingDedup/)
+
+### ТЗ-OPT1: UsageLogging + SonnetMigration — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Таблица `ai_usage_log`** — 13 колонок (modelId, 5 token counters, costUsd numeric(10,6), chatMode, durationMs), 2 индекса, chatId nullable FK
+- **`saveAiUsageLog()`** — fire-and-forget функция, никогда не блокирует стриминг
+- **Интеграция в 3 эндпоинта**: chat/route.ts (основной + expertise + create), task-chat/route.ts (проекты), professor-pipeline.ts (3 фазы)
+- **Миграция Sonnet 4.5 → 4.6** — `claude-sonnet-4-5-20250929` → `claude-sonnet-4-6` в providers.ts (3 алиаса)
+
+**Ключевые файлы:**
+- `lib/db/schema.ts` — таблица `aiUsageLog`
+- `lib/db/queries.ts` — `saveAiUsageLog()`
+- `lib/db/migrations/0038_ai-usage-log.sql` — миграция
+- `lib/ai/providers.ts` — Sonnet 4.6
+- `app/(chat)/api/chat/route.ts` — usage logging
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — usage logging
+- `lib/ai/professor-pipeline.ts` — usage logging (3 фазы)
+
+**Детали:** [specs/TZ_OPT1_UsageAndMigration/](specs/TZ_OPT1_UsageAndMigration/)
 
 ### ТЗ-Б2: PodcastUI — ✅ ЗАВЕРШЁН
 
@@ -692,7 +711,7 @@ components/projects/
 
 **Выполнено:**
 - **Полное переключение AI-провайдера** — все AI-модели переведены с Google Gemini на Anthropic Claude через `@ai-sdk/anthropic` (прямое подключение, без OpenRouter)
-- **Три модели Claude** — Sonnet (`claude-sonnet-4-5-20250929`), Haiku (`claude-haiku-4-5-20251001`), Opus (`claude-opus-4-6`)
+- **Три модели Claude** — Sonnet (`claude-sonnet-4-6`), Haiku (`claude-haiku-4-5-20251001`), Opus (`claude-opus-4-6`)
 - **~28 файлов обновлены** — providers, routes, pipeline, clerks, professors, UI components, configs
 - **Tool schema fix** — `getWeather` tool: `z.union()` → `z.object()` с optional полями (Claude API требует `type: "object"` в input_schema)
 - **vision-ocr.ts** — намеренно оставлен на Google Gemini (отдельный `createGoogleGenerativeAI` экземпляр)

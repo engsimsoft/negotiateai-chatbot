@@ -25,6 +25,7 @@ import { ChatSDKError } from "../errors";
 import type { AppUsage } from "../usage";
 import { estimateMessageTokens, generateUUID } from "../utils";
 import {
+  aiUsageLog,
   type BriefingHistory,
   type BriefingSettings,
   type BriefingSource,
@@ -3445,5 +3446,56 @@ export async function getPreviousBriefing({
     // Non-blocking: if we can't load previous briefing, dedup just won't happen
     console.warn("[getPreviousBriefing] Failed to load, skipping dedup:", _error);
     return null;
+  }
+}
+
+// ============================================================================
+// AI Usage Log (ТЗ-OPT1)
+// ============================================================================
+
+/**
+ * ТЗ-OPT1: Save AI usage log entry (fire-and-forget, never throws).
+ */
+export async function saveAiUsageLog({
+  chatId,
+  userId,
+  modelId,
+  inputTokens,
+  outputTokens,
+  thinkingTokens = 0,
+  cacheWriteTokens = 0,
+  cacheReadTokens = 0,
+  costUsd,
+  chatMode,
+  durationMs,
+}: {
+  chatId?: string | null;
+  userId: string;
+  modelId: string;
+  inputTokens: number;
+  outputTokens: number;
+  thinkingTokens?: number;
+  cacheWriteTokens?: number;
+  cacheReadTokens?: number;
+  costUsd?: number | null;
+  chatMode: string;
+  durationMs?: number | null;
+}): Promise<void> {
+  try {
+    await db.insert(aiUsageLog).values({
+      chatId: chatId ?? null,
+      userId,
+      modelId,
+      inputTokens,
+      outputTokens,
+      thinkingTokens,
+      cacheWriteTokens,
+      cacheReadTokens,
+      costUsd: costUsd != null ? String(costUsd) : null,
+      chatMode,
+      durationMs: durationMs ?? null,
+    });
+  } catch (error) {
+    console.error("[saveAiUsageLog] Failed to save usage log:", error);
   }
 }

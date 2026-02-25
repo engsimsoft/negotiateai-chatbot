@@ -70,14 +70,13 @@
 
 | Модель | ID в проекте | Реальный ID | Input | Output | Контекст | Max Output |
 |--------|--------------|-------------|-------|--------|----------|------------|
-| **Claude Sonnet 4.6** | `claude-sonnet-4-6` | `claude-sonnet-4-6` | — | — | — | — |
-| **Claude Sonnet 4.5** | `claude-sonnet` | `claude-sonnet-4-5-20250929` | $3.00/1M | $15.00/1M | 200K (1M бета) | 64K |
+| **Claude Sonnet 4.6** | `claude-sonnet` | `claude-sonnet-4-6` | $3.00/1M | $15.00/1M | 200K (1M бета) | 64K |
 | **Claude Haiku 4.5** | `claude-haiku` | `claude-haiku-4-5-20251001` | $1.00/1M | $5.00/1M | 200K | 64K |
 | **Claude Opus 4.6** | `claude-opus` | `claude-opus-4-6` | $5.00/1M | $25.00/1M | 200K (1M бета) | 128K |
 
 **Алиасы:**
 - `title-model` → `claude-haiku-4-5-20251001`
-- `artifact-model` → `claude-sonnet-4-5-20250929`
+- `artifact-model` → `claude-sonnet-4-6`
 
 ### Google Gemini
 
@@ -205,12 +204,12 @@ const model = myProvider.languageModel('claude-sonnet');
 
 | ID | Реальный ID | Назначение |
 |----|-------------|------------|
-| `claude-sonnet` | `claude-sonnet-4-5-20250929` | Основной чат, Секретарь, Эксперт, артефакты |
+| `claude-sonnet` | `claude-sonnet-4-6` | Основной чат, Секретарь, Эксперт, артефакты |
 | `claude-haiku` | `claude-haiku-4-5-20251001` | Бен, Менеджер, Клерки, Исполнитель, заголовки |
 | `claude-opus` | `claude-opus-4-6` | Профессоры (планирование, ревью) |
 | `claude-sonnet-4-6` | `claude-sonnet-4-6` | Briefing: Онбординг, Автор статьи |
 | `title-model` | `claude-haiku-4-5-20251001` | Генерация заголовков чатов |
-| `artifact-model` | `claude-sonnet-4-5-20250929` | Генерация suggestions |
+| `artifact-model` | `claude-sonnet-4-6` | Генерация suggestions |
 
 ### Прямые экспорты (для pipelines и clerks)
 
@@ -270,7 +269,7 @@ PERPLEXITY_API_KEY=your_perplexity_api_key
 | Модель | 1K input + 1K output | 10K input + 2K output |
 |--------|---------------------|----------------------|
 | Claude Haiku 4.5 | $0.006 | $0.020 |
-| Claude Sonnet 4.5 | $0.018 | $0.060 |
+| Claude Sonnet 4.6 | $0.018 | $0.060 |
 | Claude Opus 4.6 | $0.030 | $0.100 |
 
 ---

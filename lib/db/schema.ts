@@ -4,6 +4,7 @@ import {
   foreignKey,
   index,
   integer,
+  numeric,
   uniqueIndex,
   json,
   jsonb,
@@ -503,3 +504,40 @@ export const savedBriefingTopics = pgTable(
 );
 
 export type SavedBriefingTopic = InferSelectModel<typeof savedBriefingTopics>;
+
+// ============================================================================
+// AI Usage Log (ТЗ-OPT1)
+// ============================================================================
+
+export const aiUsageLog = pgTable(
+  "ai_usage_log",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    chatId: uuid("chatId").references(() => chat.id),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    modelId: varchar("modelId", { length: 100 }).notNull(),
+    inputTokens: integer("inputTokens").notNull().default(0),
+    outputTokens: integer("outputTokens").notNull().default(0),
+    thinkingTokens: integer("thinkingTokens").notNull().default(0),
+    cacheWriteTokens: integer("cacheWriteTokens").notNull().default(0),
+    cacheReadTokens: integer("cacheReadTokens").notNull().default(0),
+    costUsd: numeric("costUsd", { precision: 10, scale: 6 }),
+    chatMode: varchar("chatMode", { length: 50 }).notNull(),
+    durationMs: integer("durationMs"),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+  },
+  (table) => ({
+    userCreatedAtIdx: index("ai_usage_log_user_created_idx").on(
+      table.userId,
+      table.createdAt
+    ),
+    chatModeCreatedAtIdx: index("ai_usage_log_chatmode_created_idx").on(
+      table.chatMode,
+      table.createdAt
+    ),
+  })
+);
+
+export type AiUsageLog = InferSelectModel<typeof aiUsageLog>;

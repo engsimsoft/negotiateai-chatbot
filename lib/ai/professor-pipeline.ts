@@ -17,6 +17,7 @@
 
 import { generateText, streamText, type CoreMessage } from "ai";
 import { myProvider } from "./providers";
+import { saveAiUsageLog } from "@/lib/db/queries";
 
 const analyzeModel = myProvider.languageModel("claude-opus");
 const executeModel = myProvider.languageModel("claude-haiku");
@@ -72,6 +73,10 @@ export interface ProfessorPipelineOptions {
   maxRetries?: number;
   /** Abort signal */
   signal?: AbortSignal;
+  /** ТЗ-OPT1: Chat ID for usage logging */
+  chatId?: string;
+  /** ТЗ-OPT1: User ID for usage logging */
+  userId?: string;
 }
 
 /**
@@ -183,6 +188,8 @@ export async function executeProfessorPipeline(
     onEvent,
     maxRetries = 2,
     signal,
+    chatId,
+    userId,
   } = options;
 
   console.log("[Professor] Starting pipeline for:", userMessage.slice(0, 100));
@@ -205,6 +212,18 @@ export async function executeProfessorPipeline(
       ],
       abortSignal: signal,
     });
+
+    // ТЗ-OPT1: Log analyze phase usage
+    if (userId && analyzeResult.usage) {
+      saveAiUsageLog({
+        chatId,
+        userId,
+        modelId: analyzeModel.modelId,
+        inputTokens: analyzeResult.usage.inputTokens ?? 0,
+        outputTokens: analyzeResult.usage.outputTokens ?? 0,
+        chatMode: "project:professor",
+      }).catch(() => {});
+    }
 
     const parsedSubtasks = parseSubtasks(analyzeResult.text);
     subtasks = parsedSubtasks.map((st) => ({
@@ -282,6 +301,18 @@ export async function executeProfessorPipeline(
           abortSignal: signal,
         });
 
+        // ТЗ-OPT1: Log execute phase usage
+        if (userId && executeResult.usage) {
+          saveAiUsageLog({
+            chatId,
+            userId,
+            modelId: executeModel.modelId,
+            inputTokens: executeResult.usage.inputTokens ?? 0,
+            outputTokens: executeResult.usage.outputTokens ?? 0,
+            chatMode: "project:professor",
+          }).catch(() => {});
+        }
+
         subtask.result = executeResult.text;
         subtask.status = "completed";
         results.push(executeResult.text);
@@ -335,6 +366,21 @@ export async function executeProfessorPipeline(
     for await (const chunk of synthesizeStream.textStream) {
       finalContent += chunk;
       onEvent({ type: "professor-content", content: chunk });
+    }
+
+    // ТЗ-OPT1: Log synthesize phase usage
+    if (userId) {
+      const synthUsage = await synthesizeStream.usage;
+      if (synthUsage) {
+        saveAiUsageLog({
+          chatId,
+          userId,
+          modelId: synthesizeModel.modelId,
+          inputTokens: synthUsage.inputTokens ?? 0,
+          outputTokens: synthUsage.outputTokens ?? 0,
+          chatMode: "project:professor",
+        }).catch(() => {});
+      }
     }
 
     console.log("[Professor] Pipeline completed successfully");

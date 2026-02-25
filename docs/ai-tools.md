@@ -406,7 +406,7 @@ requestSuggestions({
 ```
 
 ### Модель
-Использует **`artifact-model`** → Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) через `myProvider`.
+Использует **`artifact-model`** → Claude Sonnet 4.6 (`claude-sonnet-4-6`) через `myProvider`.
 
 ### Файл
 [lib/ai/tools/request-suggestions.ts](../lib/ai/tools/request-suggestions.ts)

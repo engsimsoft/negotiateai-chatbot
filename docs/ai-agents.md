@@ -155,7 +155,7 @@ lib/prompts/agents/
 | Параметр | Значение |
 |----------|----------|
 | ID | `chat` |
-| Модель | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) |
+| Модель | Claude Sonnet 4.6 (`claude-sonnet-4-6`) |
 | Инструменты | Все (search, documents, weather и др.) |
 | Сборка | `buildChatPrompt()` |
 
@@ -167,7 +167,7 @@ lib/prompts/agents/
 |----------|----------|
 | ID | `prompt-agent` |
 | Тип | Skill (utility/prompt-helper) |
-| Модель | Claude Sonnet 4.5 |
+| Модель | Claude Sonnet 4.6 |
 | Инструменты | Нет (только текст) |
 | UI | Модальное окно (кнопка 📝) |
 | Сборка | `buildPromptAgentPrompt()` |
@@ -214,7 +214,7 @@ AI-интервью для создания проектов.
 | Параметр | Значение |
 |----------|----------|
 | ID | `project-creation` |
-| Модель | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) |
+| Модель | Claude Sonnet 4.6 (`claude-sonnet-4-6`) |
 | Промпт | `lib/prompts/service-chats/project-creation.md` |
 | Оболочка | Full-page (split layout: preview + chat) |
 | Инструменты | `updateProjectDraft` |
@@ -253,7 +253,7 @@ AI-диалог по конкретной ProjectTask. Эксперт получ
 | Параметр | Значение |
 |----------|----------|
 | ID | `task-expert` |
-| Модель | `process.env.EXPERT_MODEL \|\| 'claude-sonnet'` (`claude-sonnet-4-5-20250929`) |
+| Модель | `process.env.EXPERT_MODEL \|\| 'claude-sonnet'` (`claude-sonnet-4-6`) |
 | Промпт | `lib/prompts/experts/task-expert.md` |
 | Prompt builder | `lib/prompts/build-task-expert-prompt.ts` |
 | Endpoint | `POST /api/projects/[id]/tasks/[taskId]/chat` |
@@ -519,9 +519,9 @@ components/modal-assistants/
 
 | Промпт | Модель по умолчанию | Причина |
 |--------|---------------------|---------|
-| chat | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) | Качество, инструменты |
+| chat | Claude Sonnet 4.6 (`claude-sonnet-4-6`) | Качество, инструменты |
 | ben | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Быстрые ответы, экономия |
-| task-expert | Claude Sonnet 4.5 (env override) | Качественный диалог по задаче |
+| task-expert | Claude Sonnet 4.6 (env override) | Качественный диалог по задаче |
 | task-summarizer | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Быстрая суммаризация |
 | task-reviewer | Claude Opus 4.6 (`claude-opus-4-6`) | Качественное ревью |
 | professor-planning | Claude Opus 4.6 (`claude-opus-4-6`) | Сложные аналитические задачи |

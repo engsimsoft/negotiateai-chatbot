@@ -80,7 +80,9 @@ export function BriefingPageClient({
   const [viewMode, setViewMode] = useState<BriefingViewMode>("read");
 
   // ТЗ-Б2: Podcast generation hook
-  const allTopicIds = article?.sections.map((s) => s.topicId) ?? [];
+  // Filter out Simply News — it's a platform communication channel, not user content for podcast
+  const podcastSections = article?.sections.filter((s) => s.topicId !== "simply_news") ?? [];
+  const allTopicIds = podcastSections.map((s) => s.topicId);
   const handlePodcastComplete = useCallback(
     (newUrls: AudioUrls, newDurations: AudioDurations, ready: number, failed: number) => {
       setAudioUrls((prev) => ({ ...prev, ...newUrls }));
@@ -92,7 +94,7 @@ export function BriefingPageClient({
   const podcast = usePodcastGeneration(allTopicIds, handlePodcastComplete);
 
   // ТЗ-Б2 Этап 3: Podcast player hook
-  const trackInfos = (article?.sections ?? []).map((s) => ({
+  const trackInfos = podcastSections.map((s) => ({
     topicId: s.topicId,
     emoji: s.emoji,
     topicName: s.topicName,
@@ -277,8 +279,8 @@ export function BriefingPageClient({
   }, [redirectUrl]);
 
   // ТЗ-Б2 Этап 5: Failed topics (for partial state in sidebar tracklist)
-  const failedPodcastTopics = audioStatus === "partial" && article
-    ? article.sections
+  const failedPodcastTopics = audioStatus === "partial"
+    ? podcastSections
         .filter((s) => !audioUrls[s.topicId])
         .map((s) => ({ topicId: s.topicId, emoji: s.emoji, topicName: s.topicName }))
     : [];
@@ -340,7 +342,7 @@ export function BriefingPageClient({
             ) : (
               <PodcastButton
                 audioStatus={audioStatus}
-                sections={article.sections}
+                sections={podcastSections}
                 isGenerating={podcast.isGenerating}
                 onGenerate={handleStartPodcast}
               />
@@ -393,6 +395,7 @@ export function BriefingPageClient({
             onSkipBackward: player.skipBackward,
             briefingDate: briefingGeneratedAt ?? undefined,
             isOutdated: audioStatus === "outdated",
+            onRerecordTrack: (topicId: string) => handleStartPodcast([topicId]),
           } : undefined}
           onSelectPodcastTrack={hasAudio ? player.setTrack : undefined}
           failedPodcastTopics={failedPodcastTopics.length > 0 ? failedPodcastTopics : undefined}

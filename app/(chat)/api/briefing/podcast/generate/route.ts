@@ -65,7 +65,8 @@ export async function POST(request: Request) {
         }
 
         // 2. Filter sections by requested topicIds (or all)
-        const sections = body.topicIds?.length
+        const isRerecord = !!body.topicIds?.length;
+        const sections = isRerecord
           ? article.sections.filter((s) =>
               body.topicIds!.includes(s.topicId),
             )
@@ -102,11 +103,18 @@ export async function POST(request: Request) {
         let readyCount = 0;
         let failedCount = 0;
 
-        const tasks = sections.map((section, index) => {
+        const tasks = sections.map((section) => {
           return limit(async () => {
+            // Use position in the FULL article for isFirst/isLast,
+            // so re-recording a single topic doesn't get greeting/farewell
+            const originalIndex = article.sections.findIndex(
+              (s) => s.topicId === section.topicId,
+            );
             const context: ScriptContext = {
-              isFirst: index === 0,
-              isLast: index === sections.length - 1,
+              isFirst: !isRerecord && originalIndex === 0,
+              isLast:
+                !isRerecord &&
+                originalIndex === article.sections.length - 1,
               sectionTitles,
               briefingDate: today,
             };

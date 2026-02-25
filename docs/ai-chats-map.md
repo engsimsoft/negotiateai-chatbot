@@ -484,7 +484,7 @@ lib/prompts/builder/index.ts          # buildChatPrompt, buildExpertisePrompt, b
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) |
+| **Модель** | Claude Sonnet 4.6 (`claude-sonnet-4-6`) |
 | **Input** | $3 / 1M токенов |
 | **Output** | $15 / 1M токенов |
 | **Контекст** | 200K (1M бета) |
@@ -559,12 +559,12 @@ const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export const myProvider = customProvider({
   languageModels: {
-    "claude-sonnet": anthropic("claude-sonnet-4-5-20250929"),
+    "claude-sonnet": anthropic("claude-sonnet-4-6"),
     "claude-haiku": anthropic("claude-haiku-4-5-20251001"),
     "claude-opus": anthropic("claude-opus-4-6"),
     "claude-sonnet-4-6": anthropic("claude-sonnet-4-6"),
     "title-model": anthropic("claude-haiku-4-5-20251001"),
-    "artifact-model": anthropic("claude-sonnet-4-5-20250929"),
+    "artifact-model": anthropic("claude-sonnet-4-6"),
   },
 });
 ```
@@ -593,8 +593,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
 
 | Модель | Input | Output | Контекст | Используется в |
 |--------|-------|--------|----------|---------------|
-| Claude Sonnet 4.6 (`claude-sonnet-4-6`) | — | — | — | Briefing: онбординг (v3.30), автор статьи (v3.38), секция (v3.42) |
-| Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) | $3 | $15 | 200K | Основной чат (DEFAULT), Секретарь, Эксперт, артефакты |
+| Claude Sonnet 4.6 (`claude-sonnet-4-6`) | $3 | $15 | 200K | Основной чат (DEFAULT), Секретарь, Эксперт, артефакты, Briefing (онбординг, автор, секция) |
 | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | $1 | $5 | 200K | Бен, Менеджер, Исполнитель, Клерки (анализатор, суммаризатор, snapshot) |
 | Claude Opus 4.6 (`claude-opus-4-6`) | $5 | $25 | 200K | Профессоры (планирование, ревью задач) |
 | Gemini 2.0 Flash (`gemini-2.0-flash`) | ~$0.10 | ~$0.40 | 1M | Briefing: фильтрация и дедупликация (v3.26) |

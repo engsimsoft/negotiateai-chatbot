@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Mic,
@@ -12,7 +12,15 @@ import {
   SkipBack,
   SkipForward,
   Download,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { PodcastTrack } from "@/hooks/use-podcast-player";
 
 interface PodcastPlayerProps {
@@ -35,6 +43,8 @@ interface PodcastPlayerProps {
   briefingDate?: string;
   /** ТЗ-Б2 Этап 5: Podcast is outdated (article updated after generation) */
   isOutdated?: boolean;
+  /** Re-record a single track by topicId */
+  onRerecordTrack?: (topicId: string) => void;
 }
 
 const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5];
@@ -94,6 +104,7 @@ export function PodcastPlayer({
   onSkipBackward,
   briefingDate,
   isOutdated,
+  onRerecordTrack,
 }: PodcastPlayerProps) {
   const progressRef = useRef<HTMLDivElement>(null);
 
@@ -136,6 +147,30 @@ export function PodcastPlayer({
         month: "long",
       })
     : undefined;
+
+  // Download all tracks merged into one MP3 (client-side concat — MP3 is a streaming format)
+  const [isMerging, setIsMerging] = useState(false);
+  const handleDownloadAll = useCallback(async () => {
+    if (tracks.length < 2) return;
+    setIsMerging(true);
+    try {
+      const buffers = await Promise.all(
+        tracks.map((t) => fetch(t.url).then((r) => r.arrayBuffer())),
+      );
+      const merged = new Blob(buffers, { type: "audio/mpeg" });
+      const url = URL.createObjectURL(merged);
+      const a = document.createElement("a");
+      a.href = url;
+      const label = dateLabel ?? "подкаст";
+      a.download = `Утренний брифинг — ${label}.mp3`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Fallback: nothing critical
+    } finally {
+      setIsMerging(false);
+    }
+  }, [tracks, dateLabel]);
 
   return (
     <div className="flex min-h-full flex-col items-center justify-center px-6 py-8">
@@ -184,11 +219,27 @@ export function PodcastPlayer({
         </div>
       </motion.div>
 
-      {/* Track info */}
-      <div className="mb-6 text-center">
+      {/* Track info + re-record */}
+      <div className="mb-6 flex items-center justify-center gap-2">
         <p className="text-[15px] font-semibold text-primary">
           {currentTrack.emoji} {currentTrack.topicName}
         </p>
+        {onRerecordTrack && (
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => onRerecordTrack(currentTrack.topicId)}
+                  className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+                >
+                  <RefreshCw className="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Перезаписать</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
 
       {/* Progress bar */}
@@ -215,82 +266,120 @@ export function PodcastPlayer({
       </div>
 
       {/* Controls — min 44px touch targets for mobile */}
-      <div className="mb-6 flex items-center gap-4 sm:gap-6">
-        <button
-          type="button"
-          onClick={onPrevTrack}
-          className="flex size-11 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-          title="Предыдущая тема"
-        >
-          <SkipBack className="size-5" />
-        </button>
+      <TooltipProvider delayDuration={300}>
+        <div className="mb-6 flex items-center gap-4 sm:gap-6">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onPrevTrack}
+                className="flex size-11 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <SkipBack className="size-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Предыдущая</TooltipContent>
+          </Tooltip>
 
-        <button
-          type="button"
-          onClick={onSkipBackward}
-          className="flex size-11 items-center justify-center text-lg font-semibold text-muted-foreground transition-colors hover:text-foreground"
-        >
-          -15
-        </button>
+          <button
+            type="button"
+            onClick={onSkipBackward}
+            className="flex size-11 items-center justify-center text-lg font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          >
+            -15
+          </button>
 
-        <button
-          type="button"
-          onClick={onTogglePlay}
-          className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
-        >
-          {isPlaying ? (
-            <Pause className="size-6" />
-          ) : (
-            <Play className="ml-0.5 size-6" />
-          )}
-        </button>
+          <button
+            type="button"
+            onClick={onTogglePlay}
+            className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
+          >
+            {isPlaying ? (
+              <Pause className="size-6" />
+            ) : (
+              <Play className="ml-0.5 size-6" />
+            )}
+          </button>
 
-        <button
-          type="button"
-          onClick={onSkipForward}
-          className="flex size-11 items-center justify-center text-lg font-semibold text-muted-foreground transition-colors hover:text-foreground"
-        >
-          +15
-        </button>
+          <button
+            type="button"
+            onClick={onSkipForward}
+            className="flex size-11 items-center justify-center text-lg font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          >
+            +15
+          </button>
 
-        <button
-          type="button"
-          onClick={onNextTrack}
-          className="flex size-11 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-          title="Следующая тема"
-        >
-          <SkipForward className="size-5" />
-        </button>
-      </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onNextTrack}
+                className="flex size-11 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <SkipForward className="size-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Следующая</TooltipContent>
+          </Tooltip>
+        </div>
+      </TooltipProvider>
 
       {/* Speed pills + Download */}
-      <div className="flex items-center gap-2">
-        <div className="flex gap-1">
-          {SPEED_OPTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => onSetSpeed(s)}
-              className={`rounded-2xl border px-3.5 py-1.5 text-[13px] font-semibold transition-all duration-150 ${
-                speed === s
-                  ? "border-primary text-primary"
-                  : "border-border text-muted-foreground hover:border-primary hover:text-primary"
-              }`}
-            >
-              {s}×
-            </button>
-          ))}
-        </div>
+      <TooltipProvider delayDuration={300}>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1">
+            {SPEED_OPTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => onSetSpeed(s)}
+                className={`rounded-2xl border px-3.5 py-1.5 text-[13px] font-semibold transition-all duration-150 ${
+                  speed === s
+                    ? "border-primary text-primary"
+                    : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+                }`}
+              >
+                {s}×
+              </button>
+            ))}
+          </div>
 
-        <button
-          type="button"
-          onClick={handleDownload}
-          className="flex items-center gap-1.5 rounded-2xl border border-border px-3.5 py-1.5 text-[13px] text-muted-foreground transition-all duration-150 hover:border-primary hover:text-primary"
-        >
-          <Download className="size-3.5" />
-          MP3
-        </button>
-      </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="flex items-center gap-1.5 rounded-2xl border border-border px-3.5 py-1.5 text-[13px] text-muted-foreground transition-all duration-150 hover:border-primary hover:text-primary"
+              >
+                <Download className="size-3.5" />
+                MP3
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Скачать трек</TooltipContent>
+          </Tooltip>
+
+          {tracks.length >= 2 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={handleDownloadAll}
+                  disabled={isMerging}
+                  className="flex items-center gap-1.5 rounded-2xl border border-border px-3.5 py-1.5 text-[13px] text-muted-foreground transition-all duration-150 hover:border-primary hover:text-primary disabled:opacity-50"
+                >
+                  {isMerging ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Download className="size-3.5" />
+                  )}
+                  Всё
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Весь подкаст одним файлом</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      </TooltipProvider>
     </div>
   );
 }
