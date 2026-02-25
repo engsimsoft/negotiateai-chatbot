@@ -76,7 +76,7 @@
     "gray-matter": "^4.0.3",
     "html2pdf.js": "^0.14.0",
     "iconv-lite": "^0.7.2",
-    "jsdom": "^28.1.0",
+    "jsdom": "26.1.0",
     "lamejs": "^1.2.1",
     "lucide-react": "^0.446.0",
     "mammoth": "^1.11.0",
