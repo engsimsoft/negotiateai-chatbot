@@ -12,6 +12,17 @@
 
 ---
 
+## [3.48.0] - 2026-02-25 - OnboardingTelegram
+
+**ТЗ-TG2**: Telegram-каналы в онбординге брифинга — агент находит, валидирует и добавляет TG-каналы как источники.
+
+### Changed
+- **Briefing onboarding prompt v8 → v9** — новая секция `<telegram_channels>` (поиск через целевой deepResearch, валидация через readTelegramChannel, формат sourceName: `"@username"`)
+- **readTelegramChannel добавлен в tools онбординга** — `app/(chat)/api/service-chat/route.ts`, блок `briefing-onboarding`
+- Обновлены `<tools_usage>` (readTelegramChannel + целевой TG-запрос для deepResearch), `<edge_cases>`, `<output_format>` (пример TG-источника)
+
+---
+
 ## [3.47.0] - 2026-02-25 - TelegramPhase1
 
 **ТЗ-TG1**: Чтение публичных Telegram-каналов — новый tool `readTelegramChannel` + shared parser + миграция briefing fetcher.
