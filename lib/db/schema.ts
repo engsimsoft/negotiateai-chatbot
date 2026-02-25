@@ -1,5 +1,6 @@
 import type { InferSelectModel } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   foreignKey,
   index,
@@ -541,3 +542,33 @@ export const aiUsageLog = pgTable(
 );
 
 export type AiUsageLog = InferSelectModel<typeof aiUsageLog>;
+
+// ============================================================================
+// Telegram Bot (ТЗ-TG3)
+// ============================================================================
+
+export const telegramConnection = pgTable("TelegramConnection", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  userId: uuid("userId")
+    .notNull()
+    .unique()
+    .references(() => user.id),
+  telegramUserId: bigint("telegramUserId", { mode: "number" }).notNull().unique(),
+  telegramUsername: text("telegramUsername"),
+  telegramFirstName: text("telegramFirstName"),
+  isActive: boolean("isActive").notNull().default(true),
+  linkedAt: timestamp("linkedAt").notNull(),
+});
+
+export type TelegramConnection = InferSelectModel<typeof telegramConnection>;
+
+export const telegramLinkToken = pgTable("TelegramLinkToken", {
+  token: text("token").primaryKey().notNull(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id),
+  createdAt: timestamp("createdAt").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+});
+
+export type TelegramLinkToken = InferSelectModel<typeof telegramLinkToken>;

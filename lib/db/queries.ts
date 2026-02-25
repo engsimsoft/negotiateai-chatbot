@@ -54,6 +54,10 @@ import {
   type Suggestion,
   stream,
   suggestion,
+  type TelegramConnection,
+  telegramConnection,
+  type TelegramLinkToken,
+  telegramLinkToken,
   type User,
   user,
   vote,
@@ -3497,5 +3501,210 @@ export async function saveAiUsageLog({
     });
   } catch (error) {
     console.error("[saveAiUsageLog] Failed to save usage log:", error);
+  }
+}
+
+// ============================================================================
+// Telegram Bot (ТЗ-TG3)
+// ============================================================================
+
+/**
+ * ТЗ-TG3: Get Telegram connection by Simply userId
+ */
+export async function getTelegramConnection({
+  userId,
+}: {
+  userId: string;
+}): Promise<TelegramConnection | null> {
+  try {
+    const [connection] = await db
+      .select()
+      .from(telegramConnection)
+      .where(eq(telegramConnection.userId, userId));
+
+    return connection || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get Telegram connection"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG3: Get Telegram connection by Telegram user ID
+ */
+export async function getTelegramConnectionByTelegramId({
+  telegramUserId,
+}: {
+  telegramUserId: number;
+}): Promise<TelegramConnection | null> {
+  try {
+    const [connection] = await db
+      .select()
+      .from(telegramConnection)
+      .where(eq(telegramConnection.telegramUserId, telegramUserId));
+
+    return connection || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get Telegram connection by Telegram ID"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG3: Create a new Telegram connection (link Simply ↔ Telegram)
+ */
+export async function createTelegramConnection({
+  userId,
+  telegramUserId,
+  telegramUsername,
+  telegramFirstName,
+}: {
+  userId: string;
+  telegramUserId: number;
+  telegramUsername?: string | null;
+  telegramFirstName?: string | null;
+}) {
+  try {
+    const [created] = await db
+      .insert(telegramConnection)
+      .values({
+        userId,
+        telegramUserId,
+        telegramUsername: telegramUsername ?? null,
+        telegramFirstName: telegramFirstName ?? null,
+        linkedAt: new Date(),
+      })
+      .returning();
+
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create Telegram connection"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG3: Delete Telegram connection (unlink)
+ */
+export async function deleteTelegramConnection({
+  userId,
+}: {
+  userId: string;
+}) {
+  try {
+    await db
+      .delete(telegramConnection)
+      .where(eq(telegramConnection.userId, userId));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete Telegram connection"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG3: Toggle isActive on Telegram connection (/stop, /start)
+ */
+export async function setTelegramConnectionActive({
+  userId,
+  isActive,
+}: {
+  userId: string;
+  isActive: boolean;
+}) {
+  try {
+    const [updated] = await db
+      .update(telegramConnection)
+      .set({ isActive })
+      .where(eq(telegramConnection.userId, userId))
+      .returning();
+
+    return updated || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update Telegram connection active status"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG3: Create a link token (UUID, expires in 10 minutes)
+ */
+export async function createTelegramLinkToken({
+  userId,
+}: {
+  userId: string;
+}) {
+  try {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000); // +10 min
+
+    const [created] = await db
+      .insert(telegramLinkToken)
+      .values({
+        token: generateUUID(),
+        userId,
+        createdAt: now,
+        expiresAt,
+      })
+      .returning();
+
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create Telegram link token"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG3: Get a link token (for validation during /start deep link)
+ */
+export async function getTelegramLinkToken({
+  token,
+}: {
+  token: string;
+}): Promise<TelegramLinkToken | null> {
+  try {
+    const [linkToken] = await db
+      .select()
+      .from(telegramLinkToken)
+      .where(eq(telegramLinkToken.token, token));
+
+    return linkToken || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get Telegram link token"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG3: Delete a used link token
+ */
+export async function deleteTelegramLinkToken({
+  token,
+}: {
+  token: string;
+}) {
+  try {
+    await db
+      .delete(telegramLinkToken)
+      .where(eq(telegramLinkToken.token, token));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete Telegram link token"
+    );
   }
 }
