@@ -8,7 +8,7 @@
  */
 
 import type { LucideIcon } from "lucide-react";
-import { FileText, FlaskConical, FolderOpen, Globe, Pencil, Search, Table2 } from "lucide-react";
+import { FileText, FlaskConical, FolderOpen, Globe, Pencil, Search, Send, Table2 } from "lucide-react";
 
 export interface ToolActivityConfig {
   icon: LucideIcon;
@@ -104,6 +104,27 @@ export const TOOL_ACTIVITY_CONFIG: Record<string, ToolActivityConfig> = {
       if (typeof result?.originalLength === "number")
         parts.push(`${Math.round(result.originalLength / 1000)}k символов`);
       return parts.length > 0 ? parts.join(" — ") : null;
+    },
+  },
+
+  readTelegramChannel: {
+    icon: Send,
+    activeLabel: "Читаю Telegram-канал",
+    doneLabel: "Канал прочитан",
+    argsFormatter: (args) => {
+      if (!args?.channel) return null;
+      const ch = args.channel.replace(/^@/, "");
+      return `@${ch}`;
+    },
+    resultFormatter: (result) => {
+      if (!result?.isValid) return "Канал недоступен";
+      const count = result?.posts?.length;
+      if (typeof count === "number") return `${count} постов`;
+      return null;
+    },
+    resultCounter: (result) => {
+      if (!result?.isValid) return 0;
+      return result?.posts?.length ?? 0;
     },
   },
 };

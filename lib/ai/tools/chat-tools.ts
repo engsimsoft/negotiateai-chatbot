@@ -20,6 +20,7 @@ import { webSearch } from "./web-search";
 import { fetchUrl } from "./fetch-url";
 import { deepResearch } from "./deep-research";
 import { loadSkill } from "./load-skill";
+import { readTelegramChannel } from "./read-telegram-channel";
 
 interface GetStandardToolsParams {
   session: Session;
@@ -70,6 +71,7 @@ export function getStandardTools({
     deepResearch: deepResearch({ defaultDepth: researchDepth }),
     parseExcel,
     loadSkill,
+    readTelegramChannel,
   };
 }
 
@@ -88,6 +90,7 @@ const ALL_TOOL_NAMES = [
   "readDocument",
   "readProjectFile",
   "createSnapshot",
+  "readTelegramChannel",
 ] as const;
 
 type ToolName = (typeof ALL_TOOL_NAMES)[number];
@@ -117,6 +120,7 @@ export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode):
       "loadSkill",
       "readProjectFile",
       "createSnapshot",
+      "readTelegramChannel",
     ];
   }
 
@@ -133,6 +137,7 @@ export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode):
     "parseExcel",
     "loadSkill",
     "createSnapshot",
+    "readTelegramChannel",
   ];
 
   // Filter out expensive tools for chatMode 'chat' (Haiku)

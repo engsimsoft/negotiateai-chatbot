@@ -23,6 +23,7 @@ const AVAILABLE_SKILLS = [
   "document/create-text-document",
   "document/analyze-document",
   "research/web-research",
+  "research/telegram-channel-reading",
 ] as const;
 
 type SkillId = (typeof AVAILABLE_SKILLS)[number];
@@ -42,6 +43,7 @@ export const loadSkill = tool({
 - Перед созданием документа → loadSkill("document/create-text-document")
 - Перед анализом файла → loadSkill("document/analyze-document")
 - Перед поиском информации → loadSkill("research/web-research")
+- Перед чтением Telegram-канала → loadSkill("research/telegram-channel-reading")
 
 ПРАВИЛО: Для сложных задач СНАЧАЛА загрузи инструкции, ПОТОМ выполняй.
 Инструкции содержат важные правила — например, какие вопросы задать пользователю.`,
