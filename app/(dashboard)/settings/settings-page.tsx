@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import useSWR from "swr";
-import { ArrowLeft, User, Monitor, Palette } from "lucide-react";
+import { ArrowLeft, User, Monitor, Palette, Link, Loader2 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,11 +47,16 @@ const OCCUPATION_OPTIONS = [
   "Другое",
 ];
 
-type Section = "profile" | "account" | "appearance";
+type Section = "profile" | "account" | "connections" | "appearance";
 
 const SECTIONS: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: "profile", label: "Профиль", icon: <User className="size-4" /> },
   { id: "account", label: "Аккаунт", icon: <Monitor className="size-4" /> },
+  {
+    id: "connections",
+    label: "Подключения",
+    icon: <Link className="size-4" />,
+  },
   {
     id: "appearance",
     label: "Внешний вид",
@@ -189,6 +195,8 @@ export function SettingsPage() {
               {activeSection === "account" && (
                 <AccountSection email={profile?.email || ""} />
               )}
+
+              {activeSection === "connections" && <ConnectionsSection />}
 
               {activeSection === "appearance" && (
                 <AppearanceSection
@@ -331,6 +339,206 @@ function AccountSection({ email }: { email: string }) {
         <div className="rounded-md border p-4 text-sm text-muted-foreground">
           Смена пароля и удаление аккаунта будут доступны в следующих обновлениях.
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// ТЗ-TG3: Telegram connection section
+// ============================================================================
+
+interface TelegramStatus {
+  connected: boolean;
+  username?: string;
+  firstName?: string;
+  linkedAt?: string;
+  isActive?: boolean;
+}
+
+function ConnectionsSection() {
+  const [status, setStatus] = useState<TelegramStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLinking, setIsLinking] = useState(false);
+  const [isUnlinking, setIsUnlinking] = useState(false);
+  const [linkUrl, setLinkUrl] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+
+  // Fetch current status
+  const fetchStatus = async () => {
+    try {
+      const res = await fetch("/api/telegram/link");
+      if (res.ok) {
+        const data: TelegramStatus = await res.json();
+        setStatus(data);
+        return data;
+      }
+    } catch {
+      // silently fail
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    fetchStatus().finally(() => setIsLoading(false));
+  }, []);
+
+  // Polling after link generation
+  useEffect(() => {
+    if (!isPolling) return;
+
+    const startTime = Date.now();
+    const maxDuration = 2 * 60 * 1000; // 2 minutes
+
+    const interval = setInterval(async () => {
+      if (Date.now() - startTime > maxDuration) {
+        clearInterval(interval);
+        setIsPolling(false);
+        setLinkUrl(null);
+        return;
+      }
+
+      const data = await fetchStatus();
+      if (data?.connected) {
+        clearInterval(interval);
+        setIsPolling(false);
+        setLinkUrl(null);
+        toast({ type: "success", description: "Telegram подключён" });
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isPolling]);
+
+  const handleConnect = async () => {
+    setIsLinking(true);
+    try {
+      const res = await fetch("/api/telegram/link", { method: "POST" });
+      if (!res.ok) throw new Error("Failed to generate link");
+
+      const data = await res.json();
+      setLinkUrl(data.linkUrl);
+      window.open(data.linkUrl, "_blank");
+      setIsPolling(true);
+    } catch {
+      toast({ type: "error", description: "Не удалось создать ссылку" });
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setIsUnlinking(true);
+    try {
+      const res = await fetch("/api/telegram/link", { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to unlink");
+
+      setStatus({ connected: false });
+      setLinkUrl(null);
+      toast({ type: "success", description: "Telegram отключён" });
+    } catch {
+      toast({ type: "error", description: "Не удалось отключить" });
+    } finally {
+      setIsUnlinking(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold">Подключения</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Внешние сервисы
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Загрузка...
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold">Подключения</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Внешние сервисы
+        </p>
+      </div>
+
+      <div className="rounded-md border p-4 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-[#2AABEE]/10">
+            <svg viewBox="0 0 24 24" className="size-5 text-[#2AABEE]" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-medium">Telegram</h3>
+            {status?.connected ? (
+              <p className="text-xs text-muted-foreground">
+                {status.username ? `@${status.username}` : status.firstName || "Подключён"}
+                {status.linkedAt && (
+                  <> · {new Date(status.linkedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}</>
+                )}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Доставка брифингов и уведомления
+              </p>
+            )}
+          </div>
+
+          {status?.connected ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDisconnect}
+              disabled={isUnlinking}
+            >
+              {isUnlinking ? "Отключение..." : "Отключить"}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={handleConnect}
+              disabled={isLinking || isPolling}
+            >
+              {isLinking ? "Создание ссылки..." : isPolling ? "Ожидание..." : "Подключить"}
+            </Button>
+          )}
+        </div>
+
+        {/* QR code + link after generating */}
+        {linkUrl && !status?.connected && (
+          <div className="border-t pt-4 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Отсканируйте QR-код камерой телефона или нажмите кнопку выше.
+            </p>
+            <div className="flex justify-center">
+              <div className="rounded-lg border bg-white p-3">
+                <QRCodeSVG value={linkUrl} size={160} />
+              </div>
+            </div>
+            {isPolling && (
+              <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1.5">
+                <Loader2 className="size-3 animate-spin" />
+                Ожидание подключения...
+              </p>
+            )}
+          </div>
+        )}
+
+        {status?.connected && (
+          <div className="border-t pt-3">
+            <p className="text-xs text-muted-foreground">
+              Бот доставляет утренний брифинг в Telegram. Управление доставкой — в настройках брифинга.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
