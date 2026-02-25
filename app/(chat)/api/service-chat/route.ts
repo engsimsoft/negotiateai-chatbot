@@ -37,6 +37,7 @@ import {
 } from "@/lib/db/queries";
 import { deepResearch } from "@/lib/ai/tools/deep-research";
 import { fetchUrl } from "@/lib/ai/tools/fetch-url";
+import { readTelegramChannel } from "@/lib/ai/tools/read-telegram-channel";
 import { ChatSDKError } from "@/lib/errors";
 import { generateUUID } from "@/lib/utils";
 import type { Project } from "@/lib/db/schema";
@@ -736,6 +737,9 @@ export async function POST(request: Request) {
 
       // fetchUrl for verifying specific sources
       tools.fetchUrl = fetchUrl;
+
+      // ТЗ-TG2: readTelegramChannel for validating Telegram channels
+      tools.readTelegramChannel = readTelegramChannel;
     }
 
     // ТЗ-A3: Server persistence for project-manager
