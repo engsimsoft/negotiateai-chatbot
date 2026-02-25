@@ -19,9 +19,7 @@ export const readTelegramChannel = tool({
 - Пользователь указывает @channel или ссылку t.me/channel
 
 Принимает: имя канала (@durov, durov, t.me/durov — любой формат).
-Возвращает: массив постов (text, date, url, hasMedia).
-
-ВАЖНО: Перед вызовом загрузи инструкции через loadSkill("research/telegram-channel-reading").`,
+Возвращает: массив постов (text, date, url, hasMedia).`,
 
   inputSchema: z.object({
     channel: z
