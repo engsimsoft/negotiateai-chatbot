@@ -1,8 +1,8 @@
 # Инструменты AI-агентов
 
-**Версия:** 3.35.0
-**Последнее обновление:** 2026-02-21
-**Статус:** 13 инструментов (deepResearch + fetchUrl добавлены в v3.29.0, Jina Reader fallback в v3.35.0)
+**Версия:** 3.47.0
+**Последнее обновление:** 2026-02-25
+**Статус:** 14 инструментов (+readTelegramChannel в v3.47.0)
 
 ---
 
@@ -33,6 +33,7 @@
 | `loadSkill` | Загрузка инструкций из SKILL.md | Все агенты |
 | `readProjectFile` | Чтение файлов проекта по имени из manifest | Только проектные чаты (Эксперт) |
 | `createSnapshot` | Фиксация прогресса диалога (сжатие контекста) | Все чаты (при наличии chatId + messageId) |
+| `readTelegramChannel` | Чтение публичных Telegram-каналов (посты, даты, медиа) | Все агенты |
 
 > **Примечание:** Excel создаётся через `createDocument(kind: "excel")`, редактируется через `updateDocument`. Отдельный `parseExcel` используется только для анализа **загруженных** пользователем файлов.
 
@@ -294,6 +295,69 @@ getCurrentDate()  // Без параметров
 
 ---
 
+## Read Telegram Channel
+
+Чтение публичных Telegram-каналов. Добавлен в v3.47.0 (ТЗ-TG1).
+
+### Возможности
+- Чтение последних постов публичного канала
+- Определение приватных/несуществующих каналов (redirect detection)
+- Медиа-детекция (фото, видео, документы, стикеры, голосовые)
+- Диапазон дат (oldestDate, newestDate)
+- Любой формат ввода: @channel, channel, t.me/channel
+
+### Параметры
+
+```typescript
+readTelegramChannel({
+  channel: string,      // @handle, handle, или t.me/handle URL
+  maxPosts?: number,    // 1-50, default 50
+})
+```
+
+### Возвращает
+
+```typescript
+{
+  isValid: boolean,
+  channel: string,
+  channelUrl: string,
+  totalFetched: number,       // Сколько постов доступно на странице
+  posts: TelegramPost[],      // text, date, url, hasMedia
+  oldestDate: string | null,  // ISO 8601
+  newestDate: string | null,  // ISO 8601
+  error?: string,             // При isValid=false
+}
+```
+
+### Архитектура
+
+Обёртка над shared parser `lib/telegram/parser.ts`:
+
+```
+readTelegramChannel (AI tool)
+  └─ parseTelegramChannel (shared parser)
+       └─ fetch t.me/s/{channel} + cheerio parsing
+```
+
+Shared parser также используется в briefing fetcher (`lib/briefing/source-fetchers/telegram-fetcher.ts`).
+
+### Skill
+
+При анализе канала модель загружает `loadSkill("research/telegram-channel-reading")` — инструкции для структурированного анализа (тематика, частота, стиль, аудитория).
+
+### Файл
+[lib/ai/tools/read-telegram-channel.ts](../lib/ai/tools/read-telegram-channel.ts)
+
+### Пример использования
+```
+Прочитай канал @durov
+Проанализируй @breakingmash
+Сравни @rbc_news и @tass_agency
+```
+
+---
+
 ## Read Document
 
 Чтение документов из базы знаний (папка `knowledge/`).
@@ -507,6 +571,7 @@ parseExcel({
 | Создание документа | `document/create-text-document` |
 | Анализ файла | `document/analyze-document` |
 | Веб-поиск | `research/web-research` |
+| Чтение Telegram-канала | `research/telegram-channel-reading` |
 
 ### Параметры
 
@@ -785,6 +850,7 @@ export function getStandardTools({ session, dataStream, isProjectChat, projectId
     deepResearch: deepResearch({ defaultDepth: researchDepth }),  // v3.29.0 (factory)
     parseExcel,
     loadSkill,
+    readTelegramChannel,                                       // v3.47.0
   };
 }
 
@@ -879,4 +945,4 @@ const CHAT_MODE_EXCLUDED_TOOLS = ["fetchUrl", "deepResearch"];
 
 ---
 
-**Обновлено:** 2026-02-22 (v3.43.0 — fix requestSuggestions model: Gemini → Claude artifact-model)
+**Обновлено:** 2026-02-25 (v3.47.0 — +readTelegramChannel tool, shared Telegram parser)

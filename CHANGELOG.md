@@ -12,6 +12,26 @@
 
 ---
 
+## [3.47.0] - 2026-02-25 - TelegramPhase1
+
+**ТЗ-TG1**: Чтение публичных Telegram-каналов — новый tool `readTelegramChannel` + shared parser + миграция briefing fetcher.
+
+### Added
+- **`readTelegramChannel` tool** — чтение публичных Telegram-каналов. Принимает @handle/URL, возвращает массив постов (text, date, url, hasMedia). Доступен во всех режимах (chat, expertise, create, projects)
+- **Shared Telegram parser** (`lib/telegram/`) — универсальный парсер: `types.ts` (TelegramPost, TelegramParseResult, ParseTelegramOptions), `utils.ts` (normalizeChannelUrl, extractChannelHandle), `parser.ts` (parseTelegramChannel — cheerio, hasMedia, isValid, freshness filter, redirect detection)
+- **SKILL.md** `research/telegram-channel-reading` — инструкции для анализа каналов (быстрый ответ, полный анализ, сравнение, цитирование)
+- **UI индикатор** — "Читаю Telegram-канал" / "Канал прочитан" с @channel и N постов (Send icon)
+
+### Changed
+- **Briefing telegram-fetcher** — переписан с inline cheerio-парсинга на shared `parseTelegramChannel()` (83 → 33 строки). Контракт FetchResult сохранён
+
+### Technical
+- `loadSkill` обновлён: +`research/telegram-channel-reading` в AVAILABLE_SKILLS и description
+- `chat-tools.ts`: +readTelegramChannel в getStandardTools, ALL_TOOL_NAMES, getActiveToolNames (оба списка). НЕ в CHAT_MODE_EXCLUDED_TOOLS (доступен для Haiku)
+- `tool-activity-config.ts`: +readTelegramChannel entry (Send icon, argsFormatter, resultFormatter, resultCounter)
+
+---
+
 ## [3.46.0] - 2026-02-25 - UsageLogging + SonnetMigration
 
 **ТЗ-OPT1**: Логирование использования AI + миграция основной модели Sonnet.
