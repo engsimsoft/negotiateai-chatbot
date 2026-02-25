@@ -9,10 +9,7 @@ import {
   streamText,
 } from "ai";
 import { z } from "zod";
-import { unstable_cache as cache } from "next/cache";
-import type { ModelCatalog } from "tokenlens/core";
-import { fetchModels } from "tokenlens/fetch";
-import { getUsage } from "tokenlens/helpers";
+import { getTokenlensCatalog, getUsage } from "@/lib/ai/tokenlens-catalog";
 import { auth } from "@/app/(auth)/auth";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import { getModelForChatMode } from "@/lib/ai/chat-mode-config";
@@ -191,21 +188,6 @@ async function convertTextFilesInAllMessages(
   return Promise.all(messages.map(convertTextFilePartsInMessage));
 }
 
-const getTokenlensCatalog = cache(
-  async (): Promise<ModelCatalog | undefined> => {
-    try {
-      return await fetchModels();
-    } catch (err) {
-      console.warn(
-        "TokenLens: catalog fetch failed, using default catalog",
-        err
-      );
-      return; // tokenlens helpers will fall back to defaultCatalog
-    }
-  },
-  ["tokenlens-catalog"],
-  { revalidate: 24 * 60 * 60 } // 24 hours
-);
 
 export async function POST(request: Request) {
   let requestBody: PostRequestBody;

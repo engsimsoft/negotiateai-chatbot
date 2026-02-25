@@ -28,6 +28,7 @@ import {
 } from "@/lib/db/queries";
 import { calcUsagePercent, SNAPSHOT_THRESHOLD, FALLBACK_MESSAGE_PAIRS } from "@/lib/ai/context-limits";
 import { createFallbackSnapshot } from "@/lib/ai/clerks/snapshot-creator";
+import { calcCostUsd } from "@/lib/ai/tokenlens-catalog";
 import { ChatSDKError } from "@/lib/errors";
 import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages } from "@/lib/utils";
 
@@ -311,13 +312,14 @@ export async function POST(
             // ТЗ-OPT1: Usage logging (fire-and-forget)
             const TIER_ALIAS: Record<string, string> = { executor: "claude-haiku", expert: "claude-sonnet", professor: "claude-opus" };
             const resolvedModelId = myProvider.languageModel(TIER_ALIAS[tier] || "claude-sonnet").modelId;
+            const costUsd = await calcCostUsd(resolvedModelId, usage);
             saveAiUsageLog({
               chatId,
               userId: session.user.id,
               modelId: resolvedModelId,
               inputTokens: usage.inputTokens ?? 0,
               outputTokens: usage.outputTokens ?? 0,
-              costUsd: null,
+              costUsd,
               chatMode: `project:${tier}`,
               durationMs: totalTime,
             }).catch(() => {});

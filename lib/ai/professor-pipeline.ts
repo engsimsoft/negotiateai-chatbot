@@ -18,6 +18,7 @@
 import { generateText, streamText, type CoreMessage } from "ai";
 import { myProvider } from "./providers";
 import { saveAiUsageLog } from "@/lib/db/queries";
+import { calcCostUsd } from "./tokenlens-catalog";
 
 const analyzeModel = myProvider.languageModel("claude-opus");
 const executeModel = myProvider.languageModel("claude-haiku");
@@ -215,12 +216,14 @@ export async function executeProfessorPipeline(
 
     // ТЗ-OPT1: Log analyze phase usage
     if (userId && analyzeResult.usage) {
+      const costUsd = await calcCostUsd(analyzeModel.modelId, analyzeResult.usage);
       saveAiUsageLog({
         chatId,
         userId,
         modelId: analyzeModel.modelId,
         inputTokens: analyzeResult.usage.inputTokens ?? 0,
         outputTokens: analyzeResult.usage.outputTokens ?? 0,
+        costUsd,
         chatMode: "project:professor",
       }).catch(() => {});
     }
@@ -303,12 +306,14 @@ export async function executeProfessorPipeline(
 
         // ТЗ-OPT1: Log execute phase usage
         if (userId && executeResult.usage) {
+          const costUsd = await calcCostUsd(executeModel.modelId, executeResult.usage);
           saveAiUsageLog({
             chatId,
             userId,
             modelId: executeModel.modelId,
             inputTokens: executeResult.usage.inputTokens ?? 0,
             outputTokens: executeResult.usage.outputTokens ?? 0,
+            costUsd,
             chatMode: "project:professor",
           }).catch(() => {});
         }
@@ -372,12 +377,14 @@ export async function executeProfessorPipeline(
     if (userId) {
       const synthUsage = await synthesizeStream.usage;
       if (synthUsage) {
+        const costUsd = await calcCostUsd(synthesizeModel.modelId, synthUsage);
         saveAiUsageLog({
           chatId,
           userId,
           modelId: synthesizeModel.modelId,
           inputTokens: synthUsage.inputTokens ?? 0,
           outputTokens: synthUsage.outputTokens ?? 0,
+          costUsd,
           chatMode: "project:professor",
         }).catch(() => {});
       }
