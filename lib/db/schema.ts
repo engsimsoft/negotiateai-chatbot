@@ -391,6 +391,9 @@ export const briefingSettings = pgTable(
     language: varchar("language", { length: 10 }).notNull().default("ru"),
     maxItems: integer("maxItems").notNull().default(15),
     volume: varchar("volume", { length: 20 }).notNull().default("standard"),
+    // ТЗ-TG4a: Delivery settings
+    deliveryEnabled: boolean("deliveryEnabled").notNull().default(false),
+    deliveryFormat: varchar("deliveryFormat", { length: 20 }).notNull().default("text_audio"),
     createdAt: timestamp("createdAt").notNull(),
     updatedAt: timestamp("updatedAt").notNull(),
   },
@@ -467,6 +470,8 @@ export const briefingHistory = pgTable(
     status: varchar("status", { length: 20 }).notNull(),
     generatedAt: timestamp("generatedAt").notNull(),
     createdAt: timestamp("createdAt").notNull(),
+    // ТЗ-TG4a: Delivery status per-issue
+    deliveryStatus: varchar("deliveryStatus", { length: 20 }).notNull().default("none"),
     // ТЗ-Б1: Podcast Engine audio columns
     audioUrls: jsonb("audioUrls"),
     audioStatus: text("audioStatus").default("none"),

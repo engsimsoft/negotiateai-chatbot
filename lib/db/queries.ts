@@ -2749,6 +2749,8 @@ export async function upsertBriefingSettings({
   language,
   maxItems,
   volume,
+  deliveryEnabled,
+  deliveryFormat,
 }: {
   userId: string;
   isActive?: boolean;
@@ -2757,6 +2759,8 @@ export async function upsertBriefingSettings({
   language?: string;
   maxItems?: number;
   volume?: string;
+  deliveryEnabled?: boolean;
+  deliveryFormat?: string;
 }) {
   try {
     const now = new Date();
@@ -2770,6 +2774,8 @@ export async function upsertBriefingSettings({
       if (language !== undefined) updateData.language = language;
       if (maxItems !== undefined) updateData.maxItems = maxItems;
       if (volume !== undefined) updateData.volume = volume;
+      if (deliveryEnabled !== undefined) updateData.deliveryEnabled = deliveryEnabled;
+      if (deliveryFormat !== undefined) updateData.deliveryFormat = deliveryFormat;
 
       const [updated] = await db
         .update(briefingSettings)
@@ -2790,6 +2796,8 @@ export async function upsertBriefingSettings({
         language: language ?? "ru",
         maxItems: maxItems ?? 15,
         volume: volume ?? "standard",
+        deliveryEnabled: deliveryEnabled ?? false,
+        deliveryFormat: deliveryFormat ?? "text_audio",
         createdAt: now,
         updatedAt: now,
       })
@@ -2801,6 +2809,97 @@ export async function upsertBriefingSettings({
       "bad_request:database",
       "Failed to upsert briefing settings"
     );
+  }
+}
+
+/**
+ * ТЗ-TG4a: Update delivery status on a briefing history record
+ */
+export async function updateBriefingDeliveryStatus({
+  briefingId,
+  deliveryStatus,
+}: {
+  briefingId: string;
+  deliveryStatus: "none" | "pending" | "sent" | "failed";
+}) {
+  try {
+    const [updated] = await db
+      .update(briefingHistory)
+      .set({ deliveryStatus })
+      .where(eq(briefingHistory.id, briefingId))
+      .returning();
+
+    return updated;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update briefing delivery status"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG4a: Get users whose delivery window matches the current cron slot.
+ * Converts each user's generationTime (in their timezone) to UTC and checks
+ * if it falls within ±7 minutes of the given UTC time.
+ */
+export async function getUsersForDelivery({
+  currentUtcTime,
+}: {
+  currentUtcTime: Date;
+}): Promise<Array<{ userId: string; timezone: string; generationTime: string; deliveryFormat: string }>> {
+  try {
+    // Get all users with delivery enabled
+    const rows = await db
+      .select({
+        userId: briefingSettings.userId,
+        timezone: briefingSettings.timezone,
+        generationTime: briefingSettings.generationTime,
+        deliveryFormat: briefingSettings.deliveryFormat,
+      })
+      .from(briefingSettings)
+      .where(eq(briefingSettings.deliveryEnabled, true));
+
+    // Filter in JS: convert each user's generationTime to UTC and check window
+    const WINDOW_MINUTES = 7;
+    const currentMinutes = currentUtcTime.getUTCHours() * 60 + currentUtcTime.getUTCMinutes();
+
+    return rows.filter((row) => {
+      const [hours, minutes] = row.generationTime.split(":").map(Number);
+      const userLocalMinutes = hours * 60 + minutes;
+
+      // Calculate UTC offset for user's timezone
+      const userUtcOffset = getTimezoneOffsetMinutes(row.timezone, currentUtcTime);
+      const userUtcMinutes = ((userLocalMinutes - userUtcOffset) % 1440 + 1440) % 1440;
+
+      // Generate 15 minutes before delivery time so briefing is ready on time
+      const generateAtUtc = ((userUtcMinutes - 15) % 1440 + 1440) % 1440;
+
+      const diff = Math.abs(currentMinutes - generateAtUtc);
+      const wrappedDiff = Math.min(diff, 1440 - diff);
+
+      return wrappedDiff <= WINDOW_MINUTES;
+    });
+  } catch (_error) {
+    console.error("[getUsersForDelivery] Failed:", _error);
+    return [];
+  }
+}
+
+/**
+ * Get timezone offset in minutes from UTC for a given IANA timezone.
+ * Positive = east of UTC (e.g., Moscow = +180).
+ */
+function getTimezoneOffsetMinutes(timezone: string, date: Date): number {
+  try {
+    const utcStr = date.toLocaleString("en-US", { timeZone: "UTC" });
+    const tzStr = date.toLocaleString("en-US", { timeZone: timezone });
+    const utcDate = new Date(utcStr);
+    const tzDate = new Date(tzStr);
+    return (tzDate.getTime() - utcDate.getTime()) / 60000;
+  } catch {
+    // Fallback to Moscow (+3)
+    return 180;
   }
 }
 
