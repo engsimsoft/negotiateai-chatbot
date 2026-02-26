@@ -12,6 +12,24 @@
 
 ---
 
+## [3.50.0] - 2026-02-26 - ToolCallGuardian
+
+**ТЗ-FIX1**: Tool Call Guardian (Фаза 1 — Detection & Logging) — детекция галлюцинаций tool calls в AI-ответах. Когда модель описывает результаты инструментов текстом (без реального вызова), Guardian это обнаруживает и логирует.
+
+### Added
+- **Tool Call Guardian** (`lib/ai/tool-call-guardian.ts`) — shared модуль детекции tool hallucinations. Паттерны для русского и английского: tool names, глаголы-маркеры, фейковый прогресс. API: `detectToolHallucination()`, `createStepTracker()`, `isResultClaim()`
+- **Guardian в chat route** — instrumentedStream отслеживает step-start/text-delta/tool-input-start/step-finish. Детекция на каждом step-finish
+- **Guardian в service-chat route** — рефакторинг `toUIMessageStreamResponse()` → `createUIMessageStream` + writer + instrumentedStream + Guardian
+- **Колонка `guardianFlags`** в `ai_usage_log` (jsonb) — результаты детекции записываются в БД для аналитики
+- **Drizzle migration** `0040_guardian-flags.sql`
+
+### Technical
+- `createStepTracker()` factory — per-step tracking (toolCallCount, textChunks) внутри instrumentedStream
+- `result.consumeStream()` в service-chat для надёжного resolve `result.text` (project-manager persistence)
+- `usageLogMeta` closure в chat route — bridge между `streamText.onFinish` (usage data) и `createUIMessageStream.onFinish` (guardianFlags)
+
+---
+
 ## [3.49.0] - 2026-02-25 - TelegramBotInfrastructure
 
 **ТЗ-TG3**: Telegram Bot инфраструктура — привязка аккаунтов Simply ↔ Telegram через @GetSimplyBot. Фундамент для доставки брифингов (TG4) и чтения закрытых групп (TG5).
