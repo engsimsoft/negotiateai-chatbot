@@ -2,19 +2,18 @@
 
 /**
  * Normalize any Telegram channel input to the web preview URL.
- * @channel        → https://t.me/s/channel
- * https://t.me/channel   → https://t.me/s/channel
- * https://t.me/s/channel → https://t.me/s/channel (no-op)
+ * Accepts any format and always returns https://t.me/s/{handle}.
+ *
+ * @channel              → https://t.me/s/channel
+ * channel               → https://t.me/s/channel
+ * https://t.me/channel  → https://t.me/s/channel
+ * https://t.me/s/channel→ https://t.me/s/channel
+ * t.me/channel          → https://t.me/s/channel
+ * t.me/s/channel        → https://t.me/s/channel
  */
 export function normalizeChannelUrl(input: string): string {
-  const trimmed = input.trim();
-  if (trimmed.startsWith("@")) {
-    return `https://t.me/s/${trimmed.slice(1)}`;
-  }
-  if (trimmed.includes("t.me/") && !trimmed.includes("t.me/s/")) {
-    return trimmed.replace("t.me/", "t.me/s/");
-  }
-  return trimmed;
+  const handle = extractChannelHandle(input);
+  return `https://t.me/s/${handle}`;
 }
 
 /**
