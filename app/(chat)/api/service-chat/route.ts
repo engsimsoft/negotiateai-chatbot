@@ -12,7 +12,7 @@
 
 import fs from "fs";
 import path from "path";
-import { streamText, tool, stepCountIs } from "ai";
+import { streamText, tool, stepCountIs, createUIMessageStream, JsonToSseTransformStream } from "ai";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { myProvider } from "@/lib/ai/providers";
@@ -38,6 +38,7 @@ import {
 import { deepResearch } from "@/lib/ai/tools/deep-research";
 import { fetchUrl } from "@/lib/ai/tools/fetch-url";
 import { readTelegramChannel } from "@/lib/ai/tools/read-telegram-channel";
+import { createStepTracker } from "@/lib/ai/tool-call-guardian";
 import { ChatSDKError } from "@/lib/errors";
 import { generateUUID } from "@/lib/utils";
 import type { Project } from "@/lib/db/schema";
@@ -816,7 +817,60 @@ export async function POST(request: Request) {
       });
     }
 
-    return result.toUIMessageStreamResponse();
+    // ТЗ-FIX1: Guardian step tracker for hallucination detection
+    const guardianTracker = createStepTracker({ context });
+    result.consumeStream();
+
+    const stream = createUIMessageStream({
+      execute: async ({ writer: dataStream }) => {
+        const baseStream = result.toUIMessageStream();
+
+        const instrumentedStream = new ReadableStream({
+          async start(controller) {
+            const reader = baseStream.getReader();
+
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) {
+                controller.close();
+                break;
+              }
+
+              // ТЗ-FIX1: Guardian — track step boundaries, text, and tool calls
+              if (value && typeof value === "object" && "type" in value) {
+                const eventType = (value as any).type;
+
+                if (eventType === "step-start") {
+                  guardianTracker.reset();
+                }
+
+                if (eventType === "text-delta") {
+                  const chunk = (value as any).textDelta ?? "";
+                  if (chunk) {
+                    guardianTracker.addText(chunk);
+                  }
+                }
+
+                if (eventType === "tool-input-start") {
+                  const toolName = (value as any).toolName || "unknown";
+                  guardianTracker.addToolCall(toolName);
+                }
+
+                if (eventType === "step-finish") {
+                  guardianTracker.analyze();
+                }
+              }
+
+              controller.enqueue(value);
+            }
+          },
+        });
+
+        dataStream.merge(instrumentedStream);
+      },
+    });
+
+    return new Response(stream.pipeThrough(new JsonToSseTransformStream()));
   } catch (error) {
     console.error("[ServiceChat] Error:", error);
     return new Response(

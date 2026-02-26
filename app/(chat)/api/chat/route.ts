@@ -32,6 +32,7 @@ import {
 import { executeProfessorPipeline } from "@/lib/ai/professor-pipeline";
 import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment } from "@/lib/constants";
+import { createStepTracker, type GuardianFlags } from "@/lib/ai/tool-call-guardian";
 import {
   addChatSnapshot,
   createStreamId,
@@ -390,6 +391,7 @@ export async function POST(request: Request) {
     await createStreamId({ streamId, chatId: id });
 
     let finalMergedUsage: AppUsage | undefined;
+    let guardianFlags: GuardianFlags | null = null;
 
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
@@ -669,6 +671,11 @@ export async function POST(request: Request) {
           sendReasoning: true,
         });
 
+        // ТЗ-FIX1: Guardian step tracker for hallucination detection
+        const guardianTracker = createStepTracker({
+          context: isProjectChat ? `project:${tier}` : chatMode,
+        });
+
         const instrumentedStream = new ReadableStream({
           async start(controller) {
             const reader = baseStream.getReader();
@@ -687,6 +694,8 @@ export async function POST(request: Request) {
             while (true) {
               const { value, done } = await reader.read();
               if (done) {
+                // ТЗ-FIX1: Collect guardian flags after stream ends
+                guardianFlags = guardianTracker.getAllDetections();
                 controller.close();
                 break;
               }
@@ -694,6 +703,22 @@ export async function POST(request: Request) {
               // Diagnostic logging for tool events (AI SDK v5 event types)
               if (value && typeof value === "object" && "type" in value) {
                 const eventType = (value as any).type;
+
+                // ТЗ-FIX1: Guardian — track step boundaries and text
+                if (eventType === "step-start") {
+                  guardianTracker.reset();
+                }
+
+                if (eventType === "text-delta") {
+                  const chunk = (value as any).textDelta ?? "";
+                  if (chunk) {
+                    guardianTracker.addText(chunk);
+                  }
+                }
+
+                if (eventType === "step-finish") {
+                  guardianTracker.analyze();
+                }
 
                 // AI SDK v5: tool-input-start = tool call begins (has toolName, toolCallId)
                 if (eventType === "tool-input-start") {
@@ -705,6 +730,9 @@ export async function POST(request: Request) {
                     toolCallId,
                     timestamp: new Date().toISOString(),
                   });
+
+                  // ТЗ-FIX1: Guardian — register tool call in step
+                  guardianTracker.addToolCall(toolName);
 
                   // ТЗ-07: Notify client that tool execution started
                   dataStream.write({
