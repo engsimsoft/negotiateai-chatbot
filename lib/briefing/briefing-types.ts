@@ -66,6 +66,19 @@ export type AudioStatus =
   | "partial"
   | "outdated";
 
+// ТЗ-TG4a: Pipeline result (server-side)
+
+/** Result of running the briefing generation pipeline */
+export interface BriefingPipelineResult {
+  status: "ready" | "failed";
+  article?: BriefingArticle;
+  sourcesChecked: number;
+  itemsIncluded: number;
+  duplicatesRemoved: number;
+  tokensUsed: number;
+  error?: string;
+}
+
 // ТЗ-А5: Streaming progress events (client-safe)
 
 export type BriefingProgressStep =
