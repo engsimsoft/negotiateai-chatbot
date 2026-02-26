@@ -832,6 +832,18 @@ export async function POST(request: Request) {
             while (true) {
               const { value, done } = await reader.read();
               if (done) {
+                // ТЗ-FIX1.2: Collect guardian flags on EOF (was missing in Phase 1)
+                const guardianFlags = guardianTracker.getAllDetections();
+                if (guardianFlags) {
+                  console.warn(`[Guardian:${context}] Stream ended with detections:`, {
+                    count: guardianFlags.count,
+                    details: guardianFlags.details.map(d => ({
+                      step: d.step,
+                      tool: d.toolMentioned,
+                      pattern: d.pattern,
+                    })),
+                  });
+                }
                 controller.close();
                 break;
               }

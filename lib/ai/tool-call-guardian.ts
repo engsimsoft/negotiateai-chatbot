@@ -189,8 +189,10 @@ const PLAN_PATTERNS = [
 /**
  * Find all tool name mentions in the text.
  * Returns unique tool names mentioned.
+ *
+ * Exported for use in smart buffering (tool-mention-gated flush).
  */
-function findToolMentions(text: string): string[] {
+export function findToolMentions(text: string): string[] {
   const found = new Set<string>();
   for (const { regex, toolName } of ALL_TOOL_PATTERNS) {
     if (regex.test(text)) {

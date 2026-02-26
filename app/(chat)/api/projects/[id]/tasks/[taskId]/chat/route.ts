@@ -29,6 +29,7 @@ import {
 import { calcUsagePercent, SNAPSHOT_THRESHOLD, FALLBACK_MESSAGE_PAIRS } from "@/lib/ai/context-limits";
 import { createFallbackSnapshot } from "@/lib/ai/clerks/snapshot-creator";
 import { calcCostUsd } from "@/lib/ai/tokenlens-catalog";
+import { createStepTracker } from "@/lib/ai/tool-call-guardian";
 import { ChatSDKError } from "@/lib/errors";
 import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages } from "@/lib/utils";
 
@@ -332,7 +333,12 @@ export async function POST(
           sendReasoning: true,
         });
 
-        // Instrumented stream with TTFT tracking
+        // ТЗ-FIX1.2: Guardian step tracker for hallucination detection
+        const guardianTracker = createStepTracker({
+          context: `project:${tier}`,
+        });
+
+        // Instrumented stream with TTFT tracking + Guardian
         const instrumentedStream = new ReadableStream({
           async start(controller) {
             const reader = baseStream.getReader();
@@ -347,8 +353,68 @@ export async function POST(
             while (true) {
               const { value, done } = await reader.read();
               if (done) {
+                // ТЗ-FIX1.2: Collect guardian flags on EOF
+                const guardianFlags = guardianTracker.getAllDetections();
+                if (guardianFlags) {
+                  console.warn(`[Guardian:project:${tier}] Stream ended with detections:`, {
+                    count: guardianFlags.count,
+                    details: guardianFlags.details.map(d => ({
+                      step: d.step,
+                      tool: d.toolMentioned,
+                      pattern: d.pattern,
+                    })),
+                  });
+                  // Save guardian flags to usage log (fire-and-forget)
+                  const TIER_ALIAS: Record<string, string> = { executor: "claude-haiku", expert: "claude-sonnet", professor: "claude-opus" };
+                  const resolvedModelId = myProvider.languageModel(TIER_ALIAS[tier] || "claude-sonnet").modelId;
+                  saveAiUsageLog({
+                    chatId,
+                    userId: session.user.id,
+                    modelId: resolvedModelId,
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    costUsd: 0,
+                    chatMode: `project:${tier}:guardian`,
+                    durationMs: 0,
+                    guardianFlags: guardianFlags as unknown as Record<string, unknown>,
+                  }).catch(() => {});
+                }
                 controller.close();
                 break;
+              }
+
+              // ТЗ-FIX1.2: Guardian — track step boundaries, text, and tool calls
+              if (value && typeof value === "object" && "type" in value) {
+                const eventType = (value as any).type;
+
+                if (eventType === "step-start") {
+                  guardianTracker.reset();
+                }
+
+                if (eventType === "text-delta") {
+                  const chunk = (value as any).textDelta ?? "";
+                  if (chunk) {
+                    guardianTracker.addText(chunk);
+                  }
+                }
+
+                if (eventType === "step-finish") {
+                  guardianTracker.analyze();
+                }
+
+                if (eventType === "tool-input-start") {
+                  const toolName = (value as any).toolName || "unknown";
+                  const toolCallId = (value as any).toolCallId || "unknown";
+
+                  // ТЗ-FIX1.2: Guardian — register tool call in step
+                  guardianTracker.addToolCall(toolName);
+
+                  // ТЗ-07: Notify client when tool execution starts
+                  dataStream.write({
+                    type: "data-tool-activity",
+                    data: { toolName, toolCallId },
+                  });
+                }
               }
 
               if (
@@ -362,21 +428,6 @@ export async function POST(
                 console.log(
                   `[TaskExpert] Task ${taskId}: first chunk = ${firstTokenTime}ms`
                 );
-              }
-
-              // ТЗ-07: Notify client when tool execution starts (AI SDK v5 event type)
-              if (
-                value &&
-                typeof value === "object" &&
-                "type" in value &&
-                (value as any).type === "tool-input-start"
-              ) {
-                const toolName = (value as any).toolName || "unknown";
-                const toolCallId = (value as any).toolCallId || "unknown";
-                dataStream.write({
-                  type: "data-tool-activity",
-                  data: { toolName, toolCallId },
-                });
               }
 
               controller.enqueue(value);
