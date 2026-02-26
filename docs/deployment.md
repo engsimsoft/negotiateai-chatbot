@@ -19,7 +19,7 @@
 - ✅ Все функции протестированы
 - ✅ Есть аккаунт на [vercel.com](https://vercel.com)
 - ✅ Репозиторий на GitHub
-- ✅ API ключи (Google Gemini, Brave Search)
+- ✅ API ключи (Anthropic, Google Gemini, Brave Search, и др.)
 - ✅ PostgreSQL database (Neon)
 
 ---
@@ -89,32 +89,51 @@ git push origin master
 
 ### 3.1 Добавление переменных
 
-В разделе **Environment Variables** добавь:
+Полный список переменных для production (см. `.env.example`):
 
-```
-GOOGLE_GENERATIVE_AI_API_KEY=ВАШ_КЛЮЧ_GEMINI
-BRAVE_SEARCH_API_KEY=BSA_ВАШ_КЛЮЧ
-AUTH_SECRET=СГЕНЕРИРОВАННЫЙ_СЕКРЕТ
-POSTGRES_URL=postgresql://username:password@host/database
-BLOB_READ_WRITE_TOKEN=ВАШ_ТОКЕН_BLOB
-NEXT_PUBLIC_APP_URL=https://ваш-проект.vercel.app
-```
+**AI Providers:**
+- `ANTHROPIC_API_KEY` — основной AI-провайдер (Claude)
+- `GOOGLE_GENERATIVE_AI_API_KEY` — vision-ocr, briefing фильтр, подкаст TTS
 
-**Для каждой переменной:**
-1. Нажми **Add**
-2. Введи **Key** (название переменной)
-3. Введи **Value** (значение)
-4. Выбери **Production**, **Preview**, **Development** (все три)
+**Search & Tools:**
+- `BRAVE_SEARCH_API_KEY` — веб-поиск
+- `PERPLEXITY_API_KEY` — Deep Research tool
+- `JINA_API_KEY` — Fetch URL fallback
+
+**Voice:**
+- `DEEPGRAM_API_KEY` — голосовой ввод (Deepgram Nova-3)
+
+**Auth & DB:**
+- `AUTH_SECRET` — шифрование сессий NextAuth
+- `AUTH_TRUST_HOST` — `true` (для Vercel)
+- `POSTGRES_URL` — PostgreSQL (Neon)
+
+**Storage & App:**
+- `BLOB_READ_WRITE_TOKEN` — Vercel Blob Storage
+- `NEXT_PUBLIC_APP_URL` — `https://your-domain.vercel.app`
+
+**Telegram Bot (ТЗ-TG3):**
+- `TELEGRAM_BOT_TOKEN` — токен бота @GetSimplyBot
+- `TELEGRAM_WEBHOOK_SECRET` — секрет для валидации webhook
+
+**Other:**
+- `CLOUDCONVERT_API_KEY` — конвертация файлов
+
+**Через Vercel CLI (рекомендуется):**
+
+> **КРИТИЧНО:** Используй `printf`, НЕ `echo` — иначе trailing newline сломает ключи! См. [docs/mcp-tools.md](mcp-tools.md) раздел Vercel.
+
+```bash
+printf 'значение' | npx vercel env add ИМЯ_ПЕРЕМЕННОЙ production
+```
 
 ### 3.2 Проверка переменных
 
-После добавления у тебя должно быть:
-- ✅ GOOGLE_GENERATIVE_AI_API_KEY
-- ✅ BRAVE_SEARCH_API_KEY
-- ✅ AUTH_SECRET
-- ✅ POSTGRES_URL
-- ✅ BLOB_READ_WRITE_TOKEN
-- ✅ NEXT_PUBLIC_APP_URL
+```bash
+npx vercel env ls production
+```
+
+Должно быть **15 переменных** для полной функциональности.
 
 ---
 
@@ -586,4 +605,4 @@ vercel domains   # Управление доменами
 
 ---
 
-**Обновлено:** 2026-01-28 (Simply rebrand)
+**Обновлено:** 2026-02-26 (v3.49.0 — Telegram Bot, обновлён список env vars)

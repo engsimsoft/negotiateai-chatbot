@@ -26,6 +26,12 @@
 - **UI "Подключения"** в настройках (`settings-page.tsx`) — connect/disconnect, QR-код (qrcode.react), polling (3s/2min), три состояния (loading/disconnected/connected)
 - **Drizzle migration** `0039_telegram-bot.sql`
 
+### Fixed (post-deploy hotfixes)
+- **jsdom 28→26.1.0** — jsdom 27+ тянет ESM-only `@exodus/bytes`, что ломает все API-роуты на Vercel (`ERR_REQUIRE_ESM`). Даунгрейд до 26.1.0 (CJS-compatible)
+- **Middleware для webhook** — добавлено исключение `/api/telegram/webhook` из auth middleware (Telegram серверы шлют без cookies)
+- **APP_URL `.trim()`** — защита от trailing newline в env vars (ломал inline-кнопки Telegram)
+- **Dashboard cookies crash** — `cookies().delete()` запрещён в Server Components (Next.js 15), заменён на `redirect("/api/auth/signout")`
+
 ### Technical
 - grammY bot singleton pattern (module-level, warm invocations reuse)
 - Edge cases: token expired, Telegram linked to different Simply, re-linking (unlink old → link new)
