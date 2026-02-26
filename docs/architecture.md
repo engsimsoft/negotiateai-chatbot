@@ -133,6 +133,7 @@
 - `SavedBriefingTopics` — сохранённые темы брифинга (topicId, topicName, emoji, content, sources, briefingGeneratedAt)
 - `TelegramConnection` — связка Simply ↔ Telegram (userId unique, telegramUserId bigint unique, isActive)
 - `TelegramLinkToken` — эфемерные токены линковки (token PK, userId FK, expiresAt = +10 min)
+- `ai_usage_log` — учёт потребления AI (modelId, tokens, costUsd, chatMode, guardianFlags JSONB)
 - `Vote_v2` — голосование за сообщения
 - NextAuth таблицы (Account, Session, VerificationToken)
 
@@ -171,6 +172,48 @@ lib/prompts/
 ```
 
 **Детали:** [ai-agents.md](ai-agents.md)
+
+---
+
+### 5. Streaming Pipeline
+
+**Файлы:** `app/(chat)/api/chat/route.ts`, `app/(chat)/api/service-chat/route.ts`
+
+Все AI-ответы проходят через streaming pipeline с инструментированием:
+
+```
+streamText(model, system, messages, tools)
+    │
+    ▼
+result.toUIMessageStream()          ← AI SDK: converts to UI events
+    │
+    ▼
+instrumentedStream (ReadableStream)  ← Observer layer: перехват событий
+    │  ├── step-start      → reset step tracker
+    │  ├── text-delta      → accumulate text
+    │  ├── tool-input-start → count tool calls + emit data-tool-activity
+    │  ├── tool-output-available → log duration
+    │  └── step-finish     → Guardian.analyze() + TTFT tracking
+    │
+    ▼
+dataStream.merge(instrumentedStream)
+    │
+    ▼
+createUIMessageStream → JsonToSseTransformStream → Response (SSE)
+    │
+    └── onFinish: saveMessages + autoNameChat + saveAiUsageLog(guardianFlags)
+```
+
+**Tool Call Guardian (v3.50.0):**
+- `lib/ai/tool-call-guardian.ts` — детектор галлюцинаций tool calls
+- Интегрирован в instrumentedStream как observer (не модифицирует поток)
+- Записывает результаты в `ai_usage_log.guardianFlags` (JSONB)
+- **ADR:** [022-tool-call-guardian](decisions/022-tool-call-guardian.md)
+
+**Usage Logging (v3.46.0):**
+- `ai_usage_log` — таблица учёта потребления (per-request)
+- Fire-and-forget паттерн (не блокирует стриминг)
+- **ADR:** [019-usage-logging-architecture](decisions/019-usage-logging-architecture.md)
 
 ---
 
@@ -243,4 +286,4 @@ lib/prompts/
 
 ---
 
-**Обновлено:** 2026-02-22 (v3.43.0 — PodcastEngine)
+**Обновлено:** 2026-02-26 (v3.50.0 — ToolCallGuardian + Streaming Pipeline docs)
