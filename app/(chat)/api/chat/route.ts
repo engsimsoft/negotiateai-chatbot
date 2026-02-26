@@ -689,37 +689,83 @@ export async function POST(request: Request) {
             // Diagnostic: track tool call timing
             const toolCallTimes: Record<string, number> = {};
             const modelName = isProjectChat ? `Simply/${tier}` : "Simply";
+            const guardianContext = isProjectChat ? `project:${tier}` : chatMode;
 
+            // ТЗ-FIX1.2: Buffer text-delta events within step, flush or block on step-finish
+            let stepTextBuffer: Array<unknown> = [];
+            let consecutiveHallucinations = 0;
+
+            // ТЗ-FIX1.2: Text-related events to buffer (text-start/delta/end must stay in order)
+            const textBufferTypes = new Set([
+              "text-start", "text-delta", "text-end",
+              "reasoning-start", "reasoning-delta", "reasoning-end",
+            ]);
+
+            try {
             while (true) {
               const { value, done } = await reader.read();
               if (done) {
+                // ТЗ-FIX1.2: Flush any remaining buffer on stream end
+                for (const buffered of stepTextBuffer) {
+                  controller.enqueue(buffered);
+                }
+                stepTextBuffer = [];
+
                 // ТЗ-FIX1: Collect guardian flags after stream ends
                 guardianFlags = guardianTracker.getAllDetections();
                 controller.close();
                 break;
               }
 
-              // Diagnostic logging for tool events (AI SDK v5 event types)
+              // Diagnostic logging for tool events
               if (value && typeof value === "object" && "type" in value) {
                 const eventType = (value as any).type;
 
-                // ТЗ-FIX1: Guardian — track step boundaries and text
-                if (eventType === "step-start") {
+                // ТЗ-FIX1.2: Guardian — track step boundaries (UI stream uses start-step/finish-step)
+                if (eventType === "start-step") {
                   guardianTracker.reset();
                 }
 
-                if (eventType === "text-delta") {
-                  const chunk = (value as any).textDelta ?? "";
-                  if (chunk) {
-                    guardianTracker.addText(chunk);
+                // ТЗ-FIX1.2: Buffer text-related events (text-start/delta/end must arrive in order)
+                if (textBufferTypes.has(eventType)) {
+                  // Track text for Guardian (UI stream uses .delta, not .textDelta)
+                  if (eventType === "text-delta") {
+                    const chunk = (value as any).delta ?? "";
+                    if (chunk) {
+                      guardianTracker.addText(chunk);
+                    }
+                  }
+                  stepTextBuffer.push(value);
+                  continue; // Do NOT enqueue — buffered until finish-step
+                }
+
+                if (eventType === "finish-step") {
+                  const guardianResult = guardianTracker.analyze();
+
+                  if (guardianResult.detected) {
+                    // ТЗ-FIX1.2: Block — do NOT flush text buffer
+                    console.warn(`[Guardian:${guardianContext}] Blocked hallucinated step (${stepTextBuffer.length} chunks suppressed)`);
+                    stepTextBuffer = [];
+                    consecutiveHallucinations++;
+
+                    if (consecutiveHallucinations >= 2) {
+                      console.warn(`[Guardian:${guardianContext}] Max retries exceeded, showing error to user`);
+                      controller.enqueue({
+                        type: "text-delta",
+                        textDelta: "Не удалось выполнить эту операцию автоматически. Попробуйте переформулировать запрос или разбить задачу на части.",
+                      });
+                    }
+                  } else {
+                    // ТЗ-FIX1.2: Clean step — flush buffered text
+                    for (const buffered of stepTextBuffer) {
+                      controller.enqueue(buffered);
+                    }
+                    stepTextBuffer = [];
+                    consecutiveHallucinations = 0; // Reset on clean step
                   }
                 }
 
-                if (eventType === "step-finish") {
-                  guardianTracker.analyze();
-                }
-
-                // AI SDK v5: tool-input-start = tool call begins (has toolName, toolCallId)
+                // tool-input-start = tool call begins (has toolName, toolCallId)
                 if (eventType === "tool-input-start") {
                   const toolName = (value as any).toolName || "unknown";
                   const toolCallId = (value as any).toolCallId || "unknown";
@@ -740,7 +786,7 @@ export async function POST(request: Request) {
                   });
                 }
 
-                // AI SDK v5: tool-output-available = tool result ready
+                // tool-output-available = tool result ready
                 if (eventType === "tool-output-available") {
                   const toolCallId = (value as any).toolCallId || "unknown";
                   const duration = toolCallTimes[toolCallId]
@@ -767,7 +813,16 @@ export async function POST(request: Request) {
                 );
               }
 
+              // Enqueue all non-buffered events immediately
               controller.enqueue(value);
+            }
+            } catch (err) {
+              console.error(`[Guardian:${guardianContext}] Stream error in instrumentedStream:`, err);
+              // Flush any remaining buffer so user sees partial text
+              for (const buffered of stepTextBuffer) {
+                try { controller.enqueue(buffered); } catch { /* controller may be closed */ }
+              }
+              controller.close();
             }
           },
         });

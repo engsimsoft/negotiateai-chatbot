@@ -338,7 +338,7 @@ export async function POST(
           context: `project:${tier}`,
         });
 
-        // Instrumented stream with TTFT tracking + Guardian
+        // Instrumented stream with TTFT tracking + Guardian + buffering
         const instrumentedStream = new ReadableStream({
           async start(controller) {
             const reader = baseStream.getReader();
@@ -350,10 +350,26 @@ export async function POST(
               "tool-error",
             ]);
 
+            // ТЗ-FIX1.2: Buffer text-delta events within step, flush or block on step-finish
+            let stepTextBuffer: Array<unknown> = [];
+            let consecutiveHallucinations = 0;
+
+            // ТЗ-FIX1.2: Text-related events to buffer (text-start/delta/end must stay in order)
+            const textBufferTypes = new Set([
+              "text-start", "text-delta", "text-end",
+              "reasoning-start", "reasoning-delta", "reasoning-end",
+            ]);
+
             while (true) {
               const { value, done } = await reader.read();
               if (done) {
-                // ТЗ-FIX1.2: Collect guardian flags on EOF
+                // ТЗ-FIX1.2: Flush any remaining buffer on stream end
+                for (const buffered of stepTextBuffer) {
+                  controller.enqueue(buffered);
+                }
+                stepTextBuffer = [];
+
+                // Collect guardian flags on EOF
                 const guardianFlags = guardianTracker.getAllDetections();
                 if (guardianFlags) {
                   console.warn(`[Guardian:project:${tier}] Stream ended with detections:`, {
@@ -383,23 +399,51 @@ export async function POST(
                 break;
               }
 
-              // ТЗ-FIX1.2: Guardian — track step boundaries, text, and tool calls
               if (value && typeof value === "object" && "type" in value) {
                 const eventType = (value as any).type;
 
-                if (eventType === "step-start") {
+                // ТЗ-FIX1.2: UI stream uses "start-step"/"finish-step" (NOT "step-start"/"step-finish")
+                if (eventType === "start-step") {
                   guardianTracker.reset();
                 }
 
-                if (eventType === "text-delta") {
-                  const chunk = (value as any).textDelta ?? "";
-                  if (chunk) {
-                    guardianTracker.addText(chunk);
+                // ТЗ-FIX1.2: Buffer text-related events (text-start/delta/end must arrive in order)
+                if (textBufferTypes.has(eventType)) {
+                  if (eventType === "text-delta") {
+                    // UI stream uses .delta (NOT .textDelta)
+                    const chunk = (value as any).delta ?? "";
+                    if (chunk) {
+                      guardianTracker.addText(chunk);
+                    }
                   }
+                  stepTextBuffer.push(value);
+                  continue; // Do NOT enqueue — buffered until finish-step
                 }
 
-                if (eventType === "step-finish") {
-                  guardianTracker.analyze();
+                if (eventType === "finish-step") {
+                  const guardianResult = guardianTracker.analyze();
+
+                  if (guardianResult.detected) {
+                    // ТЗ-FIX1.2: Block — do NOT flush text buffer
+                    console.warn(`[Guardian:project:${tier}] Blocked hallucinated step (${stepTextBuffer.length} chunks suppressed)`);
+                    stepTextBuffer = [];
+                    consecutiveHallucinations++;
+
+                    if (consecutiveHallucinations >= 2) {
+                      console.warn(`[Guardian:project:${tier}] Max retries exceeded, showing error to user`);
+                      controller.enqueue({
+                        type: "text-delta",
+                        textDelta: "Не удалось выполнить эту операцию автоматически. Попробуйте переформулировать запрос или разбить задачу на части.",
+                      });
+                    }
+                  } else {
+                    // ТЗ-FIX1.2: Clean step — flush buffered text
+                    for (const buffered of stepTextBuffer) {
+                      controller.enqueue(buffered);
+                    }
+                    stepTextBuffer = [];
+                    consecutiveHallucinations = 0; // Reset on clean step
+                  }
                 }
 
                 if (eventType === "tool-input-start") {
