@@ -527,6 +527,7 @@ export const aiUsageLog = pgTable(
     costUsd: numeric("costUsd", { precision: 10, scale: 6 }),
     chatMode: varchar("chatMode", { length: 50 }).notNull(),
     durationMs: integer("durationMs"),
+    guardianFlags: jsonb("guardianFlags"),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
   },
   (table) => ({

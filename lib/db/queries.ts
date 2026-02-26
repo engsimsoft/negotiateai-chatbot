@@ -3472,6 +3472,7 @@ export async function saveAiUsageLog({
   costUsd,
   chatMode,
   durationMs,
+  guardianFlags,
 }: {
   chatId?: string | null;
   userId: string;
@@ -3484,6 +3485,7 @@ export async function saveAiUsageLog({
   costUsd?: number | null;
   chatMode: string;
   durationMs?: number | null;
+  guardianFlags?: Record<string, unknown> | null;
 }): Promise<void> {
   try {
     await db.insert(aiUsageLog).values({
@@ -3498,6 +3500,7 @@ export async function saveAiUsageLog({
       costUsd: costUsd != null ? String(costUsd) : null,
       chatMode,
       durationMs: durationMs ?? null,
+      guardianFlags: guardianFlags ?? null,
     });
   } catch (error) {
     console.error("[saveAiUsageLog] Failed to save usage log:", error);

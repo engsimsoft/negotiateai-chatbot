@@ -392,6 +392,7 @@ export async function POST(request: Request) {
 
     let finalMergedUsage: AppUsage | undefined;
     let guardianFlags: GuardianFlags | null = null;
+    let usageLogMeta: { modelId: string; inputTokens: number; outputTokens: number; costUsd: number | null; chatMode: string; durationMs: number } | null = null;
 
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
@@ -649,19 +650,17 @@ export async function POST(request: Request) {
               dataStream.write({ type: "data-usage", data: finalMergedUsage });
             }
 
-            // ТЗ-OPT1: Usage logging (fire-and-forget)
+            // ТЗ-OPT1+FIX1: Store usage data for logging after guardian analysis completes
             const logModelId = resolvedModelId || (isProjectChat ? `project:${tier}` : chatMode);
             const logChatMode = isProjectChat ? `project:${tier}` : chatMode;
-            saveAiUsageLog({
-              chatId: id,
-              userId: session.user.id,
+            usageLogMeta = {
               modelId: logModelId,
               inputTokens: usage.inputTokens ?? 0,
               outputTokens: usage.outputTokens ?? 0,
               costUsd,
               chatMode: logChatMode,
               durationMs: totalTime,
-            }).catch(() => {});
+            };
           },
         });
 
@@ -854,6 +853,16 @@ export async function POST(request: Request) {
           } catch (err) {
             console.warn("Unable to persist last usage for chat", id, err);
           }
+        }
+
+        // ТЗ-FIX1: Save usage log with guardian flags (after instrumentedStream is fully consumed)
+        if (usageLogMeta) {
+          saveAiUsageLog({
+            chatId: id,
+            userId: session.user.id,
+            ...usageLogMeta,
+            guardianFlags: guardianFlags as Record<string, unknown> | null,
+          }).catch(() => {});
         }
       },
       onError: () => {

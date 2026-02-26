@@ -281,6 +281,13 @@
       "when": 1772150400000,
       "tag": "0039_telegram-bot",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1772236800000,
+      "tag": "0040_guardian-flags",
+      "breakpoints": true
     }
   ]
 }
