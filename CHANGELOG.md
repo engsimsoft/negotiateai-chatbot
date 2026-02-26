@@ -12,6 +12,28 @@
 
 ---
 
+## [3.51.0] - 2026-02-26 - GuardianBlocking
+
+**ТЗ-FIX1.2**: Guardian Phase 2 — буферизация и блокировка галлюцинаций tool calls. Текст буферизуется per-step, на finish-step Guardian решает: flush (чисто) или block (галлюцинация).
+
+### Added
+- **Полная буферизация text events** в instrumentedStream всех 3 routes (chat, service-chat, tasks/chat). Buffer: text-start/text-delta/text-end/reasoning-*. На finish-step: analyze → flush или block
+- **Блокировка при 2+ подряд галлюцинациях** — error message пользователю через controller.enqueue
+- **Guardian Phase 1 в tasks/chat** — `createStepTracker` + 4 events + `getAllDetections` + guardianFlags в usage log (ранее отсутствовал)
+- **ADR 023** — Guardian Blocking Strategy (full buffering vs smart buffering trade-off)
+
+### Fixed
+- **Export `findToolMentions()`** из `tool-call-guardian.ts` — ранее не экспортирована
+- **guardianFlags в service-chat** — `getAllDetections()` на EOF ранее отсутствовал
+- **Event types** — исправлены во всех routes: `start-step`/`finish-step` (не `step-start`/`step-finish`), `.delta` (не `.textDelta`)
+- **Буферизация всех text events** — ранее буферился только `text-delta`, что ломало `processUIMessageStream` (crash: `Cannot read properties of undefined`)
+
+### Known Limitations
+- Детекция зависит от упоминания tool names в тексте. Модель может описать результаты без naming tools — Guardian не сработает
+- Tool call с фейковыми данными не детектируется (toolCallCount > 0 → pass)
+
+---
+
 ## [3.50.0] - 2026-02-26 - ToolCallGuardian
 
 **ТЗ-FIX1**: Tool Call Guardian (Фаза 1 — Detection & Logging) — детекция галлюцинаций tool calls в AI-ответах. Когда модель описывает результаты инструментов текстом (без реального вызова), Guardian это обнаруживает и логирует.

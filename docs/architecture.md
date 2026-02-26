@@ -204,11 +204,12 @@ createUIMessageStream → JsonToSseTransformStream → Response (SSE)
     └── onFinish: saveMessages + autoNameChat + saveAiUsageLog(guardianFlags)
 ```
 
-**Tool Call Guardian (v3.50.0):**
+**Tool Call Guardian (v3.50.0 + v3.51.0):**
 - `lib/ai/tool-call-guardian.ts` — детектор галлюцинаций tool calls
-- Интегрирован в instrumentedStream как observer (не модифицирует поток)
+- **Phase 1 (v3.50.0):** detection + logging. Observer в instrumentedStream
+- **Phase 2 (v3.51.0):** полная буферизация text events per step. На finish-step: flush (clean) или block (hallucination). 2+ blocks → error message. Все 3 routes (chat, service-chat, tasks/chat)
 - Записывает результаты в `ai_usage_log.guardianFlags` (JSONB)
-- **ADR:** [022-tool-call-guardian](decisions/022-tool-call-guardian.md)
+- **ADR:** [022-tool-call-guardian](decisions/022-tool-call-guardian.md), [023-guardian-blocking-strategy](decisions/023-guardian-blocking-strategy.md)
 
 **Usage Logging (v3.46.0):**
 - `ai_usage_log` — таблица учёта потребления (per-request)
