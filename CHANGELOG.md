@@ -12,6 +12,38 @@
 
 ---
 
+## [3.52.0] - 2026-02-26 - ResearchProgressMode
+
+**ТЗ-FIX2**: Research Progress Mode — live-прогресс исследования источников при онбординге брифинга + DEV mode extraction для service-chat.
+
+### Added
+- **Research Engine** (`lib/briefing/research-engine.ts`): серверная оркестрация поиска источников по темам — Perplexity API → extract citations → verify URLs → classify (tier, fetchMethod, language). `p-limit(3)` параллелизм
+- **Perplexity Client** (`lib/ai/tools/perplexity-client.ts`): shared utility для Perplexity Sonar API, извлечён из `deep-research.ts`
+- **startResearch tool** в service-chat route: вызывает research engine с progress callback, streaming `data-research-progress` events через `dataStream.write()`
+- **ResearchProgressCard** (`research-progress-card.tsx`): live-прогресс по темам в чате (searching → verifying → done), анимация framer-motion, индикатор "Анализирую и готовлю ответ…" после завершения
+- **DEV mode utility** (`lib/prompts/builder/dev-mode-inject.ts`): extracted `injectDevMode()` — shared между composer.ts и service-chat. Кеширование dev-mode.md
+- **data-model-info** emit в service-chat route: badge модели в briefing onboarding чате
+- **RSS discovery** в fetch-page.ts: парсит `<link rel="alternate">` до Readability (бесплатно)
+
+### Fixed
+- **3 бага клиентской ошибки** при startResearch (анализ архитектора):
+  - `research-progress` → `data-research-progress` + `transient: true` (AI SDK v5 протокол)
+  - `consumeStream()` перенесён внутрь `createUIMessageStream execute` (race condition fix)
+  - Типизация progressRef: `data-${string}` вместо `string`, убран `as any`
+- **UX dead zone** после завершения research: добавлен спиннер "Анализирую и готовлю ответ…"
+
+### Changed
+- `composer.ts` — inline DEV mode заменён на вызов `injectDevMode()` (DRY)
+- `deep-research.ts` — использует shared `perplexity-client.ts` вместо inline API call
+- **saveBriefingProfile** — фильтрация URL через server-side `verifiedSourceUrls: Set<string>` + existing DB sources
+
+### Technical
+- AI SDK v5: `onData` callback в `useChat` для custom `data-*` events
+- Guardian text buffering: progress events проходят через `dataStream.write()` (bypass Guardian buffer)
+- `DefaultChatTransport` + `sendMessage` pattern для briefing onboarding
+
+---
+
 ## [3.51.0] - 2026-02-26 - GuardianBlocking
 
 **ТЗ-FIX1.2**: Guardian Phase 2 — буферизация и блокировка галлюцинаций tool calls. Текст буферизуется per-step, на finish-step Guardian решает: flush (чисто) или block (галлюцинация).

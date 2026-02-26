@@ -27,6 +27,8 @@ export interface FetchPageResult {
   url: string;
   originalLength: number;
   source: FetchPageSource;
+  /** RSS feed URL discovered from <link rel="alternate"> (ТЗ-FIX2) */
+  rssUrl?: string;
 }
 
 export interface FetchPageOptions {
@@ -91,6 +93,17 @@ function decodeBuffer(buffer: Buffer, charset: string): string {
 }
 
 /**
+ * ТЗ-FIX2: Discover RSS feed URL from <link rel="alternate"> in HTML <head>.
+ * Must be called BEFORE Readability.parse() which mutates the DOM.
+ */
+function discoverRssUrl(document: Document): string | undefined {
+  const link = document.querySelector(
+    'link[rel="alternate"][type="application/rss+xml"], link[rel="alternate"][type="application/atom+xml"]',
+  );
+  return (link as Element | null)?.getAttribute("href") ?? undefined;
+}
+
+/**
  * Extract text from semantic HTML tags via JSDOM DOM API.
  * Used as fallback when Readability fails or returns too little content.
  */
@@ -148,6 +161,7 @@ export async function fetchPage(
   let readabilityText: string | undefined;
   let articleTitle: string | undefined;
   let semanticText: string | undefined;
+  let rssUrl: string | undefined;
 
   try {
     const response = await fetch(pageUrl, {
@@ -169,6 +183,10 @@ export async function fetchPage(
     const html = decodeBuffer(buffer, charset);
 
     const dom = new JSDOM(html, { url: pageUrl });
+
+    // ТЗ-FIX2: Discover RSS before Readability (which mutates the DOM)
+    rssUrl = discoverRssUrl(dom.window.document);
+
     const reader = new Readability(dom.window.document);
     const article = reader.parse();
 
@@ -183,6 +201,7 @@ export async function fetchPage(
         url: pageUrl,
         originalLength: readabilityText.length,
         source: "readability",
+        rssUrl,
       };
     }
 
@@ -196,6 +215,7 @@ export async function fetchPage(
         url: pageUrl,
         originalLength: semanticText.length,
         source: "semantic",
+        rssUrl,
       };
     }
   } catch (error) {
@@ -215,6 +235,7 @@ export async function fetchPage(
         url: pageUrl,
         originalLength: jinaResult.content.length,
         source: "jina",
+        rssUrl,
       };
     }
   }
@@ -232,5 +253,6 @@ export async function fetchPage(
     url: pageUrl,
     originalLength: bestText.length,
     source: readabilityText ? "readability" : "semantic",
+    rssUrl,
   };
 }

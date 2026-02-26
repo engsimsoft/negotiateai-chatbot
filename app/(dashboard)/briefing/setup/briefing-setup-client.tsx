@@ -26,6 +26,7 @@ import {
   type BriefingProfile,
 } from "./components/briefing-profile-preview";
 import { BriefingChatPanel } from "./components/briefing-chat-panel";
+import type { TopicProgress } from "./components/research-progress-card";
 
 interface UserProfile {
   displayName?: string | null;
@@ -120,6 +121,12 @@ export function BriefingSetupClient({
   const [error, setError] = useState<Error | null>(null);
   const [isSaved, setIsSaved] = useState(false);
 
+  // ТЗ-FIX2 Этап 3: research progress state (data-research-progress events)
+  const [researchProgress, setResearchProgress] = useState<Map<string, TopicProgress>>(new Map());
+
+  // ТЗ-FIX2 Этап 4: dev model badge (only in development)
+  const [devModelName, setDevModelName] = useState<string | null>(null);
+
   // ТЗ-А5: streaming generation progress
   const generation = useBriefingGeneration();
 
@@ -170,9 +177,43 @@ export function BriefingSetupClient({
     transport,
     messages: initialMessages,
     onError: (err) => setError(err),
+    // ТЗ-FIX2: Consume data stream events (research progress + model info)
+    onData: (part) => {
+      if (part.type === "data-research-progress") {
+        const event = part.data as {
+          topicId: string;
+          topicName: string;
+          emoji: string;
+          phase: "searching" | "verifying" | "done" | "error";
+          found?: number;
+          verified?: number;
+          error?: string;
+        };
+        setResearchProgress((prev) => {
+          const next = new Map(prev);
+          next.set(event.topicId, event);
+          return next;
+        });
+      }
+      // ТЗ-FIX2 Этап 4: model info for dev badge
+      if (part.type === "data-model-info") {
+        const info = part.data as { modelName?: string };
+        if (info.modelName) setDevModelName(info.modelName);
+      }
+    },
   });
 
   const isLoading = status === "streaming" || status === "submitted";
+
+  // ТЗ-FIX2: Derive active research progress (show only while researching)
+  const activeResearchTopics = useMemo(() => {
+    if (researchProgress.size === 0) return [];
+    const topics = Array.from(researchProgress.values());
+    // All done/error → research complete, hide progress
+    const allFinished = topics.every((t) => t.phase === "done" || t.phase === "error");
+    if (allFinished && !isLoading) return [];
+    return topics;
+  }, [researchProgress, isLoading]);
 
   // Convert chat messages to display format
   const displayMessages: DisplayMessage[] = useMemo(() => {
@@ -333,6 +374,8 @@ export function BriefingSetupClient({
           onSend={handleSend}
           isLoading={isLoading}
           error={error}
+          researchTopics={activeResearchTopics}
+          devModelName={devModelName}
         />
       </main>
     </div>

@@ -16,6 +16,7 @@ import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ServiceChatInput } from "@/components/input";
 import { cn } from "@/lib/utils";
+import { ResearchProgressCard, type TopicProgress } from "./research-progress-card";
 
 interface DisplayMessage {
   id: string;
@@ -30,6 +31,10 @@ interface BriefingChatPanelProps {
   onSend: () => void;
   isLoading: boolean;
   error?: Error | null;
+  /** ТЗ-FIX2: Live research progress per topic */
+  researchTopics?: TopicProgress[];
+  /** ТЗ-FIX2 Этап 4: Dev model badge (only in development) */
+  devModelName?: string | null;
 }
 
 export function BriefingChatPanel({
@@ -39,6 +44,8 @@ export function BriefingChatPanel({
   onSend,
   isLoading,
   error,
+  researchTopics,
+  devModelName,
 }: BriefingChatPanelProps) {
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
@@ -65,8 +72,15 @@ export function BriefingChatPanel({
                 )}
               >
                 {message.role === "assistant" && (
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    S
+                  <div className="flex shrink-0 flex-col items-center gap-0.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                      S
+                    </div>
+                    {devModelName && (
+                      <span className="mt-0.5 font-mono text-[10px] leading-none text-muted-foreground/60">
+                        {devModelName}
+                      </span>
+                    )}
                   </div>
                 )}
                 <div
@@ -85,10 +99,13 @@ export function BriefingChatPanel({
             ))}
           </AnimatePresence>
 
-          {/* Typing indicator */}
+          {/* ТЗ-FIX2: Research progress or typing indicator */}
           <AnimatePresence>
-            {isLoading && (
+            {isLoading && researchTopics && researchTopics.length > 0 ? (
+              <ResearchProgressCard key="research-progress" topics={researchTopics} />
+            ) : isLoading ? (
               <motion.div
+                key="typing-indicator"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
@@ -101,7 +118,7 @@ export function BriefingChatPanel({
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               </motion.div>
-            )}
+            ) : null}
           </AnimatePresence>
 
           {/* Scroll anchor */}

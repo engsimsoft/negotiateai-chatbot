@@ -26,7 +26,7 @@
 │  │  Business Logic (lib/)                               │  │
 │  │  ├── ai/providers.ts   - AI Provider config          │  │
 │  │  ├── ai/tools/         - AI-инструменты              │  │
-│  │  ├── briefing/         - Briefing pipeline + types (v3.27) │
+│  │  ├── briefing/         - Briefing pipeline + types + research engine (v3.27, v3.52) │
 │  │  ├── podcast/          - Podcast Engine (v3.43)           │
 │  │  ├── prompts/          - Skills + Agents system      │  │
 │  │  ├── db/queries.ts     - Database queries            │  │
@@ -157,7 +157,8 @@ lib/prompts/
 │   ├── registry.ts   - Сканирование skills/agents
 │   ├── skill-loader.ts
 │   ├── agent-loader.ts
-│   └── composer.ts
+│   ├── composer.ts
+│   └── dev-mode-inject.ts - DEV mode utility (v3.52.0)
 ├── skills/           - Атомарные навыки (SKILL.md)
 │   ├── document/     - create-presentation, create-spreadsheet, etc.
 │   ├── research/     - web-research

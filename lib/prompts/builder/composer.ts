@@ -16,6 +16,7 @@ import { buildSimpleMemoryContext } from '../contexts/chat-memory';
 import { getSkillsRegistry, type SkillMetadata } from './registry';
 import { loadAgent, type Agent } from './agent-loader';
 import { loadSkill, type Skill } from './skill-loader';
+import { injectDevMode } from './dev-mode-inject';
 
 // =============================================================================
 // Types
@@ -205,16 +206,6 @@ export function composeChatPrompt(context: BuildContext = {}, chatMode: string =
     parts.push('---\n\n' + buildSkillsMetadataBlock(skills));
   }
 
-  // Dev mode block
-  if (process.env.SIMPLY_DEV_MODE === 'true') {
-    const devBlock = loadCoreBlock('dev-mode.md');
-    if (devBlock) {
-      parts.push('---\n\n' + devBlock);
-    }
-    // Dev reminder — в самом конце, ближе к ответу модели
-    parts.push(`<dev_reminder>DEV-РЕЖИМ: каждый ответ НАЧИНАЕТСЯ с блока [DEV]. Режим: ${chatMode}</dev_reminder>`);
-  }
-
   // Модель определяется chatMode
   const modelMap: Record<string, ModelId> = {
     chat: 'claude-haiku',
@@ -223,7 +214,7 @@ export function composeChatPrompt(context: BuildContext = {}, chatMode: string =
   };
 
   return {
-    systemPrompt: parts.join('\n\n'),
+    systemPrompt: injectDevMode(parts.join('\n\n'), chatMode),
     model: modelMap[chatMode] || 'claude-haiku',
     greeting: 'Привет! Чем могу помочь?',
     toolAccess: null,

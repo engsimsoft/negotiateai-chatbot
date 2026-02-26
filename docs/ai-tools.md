@@ -1,8 +1,8 @@
 # Инструменты AI-агентов
 
-**Версия:** 3.47.0
-**Последнее обновление:** 2026-02-25
-**Статус:** 14 инструментов (+readTelegramChannel в v3.47.0)
+**Версия:** 3.52.0
+**Последнее обновление:** 2026-02-26
+**Статус:** 15 инструментов (+startResearch в v3.52.0)
 
 ---
 
@@ -34,6 +34,7 @@
 | `readProjectFile` | Чтение файлов проекта по имени из manifest | Только проектные чаты (Эксперт) |
 | `createSnapshot` | Фиксация прогресса диалога (сжатие контекста) | Все чаты (при наличии chatId + messageId) |
 | `readTelegramChannel` | Чтение публичных Telegram-каналов (посты, даты, медиа) | Все агенты |
+| `startResearch` | Исследование источников по темам (Perplexity → verify → classify, progress streaming) | Только briefing-onboarding (v3.52.0) |
 
 > **Примечание:** Excel создаётся через `createDocument(kind: "excel")`, редактируется через `updateDocument`. Отдельный `parseExcel` используется только для анализа **загруженных** пользователем файлов.
 
@@ -945,4 +946,4 @@ const CHAT_MODE_EXCLUDED_TOOLS = ["fetchUrl", "deepResearch"];
 
 ---
 
-**Обновлено:** 2026-02-25 (v3.47.0 — +readTelegramChannel tool, shared Telegram parser)
+**Обновлено:** 2026-02-26 (v3.52.0 — +startResearch tool, research engine, perplexity client extraction)

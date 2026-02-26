@@ -5,16 +5,21 @@
  * - "pro" (sonar-pro): fast multi-step search, 5-15 sec, ~$0.02/req
  * - "deep" (sonar-deep-research): exhaustive research, 30-120 sec, ~$0.80/req
  *
- * API is OpenAI Chat Completions compatible.
+ * ТЗ-FIX2: Uses shared perplexity-client for API calls.
  */
 
 import { tool } from "ai";
 import { z } from "zod";
+
+import {
+  callPerplexity,
+  type PerplexityModel,
+} from "./perplexity-client";
 import { wrapToolExecution } from "./tool-wrapper";
 
 type ResearchDepth = "pro" | "deep";
 
-const PERPLEXITY_MODELS: Record<ResearchDepth, string> = {
+const PERPLEXITY_MODELS: Record<ResearchDepth, PerplexityModel> = {
   pro: "sonar-pro",
   deep: "sonar-deep-research",
 };
@@ -23,34 +28,6 @@ const PERPLEXITY_TIMEOUTS: Record<ResearchDepth, number> = {
   pro: 30_000, // 30 sec
   deep: 180_000, // 3 min
 };
-
-interface PerplexityCitation {
-  url: string;
-  title?: string;
-}
-
-interface PerplexityResponse {
-  choices: Array<{
-    message: {
-      role: string;
-      content: string;
-    };
-    finish_reason: string;
-  }>;
-  citations?: string[];
-  search_results?: Array<{
-    title: string;
-    url: string;
-    snippet?: string;
-  }>;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-    search_queries?: number;
-    cost?: number;
-  };
-}
 
 /**
  * Build the deepResearch tool.
@@ -97,8 +74,6 @@ export const deepResearch = ({ defaultDepth }: { defaultDepth?: ResearchDepth } 
         enableLogging: true,
       },
       async ({ query, depth: modelDepth = "pro" }) => {
-        const apiKey = process.env.PERPLEXITY_API_KEY;
-
         // defaultDepth from client UI overrides model choice
         const depth: ResearchDepth = defaultDepth ?? modelDepth;
         const model = PERPLEXITY_MODELS[depth];
@@ -109,98 +84,43 @@ export const deepResearch = ({ defaultDepth }: { defaultDepth?: ResearchDepth } 
           depth,
           model,
           timeoutMs,
-          hasApiKey: !!apiKey,
-          keyPreview: apiKey ? apiKey.substring(0, 15) + "..." : "NO KEY",
+          hasApiKey: !!process.env.PERPLEXITY_API_KEY,
           overriddenByClient: !!defaultDepth,
         });
 
-        if (!apiKey) {
-          return {
-            error:
-              "Perplexity API key is not configured. Please set PERPLEXITY_API_KEY in .env.local",
-          };
-        }
-
         try {
-          // Auto-detect language
-          const hasCyrillic = /[а-яА-ЯёЁ]/.test(query);
-          const systemPrompt = hasCyrillic
-            ? "Отвечай на русском языке. Будь точным и структурированным."
-            : "Be precise and well-structured.";
-
-          const response = await fetch(
-            "https://api.perplexity.ai/chat/completions",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${apiKey}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                model,
-                messages: [
-                  { role: "system", content: systemPrompt },
-                  { role: "user", content: query },
-                ],
-              }),
-              signal: AbortSignal.timeout(timeoutMs),
-            },
-          );
-
-          console.log("[deepResearch] Response status:", response.status);
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            return {
-              error: `Perplexity API error (${response.status}): ${errorText}`,
-            };
-          }
-
-          const data: PerplexityResponse = await response.json();
-
-          const content = data.choices?.[0]?.message?.content;
-          if (!content) {
-            return { error: "Perplexity returned empty response" };
-          }
-
-          // Build citations list from citations array or search_results
-          const citations: PerplexityCitation[] = [];
-          if (data.citations) {
-            for (const url of data.citations) {
-              // Try to find title from search_results
-              const sr = data.search_results?.find((r) => r.url === url);
-              citations.push({ url, title: sr?.title });
-            }
-          } else if (data.search_results) {
-            for (const sr of data.search_results) {
-              citations.push({ url: sr.url, title: sr.title });
-            }
-          }
+          const result = await callPerplexity({
+            query,
+            model,
+            timeoutMs,
+          });
 
           console.log("[deepResearch] Success:", {
             depth,
             model,
-            contentLength: content.length,
-            citationsCount: citations.length,
-            usage: data.usage,
+            contentLength: result.content.length,
+            citationsCount: result.citations.length,
+            usage: result.usage,
           });
 
           return {
             query,
             depth,
-            content,
-            citations,
-            citationsCount: citations.length,
-            usage: data.usage
-              ? {
-                  totalTokens: data.usage.total_tokens,
-                  searchQueries: data.usage.search_queries,
-                }
-              : undefined,
+            content: result.content,
+            citations: result.citations,
+            citationsCount: result.citations.length,
+            usage: result.usage,
           };
         } catch (error) {
+          const message = error instanceof Error ? error.message : "Unknown error";
+
+          // Match original error format for backward compatibility
+          if (message.includes("API key is not configured")) {
+            return { error: message };
+          }
+
           return {
-            error: `Deep research failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+            error: `Deep research failed: ${message}`,
             query,
             depth,
           };

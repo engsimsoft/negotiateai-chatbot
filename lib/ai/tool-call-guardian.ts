@@ -60,11 +60,24 @@ const EXTERNAL_TOOL_NAMES = [
 ] as const;
 
 /**
+ * Tools that startResearch calls internally.
+ * After startResearch completes, the model legitimately presents results
+ * that reference these tools — this is NOT hallucination.
+ */
+const START_RESEARCH_INTERNAL_TOOLS = new Set<string>([
+  "deepResearch",
+  "fetchUrl",
+  "readTelegramChannel",
+  "startResearch",
+]);
+
+/**
  * Service-chat specific tools that can be hallucinated.
  */
 const SERVICE_TOOL_NAMES = [
   "updateBriefingPreview",
   "saveBriefingProfile",
+  "startResearch",
 ] as const;
 
 /** All tool names we monitor for hallucination */
@@ -97,6 +110,10 @@ const TOOL_ALIAS_PATTERNS: Array<{ regex: RegExp; toolName: string }> = [
   // webSearch
   { regex: /web\s*search/i, toolName: "webSearch" },
   { regex: /поиск(?:овый|овой)?\s+(?:в\s+)?(?:интернет|сет)/i, toolName: "webSearch" },
+  // startResearch
+  { regex: /start\s*research/i, toolName: "startResearch" },
+  { regex: /исследовани[еяю]\s+источник/i, toolName: "startResearch" },
+  { regex: /поиск\s+источник/i, toolName: "startResearch" },
 ];
 
 const ALL_TOOL_PATTERNS = [...TOOL_NAME_PATTERNS, ...TOOL_ALIAS_PATTERNS];
@@ -365,6 +382,7 @@ export function createStepTracker(options?: {
   let stepNumber = 0;
   let stepText = "";
   let stepToolCallCount = 0;
+  let hadStartResearch = false; // ТЗ-FIX2: startResearch calls tools internally
   const allDetections: HallucinationDetail[] = [];
 
   return {
@@ -378,14 +396,35 @@ export function createStepTracker(options?: {
       stepText += chunk;
     },
 
-    addToolCall(_toolName: string) {
+    addToolCall(toolName: string) {
       stepToolCallCount++;
+      if (toolName === "startResearch") {
+        hadStartResearch = true;
+      }
     },
 
     analyze(): GuardianResult {
       const result = detectToolHallucination(stepText, stepToolCallCount);
 
       if (result.detected) {
+        // ТЗ-FIX2: After startResearch completed in a previous step, the model
+        // legitimately presents results that reference internal tools (deepResearch,
+        // fetchUrl, readTelegramChannel). Filter out these false positives.
+        if (hadStartResearch && stepToolCallCount === 0) {
+          result.details = result.details.filter(
+            (d) => !START_RESEARCH_INTERNAL_TOOLS.has(d.toolMentioned)
+          );
+          if (result.details.length === 0) {
+            console.log(
+              `[Guardian:${context}] Suppressed false positive after startResearch in step ${stepNumber}`
+            );
+            return { detected: false, confidence: 0, details: [] };
+          }
+          result.confidence = Math.max(
+            ...result.details.map((d) => d.confidence)
+          );
+        }
+
         // Set step number on all details
         for (const detail of result.details) {
           detail.step = stepNumber;

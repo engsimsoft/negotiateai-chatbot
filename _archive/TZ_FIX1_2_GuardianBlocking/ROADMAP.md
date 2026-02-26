@@ -111,7 +111,7 @@ git commit -m "feat(tz-fix1.2): guardian blocking — buffering + hallucination 
 
 **Завершение:**
 - [x] Финальное мануальное тестирование (пользователь) — chat 200, service-chat 200
-- [ ] Переместить папку в _archive/
+- [x] Переместить папку в _archive/
 
 **Валидация:**
 - [x] `npm run build` — успешен
