@@ -27,6 +27,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Allow Vercel Cron routes (authenticated via CRON_SECRET, not JWT)
+  if (pathname.startsWith("/api/cron/")) {
+    return NextResponse.next();
+  }
+
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,

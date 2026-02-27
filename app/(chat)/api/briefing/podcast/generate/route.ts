@@ -1,19 +1,11 @@
-// ТЗ-Б1: POST /api/briefing/podcast/generate — streaming podcast generation
+// ТЗ-Б1 + ТЗ-TG4a: POST /api/briefing/podcast/generate — streaming podcast generation
+// Thin wrapper: auth + stream. Core logic in lib/podcast/podcast-pipeline.ts
 
 import { auth } from "@/app/(auth)/auth";
-import { generatePodcastSegment } from "@/lib/podcast";
-import type {
-  PodcastProgressEvent,
-  ScriptContext,
-} from "@/lib/podcast/types";
-import type { BriefingArticle } from "@/lib/briefing/briefing-types";
-import {
-  getBriefingHistory,
-  updateBriefingAudio,
-} from "@/lib/db/queries";
-import { put } from "@vercel/blob";
+import type { PodcastProgressEvent } from "@/lib/podcast/types";
+import { runPodcastPipeline } from "@/lib/podcast/podcast-pipeline";
+import { updateBriefingAudio } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
-import pLimit from "p-limit";
 
 export const maxDuration = 120;
 
@@ -36,176 +28,10 @@ export async function POST(request: Request) {
       };
 
       try {
-        // 1. Load latest ready briefing
-        const history = await getBriefingHistory({
+        await runPodcastPipeline({
           userId,
-          limit: 1,
-          status: "ready",
-        });
-
-        if (history.length === 0) {
-          emit({
-            step: "error",
-            message: "Нет готового брифинга для озвучки",
-          });
-          controller.close();
-          return;
-        }
-
-        const briefing = history[0];
-        const article = briefing.briefingJson as BriefingArticle;
-
-        if (!article?.sections?.length) {
-          emit({
-            step: "error",
-            message: "Брифинг не содержит секций",
-          });
-          controller.close();
-          return;
-        }
-
-        // 2. Filter sections by requested topicIds (or all)
-        const isRerecord = !!body.topicIds?.length;
-        const sections = isRerecord
-          ? article.sections.filter((s) =>
-              body.topicIds!.includes(s.topicId),
-            )
-          : article.sections;
-
-        if (sections.length === 0) {
-          emit({
-            step: "error",
-            message: "Не найдены указанные темы в брифинге",
-          });
-          controller.close();
-          return;
-        }
-
-        // 3. Mark as generating
-        await updateBriefingAudio({
-          userId,
-          audioStatus: "generating",
-        });
-
-        // 4. Build section titles for script context
-        const sectionTitles = article.sections.map(
-          (s) => `${s.emoji} ${s.topicName}`,
-        );
-
-        const today = new Date().toLocaleDateString("ru-RU", {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        });
-
-        // 5. Process sections with p-limit(2)
-        const limit = pLimit(2);
-        let readyCount = 0;
-        let failedCount = 0;
-
-        const tasks = sections.map((section) => {
-          return limit(async () => {
-            // Use position in the FULL article for isFirst/isLast,
-            // so re-recording a single topic doesn't get greeting/farewell
-            const originalIndex = article.sections.findIndex(
-              (s) => s.topicId === section.topicId,
-            );
-            const context: ScriptContext = {
-              isFirst: !isRerecord && originalIndex === 0,
-              isLast:
-                !isRerecord &&
-                originalIndex === article.sections.length - 1,
-              sectionTitles,
-              briefingDate: today,
-            };
-
-            try {
-              // Step: script
-              emit({
-                step: "script",
-                topicId: section.topicId,
-                message: `Пишем сценарий: ${section.emoji} ${section.topicName}`,
-              });
-
-              const segment = await generatePodcastSegment(
-                section,
-                context,
-              );
-
-              // Step: recording (TTS already done inside generatePodcastSegment)
-              emit({
-                step: "recording",
-                topicId: section.topicId,
-                message: `Записано: ${section.emoji} ${section.topicName}`,
-                replicaCount: segment.replicaCount,
-              });
-
-              // Upload MP3 to Vercel Blob
-              const timestamp = Date.now();
-              const blobPath = `briefing-podcast/${userId}/${section.topicId}-${timestamp}.mp3`;
-
-              const blob = await put(blobPath, segment.mp3Buffer, {
-                access: "public",
-                contentType: "audio/mpeg",
-              });
-
-              // Update DB incrementally
-              await updateBriefingAudio({
-                userId,
-                audioUrls: { [section.topicId]: blob.url },
-                audioDurations: {
-                  [section.topicId]: segment.durationSeconds,
-                },
-              });
-
-              readyCount++;
-
-              emit({
-                step: "done",
-                topicId: section.topicId,
-                message: `Готово: ${section.emoji} ${section.topicName}`,
-                url: blob.url,
-                durationSeconds: segment.durationSeconds,
-              });
-            } catch (err) {
-              failedCount++;
-              console.error(
-                `[podcast/generate] Failed for topic ${section.topicId}:`,
-                err,
-              );
-              emit({
-                step: "error",
-                topicId: section.topicId,
-                message: `Ошибка: ${section.emoji} ${section.topicName} — ${err instanceof Error ? err.message : "неизвестная ошибка"}`,
-              });
-            }
-          });
-        });
-
-        await Promise.allSettled(tasks);
-
-        // 6. Update final audio status
-        const finalStatus =
-          readyCount === 0
-            ? "none"
-            : failedCount > 0
-              ? "partial"
-              : "ready";
-
-        await updateBriefingAudio({
-          userId,
-          audioStatus: finalStatus,
-        });
-
-        // 7. Complete event
-        emit({
-          step: "complete",
-          message:
-            readyCount === sections.length
-              ? "Подкаст готов!"
-              : `Готово ${readyCount} из ${sections.length} тем`,
-          readyCount,
-          failedCount,
+          topicIds: body.topicIds,
+          onProgress: emit,
         });
 
         controller.close();

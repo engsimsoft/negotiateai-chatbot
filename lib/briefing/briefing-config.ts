@@ -34,3 +34,14 @@ export const AUTHOR_MODEL = "claude-sonnet-4-6";
 
 /** Fallback author if primary is unavailable */
 export const AUTHOR_MODEL_FALLBACK = "claude-sonnet-4-5-20250929";
+
+// --- Cron ---
+
+/** ТЗ-TG4a: Cron interval in minutes (Vercel Cron schedule) */
+export const CRON_INTERVAL_MINUTES = 15;
+
+/** ТЗ-TG4a: Max concurrent briefing generations per cron invocation */
+export const CRON_CONCURRENCY_LIMIT = 3;
+
+/** ТЗ-TG4a: Max duration for cron route (seconds). Vercel Pro allows up to 300s. */
+export const CRON_MAX_DURATION = 240;
