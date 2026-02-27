@@ -217,6 +217,42 @@ createUIMessageStream → JsonToSseTransformStream → Response (SSE)
 - Fire-and-forget паттерн (не блокирует стриминг)
 - **ADR:** [019-usage-logging-architecture](decisions/019-usage-logging-architecture.md)
 
+**Background Briefing Generation (v3.54.0):**
+
+Автоматическая генерация брифингов по расписанию без участия браузера.
+
+```
+Vercel Cron (hourly)
+    │
+    ▼
+/api/cron/briefing (GET)
+    │ CRON_SECRET auth
+    │
+    ▼
+getUsersForDelivery(currentUtcTime)  ← users with deliveryEnabled + matching generationTime
+    │
+    ▼
+p-limit(3) concurrent processing
+    │
+    ├── Idempotency check: skip if ready briefing exists today
+    │
+    ├── runBriefingPipeline({ userId })  ← background mode (no onProgress)
+    │   └── load settings → fetch sources → filter → generate article → save to DB
+    │
+    ├── updateBriefingDeliveryStatus(briefingId, 'pending')
+    │
+    └── if format includes audio:
+        └── waitUntil(runPodcastPipeline({ userId, briefingId }))  ← non-blocking
+```
+
+- **Cron Schedule:** `0 * * * *` (hourly, Hobby plan). Pro plan: `*/15 * * * *`
+- **Matching Window:** 30 min (WINDOW_MINUTES) — covers hourly cron
+- **Concurrency:** p-limit(3) users processed in parallel
+- **Idempotency:** skip if a `ready` briefing exists for today (UTC)
+- **Podcast:** non-blocking via `waitUntil()` (@vercel/functions)
+- **Delivery:** text ready → `deliveryStatus='pending'`. Actual Telegram sending — future ТЗ-TG4b
+- **ADR:** [026-background-briefing-architecture](decisions/026-background-briefing-architecture.md)
+
 ---
 
 ## Smart Routing (план)
@@ -288,4 +324,4 @@ createUIMessageStream → JsonToSseTransformStream → Response (SSE)
 
 ---
 
-**Обновлено:** 2026-02-26 (v3.50.0 — ToolCallGuardian + Streaming Pipeline docs)
+**Обновлено:** 2026-02-27 (v3.54.0 — Background Briefing Generation)

@@ -12,6 +12,36 @@
 
 ---
 
+## [3.54.0] - 2026-02-27 - BackgroundBriefing
+
+**ТЗ-TG4a**: Фоновая генерация брифинга — Vercel Cron + pipeline extraction + podcast pipeline + delivery settings UI.
+
+### Added
+- **Vercel Cron** (`vercel.json`): hourly cron job (`0 * * * *`) триггерит `/api/cron/briefing`
+- **Cron endpoint** (`app/api/cron/briefing/route.ts`): авторизация CRON_SECRET, getUsersForDelivery, p-limit(3) конкурентность, идемпотентность (skip если ready за сегодня), waitUntil для podcast
+- **Briefing pipeline** (`lib/briefing/briefing-pipeline.ts`): вынесенная core-логика генерации (load settings → fetch → filter → generate → save), работает с onProgress (browser) и без (background)
+- **Podcast pipeline** (`lib/podcast/podcast-pipeline.ts`): вынесенная core-логика генерации подкаста, non-blocking через waitUntil
+- **Delivery settings API** (`app/(chat)/api/briefing/delivery/route.ts`): GET/PATCH для настроек доставки + telegram status
+- **Delivery settings UI** (`components/briefing/briefing-delivery-settings.tsx`): Popover от Clock-иконки в header `/briefing/setup` — toggle, time picker (30-min), format selector (text/audio/text_audio), Telegram status
+- **DB fields**: `deliveryEnabled` (boolean), `deliveryFormat` (varchar) в BriefingSettings; `deliveryStatus` (varchar) в BriefingHistory
+- **Switch component** (`components/ui/switch.tsx`): shadcn Switch
+- **Delivery format "audio"**: аудио-only доставка (только подкаст, без текста)
+
+### Changed
+- **Cron schedule**: `0 * * * *` (hourly, Vercel Hobby plan; Pro план: `*/15 * * * *`)
+- **WINDOW_MINUTES**: 30 min для hourly cron (getUsersForDelivery matching window)
+- **Podcast generate route** рефакторинг: тонкая обёртка вокруг podcast-pipeline.ts
+- **Briefing generate route** рефакторинг: тонкая обёртка вокруг briefing-pipeline.ts
+- **Middleware**: добавлено исключение `/api/cron/` (не требует JWT)
+
+### Technical
+- Vercel Hobby план: minimum cron frequency = 1 hour. Pro план = 1 minute
+- `waitUntil()` (@vercel/functions): non-blocking podcast generation после briefing ready
+- `p-limit(3)`: конкурентность обработки пользователей в cron
+- Delivery sending (Telegram) — **не реализовано**, будет в ТЗ-TG4b
+
+---
+
 ## [3.53.0] - 2026-02-27 - OnboardingRestore
 
 **ТЗ-FIX3**: Восстановление инструментов create mode — unified tools, Guardian bypass, Save button, промпт v11.

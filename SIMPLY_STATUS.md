@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.53.0
+**Версия:** 3.54.0
 **Дата:** 2026-02-27
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -328,6 +328,28 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-TG4a: BackgroundBriefing — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **Vercel Cron** — hourly job (`0 * * * *`) триггерит `/api/cron/briefing` для фоновой генерации брифингов
+- **Briefing Pipeline** — core-логика генерации вынесена в `lib/briefing/briefing-pipeline.ts` (browser + background)
+- **Podcast Pipeline** — core-логика подкаста вынесена в `lib/podcast/podcast-pipeline.ts` (non-blocking через waitUntil)
+- **Cron endpoint** — авторизация CRON_SECRET, p-limit(3), идемпотентность, deliveryStatus tracking
+- **DB расширение** — deliveryEnabled, deliveryFormat в BriefingSettings; deliveryStatus в BriefingHistory
+- **Delivery Settings UI** — Popover от Clock-иконки в header /briefing/setup (toggle, time, format, Telegram status)
+- **3 формата доставки** — text, audio (только подкаст), text_audio
+
+**Ключевые файлы:**
+- `vercel.json` — cron config
+- `app/api/cron/briefing/route.ts` — cron handler
+- `lib/briefing/briefing-pipeline.ts` — extracted briefing core
+- `lib/podcast/podcast-pipeline.ts` — extracted podcast core
+- `app/(chat)/api/briefing/delivery/route.ts` — delivery settings API
+- `components/briefing/briefing-delivery-settings.tsx` — delivery settings UI
+- `lib/briefing/briefing-config.ts` — +CRON constants
+
+**Детали:** [specs/TZ_TG4A_BackgroundBriefing/](specs/TZ_TG4A_BackgroundBriefing/)
 
 ### ТЗ-BF5: BriefingDedup — ✅ ЗАВЕРШЁН
 

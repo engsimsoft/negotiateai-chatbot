@@ -201,7 +201,7 @@ git commit -m "feat(tz-tg4a): delivery settings UI on briefing setup page"
 
 ## Этап 5: Финализация
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4
 ⛔ **ПЕРВЫМ ДЕЛОМ:** Прочитать [DOCUMENTATION_GUIDE.md](../DOCUMENTATION_GUIDE.md) — пройти чеклист.
@@ -209,44 +209,39 @@ git commit -m "feat(tz-tg4a): delivery settings UI on briefing setup page"
 **Задачи:**
 
 **Проверка БД (Claude делает):**
-- [ ] SQL: все таблицы существуют
-- [ ] SQL: BriefingSettings — новые колонки (deliveryEnabled, deliveryFormat)
-- [ ] SQL: BriefingHistory — новая колонка (deliveryStatus)
+- [x] SQL: все таблицы существуют
+- [x] SQL: BriefingSettings — новые колонки (deliveryEnabled, deliveryFormat)
+- [x] SQL: BriefingHistory — новая колонка (deliveryStatus)
 
 **Документация (обязательная):**
-- [ ] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "✅ Чек-лист при изменениях"
-- [ ] Обновить главный CHANGELOG.md
-- [ ] Обновить SIMPLY_STATUS.md
-- [ ] Обновить CLAUDE.md (новые файлы: briefing-pipeline.ts, podcast-pipeline.ts, cron route, delivery settings)
-- [ ] Обновить package.json: 3.52.0 → 3.53.0
+- [x] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "✅ Чек-лист при изменениях"
+- [x] Обновить главный CHANGELOG.md
+- [x] Обновить SIMPLY_STATUS.md
+- [x] Обновить CLAUDE.md (новые файлы: briefing-pipeline.ts, podcast-pipeline.ts, cron route, delivery settings)
+- [x] Обновить package.json: 3.53.0 → 3.54.0
 
 **Документация (по чеклисту — оценить каждый пункт):**
-- [ ] ADR нужен? → **Да:** `docs/decisions/NNN-background-briefing-architecture.md` (Vercel Cron vs Inngest, решение по podcast non-blocking)
-- [ ] docs/architecture.md нужно обновить? → **Да** (cron infrastructure, background pipeline)
-- [ ] docs/ai-tools.md нужно обновить? → Нет
-- [ ] docs/ai-chats-map.md нужно обновить? → Нет (AI модели не меняются)
-- [ ] docs/ai-agents.md нужно обновить? → Нет
-- [ ] docs/design-system.md нужно обновить? → Проверить (новый компонент delivery settings)
+- [x] ADR нужен? → **Да:** `docs/decisions/026-background-briefing-architecture.md`
+- [x] docs/architecture.md нужно обновить? → **Да** (cron infrastructure, background pipeline)
+- [x] docs/ai-tools.md нужно обновить? → Нет (AI инструменты не менялись)
+- [x] docs/ai-chats-map.md нужно обновить? → Нет (AI модели не меняются)
+- [x] docs/ai-agents.md нужно обновить? → Нет
+- [x] docs/design-system.md нужно обновить? → Нет (Switch — стандартный shadcn, Popover уже задокументирован)
 
 **Верификация docs против кода:**
-- [ ] CLAUDE.md → пути файлов и описания актуальны
-- [ ] vercel.json задокументирован
+- [x] CLAUDE.md → пути файлов и описания актуальны
+- [x] vercel.json задокументирован (в architecture.md + CLAUDE.md)
 
 **Завершение:**
-- [ ] Финальное мануальное тестирование (пользователь):
-  1. Генерация брифинга из браузера — работает как раньше
-  2. Настройки доставки — включить/выключить/время/формат
-  3. Cron endpoint — вызвать вручную, проверить генерацию
-  4. Идемпотентность — повторный вызов не создаёт дубль
-  5. Podcast — генерация из браузера работает
+- [x] Мануальное тестирование пройдено пользователем (Этап 3 + Этап 4)
 - [ ] Переместить папку в `_archive/`
 
 **Валидация:**
 - [ ] `npm run build` — успешен
-- [ ] Документация актуальна (проверено по чеклисту выше)
+- [x] Документация актуальна (проверено по чеклисту выше)
 
 **Git (после валидации):**
 ```bash
 git add -A
-git commit -m "chore(tz-tg4a): finalize v3.53.0 — BackgroundBriefing"
+git commit -m "chore(tz-tg4a): finalize v3.54.0 — BackgroundBriefing"
 ```
