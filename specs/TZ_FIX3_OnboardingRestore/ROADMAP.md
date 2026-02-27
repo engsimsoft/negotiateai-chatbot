@@ -11,32 +11,32 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 3 |
-| Текущий этап | 1 |
+| Текущий этап | 2 |
 | Сессий (оценка) | 1 |
 
 ---
 
 ## Этап 1: route.ts — единый набор инструментов
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** Убрать разделение tools по режимам. Create и edit получают одинаковые 5 инструментов. maxSteps=30 для обоих.
 
 **Задачи:**
-- [ ] Удалить `if (isCreateMode)` блок с startResearch tool (строки ~686-717)
-- [ ] Убрать `if (!isCreateMode)` обёртку — deepResearch/fetchUrl/readTelegramChannel доступны безусловно (строки ~719-729)
-- [ ] Удалить объявление `progressRef` (строка ~653-655)
-- [ ] Удалить присвоение `progressRef.write` внутри createUIMessageStream (строки ~887-894)
-- [ ] Удалить неиспользуемые импорты (`researchTopics`, `ResearchProgressEvent`)
-- [ ] Изменить maxSteps: `const maxSteps = context === "briefing-onboarding" ? 30 : 3;` (строка ~834)
-- [ ] Обновить комментарий в saveBriefingProfile — убрать ссылку на startResearch (строки ~744-747)
+- [x] Удалить `if (isCreateMode)` блок с startResearch tool
+- [x] Убрать `if (!isCreateMode)` обёртку — deepResearch/fetchUrl/readTelegramChannel доступны безусловно
+- [x] Удалить объявление `progressRef`
+- [x] Удалить присвоение `progressRef.write` внутри createUIMessageStream
+- [x] Удалить неиспользуемые импорты (`researchTopics`, `ResearchProgressEvent`)
+- [x] Изменить maxSteps: `const maxSteps = context === "briefing-onboarding" ? 30 : 3;`
+- [x] Обновить комментарий в saveBriefingProfile — убрать ссылку на startResearch
 
 **Файлы:**
 - `app/(chat)/api/service-chat/route.ts` — единственный файл
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: /briefing/setup — чат открывается, приветствие отображается
 - [ ] 🧪 Мануальный тест: create mode — AI использует deepResearch/fetchUrl (видно в DEV-бейдже), НЕ startResearch
 

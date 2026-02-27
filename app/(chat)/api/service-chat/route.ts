@@ -40,7 +40,7 @@ import { fetchUrl } from "@/lib/ai/tools/fetch-url";
 import { readTelegramChannel } from "@/lib/ai/tools/read-telegram-channel";
 import { createStepTracker } from "@/lib/ai/tool-call-guardian";
 import { injectDevMode } from "@/lib/prompts/builder/dev-mode-inject";
-import { researchTopics, type ResearchProgressEvent } from "@/lib/briefing/research-engine";
+
 import { ChatSDKError } from "@/lib/errors";
 import { generateUUID } from "@/lib/utils";
 import type { Project } from "@/lib/db/schema";
@@ -650,15 +650,8 @@ export async function POST(request: Request) {
       });
     }
 
-    // ТЗ-FIX2: Shared reference for briefing-onboarding (closure pattern)
-    // progressRef.write is set inside createUIMessageStream execute, used by startResearch
-    const progressRef: { write: ((event: { type: `data-${string}`; data: unknown; transient?: boolean }) => void) | null } = { write: null };
-
-    // ТЗ-A2 + ТЗ-FIX2: Tools for briefing-onboarding context
-    // Tools are split by briefingMode: create gets startResearch, edit gets deepResearch/fetchUrl/readTelegramChannel
+    // ТЗ-A2 + ТЗ-FIX3: Tools for briefing-onboarding context (unified for create/edit)
     if (context === "briefing-onboarding") {
-      const isCreateMode = briefingMode !== "edit";
-
       const briefingProfileSchema = z.object({
         topics: z.array(z.object({
           topicId: z.string().describe("Латиница, slug, lowercase"),
@@ -683,52 +676,11 @@ export async function POST(request: Request) {
         }).optional().describe("Настройки брифинга"),
       });
 
-      // ТЗ-FIX2: create mode — startResearch (server-side orchestration)
-      if (isCreateMode) {
-        tools.startResearch = tool({
-          description: `Автоматический поиск и верификация источников для брифинга. Вызывай ОДИН РАЗ когда темы определены и briefingStyle сформирован. Передай все темы одним массивом. Не описывай процесс — пользователь видит прогресс автоматически.`,
-          inputSchema: z.object({
-            topics: z.array(z.object({
-              topicId: z.string().describe("Slug ID темы (латиница, lowercase)"),
-              topicName: z.string().describe("Название темы на русском"),
-              emoji: z.string().describe("Emoji темы"),
-              briefingStyle: z.string().describe("Стиль подачи для темы"),
-            })).describe("Темы для исследования (макс. 8)"),
-          }),
-          execute: async ({ topics }) => {
-            console.log("[startResearch] Starting for topics:", topics.map(t => t.topicName));
+      // ТЗ-FIX3: Unified tools for both create/edit modes
+      tools.deepResearch = deepResearch({ defaultDepth: "pro" });
+      tools.fetchUrl = fetchUrl;
+      tools.readTelegramChannel = readTelegramChannel;
 
-            const result = await researchTopics(topics, (event: ResearchProgressEvent) => {
-              // ТЗ-FIX2: Stream progress to client via shared closure
-              // data- prefix required by AI SDK v5 UIMessage Stream Protocol for custom types
-              // transient: true prevents saving progress events in message history (GitHub #7450)
-              progressRef.write?.({ type: "data-research-progress", data: event, transient: true });
-            });
-
-            console.log("[startResearch] Done:", {
-              success: result.success,
-              totalSources: result.totalSources,
-              totalVerified: result.totalVerified,
-            });
-
-            return result;
-          },
-        });
-      }
-
-      // ТЗ-FIX2: edit mode — individual tools for manual source management
-      if (!isCreateMode) {
-        // deepResearch with default depth "pro" for source discovery
-        tools.deepResearch = deepResearch({ defaultDepth: "pro" });
-
-        // fetchUrl for verifying specific sources
-        tools.fetchUrl = fetchUrl;
-
-        // ТЗ-TG2: readTelegramChannel for validating Telegram channels
-        tools.readTelegramChannel = readTelegramChannel;
-      }
-
-      // Shared tools for both modes
       tools.updateBriefingPreview = tool({
         description: "Обновить превью профиля брифинга в реальном времени. Вызывай с ПОЛНЫМ текущим списком тем и источников.",
         inputSchema: briefingProfileSchema,
@@ -741,10 +693,6 @@ export async function POST(request: Request) {
         description: "Финальное сохранение профиля брифинга в БД. Вызывай только когда пользователь подтвердил настройки.",
         inputSchema: briefingProfileSchema,
         execute: async (input: z.infer<typeof briefingProfileSchema>) => {
-          // Sources are already verified by startResearch (research-engine).
-          // Previous ТЗ-FIX2 filter used request-scoped verifiedSourceUrls Set,
-          // but saveBriefingProfile runs in a DIFFERENT HTTP request than startResearch,
-          // so the Set was always empty → 0 sources saved. Removed the broken filter.
           const sourcesToSave = input.sources;
 
           console.log(`[saveBriefingProfile] Saving ${input.topics.length} topics, ${sourcesToSave.length} sources for user ${userId}`);
@@ -827,13 +775,8 @@ export async function POST(request: Request) {
       content: extractMessageContent(msg),
     }));
 
-    // Dynamic step count:
-    // - briefing create: ~10 steps (interview + startResearch + updatePreview + save)
-    // - briefing edit: 30 steps (deepResearch + fetchUrl + readTelegramChannel per source)
-    // - other contexts: 3 steps
-    const maxSteps = context === "briefing-onboarding"
-      ? (briefingMode === "edit" ? 30 : 10)
-      : 3;
+    // ТЗ-FIX3: Unified step count — briefing needs many steps for sequential deepResearch + fetchUrl per topic
+    const maxSteps = context === "briefing-onboarding" ? 30 : 3;
 
     // ТЗ-FIX2: Inject DEV mode into system prompt (no-op when SIMPLY_DEV_MODE !== 'true')
     const finalSystemPrompt = injectDevMode(systemPrompt, context);
@@ -884,16 +827,7 @@ export async function POST(request: Request) {
 
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
-        // ТЗ-FIX2: Wire progress writer — startResearch can now stream events to client
-        progressRef.write = (event) => {
-          try {
-            dataStream.write(event);
-          } catch (err) {
-            console.error("[progressRef.write] Failed to write progress event:", err);
-          }
-        };
-
-        // ТЗ-FIX2: Emit model info for dev UI badge
+        // Emit model info for dev UI badge
         {
           const DISPLAY: Record<string, string> = {
             "claude-haiku": "Haiku",
