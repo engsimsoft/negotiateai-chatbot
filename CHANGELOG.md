@@ -12,6 +12,22 @@
 
 ---
 
+## [3.55.0] - 2026-02-28 - TelegramDelivery
+
+**ТЗ-TG4b**: Доставка брифинга в Telegram — бот отправляет текстовую выжимку + аудио (если готово) пользователю.
+
+### Added
+- **Delivery module** (`lib/telegram/briefing-delivery.ts`): `deliverBriefingToTelegram()` — форматирование BriefingArticle как HTML-дайджест + отправка через grammY `bot.api.sendMessage` + `sendAudio`
+- **Message formatting**: `formatBriefingMessage()` — заголовок с датой в таймзоне пользователя, до 7 секций с emoji + first sentence, inline-кнопки «Читать полностью» / «⚙️ Настроить»
+- **Audio delivery**: MP3 через `sendAudio` с caption если `audioStatus === "ready"` (known MVP limitation: из cron аудио обычно не готово)
+- **Error handling**: классификация ошибок Telegram API (403 blocked, 5xx unavailable), non-blocking для cron
+
+### Changed
+- **Cron route** (`app/api/cron/briefing/route.ts`): `generateForUser` → `generateAndDeliver`, вызов `deliverBriefingToTelegram` после pipeline, `deliveryStatus` tracking (pending → sent/failed)
+- **getUsersForDelivery** (`lib/db/queries.ts`): для Hobby plan (daily cron) возвращает всех с `deliveryEnabled=true` без фильтрации по времени. Pro plan фильтр сохранён как комментарий
+
+---
+
 ## [3.54.0] - 2026-02-27 - BackgroundBriefing
 
 **ТЗ-TG4a**: Фоновая генерация брифинга — Vercel Cron + pipeline extraction + podcast pipeline + delivery settings UI.
