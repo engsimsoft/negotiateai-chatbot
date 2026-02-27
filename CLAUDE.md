@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.52.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.53.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -107,11 +107,13 @@
 - `lib/briefing/briefing-types.ts` — Shared типы BriefingArticle/Section/Source/Meta + BriefingProgressStep/Event + SavedBriefingTopicClient (client-safe)
 - `app/(dashboard)/briefing/page.tsx` — Страница /briefing (Server Component → BriefingPageClient, роутинг: isActive → выпуск с sidebar, !isActive → лендинг, загрузка saved topics)
 - `app/(dashboard)/briefing/setup/page.tsx` — Server Component: auth, mode detection (create/edit), загрузка topics/sources
-- `app/(dashboard)/briefing/setup/briefing-setup-client.tsx` — Split layout (preview + chat), useChat, live preview, edit mode, progress при генерации
+- `app/(dashboard)/briefing/setup/briefing-setup-client.tsx` — Split layout (preview + chat), useChat, live preview, edit mode, progress при генерации, Save button + unsaved guard (v3.53.0)
 - `app/(dashboard)/briefing/setup/components/` — BriefingProfilePreview (темы, источники, tier) + BriefingChatPanel + ResearchProgressCard (live progress per topic, v3.52.0)
 - `app/(chat)/api/briefing/latest/route.ts` — GET API (latest briefing + settings)
 - `app/(chat)/api/briefing/topics/save/route.ts` — POST (save topic) / DELETE (delete topic) API
 - `app/(chat)/api/briefing/topics/saved/route.ts` — GET (list saved topics) API
+- `app/(chat)/api/briefing/save-profile/route.ts` — POST API сохранения профиля брифинга (topics + sources + settings) ← v3.53.0
+- `lib/briefing/save-briefing-profile.ts` — Логика сохранения профиля (upsertSettings → deleteAll → addAll) ← v3.53.0
 - `hooks/use-briefing-generation.ts` — Custom hook: streaming fetch → parse JSON Lines → state (steps, isGenerating, error, redirectUrl)
 - `components/briefing/briefing-card.tsx` — Карточка на дашборде (3 состояния: пустое/готов/генерируется)
 - `components/briefing/briefing-page.tsx` — Лендинг (hero + демо выпуска + CTA)
@@ -220,9 +222,10 @@
 - `app/(chat)/api/telegram/link/route.ts` — Link API: POST (generate deep link), GET (status), DELETE (unlink)
 - `app/(dashboard)/settings/settings-page.tsx` — +секция "Подключения" (ConnectionsSection: QR, polling, connect/disconnect)
 
-**Tool Call Guardian (v3.50.0 — ТЗ-FIX1, v3.51.0 — ТЗ-FIX1.2):**
+**Tool Call Guardian (v3.50.0 — ТЗ-FIX1, v3.51.0 — ТЗ-FIX1.2, v3.53.0 — Guardian Bypass):**
 - `lib/ai/tool-call-guardian.ts` — Детектор галлюцинаций tool calls (паттерны RU/EN, `detectToolHallucination()`, `createStepTracker()`, `findToolMentions()`)
 - Phase 2 (v3.51.0): полная буферизация text events per step в instrumentedStream → на finish-step: flush (чисто) или block (галлюцинация). 2+ блокировок подряд → error message. Все 3 routes.
+- Guardian Bypass (v3.53.0): для `context === "briefing-onboarding"` текст проходит без буферизации, Guardian только логирует (console.warn). Паттерн расширяем на другие multi-step flows. См. [ADR 025](docs/decisions/025-guardian-bypass-pattern.md)
 
 **Tool Activity UX (v3.20.0):**
 - `lib/ai/tool-activity-config.ts` — Конфиг инструментов (icon, activeLabel, doneLabel, argsFormatter, resultFormatter, resultCounter)
@@ -318,7 +321,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-FIX2 (v3.52.0 — ResearchProgressMode), ТЗ-FIX1.2 (v3.51.0 — GuardianBlocking), ТЗ-FIX1 (v3.50.0 — ToolCallGuardian), ТЗ-TG3 (v3.49.0 — TelegramBotInfrastructure), ТЗ-TG2 (v3.48.0 — OnboardingTelegram), ТЗ-TG1 (v3.47.0 — TelegramPhase1), ТЗ-OPT1 (v3.46.0 — UsageLogging + SonnetMigration), PATCH-podcast (v3.45.1 — PodcastFixes), ТЗ-BF5 (v3.45.0 — BriefingDedup), ТЗ-Б2 (v3.44.0 — PodcastUI), ТЗ-Б1 (v3.43.0 — PodcastEngine), ТЗ-BF4 (v3.42.0 — PerSectionRefresh), ТЗ-BF3 (v3.41.0 — BriefingSidebarRedesign), ТЗ-BF2 (v3.40.0 — SimplyNews), ТЗ-BF1 (v3.39.0 — BriefingUIRefactor), ТЗ-BRIEFING-AUTHOR-CLAUDE (v3.38.0 — BriefingAuthorClaude), PATCH-volume (v3.37.1 — BriefingVolumePromptEnforcement), ТЗ-BF1-fix (v3.37.0 — BriefingItemIdFix), ТЗ-BRIEFING-VOLUME (v3.36.0 — BriefingVolume), ТЗ-WS2 (v3.35.0 — JinaReader), ТЗ-WS1 (v3.34.0 — CharsetUnification), ТЗ-HF1 (v3.33.1 — BriefingPEUpdate), ТЗ-А5 (v3.33.0 — BriefingProgress), ТЗ-А4 (v3.32.0 — BriefingIssuePage), ТЗ-А3 (v3.31.0 — BriefingAuthor), ТЗ-A2 (v3.30.0 — BriefingOnboarding), ТЗ-PX+FU (v3.29.0 — DeepResearch + FetchUrl), ТЗ-A1 (v3.28.0 — BriefingLanding), ТЗ-BR3 (v3.27.1 — PromptIntegration), ТЗ-BR2 (v3.27.0 — BriefingUI), ТЗ-BR1 (v3.26.0 — MorningBriefingBackend), ТЗ-RG (v3.25.0 — RouteGroups), ТЗ-DV2 (v3.24.0 — DashboardV2), ТЗ-C4 (v3.23.0 — AnthropicProviderSwitch), ТЗ-C3 (v3.22.0 — ChatContextManagement), ТЗ-08CS (v3.21.0 — ChatSidebar + RightSidebar), ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-FIX3 (v3.53.0 — OnboardingRestore), ТЗ-FIX2 (v3.52.0 — ResearchProgressMode), ТЗ-FIX1.2 (v3.51.0 — GuardianBlocking), ТЗ-FIX1 (v3.50.0 — ToolCallGuardian), ТЗ-TG3 (v3.49.0 — TelegramBotInfrastructure), ТЗ-TG2 (v3.48.0 — OnboardingTelegram), ТЗ-TG1 (v3.47.0 — TelegramPhase1), ТЗ-OPT1 (v3.46.0 — UsageLogging + SonnetMigration), PATCH-podcast (v3.45.1 — PodcastFixes), ТЗ-BF5 (v3.45.0 — BriefingDedup), ТЗ-Б2 (v3.44.0 — PodcastUI), ТЗ-Б1 (v3.43.0 — PodcastEngine), ТЗ-BF4 (v3.42.0 — PerSectionRefresh), ТЗ-BF3 (v3.41.0 — BriefingSidebarRedesign), ТЗ-BF2 (v3.40.0 — SimplyNews), ТЗ-BF1 (v3.39.0 — BriefingUIRefactor), ТЗ-BRIEFING-AUTHOR-CLAUDE (v3.38.0 — BriefingAuthorClaude), PATCH-volume (v3.37.1 — BriefingVolumePromptEnforcement), ТЗ-BF1-fix (v3.37.0 — BriefingItemIdFix), ТЗ-BRIEFING-VOLUME (v3.36.0 — BriefingVolume), ТЗ-WS2 (v3.35.0 — JinaReader), ТЗ-WS1 (v3.34.0 — CharsetUnification), ТЗ-HF1 (v3.33.1 — BriefingPEUpdate), ТЗ-А5 (v3.33.0 — BriefingProgress), ТЗ-А4 (v3.32.0 — BriefingIssuePage), ТЗ-А3 (v3.31.0 — BriefingAuthor), ТЗ-A2 (v3.30.0 — BriefingOnboarding), ТЗ-PX+FU (v3.29.0 — DeepResearch + FetchUrl), ТЗ-A1 (v3.28.0 — BriefingLanding), ТЗ-BR3 (v3.27.1 — PromptIntegration), ТЗ-BR2 (v3.27.0 — BriefingUI), ТЗ-BR1 (v3.26.0 — MorningBriefingBackend), ТЗ-RG (v3.25.0 — RouteGroups), ТЗ-DV2 (v3.24.0 — DashboardV2), ТЗ-C4 (v3.23.0 — AnthropicProviderSwitch), ТЗ-C3 (v3.22.0 — ChatContextManagement), ТЗ-08CS (v3.21.0 — ChatSidebar + RightSidebar), ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**

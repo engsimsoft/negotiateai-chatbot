@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-02-22
+**Обновлено:** 2026-02-27
 
 ---
 
@@ -37,7 +37,7 @@
 | **Ревьюер задач** | Claude Opus | ✅ Работает | Профессор — ревью завершённой задачи (v3.17) |
 | **Клерк-анализатор** | Claude Haiku | ✅ Работает | Автоматический анализ файлов проекта |
 | **Snapshot Creator** | Claude Haiku | ✅ Работает | Fallback-клерк создания snapshot при заполнении контекста (v3.18) |
-| **Briefing: Онбординг** | Claude Sonnet 4.6 | ✅ Работает | AI-интервью для настройки брифинга (v3.30) |
+| **Briefing: Онбординг** | Claude Sonnet 4.6 | ✅ Работает | AI-интервью для настройки брифинга (v3.30, v3.53 — save via UI) |
 | **Briefing: Фильтр** | Gemini 2.0 Flash | ✅ Работает | Фильтрация и дедупликация новостей (v3.26) |
 | **Briefing: Автор** | Claude Sonnet 4.6 | ✅ Работает | Генерация статьи из отфильтрованных новостей (v3.31→v3.38) |
 | **Podcast: Скрипт** | Gemini 2.5 Flash | ✅ Работает | Генерация диалогового сценария из секции брифинга (v3.43) |
@@ -308,16 +308,18 @@ lib/prompts/clerks/snapshot-creator.md     # Промпт клерка
 |----------|----------|
 | **Модель** | Claude Sonnet 4.6 (`claude-sonnet-4-6`) |
 | **Оболочка** | Full-page (split layout: aside 400px preview + main chat) |
-| **Промпт** | `lib/prompts/service-chats/briefing-onboarding.md` + mode injection |
-| **Инструменты** | `updateBriefingPreview`, `saveBriefingProfile`, `deepResearch`, `fetchUrl` |
+| **Промпт** | `lib/prompts/service-chats/briefing-onboarding.md` (v11) + mode injection |
+| **Инструменты** | `updateBriefingPreview`, `deepResearch`, `fetchUrl`, `readTelegramChannel` |
+| **Guardian** | Bypass mode — текст проходит без буферизации, Guardian только логирует ([ADR 025](decisions/025-guardian-bypass-pattern.md)) |
 
 **Как работает:**
 1. Server Component определяет mode (create/edit), загружает userProfile + topics/sources
 2. AI проводит интервью: узнаёт интересы, ищет источники через deepResearch
 3. `updateBriefingPreview` обновляет live preview в реальном времени
-4. `saveBriefingProfile` записывает финальный профиль в БД (settings + topics + sources)
+4. Пользователь нажимает «Сохранить» → `POST /api/briefing/save-profile` (v3.53.0, ранее — AI tool `saveBriefingProfile`)
 5. Success card с кнопкой "Сгенерировать первый брифинг"
 6. Edit mode: загружает сохранённый профиль, greeting адаптирован
+7. Unsaved changes guard: AlertDialog при попытке уйти без сохранения (v3.53.0)
 
 **Файлы:**
 ```
@@ -326,7 +328,9 @@ app/(dashboard)/briefing/setup/briefing-setup-client.tsx    # Client (split layo
 app/(dashboard)/briefing/setup/components/                  # Preview + chat panel
 components/service-chat/configs/briefing-onboarding.ts      # Reference config
 lib/prompts/service-chats/briefing-onboarding.md            # Промпт
-app/(chat)/api/service-chat/route.ts                        # API (context: briefing-onboarding)
+app/(chat)/api/service-chat/route.ts                        # API (context: briefing-onboarding, Guardian bypass)
+app/(chat)/api/briefing/save-profile/route.ts               # POST API сохранения профиля (v3.53.0)
+lib/briefing/save-briefing-profile.ts                       # Логика сохранения (v3.53.0)
 ```
 
 #### Briefing: AI-пайплайн (v3.26)

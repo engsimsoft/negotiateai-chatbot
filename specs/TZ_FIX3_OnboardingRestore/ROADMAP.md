@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 3 |
-| Текущий этап | 2 |
+| Текущий этап | 3 (завершён) |
 | Сессий (оценка) | 1 |
 
 ---
@@ -37,8 +37,8 @@
 **Валидация этапа:**
 - [x] `npx tsc --noEmit` — 0 ошибок
 - [x] `npm run build` — успешен
-- [ ] Браузер: /briefing/setup — чат открывается, приветствие отображается
-- [ ] 🧪 Мануальный тест: create mode — AI использует deepResearch/fetchUrl (видно в DEV-бейдже), НЕ startResearch
+- [x] Браузер: /briefing/setup — чат открывается, приветствие отображается
+- [x] 🧪 Мануальный тест: create mode — AI использует deepResearch/fetchUrl (видно в DEV-бейдже), НЕ startResearch
 
 **Git (после валидации):**
 ```bash
@@ -56,7 +56,7 @@ git commit -m "fix(tz-fix3): restore unified tools for create mode"
 
 ## Этап 2: Guardian bypass + temperature + Save button + промпт v11
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 **Источник:** [TZ_FIX3_ETAP2_CLAUDE_CODE.md](TZ_FIX3_ETAP2_CLAUDE_CODE.md)
 
 **Цель:** Убрать Guardian-блокировки для briefing-onboarding, перенести сохранение в UI-кнопку, обновить промпт.
@@ -111,10 +111,10 @@ git commit -m "fix(tz-fix3): restore unified tools for create mode"
 **Валидация этапа (после каждой подзадачи — `npx tsc --noEmit`):**
 - [x] `npx tsc --noEmit` — 0 ошибок
 - [x] `npm run build` — успешен
-- [ ] 🧪 Мануальный тест create: AI → deepResearch → fetchUrl → updateBriefingPreview → текст пользователю (Guardian не блокирует)
-- [ ] 🧪 Мануальный тест save: кнопка active → нажатие → loading → redirect → данные в БД
-- [ ] 🧪 Unsaved guard: ← при непустом превью → AlertDialog
-- [ ] 🧪 SQL: источники и темы в БД после save
+- [x] 🧪 Мануальный тест create: AI → deepResearch → fetchUrl → updateBriefingPreview → текст пользователю (Guardian не блокирует)
+- [x] 🧪 Мануальный тест save: кнопка active → нажатие → loading → redirect → данные в БД
+- [x] 🧪 Unsaved guard: ← при непустом превью → AlertDialog
+- [x] 🧪 SQL: источники и темы в БД после save
 
 **Git (после валидации):**
 ```bash
@@ -138,26 +138,26 @@ git commit -m "fix(tz-fix3): prompt v11 — unified tools, save via button"
 
 ## Этап 3: Финализация
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 ⛔ **ПЕРВЫМ ДЕЛОМ:** Прочитать [DOCUMENTATION_GUIDE.md](../DOCUMENTATION_GUIDE.md) — пройти чеклист.
 
 **Документация (обязательная):**
-- [ ] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "✅ Чек-лист при изменениях"
-- [ ] Обновить главный CHANGELOG.md
-- [ ] Обновить SIMPLY_STATUS.md
-- [ ] Обновить CLAUDE.md (секция Briefing UI — save button, guardian bypass, prompt v11)
-- [ ] Обновить package.json: 3.52.0 → 3.53.0
+- [x] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "✅ Чек-лист при изменениях"
+- [x] Обновить главный CHANGELOG.md
+- [x] Обновить SIMPLY_STATUS.md
+- [x] Обновить CLAUDE.md (секция Briefing UI — save button, guardian bypass, prompt v11)
+- [x] Обновить package.json: 3.52.0 → 3.53.0
 
 **Документация (по чеклисту — оценить каждый пункт):**
-- [ ] ADR нужен? → Да (Save button вместо AI tool — архитектурное решение)
-- [ ] docs/ai-chats-map.md нужно обновить? → Да (maxSteps, tools changed, guardian bypass)
-- [ ] docs/ai-agents.md нужно обновить? → Да (промпт v10 → v11, убран saveBriefingProfile)
+- [x] ADR нужен? → Да → [ADR 025: Guardian Bypass](../../docs/decisions/025-guardian-bypass-pattern.md)
+- [x] docs/ai-chats-map.md нужно обновить? → Да (tools changed, guardian bypass, save via UI)
+- [x] docs/ai-agents.md нужно обновить? → Да (версия 3.43.0 → 3.53.0)
 
 **Завершение:**
-- [ ] Финальное мануальное тестирование (пользователь)
+- [x] Финальное мануальное тестирование (пользователь) — подтверждено
 - [ ] Переместить папку в _archive/
 
 **Валидация:**
-- [ ] `npm run build` — успешен
-- [ ] Документация актуальна (проверено по чеклисту выше)
+- [x] `npm run build` — успешен
+- [x] Документация актуальна (проверено по чеклисту выше)

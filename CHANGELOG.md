@@ -12,6 +12,30 @@
 
 ---
 
+## [3.53.0] - 2026-02-27 - OnboardingRestore
+
+**ТЗ-FIX3**: Восстановление инструментов create mode — unified tools, Guardian bypass, Save button, промпт v11.
+
+### Changed
+- **Unified tools** для briefing-onboarding: create и edit получают одинаковые 5 инструментов (deepResearch, fetchUrl, readTelegramChannel, updateBriefingPreview). Убрано разделение по режимам
+- **maxSteps=30** для обоих режимов (было 10 для create)
+- **Guardian bypass** для briefing-onboarding: текст проходит напрямую, Guardian log-only (ADR 025)
+- **Temperature 0.5** для briefing-onboarding (игнорируется при adaptive thinking)
+- **Промпт v11** (`briefing-onboarding.md`): единые инструменты, updateBriefingPreview-first паттерн, направление к кнопке Save
+
+### Added
+- **Save API endpoint** (`POST /api/briefing/save-profile`): извлечённая логика сохранения профиля
+- **Кнопка «Сохранить»** в header `/briefing/setup`: disabled → active → loading → redirect
+- **Unsaved changes guard**: AlertDialog при попытке уйти без сохранения
+- **ADR 025**: Guardian Bypass Pattern — архитектурное решение для multi-step flows
+
+### Removed
+- **saveBriefingProfile tool** — сохранение перенесено из AI-инструмента в UI-кнопку
+- **startResearch tool** — заменён на прямые вызовы deepResearch/fetchUrl/readTelegramChannel
+- **progressRef** и research progress events — убраны (связаны с startResearch)
+
+---
+
 ## [3.52.0] - 2026-02-26 - ResearchProgressMode
 
 **ТЗ-FIX2**: Research Progress Mode — live-прогресс исследования источников при онбординге брифинга + DEV mode extraction для service-chat.
