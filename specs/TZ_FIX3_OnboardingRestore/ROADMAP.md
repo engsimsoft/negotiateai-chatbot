@@ -54,42 +54,81 @@ git commit -m "fix(tz-fix3): restore unified tools for create mode"
 
 ---
 
-## Этап 2: Промпт v11 — убрать startResearch, единый flow
+## Этап 2: Guardian bypass + temperature + Save button + промпт v11
 
 **Статус:** ⬜ Не начат
+**Источник:** [TZ_FIX3_ETAP2_CLAUDE_CODE.md](TZ_FIX3_ETAP2_CLAUDE_CODE.md)
 
-**Цель:** Обновить промпт онбординга: единый набор инструментов, последовательная работа deepResearch → fetchUrl.
+**Цель:** Убрать Guardian-блокировки для briefing-onboarding, перенести сохранение в UI-кнопку, обновить промпт.
 
-**Задачи:**
-- [ ] Обновить заголовок: v10 → v11, описание изменений
-- [ ] `<source_discovery>`: убрать разделение create/edit, единый текст — AI ищет через deepResearch и проверяет через fetchUrl/readTelegramChannel
-- [ ] `<tools_usage>`: убрать секцию "startResearch (только create)", сделать единый список для обоих режимов
-- [ ] Шаг 3: если пользователь дал ссылку → fetchUrl, если @username → readTelegramChannel
-- [ ] Шаг 7: deepResearch по одной теме → fetchUrl каждый источник → следующая тема
-- [ ] Шаг 8: презентация проверенных источников → updateBriefingPreview
-- [ ] Шаг 9: корректировки через соответствующий инструмент → updateBriefingPreview
-- [ ] `<tool_rules>`: добавить — один инструмент за шаг, одна тема за вызов deepResearch
-- [ ] `<self_check>`: заменить startResearch на deepResearch/fetchUrl
-- [ ] `<telegram_channels>`: убрать разделение create/edit
-- [ ] `<source_evaluation>`: убрать "(для edit-режима при ручном отборе)" — для обоих
-- [ ] `<source_accessibility>`: убрать "В create-режиме accessibility проверяется автоматически внутри startResearch"
+### 2.1 Temperature 0.5
+
+- [x] Изменить temperature для briefing-onboarding на 0.5 в route.ts
+- [x] Добавить комментарий: при adaptive thinking temperature игнорируется
+
+**Файл:** `app/(chat)/api/service-chat/route.ts` (строка temperature)
+
+### 2.2 Guardian bypass для briefing-onboarding
+
+- [x] Для `context === "briefing-onboarding"` — пропускать буферизацию в instrumentedStream
+- [x] Guardian log-only: текст идёт напрямую к клиенту, Guardian только console.warn
+- [x] Для остальных контекстов (chat, project tasks) — без изменений
+
+**Файл:** `app/(chat)/api/service-chat/route.ts` (instrumentedStream)
+
+### 2.3 Save API endpoint
+
+- [x] Создать `lib/briefing/save-briefing-profile.ts` — выделить логику сохранения (settings + topics + sources в БД)
+- [x] Создать `app/(chat)/api/briefing/save-profile/route.ts` — POST endpoint, вызывает save logic
+- [x] Принимает JSON: `{ topics, sources, settings }`, возвращает `{ success, topicsCount, sourcesCount }`
 
 **Файлы:**
-- `lib/prompts/service-chats/briefing-onboarding.md` — единственный файл
+- `lib/briefing/save-briefing-profile.ts` — новый
+- `app/(chat)/api/briefing/save-profile/route.ts` — новый
 
-**Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок (промпт — md файл, но проверяем что ничего не сломали)
-- [ ] `npm run build` — успешен
-- [ ] 🧪 Мануальный тест: полный цикл create mode — собеседование → deepResearch по темам → fetchUrl → презентация → "сохрани" → saveBriefingProfile (не startResearch). Проверить DEV-бейдж.
-- [ ] 🧪 Проверка: источники сохранились в БД (SQL-запрос)
+### 2.4 Убрать saveBriefingProfile tool
+
+- [x] Удалить регистрацию `tools.saveBriefingProfile` в route.ts
+- [x] Удалить неиспользуемые импорты если останутся
+
+**Файл:** `app/(chat)/api/service-chat/route.ts`
+
+### 2.5 Кнопка «Сохранить» + unsaved guard
+
+- [x] Кнопка в header `/briefing/setup`, справа (перед UserMenu)
+- [x] Текст: "Сохранить" (create) / "Сохранить изменения" (edit)
+- [x] Состояния: disabled (превью пустое) → active (≥1 тема + ≥1 источник) → loading → redirect `/briefing`
+- [x] Логика: POST `/api/briefing/save-profile` с данными из `preview` state
+- [x] Unsaved changes guard: AlertDialog при нажатии ← если превью не пустое и не сохранено
+- [x] Убрать `checkSaveComplete()` и `isSaved` state (больше не нужен — redirect сразу)
+
+**Файл:** `app/(dashboard)/briefing/setup/briefing-setup-client.tsx`
+
+### 2.6 Промпт v11
+
+- [x] Подложить файл `lib/prompts/service-chats/briefing-onboarding.md` (v11 из specs)
+
+**Валидация этапа (после каждой подзадачи — `npx tsc --noEmit`):**
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [ ] 🧪 Мануальный тест create: AI → deepResearch → fetchUrl → updateBriefingPreview → текст пользователю (Guardian не блокирует)
+- [ ] 🧪 Мануальный тест save: кнопка active → нажатие → loading → redirect → данные в БД
+- [ ] 🧪 Unsaved guard: ← при непустом превью → AlertDialog
+- [ ] 🧪 SQL: источники и темы в БД после save
 
 **Git (после валидации):**
 ```bash
-git add lib/prompts/service-chats/briefing-onboarding.md
-git commit -m "fix(tz-fix3): prompt v11 — unified tools, sequential flow"
+git add -A
+git commit -m "fix(tz-fix3): guardian bypass + save button + temperature"
 ```
 
-**Критерий готовности:** AI в create mode ведёт диалог → deepResearch по одной теме → fetchUrl → следующая тема → сохранение. Без повторных вызовов research при "сохрани".
+Если промпт готов к этому моменту — отдельный коммит:
+```bash
+git add lib/prompts/service-chats/briefing-onboarding.md
+git commit -m "fix(tz-fix3): prompt v11 — unified tools, save via button"
+```
+
+**Критерий готовности:** AI работает без Guardian-блокировок. Сохранение через UI-кнопку. Промпт v11 направляет AI к updateBriefingPreview.
 
 ---
 
@@ -107,13 +146,13 @@ git commit -m "fix(tz-fix3): prompt v11 — unified tools, sequential flow"
 - [ ] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "✅ Чек-лист при изменениях"
 - [ ] Обновить главный CHANGELOG.md
 - [ ] Обновить SIMPLY_STATUS.md
-- [ ] Обновить CLAUDE.md (секция Briefing UI — убрать упоминание ResearchProgressCard как live progress)
+- [ ] Обновить CLAUDE.md (секция Briefing UI — save button, guardian bypass, prompt v11)
 - [ ] Обновить package.json: 3.52.0 → 3.53.0
 
 **Документация (по чеклисту — оценить каждый пункт):**
-- [ ] ADR нужен? → Нет (откат к предыдущей рабочей архитектуре, не новое решение)
-- [ ] docs/ai-chats-map.md нужно обновить? → Проверить (maxSteps изменился)
-- [ ] docs/ai-agents.md нужно обновить? → Проверить (промпт v10 → v11)
+- [ ] ADR нужен? → Да (Save button вместо AI tool — архитектурное решение)
+- [ ] docs/ai-chats-map.md нужно обновить? → Да (maxSteps, tools changed, guardian bypass)
+- [ ] docs/ai-agents.md нужно обновить? → Да (промпт v10 → v11, убран saveBriefingProfile)
 
 **Завершение:**
 - [ ] Финальное мануальное тестирование (пользователь)

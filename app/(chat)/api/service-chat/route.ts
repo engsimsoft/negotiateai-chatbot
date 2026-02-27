@@ -29,11 +29,6 @@ import {
   getBriefingSettings,
   getBriefingTopics,
   getBriefingSources,
-  upsertBriefingSettings,
-  addBriefingTopic,
-  addBriefingSource,
-  deleteAllBriefingTopicsByUser,
-  deleteAllBriefingSourcesByUser,
 } from "@/lib/db/queries";
 import { deepResearch } from "@/lib/ai/tools/deep-research";
 import { fetchUrl } from "@/lib/ai/tools/fetch-url";
@@ -689,60 +684,7 @@ export async function POST(request: Request) {
         },
       });
 
-      tools.saveBriefingProfile = tool({
-        description: "Финальное сохранение профиля брифинга в БД. Вызывай только когда пользователь подтвердил настройки.",
-        inputSchema: briefingProfileSchema,
-        execute: async (input: z.infer<typeof briefingProfileSchema>) => {
-          const sourcesToSave = input.sources;
-
-          console.log(`[saveBriefingProfile] Saving ${input.topics.length} topics, ${sourcesToSave.length} sources for user ${userId}`);
-
-          // 1. Upsert settings
-          await upsertBriefingSettings({
-            userId,
-            isActive: true,
-            timezone: input.settings?.timezone ?? "Europe/Moscow",
-            language: input.settings?.language ?? "ru",
-            maxItems: input.settings?.maxItems ?? 15,
-            volume: input.settings?.volume ?? "standard",
-          });
-
-          // 2. Replace all topics
-          await deleteAllBriefingTopicsByUser({ userId });
-          for (let i = 0; i < input.topics.length; i++) {
-            const t = input.topics[i];
-            await addBriefingTopic({
-              userId,
-              topicId: t.topicId,
-              topicName: t.topicName,
-              emoji: t.emoji,
-              orderIndex: i,
-              briefingStyle: t.briefingStyle ?? null,
-            });
-          }
-
-          // 3. Replace all sources
-          await deleteAllBriefingSourcesByUser({ userId });
-          for (const s of sourcesToSave) {
-            await addBriefingSource({
-              userId,
-              topicId: s.topicId,
-              sourceName: s.sourceName,
-              sourceUrl: s.sourceUrl,
-              rssUrl: s.rssUrl ?? undefined,
-              fetchMethod: s.fetchMethod,
-              sourceLanguage: s.sourceLanguage,
-              tier: s.tier,
-            });
-          }
-
-          return {
-            success: true,
-            topicsCount: input.topics.length,
-            sourcesCount: sourcesToSave.length,
-          };
-        },
-      });
+      // ТЗ-FIX3: saveBriefingProfile removed — save via UI button + POST /api/briefing/save-profile
     }
 
     // ТЗ-A3: Server persistence for project-manager
@@ -788,7 +730,8 @@ export async function POST(request: Request) {
       messages: transformedMessages,
       tools: Object.keys(tools).length > 0 ? tools : undefined,
       stopWhen: stepCountIs(maxSteps),
-      temperature: context === "project-manager" ? 0.5 : 1.0,
+      // ТЗ-FIX3: 0.5 for structured flows (manager, briefing). Note: ignored when adaptive thinking is enabled
+      temperature: (context === "project-manager" || context === "briefing-onboarding") ? 0.5 : 1.0,
       // Adaptive thinking for briefing-onboarding (Sonnet 4.6): multi-step tool calling, source evaluation
       ...(context === "briefing-onboarding" ? {
         providerOptions: {
@@ -846,6 +789,11 @@ export async function POST(request: Request) {
         result.consumeStream();
         const baseStream = result.toUIMessageStream();
 
+        // ТЗ-FIX3: briefing-onboarding uses 30-step flow where AI legitimately
+        // references results from previous steps. Guardian false-positives on these.
+        // Bypass: text passes through immediately, Guardian log-only (no buffering/blocking).
+        const guardianBypass = context === "briefing-onboarding";
+
         const instrumentedStream = new ReadableStream({
           async start(controller) {
             const reader = baseStream.getReader();
@@ -863,12 +811,14 @@ export async function POST(request: Request) {
               const { value, done } = await reader.read();
               if (done) {
                 // ТЗ-FIX1.2: Flush any remaining buffer on stream end
-                for (const buffered of stepTextBuffer) {
-                  controller.enqueue(buffered);
+                if (!guardianBypass) {
+                  for (const buffered of stepTextBuffer) {
+                    controller.enqueue(buffered);
+                  }
+                  stepTextBuffer = [];
                 }
-                stepTextBuffer = [];
 
-                // Collect guardian flags on EOF
+                // Collect guardian flags on EOF (log for all contexts)
                 const guardianFlags = guardianTracker.getAllDetections();
                 if (guardianFlags) {
                   console.warn(`[Guardian:${context}] Stream ended with detections:`, {
@@ -891,6 +841,27 @@ export async function POST(request: Request) {
                 // ТЗ-FIX1.2: Guardian — track step boundaries (UI stream uses start-step/finish-step)
                 if (eventType === "start-step") {
                   guardianTracker.reset();
+                }
+
+                // ТЗ-FIX3: In bypass mode — still feed text to Guardian for logging, but don't buffer
+                if (guardianBypass) {
+                  if (eventType === "text-delta") {
+                    const chunk = (value as any).delta ?? "";
+                    if (chunk) guardianTracker.addText(chunk);
+                  }
+                  if (eventType === "tool-input-start") {
+                    const toolName = (value as any).toolName || "unknown";
+                    guardianTracker.addToolCall(toolName);
+                  }
+                  if (eventType === "finish-step") {
+                    const guardianResult = guardianTracker.analyze();
+                    if (guardianResult.detected) {
+                      console.warn(`[Guardian:${context}] Log-only: would block step (${guardianResult.details?.length} patterns), bypassed`);
+                    }
+                  }
+                  // Pass everything through immediately
+                  controller.enqueue(value);
+                  continue;
                 }
 
                 // ТЗ-FIX1.2: Buffer text-related events (text-start/delta/end must arrive in order)

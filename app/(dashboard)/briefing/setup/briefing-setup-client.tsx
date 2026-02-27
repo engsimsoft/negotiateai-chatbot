@@ -14,10 +14,19 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { generateUUID } from "@/lib/utils";
 import { useBriefingGeneration } from "@/hooks/use-briefing-generation";
 import { BriefingGenerationProgress } from "@/components/briefing/briefing-generation-progress";
@@ -62,7 +71,7 @@ function getMessageText(parts: Array<{ type: string; text?: string }>): string {
 }
 
 /**
- * Extract briefing preview updates from updateBriefingPreview or saveBriefingProfile tool results
+ * Extract briefing preview updates from updateBriefingPreview tool results
  */
 function extractPreviewUpdate(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,19 +79,11 @@ function extractPreviewUpdate(
 ): BriefingProfile | null {
   for (const part of parts) {
     if (
-      (part.type === "tool-updateBriefingPreview" ||
-        part.type === "tool-saveBriefingProfile") &&
+      part.type === "tool-updateBriefingPreview" &&
       part.state === "output-available" &&
       part.output?.success
     ) {
-      // updateBriefingPreview returns { success, preview }
-      // saveBriefingProfile returns { success, topicsCount, sourcesCount }
       const data = part.output.preview || part.output;
-
-      // For saveBriefingProfile, we don't have full preview data
-      if (part.type === "tool-saveBriefingProfile") {
-        return null; // Signal save completed separately
-      }
 
       if (data.topics && data.sources) {
         return {
@@ -96,20 +97,6 @@ function extractPreviewUpdate(
   return null;
 }
 
-/**
- * Check if saveBriefingProfile was called successfully
- */
-function checkSaveComplete(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  parts: Array<{ type: string; output?: any; state?: string }>
-): boolean {
-  return parts.some(
-    (p) =>
-      p.type === "tool-saveBriefingProfile" &&
-      p.state === "output-available" &&
-      p.output?.success
-  );
-}
 
 export function BriefingSetupClient({
   briefingMode,
@@ -119,7 +106,10 @@ export function BriefingSetupClient({
   const router = useRouter();
   const [input, setInput] = useState("");
   const [error, setError] = useState<Error | null>(null);
+  // ТЗ-FIX3: Save via UI button, not AI tool
+  const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
   // ТЗ-FIX2 Этап 3: research progress state (data-research-progress events)
   const [researchProgress, setResearchProgress] = useState<Map<string, TopicProgress>>(new Map());
@@ -245,11 +235,7 @@ export function BriefingSetupClient({
         processedIdsRef.current.add(m.id);
       }
 
-      // Check for save completion
-      if (checkSaveComplete(m.parts)) {
-        setIsSaved(true);
-        processedIdsRef.current.add(m.id);
-      }
+      // ТЗ-FIX3: saveBriefingProfile tool removed — save via UI button
     }
   }, [chatMessages]);
 
@@ -264,6 +250,41 @@ export function BriefingSetupClient({
     });
     setInput("");
   }, [input, isLoading, sendMessage]);
+
+  // ТЗ-FIX3: Save button — enabled when ≥1 topic + ≥1 source
+  const canSave = preview.topics.length >= 1 && preview.sources.length >= 1;
+  const hasUnsavedData = preview.topics.length > 0 || preview.sources.length > 0;
+
+  const handleSave = useCallback(async () => {
+    if (!canSave || isSaving) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/briefing/save-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topics: preview.topics,
+          sources: preview.sources,
+          settings: preview.settings,
+        }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      setIsSaved(true);
+    } catch (err) {
+      console.error("[BriefingSetup] Save error:", err);
+      setError(err instanceof Error ? err : new Error("Save failed"));
+      setIsSaving(false);
+    }
+  }, [canSave, isSaving, preview]);
+
+  // ТЗ-FIX3: Back button — show leave dialog if unsaved
+  const handleBack = useCallback(() => {
+    if (hasUnsavedData && !isSaved) {
+      setShowLeaveDialog(true);
+    } else {
+      router.push("/briefing");
+    }
+  }, [hasUnsavedData, isSaved, router]);
 
   // ТЗ-А5: auto-navigate on generation complete
   useEffect(() => {
@@ -346,11 +367,9 @@ export function BriefingSetupClient({
         {/* Header */}
         <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <Link href="/briefing">
-              <Button size="icon" variant="ghost">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
+            <Button size="icon" variant="ghost" onClick={handleBack}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <div className="flex items-center gap-2">
               <span className="text-lg">☀️</span>
               <div>
@@ -363,7 +382,17 @@ export function BriefingSetupClient({
               </div>
             </div>
           </div>
-          <UserMenu />
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              disabled={!canSave || isSaving}
+              onClick={handleSave}
+            >
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {briefingMode === "edit" ? "Сохранить изменения" : "Сохранить"}
+            </Button>
+            <UserMenu />
+          </div>
         </header>
 
         {/* Chat panel */}
@@ -378,6 +407,29 @@ export function BriefingSetupClient({
           devModelName={devModelName}
         />
       </main>
+
+      {/* ТЗ-FIX3: Unsaved changes guard */}
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Выйти без сохранения?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {briefingMode === "edit"
+                ? "Изменения не сохранены. Всё вернётся к прежним настройкам."
+                : "Настройки брифинга не сохранены. При выходе все изменения будут потеряны."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Остаться</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => router.push("/briefing")}
+            >
+              Выйти
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
