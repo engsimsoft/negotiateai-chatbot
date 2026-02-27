@@ -650,11 +650,9 @@ export async function POST(request: Request) {
       });
     }
 
-    // ТЗ-FIX2: Shared references for briefing-onboarding (closure pattern)
+    // ТЗ-FIX2: Shared reference for briefing-onboarding (closure pattern)
     // progressRef.write is set inside createUIMessageStream execute, used by startResearch
-    // verifiedSourceUrls is filled by startResearch, checked by saveBriefingProfile
     const progressRef: { write: ((event: { type: `data-${string}`; data: unknown; transient?: boolean }) => void) | null } = { write: null };
-    const verifiedSourceUrls = new Set<string>();
 
     // ТЗ-A2 + ТЗ-FIX2: Tools for briefing-onboarding context
     // Tools are split by briefingMode: create gets startResearch, edit gets deepResearch/fetchUrl/readTelegramChannel
@@ -707,18 +705,10 @@ export async function POST(request: Request) {
               progressRef.write?.({ type: "data-research-progress", data: event, transient: true });
             });
 
-            // ТЗ-FIX2: Populate verified URL set for saveBriefingProfile validation
-            for (const topicResult of result.results) {
-              for (const source of topicResult.sources) {
-                verifiedSourceUrls.add(source.sourceUrl);
-              }
-            }
-
             console.log("[startResearch] Done:", {
               success: result.success,
               totalSources: result.totalSources,
               totalVerified: result.totalVerified,
-              verifiedUrls: verifiedSourceUrls.size,
             });
 
             return result;
@@ -751,24 +741,13 @@ export async function POST(request: Request) {
         description: "Финальное сохранение профиля брифинга в БД. Вызывай только когда пользователь подтвердил настройки.",
         inputSchema: briefingProfileSchema,
         execute: async (input: z.infer<typeof briefingProfileSchema>) => {
-          // ТЗ-FIX2: Load existing sources from DB (for edit mode — old sources are trusted)
-          const existingSources = await getBriefingSources({ userId });
-          const existingSourceUrls = new Set(existingSources.map(s => s.sourceUrl));
+          // Sources are already verified by startResearch (research-engine).
+          // Previous ТЗ-FIX2 filter used request-scoped verifiedSourceUrls Set,
+          // but saveBriefingProfile runs in a DIFFERENT HTTP request than startResearch,
+          // so the Set was always empty → 0 sources saved. Removed the broken filter.
+          const sourcesToSave = input.sources;
 
-          // ТЗ-FIX2: Filter sources — accept only verified (this session) or existing (in DB)
-          const acceptedSources = input.sources.filter(s => {
-            const isVerified = verifiedSourceUrls.has(s.sourceUrl);
-            const isExisting = existingSourceUrls.has(s.sourceUrl);
-            if (!isVerified && !isExisting) {
-              console.warn(`[saveBriefingProfile] Rejected unverified source: ${s.sourceUrl} (${s.sourceName})`);
-              return false;
-            }
-            return true;
-          });
-
-          if (acceptedSources.length < input.sources.length) {
-            console.warn(`[saveBriefingProfile] Filtered ${input.sources.length - acceptedSources.length} unverified sources`);
-          }
+          console.log(`[saveBriefingProfile] Saving ${input.topics.length} topics, ${sourcesToSave.length} sources for user ${userId}`);
 
           // 1. Upsert settings
           await upsertBriefingSettings({
@@ -794,9 +773,9 @@ export async function POST(request: Request) {
             });
           }
 
-          // 3. Replace all sources (only accepted)
+          // 3. Replace all sources
           await deleteAllBriefingSourcesByUser({ userId });
-          for (const s of acceptedSources) {
+          for (const s of sourcesToSave) {
             await addBriefingSource({
               userId,
               topicId: s.topicId,
@@ -812,10 +791,7 @@ export async function POST(request: Request) {
           return {
             success: true,
             topicsCount: input.topics.length,
-            sourcesCount: acceptedSources.length,
-            ...(acceptedSources.length < input.sources.length ? {
-              filteredCount: input.sources.length - acceptedSources.length,
-            } : {}),
+            sourcesCount: sourcesToSave.length,
           };
         },
       });
