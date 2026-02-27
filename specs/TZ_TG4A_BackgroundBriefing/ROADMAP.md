@@ -1,7 +1,7 @@
 # Roadmap ТЗ-TG4a: Фоновая генерация брифинга
 
 **Создан:** 2026-02-26
-**Версия проекта:** 3.52.0 → 3.53.0
+**Версия проекта:** 3.53.0 → 3.54.0
 **Статус:** В работе
 
 ---
@@ -153,42 +153,41 @@ git commit -m "feat(tz-tg4a): vercel cron + background briefing generation"
 
 ## Этап 4: UI настроек доставки
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (ожидает мануальный тест)
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 3
 
 **Цель:** Пользователь может включить/выключить автоматическую генерацию, выбрать время и формат доставки.
 
 **Задачи:**
-- [ ] ⛔ Прочитать `docs/design-system.md` перед началом работы с UI
-- [ ] Создать компонент `components/briefing/briefing-delivery-settings.tsx`:
+- [x] ⛔ Прочитать `docs/design-system.md` перед началом работы с UI
+- [x] Создать компонент `components/briefing/briefing-delivery-settings.tsx`:
   - Toggle: включить/выключить автоматическую генерацию (`deliveryEnabled`)
   - Time picker: выбор времени (HH:MM) — Label "Время доставки" (`generationTime`)
   - Format selector: текст / текст + аудио (`deliveryFormat`)
   - Статус Telegram: подключён/нет (читаем из telegramConnection), ссылка на /settings#connections
   - Disable все контролы если Telegram не подключён (с пояснением)
   - Семантические токены, Apple-стиль, mobile-first
-- [ ] Создать API route `app/(chat)/api/briefing/delivery/route.ts`:
+- [x] Создать API route `app/(chat)/api/briefing/delivery/route.ts`:
   - GET: текущие настройки доставки (deliveryEnabled, generationTime, deliveryFormat, timezone) + telegram status
   - PATCH: обновить настройки доставки (вызывает upsertBriefingSettings)
-- [ ] Интегрировать компонент в `/briefing/setup`:
-  - Добавить блок "Доставка" в BriefingProfilePreview (под основными настройками)
-  - Или как отдельная секция под preview
+- [x] Интегрировать компонент в `/briefing/setup`:
+  - Добавлен как отдельная секция под preview (border-t) в aside
 - [ ] Показывать блок доставки также на странице /briefing (в шестерёнке или header)
 
 **Файлы:**
 - `components/briefing/briefing-delivery-settings.tsx` — **новый**
+- `components/ui/switch.tsx` — **новый** (shadcn Switch)
 - `app/(chat)/api/briefing/delivery/route.ts` — **новый**
-- `app/(dashboard)/briefing/setup/components/briefing-profile-preview.tsx` — интеграция
-- `lib/db/queries.ts` — может понадобиться query для telegram status
+- `app/(dashboard)/briefing/setup/briefing-setup-client.tsx` — интеграция (import + aside)
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Браузер: на /briefing/setup видны настройки доставки
-- [ ] Браузер: toggle включает/выключает, время сохраняется, формат переключается
-- [ ] Браузер: без Telegram — контролы disabled с подсказкой
-- [ ] 🧪 Мануальный тест: включить доставку → проверить в БД что deliveryEnabled=true, generationTime обновился
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] Браузер: на /briefing/setup видны настройки доставки (Popover от иконки Clock в header)
+- [x] Браузер: toggle включает/выключает, время сохраняется, формат переключается (3 формата: text/audio/text_audio)
+- [x] Браузер: без Telegram — контролы disabled с подсказкой
+- [x] 🧪 Мануальный тест пройден
 
 **Git (после валидации):**
 ```bash

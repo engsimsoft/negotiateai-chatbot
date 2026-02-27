@@ -14,8 +14,19 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { UserMenu } from "@/components/user-menu";
 import {
   AlertDialog,
@@ -35,6 +46,7 @@ import {
   type BriefingProfile,
 } from "./components/briefing-profile-preview";
 import { BriefingChatPanel } from "./components/briefing-chat-panel";
+import { BriefingDeliverySettings } from "@/components/briefing/briefing-delivery-settings";
 import type { TopicProgress } from "./components/research-progress-card";
 
 interface UserProfile {
@@ -358,7 +370,7 @@ export function BriefingSetupClient({
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
       {/* Left: Preview (desktop only) */}
-      <aside className="hidden w-[400px] flex-shrink-0 overflow-auto border-r p-6 lg:block">
+      <aside className="hidden w-100 shrink-0 overflow-auto border-r p-6 lg:block">
         <BriefingProfilePreview profile={preview} />
       </aside>
 
@@ -383,6 +395,28 @@ export function BriefingSetupClient({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* ТЗ-TG4a: Delivery settings popover */}
+            <TooltipProvider delayDuration={300}>
+              <Popover>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="relative h-9 w-9"
+                      >
+                        <Clock className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Доставка</TooltipContent>
+                </Tooltip>
+                <PopoverContent align="end" className="w-80 p-4">
+                  <BriefingDeliverySettings />
+                </PopoverContent>
+              </Popover>
+            </TooltipProvider>
             <Button
               size="sm"
               disabled={!canSave || isSaving}

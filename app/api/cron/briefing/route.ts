@@ -125,8 +125,8 @@ async function generateForUser(
         deliveryStatus: "pending",
       });
 
-      // If user wants audio, generate podcast non-blocking
-      if (deliveryFormat === "text_audio") {
+      // If user wants audio (audio-only or text+audio), generate podcast non-blocking
+      if (deliveryFormat === "audio" || deliveryFormat === "text_audio") {
         console.log(
           `[cron/briefing] User ${userId}: starting podcast pipeline (non-blocking)`,
         );
