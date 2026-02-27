@@ -69,24 +69,36 @@ function countReplicas(script: string): number {
 }
 
 const MIN_SCRIPT_WORDS = 120;
-const MAX_SCRIPT_RETRIES = 2;
+const MAX_SCRIPT_RETRIES = 4;
+
+/**
+ * Reinforcement suffix added to the prompt on retry attempts.
+ * Gemini Flash sometimes produces ~40-word stubs; explicit length reminder helps.
+ */
+const RETRY_REINFORCEMENT =
+  "\n\n---\nВАЖНО: Предыдущая попытка была слишком короткой. Сценарий ОБЯЗАН содержать 200-400 слов и 10-20 реплик. Напиши полноценный диалог по всему материалу секции.";
 
 /**
  * Generate a dialogue script from a briefing section.
  * Returns the raw script text and replica count.
- * Retries automatically if Gemini produces a truncated/short script.
+ * Retries automatically if Gemini produces a truncated/short script,
+ * adding a reinforcement prompt on attempts 2+.
  */
 export async function generateScript(
   section: BriefingArticleSection,
   context: ScriptContext,
 ): Promise<{ script: string; replicaCount: number }> {
-  const userMessage = buildScriptwriterMessage(section, context);
+  const baseMessage = buildScriptwriterMessage(section, context);
 
   for (let attempt = 0; attempt <= MAX_SCRIPT_RETRIES; attempt++) {
+    // Add reinforcement on retry attempts 2+ (after 2 consecutive failures)
+    const prompt =
+      attempt >= 2 ? baseMessage + RETRY_REINFORCEMENT : baseMessage;
+
     const { text } = await generateText({
       model: google(SCRIPT_MODEL),
       system: SYSTEM_PROMPT,
-      prompt: userMessage,
+      prompt,
       maxOutputTokens: 2048,
     });
 
@@ -100,6 +112,12 @@ export async function generateScript(
         `[podcast/script] ${section.topicId}: too short (${wordCount} words, ${replicaCount} replicas), retrying (${attempt + 1}/${MAX_SCRIPT_RETRIES})`,
       );
       continue;
+    }
+
+    if (wordCount < MIN_SCRIPT_WORDS) {
+      console.error(
+        `[podcast/script] ${section.topicId}: still too short after ${MAX_SCRIPT_RETRIES} retries (${wordCount} words) — giving up`,
+      );
     }
 
     return { script, replicaCount };
