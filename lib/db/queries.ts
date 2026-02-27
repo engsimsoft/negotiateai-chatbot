@@ -2844,7 +2844,7 @@ export async function updateBriefingDeliveryStatus({
  * if it falls within ±7 minutes of the given UTC time.
  */
 export async function getUsersForDelivery({
-  currentUtcTime,
+  currentUtcTime: _currentUtcTime,
 }: {
   currentUtcTime: Date;
 }): Promise<Array<{ userId: string; timezone: string; generationTime: string; deliveryFormat: string }>> {
@@ -2860,27 +2860,25 @@ export async function getUsersForDelivery({
       .from(briefingSettings)
       .where(eq(briefingSettings.deliveryEnabled, true));
 
-    // Filter in JS: convert each user's generationTime to UTC and check window
-    // Window = 30 min for hourly cron (Hobby plan). Reduce to 7 for 15-min cron (Pro plan).
-    const WINDOW_MINUTES = 30;
-    const currentMinutes = currentUtcTime.getUTCHours() * 60 + currentUtcTime.getUTCMinutes();
+    // ТЗ-TG4b: Hobby plan — cron runs once daily (0 5 * * *).
+    // Return ALL users with deliveryEnabled=true, ignoring generationTime.
+    // When upgrading to Pro plan with */15 cron, uncomment the time-window filter below.
+    return rows;
 
-    return rows.filter((row) => {
-      const [hours, minutes] = row.generationTime.split(":").map(Number);
-      const userLocalMinutes = hours * 60 + minutes;
-
-      // Calculate UTC offset for user's timezone
-      const userUtcOffset = getTimezoneOffsetMinutes(row.timezone, currentUtcTime);
-      const userUtcMinutes = ((userLocalMinutes - userUtcOffset) % 1440 + 1440) % 1440;
-
-      // Generate 15 minutes before delivery time so briefing is ready on time
-      const generateAtUtc = ((userUtcMinutes - 15) % 1440 + 1440) % 1440;
-
-      const diff = Math.abs(currentMinutes - generateAtUtc);
-      const wrappedDiff = Math.min(diff, 1440 - diff);
-
-      return wrappedDiff <= WINDOW_MINUTES;
-    });
+    // --- Pro plan: time-window filter (uncomment when switching to */15 cron) ---
+    // const WINDOW_MINUTES = 7; // tight window for 15-min cron
+    // const currentMinutes = currentUtcTime.getUTCHours() * 60 + currentUtcTime.getUTCMinutes();
+    //
+    // return rows.filter((row) => {
+    //   const [hours, minutes] = row.generationTime.split(":").map(Number);
+    //   const userLocalMinutes = hours * 60 + minutes;
+    //   const userUtcOffset = getTimezoneOffsetMinutes(row.timezone, currentUtcTime);
+    //   const userUtcMinutes = ((userLocalMinutes - userUtcOffset) % 1440 + 1440) % 1440;
+    //   const generateAtUtc = ((userUtcMinutes - 15) % 1440 + 1440) % 1440;
+    //   const diff = Math.abs(currentMinutes - generateAtUtc);
+    //   const wrappedDiff = Math.min(diff, 1440 - diff);
+    //   return wrappedDiff <= WINDOW_MINUTES;
+    // });
   } catch (_error) {
     console.error("[getUsersForDelivery] Failed:", _error);
     return [];
@@ -2890,7 +2888,9 @@ export async function getUsersForDelivery({
 /**
  * Get timezone offset in minutes from UTC for a given IANA timezone.
  * Positive = east of UTC (e.g., Moscow = +180).
+ * NOTE: Currently unused (Hobby plan daily cron). Needed for Pro plan time-window filter.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getTimezoneOffsetMinutes(timezone: string, date: Date): number {
   try {
     const utcStr = date.toLocaleString("en-US", { timeZone: "UTC" });
