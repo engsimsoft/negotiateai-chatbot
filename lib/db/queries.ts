@@ -2861,7 +2861,8 @@ export async function getUsersForDelivery({
       .where(eq(briefingSettings.deliveryEnabled, true));
 
     // Filter in JS: convert each user's generationTime to UTC and check window
-    const WINDOW_MINUTES = 7;
+    // Window = 30 min for hourly cron (Hobby plan). Reduce to 7 for 15-min cron (Pro plan).
+    const WINDOW_MINUTES = 30;
     const currentMinutes = currentUtcTime.getUTCHours() * 60 + currentUtcTime.getUTCMinutes();
 
     return rows.filter((row) => {
