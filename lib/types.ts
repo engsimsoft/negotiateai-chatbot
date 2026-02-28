@@ -2,6 +2,12 @@ import type { InferUITool, UIMessage } from "ai";
 import { z } from "zod";
 import type { ArtifactKind } from "@/components/artifact";
 import type { createDocument } from "./ai/tools/create-document";
+import type {
+  DebugStepData,
+  DebugFinishData,
+  DebugGuardianData,
+  DebugPromptData,
+} from "./ai/debug-events";
 import type { getWeather } from "./ai/tools/get-weather";
 import type { requestSuggestions } from "./ai/tools/request-suggestions";
 import type { updateDocument } from "./ai/tools/update-document";
@@ -79,6 +85,11 @@ export type CustomUIDataTypes = {
   "research-depth": {
     depth: string;
   };
+  // ТЗ-DEV1: Developer Panel debug events (transient, dev-mode only)
+  "debug-prompt": DebugPromptData;
+  "debug-step": DebugStepData;
+  "debug-guardian": DebugGuardianData;
+  "debug-finish": DebugFinishData;
 };
 
 export type ChatMessage = UIMessage<

@@ -31,8 +31,17 @@ import {
 } from "@/lib/ai/context-limits";
 import { executeProfessorPipeline } from "@/lib/ai/professor-pipeline";
 import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
-import { isProductionEnvironment } from "@/lib/constants";
+import { isProductionEnvironment, isSimplyDevMode } from "@/lib/constants";
 import { createStepTracker, type GuardianFlags } from "@/lib/ai/tool-call-guardian";
+import { calculateCostRub } from "@/lib/ai/providers";
+import {
+  emitDebugStep,
+  emitDebugGuardian,
+  emitDebugFinish,
+  emitDebugPrompt,
+  truncateForDebug,
+  type DebugStepData,
+} from "@/lib/ai/debug-events";
 import {
   addChatSnapshot,
   createStreamId,
@@ -515,17 +524,34 @@ export async function POST(request: Request) {
           data: { percent: Math.round(estimatedPercent), tokens: totalHistoryTokens + systemPromptTokens },
         });
 
-        // Dev: emit model info for UI badge
-        {
-          const TIER_MODEL: Record<string, string> = { executor: "claude-haiku", expert: "claude-sonnet", professor: "claude-opus" };
-          const DISPLAY: Record<string, string> = { "claude-haiku": "Haiku", "claude-sonnet": "Sonnet", "claude-opus": "Opus" };
-          const mid = isProjectChat ? (TIER_MODEL[tier] || "claude-sonnet") : getModelForChatMode(chatMode);
-          dataStream.write({ type: "data-model-info", data: { modelId: mid, modelName: DISPLAY[mid] || mid } });
-        }
-
         // ТЗ-PX: Emit research depth override for dev UI
         if (researchDepth) {
           dataStream.write({ type: "data-research-depth", data: { depth: researchDepth } });
+        }
+
+        // ТЗ-DEV1: Emit debug prompt info
+        {
+          const agentName = isProjectChat
+            ? `Проект (${tier})`
+            : chatMode === "expertise"
+              ? "Экспертиза"
+              : chatMode === "create"
+                ? "Создать"
+                : "Simply Chat";
+          const injections: string[] = [];
+          if (userProfile?.displayName || userProfile?.bio) injections.push("user-profile");
+          if (snapshotContext) injections.push("snapshot-context");
+          if (isProjectChat) injections.push("project-context");
+          emitDebugPrompt(dataStream, {
+            systemPromptPreview: systemPromptText.slice(0, 500),
+            systemPromptLength: systemPromptText.length,
+            activeAgent: agentName,
+            chatMode,
+            isProjectChat,
+            projectTier: isProjectChat ? tier : undefined,
+            hasSnapshotContext: !!snapshotContext,
+            contextInjections: injections,
+          });
         }
 
         // ТЗ-C3: Generate assistant message ID upfront (needed for snapshot tool)
@@ -533,6 +559,10 @@ export async function POST(request: Request) {
 
         const startTime = Date.now();
         let firstTokenTime: number | null = null;
+
+        // ТЗ-DEV1: Debug step tracking state
+        let debugStepIndex = 0;
+        const debugStepDataQueue: DebugStepData[] = [];
 
         // ТЗ-03 Фаза 7: Professor Pipeline Mode
         if (isProfessorMode) {
@@ -607,6 +637,35 @@ export async function POST(request: Request) {
             isEnabled: isProductionEnvironment,
             functionId: "stream-text",
           },
+          onStepFinish: ({ usage, toolCalls, toolResults, response, finishReason }) => {
+            if (isSimplyDevMode) {
+              const inferredType = finishReason === "tool-calls"
+                ? "tool-calls"
+                : toolResults && toolResults.length > 0
+                  ? "tool-result"
+                  : "initial";
+              const stepData: DebugStepData = {
+                stepIndex: debugStepIndex++,
+                stepType: inferredType,
+                modelId: response?.modelId || "unknown",
+                inputTokens: usage?.inputTokens ?? 0,
+                outputTokens: usage?.outputTokens ?? 0,
+                cachedTokens: (usage as any)?.cachedInputTokens ?? 0,
+                reasoningTokens: (usage as any)?.reasoningTokens ?? 0,
+                finishReason: finishReason || "unknown",
+                toolCalls: (toolCalls ?? []).map((tc: any) => ({
+                  toolName: tc.toolName,
+                  args: tc.args as Record<string, unknown>,
+                })),
+                toolResults: (toolResults ?? []).map((tr: any) => ({
+                  toolName: tr.toolName,
+                  result: truncateForDebug(tr.result),
+                })),
+                timestamp: Date.now(),
+              };
+              debugStepDataQueue.push(stepData);
+            }
+          },
           onFinish: async ({ usage }) => {
             const totalTime = Date.now() - startTime;
             if (firstTokenTime === null) {
@@ -661,6 +720,27 @@ export async function POST(request: Request) {
               chatMode: logChatMode,
               durationMs: totalTime,
             };
+
+            // ТЗ-DEV1: Emit debug finish summary
+            emitDebugFinish(dataStream, {
+              totalInputTokens: usage.inputTokens ?? 0,
+              totalOutputTokens: usage.outputTokens ?? 0,
+              totalCachedTokens: (usage as any).cachedInputTokens ?? 0,
+              totalReasoningTokens: (usage as any).reasoningTokens ?? 0,
+              totalSteps: debugStepDataQueue.length,
+              totalDurationMs: totalTime,
+              timeToFirstTokenMs: firstTokenTime ?? totalTime,
+              estimatedCostRub: calculateCostRub(
+                resolvedModelId || logModelId,
+                {
+                  inputTokens: usage.inputTokens ?? 0,
+                  outputTokens: usage.outputTokens ?? 0,
+                  cachedInputTokens: (usage as any).cachedInputTokens ?? 0,
+                },
+              ),
+              modelId: resolvedModelId || logModelId,
+              finishReason: "stop",
+            });
           },
         });
 
@@ -695,6 +775,10 @@ export async function POST(request: Request) {
             let stepTextBuffer: Array<unknown> = [];
             let consecutiveHallucinations = 0;
 
+            // ТЗ-DEV1: Per-step timing
+            let stepStartTime = Date.now();
+            let debugStreamStepIndex = 0;
+
             // ТЗ-FIX1.2: Text-related events to buffer (text-start/delta/end must stay in order)
             const textBufferTypes = new Set([
               "text-start", "text-delta", "text-end",
@@ -724,6 +808,7 @@ export async function POST(request: Request) {
                 // ТЗ-FIX1.2: Guardian — track step boundaries (UI stream uses start-step/finish-step)
                 if (eventType === "start-step") {
                   guardianTracker.reset();
+                  stepStartTime = Date.now(); // ТЗ-DEV1: timing
                 }
 
                 // ТЗ-FIX1.2: Buffer text-related events (text-start/delta/end must arrive in order)
@@ -762,6 +847,28 @@ export async function POST(request: Request) {
                     }
                     stepTextBuffer = [];
                     consecutiveHallucinations = 0; // Reset on clean step
+                  }
+
+                  // ТЗ-DEV1: Emit debug step + guardian events
+                  if (isSimplyDevMode) {
+                    const stepDurationMs = Date.now() - stepStartTime;
+                    const pendingStep = debugStepDataQueue[debugStreamStepIndex];
+                    if (pendingStep) {
+                      emitDebugStep(dataStream, pendingStep);
+                    }
+                    emitDebugGuardian(dataStream, {
+                      stepIndex: debugStreamStepIndex,
+                      detected: guardianResult.detected,
+                      confidence: guardianResult.confidence,
+                      action: guardianResult.detected ? "blocked" : "clean",
+                      details: (guardianResult.details || []).map((d: any) => ({
+                        toolMentioned: d.toolMentioned || "",
+                        pattern: d.pattern || "",
+                        snippet: d.snippet || "",
+                      })),
+                      durationMs: stepDurationMs,
+                    });
+                    debugStreamStepIndex++;
                   }
                 }
 

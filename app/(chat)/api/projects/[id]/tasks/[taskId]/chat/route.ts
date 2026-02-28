@@ -12,7 +12,16 @@ import { buildTaskExpertPrompt } from "@/lib/prompts/build-task-expert-prompt";
 import { getProjectModel, isValidModelTier, DEFAULT_PROJECT_MODEL } from "@/lib/ai/model-tiers";
 import { myProvider } from "@/lib/ai/providers";
 import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
-import { isProductionEnvironment } from "@/lib/constants";
+import { isProductionEnvironment, isSimplyDevMode } from "@/lib/constants";
+import { calculateCostRub } from "@/lib/ai/providers";
+import {
+  emitDebugStep,
+  emitDebugGuardian,
+  emitDebugFinish,
+  emitDebugPrompt,
+  truncateForDebug,
+  type DebugStepData,
+} from "@/lib/ai/debug-events";
 import {
   addChatSnapshot,
   createStreamId,
@@ -280,13 +289,25 @@ export async function POST(
           data: { percent: estimatedPercent, tokens: messagesTokens + systemPromptTokens },
         });
 
-        // Dev: emit model info for UI badge
+        // ТЗ-DEV1: Emit debug prompt info
         {
-          const TIER_MODEL: Record<string, string> = { executor: "claude-haiku", expert: "claude-sonnet", professor: "claude-opus" };
-          const mid = TIER_MODEL[tier] || "claude-sonnet";
-          const DISPLAY: Record<string, string> = { "claude-haiku": "Haiku", "claude-sonnet": "Sonnet", "claude-opus": "Opus" };
-          dataStream.write({ type: "data-model-info", data: { modelId: mid, modelName: DISPLAY[mid] || mid } });
+          const injections: string[] = ["project-context"];
+          if (snapshotContext) injections.push("snapshot-context");
+          emitDebugPrompt(dataStream, {
+            systemPromptPreview: finalSystemPrompt.slice(0, 500),
+            systemPromptLength: finalSystemPrompt.length,
+            activeAgent: `Эксперт (${tier})`,
+            chatMode: `project:${tier}`,
+            isProjectChat: true,
+            projectTier: tier,
+            hasSnapshotContext: !!snapshotContext,
+            contextInjections: injections,
+          });
         }
+
+        // ТЗ-DEV1: Debug step tracking state
+        let debugStepIndex = 0;
+        const debugStepDataQueue: DebugStepData[] = [];
 
         const result = streamText({
           model: modelToUse,
@@ -300,6 +321,35 @@ export async function POST(
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
             functionId: "stream-task-expert",
+          },
+          onStepFinish: ({ usage, toolCalls, toolResults, response, finishReason }) => {
+            if (isSimplyDevMode) {
+              const inferredType = finishReason === "tool-calls"
+                ? "tool-calls"
+                : toolResults && toolResults.length > 0
+                  ? "tool-result"
+                  : "initial";
+              const stepData: DebugStepData = {
+                stepIndex: debugStepIndex++,
+                stepType: inferredType,
+                modelId: response?.modelId || "unknown",
+                inputTokens: usage?.inputTokens ?? 0,
+                outputTokens: usage?.outputTokens ?? 0,
+                cachedTokens: (usage as any)?.cachedInputTokens ?? 0,
+                reasoningTokens: (usage as any)?.reasoningTokens ?? 0,
+                finishReason: finishReason || "unknown",
+                toolCalls: (toolCalls ?? []).map((tc: any) => ({
+                  toolName: tc.toolName,
+                  args: tc.args as Record<string, unknown>,
+                })),
+                toolResults: (toolResults ?? []).map((tr: any) => ({
+                  toolName: tr.toolName,
+                  result: truncateForDebug(tr.result),
+                })),
+                timestamp: Date.now(),
+              };
+              debugStepDataQueue.push(stepData);
+            }
           },
           onFinish: async ({ usage }) => {
             const totalTime = Date.now() - startTime;
@@ -324,6 +374,24 @@ export async function POST(
               chatMode: `project:${tier}`,
               durationMs: totalTime,
             }).catch(() => {});
+
+            // ТЗ-DEV1: Emit debug finish summary
+            emitDebugFinish(dataStream, {
+              totalInputTokens: usage.inputTokens ?? 0,
+              totalOutputTokens: usage.outputTokens ?? 0,
+              totalCachedTokens: (usage as any).cachedInputTokens ?? 0,
+              totalReasoningTokens: (usage as any).reasoningTokens ?? 0,
+              totalSteps: debugStepDataQueue.length,
+              totalDurationMs: totalTime,
+              timeToFirstTokenMs: firstTokenTime ?? totalTime,
+              estimatedCostRub: calculateCostRub(resolvedModelId, {
+                inputTokens: usage.inputTokens ?? 0,
+                outputTokens: usage.outputTokens ?? 0,
+                cachedInputTokens: (usage as any).cachedInputTokens ?? 0,
+              }),
+              modelId: resolvedModelId,
+              finishReason: "stop",
+            });
           },
         });
 
@@ -337,6 +405,10 @@ export async function POST(
         const guardianTracker = createStepTracker({
           context: `project:${tier}`,
         });
+
+        // ТЗ-DEV1: Per-step timing
+        let stepStartTime = Date.now();
+        let debugStreamStepIndex = 0;
 
         // Instrumented stream with TTFT tracking + Guardian + buffering
         const instrumentedStream = new ReadableStream({
@@ -402,9 +474,10 @@ export async function POST(
               if (value && typeof value === "object" && "type" in value) {
                 const eventType = (value as any).type;
 
-                // ТЗ-FIX1.2: UI stream uses "start-step"/"finish-step" (NOT "step-start"/"step-finish")
+                // ТЗ-FIX1.2: UI stream uses "start-step"/"finish-step"
                 if (eventType === "start-step") {
                   guardianTracker.reset();
+                  stepStartTime = Date.now(); // ТЗ-DEV1: timing
                 }
 
                 // ТЗ-FIX1.2: Buffer text-related events (text-start/delta/end must arrive in order)
@@ -443,6 +516,26 @@ export async function POST(
                     }
                     stepTextBuffer = [];
                     consecutiveHallucinations = 0; // Reset on clean step
+                  }
+
+                  // ТЗ-DEV1: Emit debug step + guardian events
+                  if (isSimplyDevMode) {
+                    const stepDurationMs = Date.now() - stepStartTime;
+                    const pendingStep = debugStepDataQueue[debugStreamStepIndex];
+                    if (pendingStep) emitDebugStep(dataStream, pendingStep);
+                    emitDebugGuardian(dataStream, {
+                      stepIndex: debugStreamStepIndex,
+                      detected: guardianResult.detected,
+                      confidence: guardianResult.confidence,
+                      action: guardianResult.detected ? "blocked" : "clean",
+                      details: (guardianResult.details || []).map((d: any) => ({
+                        toolMentioned: d.toolMentioned || "",
+                        pattern: d.pattern || "",
+                        snippet: d.snippet || "",
+                      })),
+                      durationMs: stepDurationMs,
+                    });
+                    debugStreamStepIndex++;
                   }
                 }
 

@@ -29,6 +29,7 @@ import { SnapshotCard, SnapshotDivider } from "./projects/snapshot-card";
 import type { SnapshotData } from "./projects/snapshot-card";
 import { ToolActivityIndicator } from "./tool-activity-indicator";
 import { TOOL_ACTIVITY_CONFIG, type ToolActivityConfig } from "@/lib/ai/tool-activity-config";
+import { DevPanelFooter } from "./dev-panel/dev-panel-footer";
 import { Weather } from "./weather";
 
 /**
@@ -208,13 +209,6 @@ const PurePreviewMessage = ({
     });
   }, [isLoading, dataStream, resolvedToolCallIds, deduplicatedParts, _devResearchDepth]);
 
-  // Dev: extract model name from data stream for badge (only in development)
-  const devModelName = useMemo(() => {
-    if (process.env.NODE_ENV !== "development") return null;
-    const parts = dataStream.filter(p => p.type === "data-model-info");
-    return (parts[parts.length - 1]?.data as { modelName?: string } | undefined)?.modelName ?? null;
-  }, [dataStream]);
-
   // Hide empty assistant messages (no visible content).
   // During streaming the SDK may create an assistant message with empty parts before
   // content arrives — "double avatar" problem. After completion, a stale empty message
@@ -252,15 +246,8 @@ const PurePreviewMessage = ({
         })}
       >
         {message.role === "assistant" && (
-          <div className="-mt-1 flex shrink-0 flex-col items-center gap-0.5">
-            <div className="flex size-8 items-center justify-center rounded-full bg-background ring-1 ring-border">
-              <SparklesIcon size={14} />
-            </div>
-            {devModelName && (
-              <span className="mt-0.5 font-mono text-[10px] leading-none text-muted-foreground/60">
-                {devModelName}
-              </span>
-            )}
+          <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
+            <SparklesIcon size={14} />
           </div>
         )}
 
@@ -601,6 +588,10 @@ const PurePreviewMessage = ({
               setMode={setMode}
               vote={vote}
             />
+          )}
+
+          {message.role === "assistant" && (
+            <DevPanelFooter messageId={message.id} />
           )}
         </div>
       </div>

@@ -16,8 +16,6 @@ import { buildSimpleMemoryContext } from '../contexts/chat-memory';
 import { getSkillsRegistry, type SkillMetadata } from './registry';
 import { loadAgent, type Agent } from './agent-loader';
 import { loadSkill, type Skill } from './skill-loader';
-import { injectDevMode } from './dev-mode-inject';
-
 // =============================================================================
 // Types
 // =============================================================================
@@ -214,7 +212,7 @@ export function composeChatPrompt(context: BuildContext = {}, chatMode: string =
   };
 
   return {
-    systemPrompt: injectDevMode(parts.join('\n\n'), chatMode),
+    systemPrompt: parts.join('\n\n'),
     model: modelMap[chatMode] || 'claude-haiku',
     greeting: 'Привет! Чем могу помочь?',
     toolAccess: null,

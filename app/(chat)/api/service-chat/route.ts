@@ -34,7 +34,16 @@ import { deepResearch } from "@/lib/ai/tools/deep-research";
 import { fetchUrl } from "@/lib/ai/tools/fetch-url";
 import { readTelegramChannel } from "@/lib/ai/tools/read-telegram-channel";
 import { createStepTracker } from "@/lib/ai/tool-call-guardian";
-import { injectDevMode } from "@/lib/prompts/builder/dev-mode-inject";
+import { isSimplyDevMode } from "@/lib/constants";
+import { calculateCostRub } from "@/lib/ai/providers";
+import {
+  emitDebugStep,
+  emitDebugGuardian,
+  emitDebugFinish,
+  emitDebugPrompt,
+  truncateForDebug,
+  type DebugStepData,
+} from "@/lib/ai/debug-events";
 
 import { ChatSDKError } from "@/lib/errors";
 import { generateUUID } from "@/lib/utils";
@@ -720,79 +729,144 @@ export async function POST(request: Request) {
     // ТЗ-FIX3: Unified step count — briefing needs many steps for sequential deepResearch + fetchUrl per topic
     const maxSteps = context === "briefing-onboarding" ? 30 : 3;
 
-    // ТЗ-FIX2: Inject DEV mode into system prompt (no-op when SIMPLY_DEV_MODE !== 'true')
-    const finalSystemPrompt = injectDevMode(systemPrompt, context);
-
     // Stream response
-    const result = streamText({
-      model: myProvider.languageModel(modelId),
-      system: finalSystemPrompt,
-      messages: transformedMessages,
-      tools: Object.keys(tools).length > 0 ? tools : undefined,
-      stopWhen: stepCountIs(maxSteps),
-      // ТЗ-FIX3: 0.5 for structured flows (manager, briefing). Note: ignored when adaptive thinking is enabled
-      temperature: (context === "project-manager" || context === "briefing-onboarding") ? 0.5 : 1.0,
-      // Adaptive thinking for briefing-onboarding (Sonnet 4.6): multi-step tool calling, source evaluation
-      ...(context === "briefing-onboarding" ? {
-        providerOptions: {
-          anthropic: {
-            thinking: { type: "adaptive" as const },
-            effort: "high" as const,
-          },
-        },
-      } : {}),
-    });
+    const startTime = Date.now();
+    let firstTokenTime: number | null = null;
 
-    // ТЗ-A3: Save assistant response after streaming completes
-    if (managerChatId) {
-      const chatId = managerChatId;
-      result.text.then(async (fullText) => {
-        if (fullText) {
-          await saveMessages({
-            messages: [{
-              id: generateUUID(),
-              chatId,
-              role: "assistant",
-              parts: [{ type: "text", text: fullText }],
-              attachments: [],
-              createdAt: new Date(),
-              tokenCount: 0,
-            }],
-          });
-        }
-      }).catch((err) => {
-        console.error("[ServiceChat] Failed to save assistant message:", err);
-      });
-    }
+    // ТЗ-DEV1: Debug step tracking state
+    let debugStepIndex = 0;
+    const debugStepDataQueue: DebugStepData[] = [];
 
     // ТЗ-FIX1: Guardian step tracker for hallucination detection
     const guardianTracker = createStepTracker({ context });
 
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
-        // Emit model info for dev UI badge
+        // ТЗ-DEV1: Emit debug prompt info
         {
-          const DISPLAY: Record<string, string> = {
-            "claude-haiku": "Haiku",
-            "claude-sonnet": "Sonnet",
-            "claude-sonnet-4-6": "Sonnet 4.6",
-            "claude-opus": "Opus",
-          };
-          dataStream.write({
-            type: "data-model-info",
-            data: { modelId, modelName: DISPLAY[modelId] || modelId },
+          const agentName = context === "ben" ? "Бен"
+            : context === "project-creation" ? "Секретарь"
+            : context === "project-manager" ? "Менеджер"
+            : context === "briefing-onboarding" ? "Briefing Onboarding"
+            : context;
+          const injections: string[] = [];
+          if (userName || userBio) injections.push("user-profile");
+          if (context === "project-manager" && projectId) injections.push("project-context");
+          if (context === "briefing-onboarding" && briefingMode === "edit") injections.push("briefing-edit-mode");
+          emitDebugPrompt(dataStream, {
+            systemPromptPreview: systemPrompt.slice(0, 500),
+            systemPromptLength: systemPrompt.length,
+            activeAgent: agentName,
+            chatMode: `service:${context}`,
+            isProjectChat: context === "project-manager",
+            hasSnapshotContext: false,
+            contextInjections: injections,
+          });
+        }
+
+        const result = streamText({
+          model: myProvider.languageModel(modelId),
+          system: systemPrompt,
+          messages: transformedMessages,
+          tools: Object.keys(tools).length > 0 ? tools : undefined,
+          stopWhen: stepCountIs(maxSteps),
+          // ТЗ-FIX3: 0.5 for structured flows (manager, briefing). Note: ignored when adaptive thinking is enabled
+          temperature: (context === "project-manager" || context === "briefing-onboarding") ? 0.5 : 1.0,
+          // Adaptive thinking for briefing-onboarding (Sonnet 4.6): multi-step tool calling, source evaluation
+          ...(context === "briefing-onboarding" ? {
+            providerOptions: {
+              anthropic: {
+                thinking: { type: "adaptive" as const },
+                effort: "high" as const,
+              },
+            },
+          } : {}),
+          onStepFinish: ({ usage, toolCalls, toolResults, response, finishReason }) => {
+            if (isSimplyDevMode) {
+              const inferredType = finishReason === "tool-calls"
+                ? "tool-calls"
+                : toolResults && toolResults.length > 0
+                  ? "tool-result"
+                  : "initial";
+              const stepData: DebugStepData = {
+                stepIndex: debugStepIndex++,
+                stepType: inferredType,
+                modelId: response?.modelId || "unknown",
+                inputTokens: usage?.inputTokens ?? 0,
+                outputTokens: usage?.outputTokens ?? 0,
+                cachedTokens: (usage as any)?.cachedInputTokens ?? 0,
+                reasoningTokens: (usage as any)?.reasoningTokens ?? 0,
+                finishReason: finishReason || "unknown",
+                toolCalls: (toolCalls ?? []).map((tc: any) => ({
+                  toolName: tc.toolName,
+                  args: tc.args as Record<string, unknown>,
+                })),
+                toolResults: (toolResults ?? []).map((tr: any) => ({
+                  toolName: tr.toolName,
+                  result: truncateForDebug(tr.result),
+                })),
+                timestamp: Date.now(),
+              };
+              debugStepDataQueue.push(stepData);
+            }
+          },
+          onFinish: async ({ usage }) => {
+            const totalTime = Date.now() - startTime;
+            if (firstTokenTime === null) firstTokenTime = totalTime;
+
+            // ТЗ-DEV1: Emit debug finish summary
+            emitDebugFinish(dataStream, {
+              totalInputTokens: usage.inputTokens ?? 0,
+              totalOutputTokens: usage.outputTokens ?? 0,
+              totalCachedTokens: (usage as any).cachedInputTokens ?? 0,
+              totalReasoningTokens: (usage as any).reasoningTokens ?? 0,
+              totalSteps: debugStepDataQueue.length,
+              totalDurationMs: totalTime,
+              timeToFirstTokenMs: firstTokenTime ?? totalTime,
+              estimatedCostRub: calculateCostRub(modelId, {
+                inputTokens: usage.inputTokens ?? 0,
+                outputTokens: usage.outputTokens ?? 0,
+                cachedInputTokens: (usage as any).cachedInputTokens ?? 0,
+              }),
+              modelId,
+              finishReason: "stop",
+            });
+          },
+        });
+
+        // ТЗ-A3: Save assistant response after streaming completes
+        if (managerChatId) {
+          const chatId = managerChatId;
+          result.text.then(async (fullText) => {
+            if (fullText) {
+              await saveMessages({
+                messages: [{
+                  id: generateUUID(),
+                  chatId,
+                  role: "assistant",
+                  parts: [{ type: "text", text: fullText }],
+                  attachments: [],
+                  createdAt: new Date(),
+                  tokenCount: 0,
+                }],
+              });
+            }
+          }).catch((err) => {
+            console.error("[ServiceChat] Failed to save assistant message:", err);
           });
         }
 
         // consumeStream() must be inside execute to avoid race condition with toUIMessageStream()
-        // (matches chat/route.ts pattern — consume + toUIMessageStream in same scope)
         result.consumeStream();
         const baseStream = result.toUIMessageStream();
 
         // ТЗ-FIX3: briefing-onboarding uses 30-step flow where AI legitimately
         // references results from previous steps. Guardian false-positives on these.
-        // Bypass: text passes through immediately, Guardian log-only (no buffering/blocking).
         const guardianBypass = context === "briefing-onboarding";
+
+        // ТЗ-DEV1: Per-step timing
+        let stepStartTime = Date.now();
+        let debugStreamStepIndex = 0;
 
         const instrumentedStream = new ReadableStream({
           async start(controller) {
@@ -838,9 +912,10 @@ export async function POST(request: Request) {
               if (value && typeof value === "object" && "type" in value) {
                 const eventType = (value as any).type;
 
-                // ТЗ-FIX1.2: Guardian — track step boundaries (UI stream uses start-step/finish-step)
+                // ТЗ-FIX1.2: Guardian — track step boundaries
                 if (eventType === "start-step") {
                   guardianTracker.reset();
+                  stepStartTime = Date.now(); // ТЗ-DEV1: timing
                 }
 
                 // ТЗ-FIX3: In bypass mode — still feed text to Guardian for logging, but don't buffer
@@ -857,6 +932,26 @@ export async function POST(request: Request) {
                     const guardianResult = guardianTracker.analyze();
                     if (guardianResult.detected) {
                       console.warn(`[Guardian:${context}] Log-only: would block step (${guardianResult.details?.length} patterns), bypassed`);
+                    }
+
+                    // ТЗ-DEV1: Emit debug step + guardian events (even in bypass mode)
+                    if (isSimplyDevMode) {
+                      const stepDurationMs = Date.now() - stepStartTime;
+                      const pendingStep = debugStepDataQueue[debugStreamStepIndex];
+                      if (pendingStep) emitDebugStep(dataStream, pendingStep);
+                      emitDebugGuardian(dataStream, {
+                        stepIndex: debugStreamStepIndex,
+                        detected: guardianResult.detected,
+                        confidence: guardianResult.confidence,
+                        action: guardianResult.detected ? "bypassed" : "clean",
+                        details: (guardianResult.details || []).map((d: any) => ({
+                          toolMentioned: d.toolMentioned || "",
+                          pattern: d.pattern || "",
+                          snippet: d.snippet || "",
+                        })),
+                        durationMs: stepDurationMs,
+                      });
+                      debugStreamStepIndex++;
                     }
                   }
                   // Pass everything through immediately
@@ -904,6 +999,26 @@ export async function POST(request: Request) {
                     }
                     stepTextBuffer = [];
                     consecutiveHallucinations = 0; // Reset on clean step
+                  }
+
+                  // ТЗ-DEV1: Emit debug step + guardian events
+                  if (isSimplyDevMode) {
+                    const stepDurationMs = Date.now() - stepStartTime;
+                    const pendingStep = debugStepDataQueue[debugStreamStepIndex];
+                    if (pendingStep) emitDebugStep(dataStream, pendingStep);
+                    emitDebugGuardian(dataStream, {
+                      stepIndex: debugStreamStepIndex,
+                      detected: guardianResult.detected,
+                      confidence: guardianResult.confidence,
+                      action: guardianResult.detected ? "blocked" : "clean",
+                      details: (guardianResult.details || []).map((d: any) => ({
+                        toolMentioned: d.toolMentioned || "",
+                        pattern: d.pattern || "",
+                        snippet: d.snippet || "",
+                      })),
+                      durationMs: stepDurationMs,
+                    });
+                    debugStreamStepIndex++;
                   }
                 }
               }

@@ -33,10 +33,12 @@ export async function deliverBriefingToTelegram({
   userId,
   briefingId,
   deliveryFormat,
+  mergedAudioUrl,
 }: {
   userId: string;
   briefingId: string;
   deliveryFormat: "text" | "audio" | "text_audio";
+  mergedAudioUrl?: string;
 }): Promise<{ success: boolean; error?: string }> {
   // 1. Check Telegram connection
   const connection = await getTelegramConnection({ userId });
@@ -104,67 +106,48 @@ export async function deliverBriefingToTelegram({
     }
   }
 
-  // 5. Send audio (for "audio" and "text_audio" formats, if podcast is ready)
-  if (wantsAudio && hasAudio) {
-    try {
-      const audioUrls = briefing.audioUrls as Record<string, string>;
-      const audioDurations =
-        (briefing.audioDurations as Record<string, number>) || {};
+  // 5. Send audio (for "audio" and "text_audio" formats)
+  if (wantsAudio) {
+    // Prefer merged combined MP3, fallback to first individual track
+    const audioUrl =
+      mergedAudioUrl ||
+      (hasAudio
+        ? Object.values(briefing.audioUrls as Record<string, string>)[0]
+        : undefined);
 
-      const firstUrl = Object.values(audioUrls)[0];
-
-      if (firstUrl) {
+    if (audioUrl) {
+      try {
+        const audioDurations =
+          (briefing.audioDurations as Record<string, number>) || {};
         const totalMinutes = Math.round(
           Object.values(audioDurations).reduce((sum, s) => sum + s, 0) / 60,
         );
         const caption = `🎧 Аудио-версия · ${totalMinutes || "~5"} мин`;
 
-        await bot.api.sendAudio(chatId, firstUrl, {
+        await bot.api.sendAudio(chatId, audioUrl, {
           caption,
           title: `Подкаст: Брифинг за ${formatShortDate(timezone)}`,
         });
+      } catch (err) {
+        console.error(
+          `[briefing-delivery] User ${userId}: sendAudio failed:`,
+          err,
+        );
+        if (deliveryFormat === "audio") {
+          await updateBriefingDeliveryStatus({
+            briefingId,
+            deliveryStatus: "failed",
+          });
+          return { success: false, error: "audio_send_failed" };
+        }
       }
-    } catch (err) {
-      console.error(
-        `[briefing-delivery] User ${userId}: sendAudio failed:`,
-        err,
-      );
-      // If audio-only and audio failed, mark as failed
-      if (deliveryFormat === "audio") {
-        await updateBriefingDeliveryStatus({
-          briefingId,
-          deliveryStatus: "failed",
-        });
-        return { success: false, error: "audio_send_failed" };
-      }
-    }
-  }
-
-  // 6. If user wants audio-only but podcast isn't ready — send notification with link
-  if (deliveryFormat === "audio" && !hasAudio) {
-    try {
-      const dateStr = formatLocalDate(timezone);
-      const keyboard = new InlineKeyboard()
-        .url("Слушать в Simply", `${APP_URL}/briefing`)
-        .row()
-        .url("⚙️ Настроить", `${APP_URL}/briefing/setup`);
-
-      await bot.api.sendMessage(
-        chatId,
-        `<b>Брифинг · ${dateStr}</b>\n\nВаш брифинг готов. Подкаст можно послушать в приложении.`,
-        { parse_mode: "HTML", reply_markup: keyboard },
-      );
-    } catch (err) {
-      const errorMsg = classifyTelegramError(err);
-      console.error(
-        `[briefing-delivery] User ${userId}: notification failed:`,
-        err,
-      );
+    } else if (deliveryFormat === "audio") {
+      // Audio-only but no podcast ready — this is an error
       await updateBriefingDeliveryStatus({
         briefingId,
         deliveryStatus: "failed",
       });
-      return { success: false, error: errorMsg };
+      return { success: false, error: "podcast_not_ready" };
     }
   }
 

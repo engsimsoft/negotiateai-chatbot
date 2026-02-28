@@ -1,6 +1,8 @@
 // ТЗ-Б1: Audio Converter — PCM to MP3 using lamejs (pure JS, no ffmpeg)
 // lamejs is loaded via lame.all.js (self-contained bundle) to avoid
 // CJS/ESM bundler issues with webpack/turbopack.
+// Lazy loading: lamejs is loaded on first use, not at import time,
+// so routes that don't need audio encoding don't pay the cold-start cost.
 
 import fs from "fs";
 import path from "path";
@@ -9,21 +11,39 @@ const DEFAULT_SAMPLE_RATE = 24000; // Gemini TTS output: 24kHz
 const DEFAULT_KBPS = 128; // MP3 bitrate
 const BLOCK_SIZE = 1152; // MPEG-1 frame size
 
-// Load lamejs self-contained bundle, bypassing bundler entirely
-const LAMEJS_PATH = path.join(
-  process.cwd(),
-  "node_modules",
-  "lamejs",
-  "lame.all.js",
-);
+// Lazy-loaded Mp3Encoder (initialized on first call to getMp3Encoder)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _Mp3Encoder: any = null;
 
-// eslint-disable-next-line @typescript-eslint/no-implied-eval
-const loadLamejs = new Function(
-  fs.readFileSync(LAMEJS_PATH, "utf-8") +
-    "\nreturn { Mp3Encoder: lamejs.Mp3Encoder };",
-);
-
-const { Mp3Encoder } = loadLamejs();
+function getMp3Encoder() {
+  if (_Mp3Encoder) return _Mp3Encoder;
+  // Resolve lamejs path: pnpm uses real path, npm/yarn use symlink path.
+  // outputFileTracingIncludes in next.config.ts ensures lame.all.js is in the bundle.
+  // require.resolve is NOT usable — bundler replaces it with numeric module ID.
+  const pnpmPath = path.join(
+    process.cwd(),
+    "node_modules",
+    ".pnpm",
+    "lamejs@1.2.1",
+    "node_modules",
+    "lamejs",
+    "lame.all.js",
+  );
+  const symlinkPath = path.join(
+    process.cwd(),
+    "node_modules",
+    "lamejs",
+    "lame.all.js",
+  );
+  const lamejsPath = fs.existsSync(pnpmPath) ? pnpmPath : symlinkPath;
+  const code = fs.readFileSync(lamejsPath, "utf-8");
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  const loader = new Function(
+    code + "\nreturn { Mp3Encoder: lamejs.Mp3Encoder };",
+  );
+  _Mp3Encoder = loader().Mp3Encoder;
+  return _Mp3Encoder;
+}
 
 /**
  * Convert raw PCM buffer (16-bit, mono) to MP3.
@@ -42,7 +62,7 @@ export function pcmToMp3(
     pcmBuffer.length / 2,
   );
 
-  const encoder = new Mp3Encoder(1, sampleRate, DEFAULT_KBPS);
+  const encoder = new (getMp3Encoder())(1, sampleRate, DEFAULT_KBPS);
   const mp3Chunks: Buffer[] = [];
 
   // Encode in blocks

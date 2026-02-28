@@ -2,6 +2,8 @@
 // Hobby plan: runs once daily (0 5 * * *), generates briefings, delivers to Telegram.
 
 import { runBriefingPipeline } from "@/lib/briefing/briefing-pipeline";
+import { runPodcastPipeline } from "@/lib/podcast/podcast-pipeline";
+import { mergeAndUploadPodcast } from "@/lib/podcast/audio-merger";
 import { CRON_CONCURRENCY_LIMIT } from "@/lib/briefing/briefing-config";
 import {
   getBriefingHistory,
@@ -9,6 +11,7 @@ import {
   updateBriefingDeliveryStatus,
 } from "@/lib/db/queries";
 import { deliverBriefingToTelegram } from "@/lib/telegram/briefing-delivery";
+import type { BriefingArticle } from "@/lib/briefing/briefing-types";
 import pLimit from "p-limit";
 
 // Next.js requires literal values for segment config (no imported constants)
@@ -72,10 +75,7 @@ export async function GET(request: Request) {
 /**
  * Generate briefing for a single user + deliver to Telegram.
  * - Idempotency: skips if a ready briefing already exists for today (UTC)
- * - On success: delivers to Telegram, updates deliveryStatus
- * - If deliveryFormat includes audio: starts podcast pipeline non-blocking via waitUntil
- *   NOTE (MVP limitation): audio is NOT delivered from cron because podcast generation
- *   runs in waitUntil() AFTER delivery. Audio only available in web UI.
+ * - On success: generates podcast (if audio format), merges tracks, delivers to Telegram
  */
 async function generateAndDeliver(
   userId: string,
@@ -138,9 +138,64 @@ async function generateAndDeliver(
       deliveryStatus: "pending",
     });
 
-    // NOTE: Podcast generation is NOT possible in Vercel serverless (lamejs requires fs access).
-    // Audio-only users get a notification with link to listen in app.
-    // Podcast can be generated from the browser UI.
+    // Generate podcast if user wants audio
+    const wantsAudio =
+      deliveryFormat === "audio" || deliveryFormat === "text_audio";
+    let mergedAudioUrl: string | undefined;
+    let podcastStatus = "skipped";
+
+    if (wantsAudio) {
+      try {
+        const podcastResult = await runPodcastPipeline({
+          userId,
+          briefingId,
+        });
+        podcastStatus = `${podcastResult.status}(${podcastResult.readyCount}/${podcastResult.totalSections})`;
+        console.log(
+          `[cron/briefing] User ${userId}: podcast ${podcastStatus}`,
+        );
+
+        if (podcastResult.readyCount > 0) {
+          // Re-read briefing with updated audioUrls
+          const updated = await getBriefingHistory({
+            userId,
+            limit: 1,
+            status: "ready",
+          });
+          const audioUrls = updated[0]?.audioUrls as Record<string, string>;
+          const audioDurations = updated[0]?.audioDurations as Record<
+            string,
+            number
+          >;
+          const article = updated[0]?.briefingJson as BriefingArticle;
+
+          if (audioUrls && Object.keys(audioUrls).length > 0 && article) {
+            const sectionOrder = article.sections.map((s) => s.topicId);
+            const merged = await mergeAndUploadPodcast({
+              userId,
+              audioUrls,
+              audioDurations,
+              sectionOrder,
+            });
+            mergedAudioUrl = merged.url;
+            podcastStatus += `,merged`;
+            console.log(
+              `[cron/briefing] User ${userId}: merged podcast ${Math.round(merged.totalDuration / 60)}min`,
+            );
+          }
+        }
+      } catch (err) {
+        const errMsg =
+          err instanceof Error ? err.message : String(err);
+        podcastStatus = `error:${errMsg.slice(0, 200)}`;
+        console.error(
+          `[cron/briefing] User ${userId}: podcast failed:`,
+          err,
+        );
+        // text_audio: text will still be delivered below
+        // audio: mergedAudioUrl stays undefined → delivery returns podcast_not_ready
+      }
+    }
 
     // Deliver to Telegram
     let deliveryStatus = "pending";
@@ -149,6 +204,7 @@ async function generateAndDeliver(
         userId,
         briefingId,
         deliveryFormat: deliveryFormat as "text" | "audio" | "text_audio",
+        mergedAudioUrl,
       });
 
       deliveryStatus = delivery.success ? "sent" : "failed";

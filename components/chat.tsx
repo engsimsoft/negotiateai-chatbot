@@ -31,6 +31,7 @@ import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { cn, fetcher, fetchWithErrorHandlers, generateUUID, getChatUrl } from "@/lib/utils";
 import { Artifact } from "./artifact";
+import { DevPanelProvider } from "./dev-panel/dev-panel-provider";
 import { ChatSidebar } from "./chat-sidebar";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
@@ -416,7 +417,7 @@ export function Chat({
   });
 
   return (
-    <>
+    <DevPanelProvider messages={messages}>
       <div className={cn(
         "overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-background",
         "transition-[margin] duration-200 ease-linear",
@@ -541,6 +542,6 @@ export function Chat({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </DevPanelProvider>
   );
 }

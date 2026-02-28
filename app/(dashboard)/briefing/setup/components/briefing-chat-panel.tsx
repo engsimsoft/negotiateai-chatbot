@@ -33,8 +33,6 @@ interface BriefingChatPanelProps {
   error?: Error | null;
   /** ТЗ-FIX2: Live research progress per topic */
   researchTopics?: TopicProgress[];
-  /** ТЗ-FIX2 Этап 4: Dev model badge (only in development) */
-  devModelName?: string | null;
 }
 
 export function BriefingChatPanel({
@@ -45,7 +43,6 @@ export function BriefingChatPanel({
   isLoading,
   error,
   researchTopics,
-  devModelName,
 }: BriefingChatPanelProps) {
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
@@ -72,15 +69,8 @@ export function BriefingChatPanel({
                 )}
               >
                 {message.role === "assistant" && (
-                  <div className="flex shrink-0 flex-col items-center gap-0.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      S
-                    </div>
-                    {devModelName && (
-                      <span className="mt-0.5 font-mono text-[10px] leading-none text-muted-foreground/60">
-                        {devModelName}
-                      </span>
-                    )}
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    S
                   </div>
                 )}
                 <div

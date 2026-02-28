@@ -160,8 +160,7 @@ lib/prompts/
 │   ├── registry.ts   - Сканирование skills/agents
 │   ├── skill-loader.ts
 │   ├── agent-loader.ts
-│   ├── composer.ts
-│   └── dev-mode-inject.ts - DEV mode utility (v3.52.0)
+│   └── composer.ts
 ├── skills/           - Атомарные навыки (SKILL.md)
 │   ├── document/     - create-presentation, create-spreadsheet, etc.
 │   ├── research/     - web-research
@@ -207,6 +206,14 @@ createUIMessageStream → JsonToSseTransformStream → Response (SSE)
     │
     └── onFinish: saveMessages + autoNameChat + saveAiUsageLog(guardianFlags)
 ```
+
+**Developer Panel (v3.57.0):**
+- `lib/ai/debug-events.ts` — 4 типа events: `data-debug-step`, `data-debug-finish`, `data-debug-guardian`, `data-debug-prompt`
+- Эмитятся через `dataStream.write()` в `onStepFinish`, `onFinish`, Guardian analyze, stream start
+- Server guard: `isSimplyDevMode` в каждой emit function (no-op в production)
+- Client: `DevPanelProvider` (React Context) → `DevPanelFooter` (compact) → `DevPanelDrawer` (6 sections)
+- Client guard: `NEXT_PUBLIC_SIMPLY_DEV_MODE` early bailout в Provider
+- **ADR:** [029-developer-panel](decisions/029-developer-panel.md)
 
 **Tool Call Guardian (v3.50.0 + v3.51.0):**
 - `lib/ai/tool-call-guardian.ts` — детектор галлюцинаций tool calls
@@ -327,4 +334,4 @@ p-limit(3) concurrent processing
 
 ---
 
-**Обновлено:** 2026-02-27 (v3.54.0 — Background Briefing Generation)
+**Обновлено:** 2026-02-28 (v3.57.0 — Developer Panel)

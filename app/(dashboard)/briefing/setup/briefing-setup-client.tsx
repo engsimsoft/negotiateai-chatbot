@@ -126,9 +126,6 @@ export function BriefingSetupClient({
   // ТЗ-FIX2 Этап 3: research progress state (data-research-progress events)
   const [researchProgress, setResearchProgress] = useState<Map<string, TopicProgress>>(new Map());
 
-  // ТЗ-FIX2 Этап 4: dev model badge (only in development)
-  const [devModelName, setDevModelName] = useState<string | null>(null);
-
   // ТЗ-А5: streaming generation progress
   const generation = useBriefingGeneration();
 
@@ -196,11 +193,6 @@ export function BriefingSetupClient({
           next.set(event.topicId, event);
           return next;
         });
-      }
-      // ТЗ-FIX2 Этап 4: model info for dev badge
-      if (part.type === "data-model-info") {
-        const info = part.data as { modelName?: string };
-        if (info.modelName) setDevModelName(info.modelName);
       }
     },
   });
@@ -438,7 +430,6 @@ export function BriefingSetupClient({
           isLoading={isLoading}
           error={error}
           researchTopics={activeResearchTopics}
-          devModelName={devModelName}
         />
       </main>
 

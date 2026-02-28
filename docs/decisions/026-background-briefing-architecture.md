@@ -18,24 +18,27 @@
 
 ## Решение
 
-**Vercel Cron + API Route + waitUntil + p-limit** — минимальная инфраструктура без внешних сервисов.
+**Vercel Cron + API Route + p-limit** — минимальная инфраструктура без внешних сервисов.
 
 ```
-Vercel Cron (hourly)
+Vercel Cron (daily, 0 5 * * *)
     → GET /api/cron/briefing (CRON_SECRET auth)
     → getUsersForDelivery(currentUtcTime)
     → p-limit(3) per-user processing
     → runBriefingPipeline({ userId })
-    → waitUntil(runPodcastPipeline({ userId, briefingId }))
+    → runPodcastPipeline({ userId, briefingId })  // синхронно
+    → mergeAndUploadPodcast(...)                   // склейка MP3
+    → deliverBriefingToTelegram(...)               // text + audio
 ```
 
 ### Ключевые компоненты:
-1. **`vercel.json`** — cron расписание (`0 * * * *`)
+1. **`vercel.json`** — cron расписание (`0 5 * * *`, daily)
 2. **`/api/cron/briefing`** — API route с CRON_SECRET авторизацией
 3. **`briefing-pipeline.ts`** — вынесенная core-логика (работает с browser и background)
 4. **`podcast-pipeline.ts`** — вынесенная core-логика подкаста
-5. **`waitUntil()`** — non-blocking podcast (не задерживает ответ cron)
-6. **DB fields** — deliveryEnabled, deliveryFormat, deliveryStatus
+5. **`audio-merger.ts`** — склейка per-section MP3 → один файл → Vercel Blob (v3.55.1)
+6. **`briefing-delivery.ts`** — доставка text + merged MP3 в Telegram (v3.55.0)
+7. **DB fields** — deliveryEnabled, deliveryFormat, deliveryStatus
 
 ---
 
@@ -43,7 +46,7 @@ Vercel Cron (hourly)
 
 1. **Zero infrastructure** — Vercel Cron бесплатен, не нужен Inngest/Trigger.dev/QStash
 2. **Reuse existing code** — pipeline вынесен из route handlers, одна и та же логика для browser и background
-3. **waitUntil pattern** — podcast генерация не блокирует cron response (важно для timeout)
+3. **Синхронный podcast** — podcast генерируется до delivery, mergedAudioUrl передаётся в Telegram (v3.55.1, ADR 027)
 4. **p-limit(3)** — контролируемая конкурентность, не перегружает DB и AI API
 5. **Idempotency** — skip если ready briefing за сегодня, safe для повторных вызовов
 
@@ -55,7 +58,7 @@ Vercel Cron (hourly)
 
 - Нет внешних зависимостей — всё на Vercel
 - Pipeline переиспользуется browser и background
-- Podcast не блокирует — text ready → deliveryStatus='pending' мгновенно
+- Podcast синхронный — merged MP3 доставляется вместе с текстом
 - Идемпотентность — safe retry при failures
 
 ### Минусы
@@ -114,7 +117,8 @@ Vercel Cron (hourly)
 
 ## Примечания
 
-- Actual Telegram delivery (sending messages) — **не реализовано** в ТЗ-TG4a. Будет в ТЗ-TG4b
+- Telegram delivery реализована в ТЗ-TG4b (v3.55.0)
+- Podcast из cron исправлен в v3.55.1 (ADR 027 — lamejs bundling)
 - deliveryStatus flow: `none` → `pending` (text ready) → `sent` (после отправки в Telegram)
 - 3 формата доставки: `text` (только текст), `audio` (только подкаст), `text_audio` (текст + подкаст)
 
@@ -122,4 +126,5 @@ Vercel Cron (hourly)
 
 ## История изменений
 
+- **2026-02-28** - Обновлён: синхронный podcast (вместо waitUntil), audio-merger, ссылка на ADR 027
 - **2026-02-27** - Документ создан (Claude Code, ТЗ-TG4a)

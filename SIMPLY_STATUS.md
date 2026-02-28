@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.56.0
+**Версия:** 3.57.0
 **Дата:** 2026-02-28
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -354,6 +354,23 @@ components/projects/
 **Возможный переход на Vercel Pro:** при 5+ пользователях с audio — maxDuration, cron frequency (daily → per-minute), Blob storage limits.
 
 **ADR:** [027-lamejs-vercel-bundling](docs/decisions/027-lamejs-vercel-bundling.md)
+
+### ТЗ-DEV1: DeveloperPanel — ✅ ЗАВЕРШЁН (v3.57.0)
+
+**Выполнено:**
+- **Debug Events** — 4 типа transient data-stream events (`data-debug-step/finish/guardian/prompt`), эмитятся в 3 routes (chat, service-chat, project tasks)
+- **DevPanel Footer** — компактная строка под AI-ответом: модель, токены, стоимость (₽), время. Live elapsed timer, красный стиль при ошибках
+- **DevPanel Drawer** — Sheet справа с 6 секциями: Model, Tokens, Timeline, Guardian, Prompt, Raw JSON
+- **Production safety** — `NEXT_PUBLIC_SIMPLY_DEV_MODE` env mapping, early bailout в Provider, server-side guard в emit functions
+- **Старый DEV mode удалён** — `injectDevMode()`, `dev-mode.md`, `devModelName` badge, `data-model-info` event
+
+**Ключевые файлы:**
+- `lib/ai/debug-events.ts` — типы + emit functions
+- `lib/ai/providers.ts` — +MODEL_PRICING_RUB + calculateCostRub()
+- `components/dev-panel/` — Provider, Footer, Drawer, 6 секций
+- `next.config.ts` — env mapping
+
+**ADR:** [029-developer-panel](docs/decisions/029-developer-panel.md)
 
 ### ТЗ-TG5: ClosedGroups — ✅ ЗАВЕРШЁН (v3.56.0)
 

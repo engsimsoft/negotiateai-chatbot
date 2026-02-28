@@ -12,6 +12,40 @@
 
 ---
 
+## [3.57.0] - 2026-02-28 - DeveloperPanel
+
+**ТЗ-DEV1**: Developer Panel — встроенная панель отладки AI-ответов. Под каждым ответом ассистента (в dev mode) отображается компактная строка с метриками, клик открывает drawer с полными деталями. Старый DEV mode (inline prefix в тексте) полностью удалён.
+
+### Added
+- **Debug Events System** (`lib/ai/debug-events.ts`): 4 типа transient data-stream events (`data-debug-step`, `data-debug-finish`, `data-debug-guardian`, `data-debug-prompt`) — эмитятся только при `SIMPLY_DEV_MODE=true`
+- **Model Pricing** (`lib/ai/providers.ts`): `MODEL_PRICING_RUB` + `calculateCostRub()` — расчёт стоимости запроса в рублях (100 ₽/$ курс)
+- **DevPanel Provider** (`components/dev-panel/dev-panel-provider.tsx`): React Context, аккумуляция debug events per message, `useDevPanel(messageId)` hook
+- **DevPanel Footer** (`components/dev-panel/dev-panel-footer.tsx`): компактная строка `Haiku 4.5 · 14.5k tok · ₽1.23 · 3.6s ▸` под каждым AI-ответом. Live elapsed timer при streaming, красный стиль при ошибках
+- **DevPanel Drawer** (`components/dev-panel/dev-panel-drawer.tsx`): Sheet справа с 6 секциями (Model, Tokens, Timeline, Guardian, Prompt, Raw JSON)
+- **6 секций drawer**: Model (модель + finishReason с цветовой кодировкой), Tokens (input/output/cached/reasoning + стоимость + context %), Timeline (пошаговые карточки с timing bars), Guardian (статус детектора галлюцинаций), Prompt (preview системного промпта + метаданные), Raw (JSON tool calls/results)
+- **Production safety**: `NEXT_PUBLIC_SIMPLY_DEV_MODE` env mapping в `next.config.ts`, early bailout в Provider, server-side guard в emit functions
+
+### Changed
+- **Debug events во всех routes**: `app/(chat)/api/chat/route.ts`, `app/(chat)/api/service-chat/route.ts`, `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — эмитят `data-debug-step/finish/guardian/prompt`
+- **DevPanelProvider** интегрирован в `components/chat.tsx`
+- **DevPanelFooter** интегрирован в `components/message.tsx` (под AI-ответами)
+
+### Removed
+- **Старый DEV mode полностью удалён:**
+  - `lib/prompts/builder/dev-mode-inject.ts` — УДАЛЁН
+  - `lib/prompts/core/dev-mode.md` — УДАЛЁН
+  - `injectDevMode()` вызовы из `composer.ts` и `service-chat/route.ts`
+  - `devModelName` state/prop/badge из `message.tsx`, `briefing-setup-client.tsx`, `briefing-chat-panel.tsx`
+  - `data-model-info` event из `service-chat/route.ts`
+
+### Fixed
+- **Chat deletion 500 error** — `deleteChatById` и `deleteAllChatsByUserId` в `lib/db/queries.ts` теперь удаляют записи `ai_usage_log` перед удалением чата (FK constraint)
+
+### Technical
+- **ADR 029**: [Developer Panel Architecture](docs/decisions/029-developer-panel.md)
+
+---
+
 ## [3.56.0] - 2026-02-28 - ClosedGroups
 
 **ТЗ-TG5**: Чтение закрытых групп через бота — бот, добавленный в группу Telegram, сохраняет сообщения в БД Simply. Данные доступны через API и в утилитарном UI.

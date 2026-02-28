@@ -218,4 +218,7 @@ lib/prompts/briefing/
 
 ## История изменений
 
+- **2026-02-28** — Добавлена ссылка на ADR 027 (lamejs bundling fix для cron)
 - **2026-02-22** — ADR создан. Podcast Engine v3.43.0
+
+**См. также:** ADR 027 — [lamejs Vercel Bundling](027-lamejs-vercel-bundling.md) (lazy loading + pnpm path resolution для работы из cron-функции)

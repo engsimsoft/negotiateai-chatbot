@@ -231,6 +231,7 @@ export async function deleteChatById({ id }: { id: string }) {
     await db.delete(vote).where(eq(vote.chatId, id));
     await db.delete(message).where(eq(message.chatId, id));
     await db.delete(stream).where(eq(stream.chatId, id));
+    await db.delete(aiUsageLog).where(eq(aiUsageLog.chatId, id));
 
     const [chatsDeleted] = await db
       .delete(chat)
@@ -262,6 +263,7 @@ export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
     await db.delete(vote).where(inArray(vote.chatId, chatIds));
     await db.delete(message).where(inArray(message.chatId, chatIds));
     await db.delete(stream).where(inArray(stream.chatId, chatIds));
+    await db.delete(aiUsageLog).where(inArray(aiUsageLog.chatId, chatIds));
 
     const deletedChats = await db
       .delete(chat)
