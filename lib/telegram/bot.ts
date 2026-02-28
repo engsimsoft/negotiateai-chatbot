@@ -6,6 +6,12 @@ import {
   createTelegramConnection,
   deleteTelegramConnection,
   setTelegramConnectionActive,
+  upsertTelegramGroup,
+  getTelegramGroupByChatId,
+  deactivateTelegramGroup,
+  upsertTelegramGroupTopic,
+  getTelegramTopicByTelegramId,
+  createTelegramMessage,
 } from "@/lib/db/queries";
 
 // ============================================================================
@@ -167,14 +173,178 @@ bot.command("help", async (ctx) => {
 });
 
 // ============================================================================
-// Any other message
+// ТЗ-TG5: my_chat_member — bot added/removed from group
+// ============================================================================
+
+bot.on("my_chat_member", async (ctx) => {
+  const chat = ctx.myChatMember.chat;
+  const newStatus = ctx.myChatMember.new_chat_member.status;
+
+  // Only handle group/supergroup events
+  if (chat.type !== "group" && chat.type !== "supergroup") return;
+
+  const telegramChatId = chat.id;
+  const title = chat.title || "Unnamed group";
+  const isForum = "is_forum" in chat && chat.is_forum === true;
+
+  if (newStatus === "member" || newStatus === "administrator") {
+    // --- Bot added to group ---
+
+    // Find owner: who added the bot → check TelegramConnection
+    const addedByTelegramId = ctx.from?.id;
+    let ownerUserId: string | null = null;
+
+    if (addedByTelegramId) {
+      const connection = await getTelegramConnectionByTelegramId({
+        telegramUserId: addedByTelegramId,
+      });
+      if (connection) {
+        ownerUserId = connection.userId;
+      }
+    }
+
+    const group = await upsertTelegramGroup({
+      telegramChatId,
+      title,
+      type: chat.type,
+      isForum,
+      ownerUserId,
+      memberCount: null,
+    });
+
+    // Auto-create "Общее" topic for forum groups (thread_id = 1)
+    if (isForum) {
+      await upsertTelegramGroupTopic({
+        groupId: group.id,
+        telegramTopicId: 1,
+        name: "Общее",
+      });
+    }
+
+    // Notify owner in DM (if connected via TelegramConnection)
+    if (addedByTelegramId && ownerUserId) {
+      try {
+        await bot.api.sendMessage(
+          addedByTelegramId,
+          `Группа «${title}» подключена к Simply.\n\nНовые сообщения будут сохраняться автоматически.`,
+          simplyButton("Открыть Simply →", "/groups"),
+        );
+      } catch {
+        // DM might fail if user hasn't started the bot — ignore silently
+      }
+    }
+  } else if (newStatus === "left" || newStatus === "kicked") {
+    // --- Bot removed from group ---
+    await deactivateTelegramGroup({ telegramChatId });
+  }
+});
+
+// ============================================================================
+// ТЗ-TG5: Group messages — save to DB silently
 // ============================================================================
 
 bot.on("message", async (ctx) => {
-  await ctx.reply(
-    "Я доставляю брифинги, но не веду переписку.\n\nЕсли нужно что-то обсудить или спросить — это в Simply.",
-    simplyButton("Открыть Simply →", "/dashboard"),
-  );
+  const chatType = ctx.chat.type;
+
+  // --- Private chat: catch-all reply (existing behavior) ---
+  if (chatType === "private") {
+    await ctx.reply(
+      "Я доставляю брифинги, но не веду переписку.\n\nЕсли нужно что-то обсудить или спросить — это в Simply.",
+      simplyButton("Открыть Simply →", "/dashboard"),
+    );
+    return;
+  }
+
+  // --- Group/supergroup: save message silently ---
+  if (chatType !== "group" && chatType !== "supergroup") return;
+
+  const msg = ctx.message;
+  if (!msg) return;
+
+  // Handle forum_topic_created / forum_topic_edited service messages
+  if (msg.forum_topic_created || msg.forum_topic_edited) {
+    const group = await getTelegramGroupByChatId({
+      telegramChatId: ctx.chat.id,
+    });
+    if (!group) return;
+
+    const threadId = msg.message_thread_id;
+    if (!threadId) return;
+
+    const topicName =
+      msg.forum_topic_created?.name ||
+      msg.forum_topic_edited?.name;
+    if (topicName) {
+      await upsertTelegramGroupTopic({
+        groupId: group.id,
+        telegramTopicId: threadId,
+        name: topicName,
+      });
+    }
+    return; // Don't save service messages as regular messages
+  }
+
+  // Extract text content: text or caption (for media with description)
+  const text = msg.text || msg.caption;
+  if (!text) return; // Skip messages without text content (media-only, service messages)
+
+  // Determine media type
+  let hasMedia = false;
+  let mediaType: string | null = null;
+  if (msg.photo) {
+    hasMedia = true;
+    mediaType = "photo";
+  } else if (msg.video) {
+    hasMedia = true;
+    mediaType = "video";
+  } else if (msg.document) {
+    hasMedia = true;
+    mediaType = "document";
+  } else if (msg.voice) {
+    hasMedia = true;
+    mediaType = "voice";
+  } else if (msg.sticker) {
+    hasMedia = true;
+    mediaType = "sticker";
+  }
+
+  // Look up the group in DB
+  const group = await getTelegramGroupByChatId({
+    telegramChatId: ctx.chat.id,
+  });
+  if (!group) return; // Group not registered (shouldn't happen, but defensive)
+
+  // Resolve topic if message is in a forum thread
+  let topicId: string | null = null;
+  if (msg.message_thread_id) {
+    // Try to find existing topic, or create placeholder
+    let topic = await getTelegramTopicByTelegramId({
+      groupId: group.id,
+      telegramTopicId: msg.message_thread_id,
+    });
+    if (!topic) {
+      topic = await upsertTelegramGroupTopic({
+        groupId: group.id,
+        telegramTopicId: msg.message_thread_id,
+        name: `Топик #${msg.message_thread_id}`,
+      });
+    }
+    topicId = topic.id;
+  }
+
+  // Save message
+  await createTelegramMessage({
+    groupId: group.id,
+    topicId,
+    telegramMessageId: msg.message_id,
+    fromUserId: msg.from?.id ?? 0,
+    fromUsername: msg.from?.username ?? null,
+    fromFirstName: msg.from?.first_name ?? null,
+    text,
+    hasMedia,
+    mediaType,
+    sentAt: new Date(msg.date * 1000),
+  });
 });
 
 export { bot };

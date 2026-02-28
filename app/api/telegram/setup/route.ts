@@ -34,6 +34,7 @@ export async function POST(request: Request) {
 
   await bot.api.setWebhook(webhookUrl, {
     secret_token: secretToken,
+    allowed_updates: ["message", "my_chat_member"],
   });
 
   return NextResponse.json({

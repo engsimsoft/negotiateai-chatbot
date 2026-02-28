@@ -578,3 +578,78 @@ export const telegramLinkToken = pgTable("TelegramLinkToken", {
 });
 
 export type TelegramLinkToken = InferSelectModel<typeof telegramLinkToken>;
+
+// ============================================================================
+// Telegram Groups (ТЗ-TG5)
+// ============================================================================
+
+export const telegramGroup = pgTable("TelegramGroup", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  telegramChatId: bigint("telegramChatId", { mode: "number" })
+    .notNull()
+    .unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  type: varchar("type", { length: 20 }).notNull(), // "group" | "supergroup"
+  isForum: boolean("isForum").notNull().default(false),
+  ownerUserId: uuid("ownerUserId").references(() => user.id),
+  isActive: boolean("isActive").notNull().default(true),
+  memberCount: integer("memberCount"),
+  createdAt: timestamp("createdAt").notNull(),
+  updatedAt: timestamp("updatedAt").notNull(),
+});
+
+export type TelegramGroup = InferSelectModel<typeof telegramGroup>;
+
+export const telegramGroupTopic = pgTable(
+  "TelegramGroupTopic",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    groupId: uuid("groupId")
+      .notNull()
+      .references(() => telegramGroup.id),
+    telegramTopicId: integer("telegramTopicId").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    createdAt: timestamp("createdAt").notNull(),
+  },
+  (table) => ({
+    groupTopicIdx: uniqueIndex("tg_group_topic_unique_idx").on(
+      table.groupId,
+      table.telegramTopicId
+    ),
+  })
+);
+
+export type TelegramGroupTopic = InferSelectModel<typeof telegramGroupTopic>;
+
+export const telegramMessage = pgTable(
+  "TelegramMessage",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    groupId: uuid("groupId")
+      .notNull()
+      .references(() => telegramGroup.id),
+    topicId: uuid("topicId").references(() => telegramGroupTopic.id),
+    telegramMessageId: integer("telegramMessageId").notNull(),
+    fromUserId: bigint("fromUserId", { mode: "number" }).notNull(),
+    fromUsername: varchar("fromUsername", { length: 255 }),
+    fromFirstName: varchar("fromFirstName", { length: 255 }),
+    text: text("text").notNull(),
+    hasMedia: boolean("hasMedia").notNull().default(false),
+    mediaType: varchar("mediaType", { length: 20 }), // "photo"|"video"|"document"|"voice"|"sticker"
+    sentAt: timestamp("sentAt").notNull(),
+    createdAt: timestamp("createdAt").notNull(),
+  },
+  (table) => ({
+    groupSentAtIdx: index("tg_message_group_sent_idx").on(
+      table.groupId,
+      table.sentAt
+    ),
+    groupTopicSentAtIdx: index("tg_message_group_topic_sent_idx").on(
+      table.groupId,
+      table.topicId,
+      table.sentAt
+    ),
+  })
+);
+
+export type TelegramMessage = InferSelectModel<typeof telegramMessage>;

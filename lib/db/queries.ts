@@ -56,8 +56,14 @@ import {
   suggestion,
   type TelegramConnection,
   telegramConnection,
+  type TelegramGroup,
+  telegramGroup,
+  type TelegramGroupTopic,
+  telegramGroupTopic,
   type TelegramLinkToken,
   telegramLinkToken,
+  telegramMessage,
+  type TelegramMessage,
   type User,
   user,
   vote,
@@ -3808,6 +3814,444 @@ export async function deleteTelegramLinkToken({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to delete Telegram link token"
+    );
+  }
+}
+
+// ============================================================================
+// Telegram Groups (ТЗ-TG5)
+// ============================================================================
+
+/**
+ * ТЗ-TG5: Create or reactivate a Telegram group when bot is added
+ */
+export async function upsertTelegramGroup({
+  telegramChatId,
+  title,
+  type,
+  isForum,
+  ownerUserId,
+  memberCount,
+}: {
+  telegramChatId: number;
+  title: string;
+  type: string;
+  isForum: boolean;
+  ownerUserId: string | null;
+  memberCount: number | null;
+}): Promise<TelegramGroup> {
+  const now = new Date();
+  try {
+    const existing = await db
+      .select()
+      .from(telegramGroup)
+      .where(eq(telegramGroup.telegramChatId, telegramChatId));
+
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(telegramGroup)
+        .set({
+          title,
+          type,
+          isForum,
+          isActive: true,
+          memberCount,
+          updatedAt: now,
+          ...(ownerUserId && !existing[0].ownerUserId
+            ? { ownerUserId }
+            : {}),
+        })
+        .where(eq(telegramGroup.telegramChatId, telegramChatId))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db
+      .insert(telegramGroup)
+      .values({
+        telegramChatId,
+        title,
+        type,
+        isForum,
+        ownerUserId,
+        isActive: true,
+        memberCount,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to upsert Telegram group"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG5: Get group by Telegram chat ID
+ */
+export async function getTelegramGroupByChatId({
+  telegramChatId,
+}: {
+  telegramChatId: number;
+}): Promise<TelegramGroup | null> {
+  try {
+    const [group] = await db
+      .select()
+      .from(telegramGroup)
+      .where(eq(telegramGroup.telegramChatId, telegramChatId));
+    return group || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get Telegram group by chat ID"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG5: Deactivate group (bot removed or user disabled)
+ */
+export async function deactivateTelegramGroup({
+  telegramChatId,
+}: {
+  telegramChatId: number;
+}) {
+  try {
+    await db
+      .update(telegramGroup)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(telegramGroup.telegramChatId, telegramChatId));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to deactivate Telegram group"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG5: Deactivate group by internal ID (for UI "Disconnect" button)
+ */
+export async function deactivateTelegramGroupById({
+  groupId,
+  ownerUserId,
+}: {
+  groupId: string;
+  ownerUserId: string;
+}) {
+  try {
+    await db
+      .update(telegramGroup)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(telegramGroup.id, groupId),
+          eq(telegramGroup.ownerUserId, ownerUserId)
+        )
+      );
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to deactivate Telegram group by ID"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG5: List groups for a user (with message count and last message date)
+ */
+export async function getTelegramGroupsByOwner({
+  ownerUserId,
+}: {
+  ownerUserId: string;
+}): Promise<
+  (TelegramGroup & { messageCount: number; lastMessageAt: Date | null })[]
+> {
+  try {
+    const groups = await db
+      .select({
+        id: telegramGroup.id,
+        telegramChatId: telegramGroup.telegramChatId,
+        title: telegramGroup.title,
+        type: telegramGroup.type,
+        isForum: telegramGroup.isForum,
+        ownerUserId: telegramGroup.ownerUserId,
+        isActive: telegramGroup.isActive,
+        memberCount: telegramGroup.memberCount,
+        createdAt: telegramGroup.createdAt,
+        updatedAt: telegramGroup.updatedAt,
+        messageCount: count(telegramMessage.id),
+        lastMessageAt: sql<Date | null>`max(${telegramMessage.sentAt})`,
+      })
+      .from(telegramGroup)
+      .leftJoin(
+        telegramMessage,
+        eq(telegramGroup.id, telegramMessage.groupId)
+      )
+      .where(eq(telegramGroup.ownerUserId, ownerUserId))
+      .groupBy(telegramGroup.id)
+      .orderBy(desc(sql`max(${telegramMessage.sentAt})`));
+
+    return groups.map((g) => ({
+      ...g,
+      messageCount: Number(g.messageCount),
+    }));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get Telegram groups by owner"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG5: Get a single group (with ownership check)
+ */
+export async function getTelegramGroupById({
+  groupId,
+  ownerUserId,
+}: {
+  groupId: string;
+  ownerUserId: string;
+}): Promise<TelegramGroup | null> {
+  try {
+    const [group] = await db
+      .select()
+      .from(telegramGroup)
+      .where(
+        and(
+          eq(telegramGroup.id, groupId),
+          eq(telegramGroup.ownerUserId, ownerUserId)
+        )
+      );
+    return group || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get Telegram group by ID"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG5: Create or update a forum topic (upsert by groupId + telegramTopicId)
+ */
+export async function upsertTelegramGroupTopic({
+  groupId,
+  telegramTopicId,
+  name,
+}: {
+  groupId: string;
+  telegramTopicId: number;
+  name: string;
+}): Promise<TelegramGroupTopic> {
+  try {
+    const [existing] = await db
+      .select()
+      .from(telegramGroupTopic)
+      .where(
+        and(
+          eq(telegramGroupTopic.groupId, groupId),
+          eq(telegramGroupTopic.telegramTopicId, telegramTopicId)
+        )
+      );
+
+    if (existing) {
+      if (existing.name !== name) {
+        const [updated] = await db
+          .update(telegramGroupTopic)
+          .set({ name })
+          .where(eq(telegramGroupTopic.id, existing.id))
+          .returning();
+        return updated;
+      }
+      return existing;
+    }
+
+    const [created] = await db
+      .insert(telegramGroupTopic)
+      .values({
+        groupId,
+        telegramTopicId,
+        name,
+        createdAt: new Date(),
+      })
+      .returning();
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to upsert Telegram group topic"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG5: Get topics for a group (with message counts)
+ */
+export async function getTelegramGroupTopics({
+  groupId,
+}: {
+  groupId: string;
+}): Promise<(TelegramGroupTopic & { messageCount: number })[]> {
+  try {
+    const topics = await db
+      .select({
+        id: telegramGroupTopic.id,
+        groupId: telegramGroupTopic.groupId,
+        telegramTopicId: telegramGroupTopic.telegramTopicId,
+        name: telegramGroupTopic.name,
+        createdAt: telegramGroupTopic.createdAt,
+        messageCount: count(telegramMessage.id),
+      })
+      .from(telegramGroupTopic)
+      .leftJoin(
+        telegramMessage,
+        eq(telegramGroupTopic.id, telegramMessage.topicId)
+      )
+      .where(eq(telegramGroupTopic.groupId, groupId))
+      .groupBy(telegramGroupTopic.id)
+      .orderBy(asc(telegramGroupTopic.telegramTopicId));
+
+    return topics.map((t) => ({
+      ...t,
+      messageCount: Number(t.messageCount),
+    }));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get Telegram group topics"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG5: Find topic UUID by (groupId, telegramTopicId) — for message handler
+ */
+export async function getTelegramTopicByTelegramId({
+  groupId,
+  telegramTopicId,
+}: {
+  groupId: string;
+  telegramTopicId: number;
+}): Promise<TelegramGroupTopic | null> {
+  try {
+    const [topic] = await db
+      .select()
+      .from(telegramGroupTopic)
+      .where(
+        and(
+          eq(telegramGroupTopic.groupId, groupId),
+          eq(telegramGroupTopic.telegramTopicId, telegramTopicId)
+        )
+      );
+    return topic || null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get Telegram topic by Telegram ID"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG5: Save a message from a group
+ */
+export async function createTelegramMessage({
+  groupId,
+  topicId,
+  telegramMessageId,
+  fromUserId,
+  fromUsername,
+  fromFirstName,
+  text,
+  hasMedia,
+  mediaType,
+  sentAt,
+}: {
+  groupId: string;
+  topicId: string | null;
+  telegramMessageId: number;
+  fromUserId: number;
+  fromUsername: string | null;
+  fromFirstName: string | null;
+  text: string;
+  hasMedia: boolean;
+  mediaType: string | null;
+  sentAt: Date;
+}): Promise<TelegramMessage> {
+  try {
+    const [created] = await db
+      .insert(telegramMessage)
+      .values({
+        groupId,
+        topicId,
+        telegramMessageId,
+        fromUserId,
+        fromUsername,
+        fromFirstName,
+        text,
+        hasMedia,
+        mediaType,
+        sentAt,
+        createdAt: new Date(),
+      })
+      .returning();
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create Telegram message"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG5: Get messages for a group with cursor pagination
+ */
+export async function getTelegramMessages({
+  groupId,
+  topicId,
+  cursor,
+  limit = 50,
+}: {
+  groupId: string;
+  topicId?: string | null;
+  cursor?: string | null; // ISO date string of sentAt
+  limit?: number;
+}): Promise<{ messages: TelegramMessage[]; nextCursor: string | null }> {
+  try {
+    const conditions: SQL[] = [eq(telegramMessage.groupId, groupId)];
+
+    if (topicId) {
+      conditions.push(eq(telegramMessage.topicId, topicId));
+    }
+
+    if (cursor) {
+      conditions.push(lt(telegramMessage.sentAt, new Date(cursor)));
+    }
+
+    const messages = await db
+      .select()
+      .from(telegramMessage)
+      .where(and(...conditions))
+      .orderBy(desc(telegramMessage.sentAt))
+      .limit(limit + 1);
+
+    const hasMore = messages.length > limit;
+    const result = hasMore ? messages.slice(0, limit) : messages;
+    const nextCursor = hasMore
+      ? result[result.length - 1].sentAt.toISOString()
+      : null;
+
+    return { messages: result, nextCursor };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get Telegram messages"
     );
   }
 }
