@@ -16,7 +16,7 @@ import { InlineKeyboard } from "grammy";
 
 const APP_URL = (
   process.env.NEXT_PUBLIC_APP_URL ||
-  "https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app"
+  "https://negotiateai-chatbot.vercel.app"
 ).trim();
 
 /** Max sections in Telegram digest (PE contract: 5-7 key points) */
@@ -68,45 +68,49 @@ export async function deliverBriefingToTelegram({
   const settings = await getBriefingSettings({ userId });
   const timezone = settings?.timezone || "Europe/Moscow";
 
-  // 4. Send text message
-  try {
-    const html = formatBriefingMessage(article, timezone);
-    const keyboard = new InlineKeyboard()
-      .url("Читать полностью", `${APP_URL}/briefing`)
-      .url("⚙️ Настроить", `${APP_URL}/briefing/setup`);
+  const hasAudio =
+    briefing.audioStatus === "ready" &&
+    briefing.audioUrls &&
+    Object.values(briefing.audioUrls as Record<string, string>).length > 0;
 
-    await bot.api.sendMessage(chatId, html, {
-      parse_mode: "HTML",
-      reply_markup: keyboard,
-    });
-  } catch (err) {
-    const errorMsg = classifyTelegramError(err);
-    console.error(
-      `[briefing-delivery] User ${userId}: sendMessage failed:`,
-      err,
-    );
-    await updateBriefingDeliveryStatus({
-      briefingId,
-      deliveryStatus: "failed",
-    });
-    return { success: false, error: errorMsg };
+  const wantsText =
+    deliveryFormat === "text" || deliveryFormat === "text_audio";
+  const wantsAudio =
+    deliveryFormat === "audio" || deliveryFormat === "text_audio";
+
+  // 4. Send text digest (for "text" and "text_audio" formats)
+  if (wantsText) {
+    try {
+      const html = formatBriefingMessage(article, timezone);
+      const keyboard = new InlineKeyboard()
+        .url("Читать полностью", `${APP_URL}/briefing`)
+        .url("⚙️ Настроить", `${APP_URL}/briefing/setup`);
+
+      await bot.api.sendMessage(chatId, html, {
+        parse_mode: "HTML",
+        reply_markup: keyboard,
+      });
+    } catch (err) {
+      const errorMsg = classifyTelegramError(err);
+      console.error(
+        `[briefing-delivery] User ${userId}: sendMessage failed:`,
+        err,
+      );
+      await updateBriefingDeliveryStatus({
+        briefingId,
+        deliveryStatus: "failed",
+      });
+      return { success: false, error: errorMsg };
+    }
   }
 
-  // 5. Send audio if format includes it AND podcast is ready
-  // NOTE: In MVP cron flow, audio is generated via waitUntil() AFTER delivery,
-  // so audioStatus will typically be "none" or "generating" here.
-  // Audio delivery from cron is a known limitation — it only works if podcast
-  // was pre-generated (e.g. manually from browser).
-  if (
-    (deliveryFormat === "audio" || deliveryFormat === "text_audio") &&
-    briefing.audioStatus === "ready" &&
-    briefing.audioUrls
-  ) {
+  // 5. Send audio (for "audio" and "text_audio" formats, if podcast is ready)
+  if (wantsAudio && hasAudio) {
     try {
       const audioUrls = briefing.audioUrls as Record<string, string>;
-      const audioDurations = (briefing.audioDurations as Record<string, number>) || {};
+      const audioDurations =
+        (briefing.audioDurations as Record<string, number>) || {};
 
-      // Pick first audio URL (or concatenated if exists)
       const firstUrl = Object.values(audioUrls)[0];
 
       if (firstUrl) {
@@ -121,15 +125,50 @@ export async function deliverBriefingToTelegram({
         });
       }
     } catch (err) {
-      // Audio failure is non-critical — text was already sent
       console.error(
-        `[briefing-delivery] User ${userId}: sendAudio failed (non-critical):`,
+        `[briefing-delivery] User ${userId}: sendAudio failed:`,
         err,
       );
+      // If audio-only and audio failed, mark as failed
+      if (deliveryFormat === "audio") {
+        await updateBriefingDeliveryStatus({
+          briefingId,
+          deliveryStatus: "failed",
+        });
+        return { success: false, error: "audio_send_failed" };
+      }
     }
   }
 
-  // 6. Mark as sent
+  // 6. If user wants audio-only but podcast isn't ready — send notification with link
+  if (deliveryFormat === "audio" && !hasAudio) {
+    try {
+      const dateStr = formatLocalDate(timezone);
+      const keyboard = new InlineKeyboard()
+        .url("Слушать в Simply", `${APP_URL}/briefing`)
+        .row()
+        .url("⚙️ Настроить", `${APP_URL}/briefing/setup`);
+
+      await bot.api.sendMessage(
+        chatId,
+        `<b>Брифинг · ${dateStr}</b>\n\nВаш брифинг готов. Подкаст можно послушать в приложении.`,
+        { parse_mode: "HTML", reply_markup: keyboard },
+      );
+    } catch (err) {
+      const errorMsg = classifyTelegramError(err);
+      console.error(
+        `[briefing-delivery] User ${userId}: notification failed:`,
+        err,
+      );
+      await updateBriefingDeliveryStatus({
+        briefingId,
+        deliveryStatus: "failed",
+      });
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  // 7. Mark as sent
   await updateBriefingDeliveryStatus({ briefingId, deliveryStatus: "sent" });
 
   return { success: true };

@@ -28,7 +28,7 @@ const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
 // Helpers
 // ============================================================================
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app").trim();
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://negotiateai-chatbot.vercel.app").trim();
 
 function simplyButton(text: string, path: string) {
   return {

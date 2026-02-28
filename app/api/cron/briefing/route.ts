@@ -8,9 +8,7 @@ import {
   getUsersForDelivery,
   updateBriefingDeliveryStatus,
 } from "@/lib/db/queries";
-import { runPodcastPipeline } from "@/lib/podcast/podcast-pipeline";
 import { deliverBriefingToTelegram } from "@/lib/telegram/briefing-delivery";
-import { waitUntil } from "@vercel/functions";
 import pLimit from "p-limit";
 
 // Next.js requires literal values for segment config (no imported constants)
@@ -140,22 +138,11 @@ async function generateAndDeliver(
       deliveryStatus: "pending",
     });
 
-    // If user wants audio, start podcast pipeline non-blocking
-    if (deliveryFormat === "audio" || deliveryFormat === "text_audio") {
-      console.log(
-        `[cron/briefing] User ${userId}: starting podcast pipeline (non-blocking)`,
-      );
-      waitUntil(
-        runPodcastPipeline({ userId, briefingId }).catch((err) => {
-          console.error(
-            `[cron/briefing] User ${userId}: podcast pipeline failed:`,
-            err,
-          );
-        }),
-      );
-    }
+    // NOTE: Podcast generation is NOT possible in Vercel serverless (lamejs requires fs access).
+    // Audio-only users get a notification with link to listen in app.
+    // Podcast can be generated from the browser UI.
 
-    // ТЗ-TG4b: Deliver to Telegram (non-blocking for other users)
+    // Deliver to Telegram
     let deliveryStatus = "pending";
     try {
       const delivery = await deliverBriefingToTelegram({
