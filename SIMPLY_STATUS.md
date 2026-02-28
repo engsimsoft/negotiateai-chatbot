@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.55.0
+**Версия:** 3.56.0
 **Дата:** 2026-02-28
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -329,12 +329,69 @@ components/projects/
 
 ## План развития
 
-### ТЗ-TG4a: BackgroundBriefing — ✅ ЗАВЕРШЁН
+### HOTFIX: PodcastFromCron — ✅ ЗАВЕРШЁН (v3.55.1)
+
+**Проблема:** Подкаст НЕ генерировался из cron-функции. lamejs (MP3-кодер) не загружался — ENOENT. Пользователи с форматом «аудио» получали текст вместо MP3.
+
+**Корневая причина:** Vercel NFT не трассирует динамически вычисленные пути. Каждая serverless-функция имеет свой бандл — lamejs попадал в бандл podcast API, но не в бандл cron. Дополнительно: pnpm-симлинки не сохраняются на Vercel, `require.resolve` заменяется webpack'ом на числовой ID.
+
+**Решение:**
+- **Lazy loading** — lamejs загружается при первом вызове `pcmToMp3()`, не при import
+- **pnpm path resolution** — `fs.existsSync(pnpmPath)` → fallback на symlink path
+- **outputFileTracingIncludes** — точный путь `.pnpm/lamejs@1.2.1/.../lame.all.js` в next.config.ts
+- **Audio Merger** — `mergeAndUploadPodcast()`: склейка per-section MP3 → один файл → Vercel Blob
+- **Синхронный podcast** — подкаст генерируется внутри cron до delivery (вместо non-blocking waitUntil)
+
+**Ключевые файлы:**
+- `lib/podcast/audio-converter.ts` — lazy loading + pnpm path resolution
+- `lib/podcast/audio-merger.ts` — **NEW**: склейка MP3 + upload
+- `next.config.ts` — outputFileTracingIncludes
+- `app/api/cron/briefing/route.ts` — podcast pipeline + merge + delivery
+- `lib/telegram/briefing-delivery.ts` — mergedAudioUrl param
+
+**Тайминг cron:** briefing ~30-60с + podcast ~60-90с + merge ~5с + delivery ~5с = **~100-160с** (из 240с maxDuration)
+
+**Возможный переход на Vercel Pro:** при 5+ пользователях с audio — maxDuration, cron frequency (daily → per-minute), Blob storage limits.
+
+**ADR:** [027-lamejs-vercel-bundling](docs/decisions/027-lamejs-vercel-bundling.md)
+
+### ТЗ-TG5: ClosedGroups — ✅ ЗАВЕРШЁН (v3.56.0)
 
 **Выполнено:**
-- **Vercel Cron** — hourly job (`0 * * * *`) триггерит `/api/cron/briefing` для фоновой генерации брифингов
+- **DB schema** — 3 таблицы: TelegramGroup, TelegramGroupTopic, TelegramMessage + индексы + миграция 0041
+- **Bot handlers** — `my_chat_member` (добавление/удаление из групп, auto-owner), групповой message handler (text/caption, hasMedia, topic resolve), forum_topic_created/edited
+- **11 DB queries** — CRUD для групп, топиков, сообщений (upsert, get, deactivate, list с messageCount, cursor-pagination)
+- **3 API endpoints** — GET groups (список с messageCount), GET messages (cursor + topic filter), DELETE group (деактивация)
+- **UI /groups page** — ListDetailPage layout, GroupList (название, тип, форум badge, статус, сообщения), GroupDetail (header + табы топиков + лента + «Загрузить ещё»), GroupMessageList (автор, текст, дата, media icon), empty state
+- **Settings → Connections** — ссылка «Группы Telegram — N групп подключено» → /groups
+
+**Ключевые файлы:**
+- `lib/db/schema.ts` — 3 таблицы + типы
+- `lib/db/queries.ts` — 11 queries
+- `lib/telegram/bot.ts` — group handlers
+- `app/(chat)/api/telegram/groups/` — 3 API routes
+- `app/(dashboard)/groups/page.tsx` — Server Component
+- `components/groups/` — 4 клиентских компонента
+- `app/(dashboard)/settings/settings-page.tsx` — groups link в Connections
+
+### ТЗ-TG4b: TelegramDelivery — ✅ ЗАВЕРШЁН (v3.55.0)
+
+**Выполнено:**
+- **Delivery module** — `deliverBriefingToTelegram()`: форматирование BriefingArticle как HTML-дайджест + отправка через grammY
+- **Message formatting** — заголовок с датой, до 7 секций с emoji + first sentence, inline-кнопки
+- **Audio delivery** — MP3 через `sendAudio` с merged podcast URL
+- **Error handling** — классификация ошибок Telegram API, non-blocking для cron
+
+**Ключевые файлы:**
+- `lib/telegram/briefing-delivery.ts` — delivery module
+- `app/api/cron/briefing/route.ts` — generateAndDeliver + delivery
+
+### ТЗ-TG4a: BackgroundBriefing — ✅ ЗАВЕРШЁН (v3.54.0)
+
+**Выполнено:**
+- **Vercel Cron** — daily job (`0 5 * * *`) триггерит `/api/cron/briefing` для фоновой генерации брифингов
 - **Briefing Pipeline** — core-логика генерации вынесена в `lib/briefing/briefing-pipeline.ts` (browser + background)
-- **Podcast Pipeline** — core-логика подкаста вынесена в `lib/podcast/podcast-pipeline.ts` (non-blocking через waitUntil)
+- **Podcast Pipeline** — core-логика подкаста вынесена в `lib/podcast/podcast-pipeline.ts`
 - **Cron endpoint** — авторизация CRON_SECRET, p-limit(3), идемпотентность, deliveryStatus tracking
 - **DB расширение** — deliveryEnabled, deliveryFormat в BriefingSettings; deliveryStatus в BriefingHistory
 - **Delivery Settings UI** — Popover от Clock-иконки в header /briefing/setup (toggle, time, format, Telegram status)

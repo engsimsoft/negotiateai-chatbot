@@ -67,6 +67,9 @@ Root Layout (app/layout.tsx)
 │   ├── /create → ListDetailPage (← Dashboard + "Создание" + UserMenu)
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │
+│   ├── /groups → ListDetailPage (← Dashboard + "Группы Telegram" + UserMenu)
+│   │   User Menu: ✅   Theme Toggle: ✅
+│   │
 │   ├── /briefing → BriefingIssueHeader (🎧 подкаст, ⚙️, UserMenu) + BriefingSidebar (выпуск, сохранённые, Simply) + fixed scroll layout
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │

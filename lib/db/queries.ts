@@ -4171,6 +4171,9 @@ export async function createTelegramMessage({
   hasMedia,
   mediaType,
   sentAt,
+  fileName,
+  fileSize,
+  blobUrl,
 }: {
   groupId: string;
   topicId: string | null;
@@ -4182,6 +4185,9 @@ export async function createTelegramMessage({
   hasMedia: boolean;
   mediaType: string | null;
   sentAt: Date;
+  fileName?: string | null;
+  fileSize?: number | null;
+  blobUrl?: string | null;
 }): Promise<TelegramMessage> {
   try {
     const [created] = await db
@@ -4198,6 +4204,9 @@ export async function createTelegramMessage({
         mediaType,
         sentAt,
         createdAt: new Date(),
+        ...(fileName != null && { fileName }),
+        ...(fileSize != null && { fileSize }),
+        ...(blobUrl != null && { blobUrl }),
       })
       .returning();
     return created;
@@ -4252,6 +4261,34 @@ export async function getTelegramMessages({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get Telegram messages"
+    );
+  }
+}
+
+/**
+ * ТЗ-TG5: Delete a message (with group ownership check)
+ */
+export async function deleteTelegramMessage({
+  messageId,
+  groupId,
+}: {
+  messageId: string;
+  groupId: string;
+}): Promise<boolean> {
+  try {
+    const result = await db
+      .delete(telegramMessage)
+      .where(
+        and(
+          eq(telegramMessage.id, messageId),
+          eq(telegramMessage.groupId, groupId),
+        ),
+      );
+    return (result.rowCount ?? 0) > 0;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete Telegram message",
     );
   }
 }

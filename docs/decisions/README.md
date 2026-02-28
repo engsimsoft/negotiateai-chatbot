@@ -30,6 +30,14 @@
 | [018](018-prompt-engineering-lessons.md) | Prompt Engineering Lessons | 2026-02-22 | Принято |
 | [019](019-usage-logging-architecture.md) | Архитектура Usage Logging — fire-and-forget + numeric precision | 2026-02-25 | Принято |
 | [020](020-telegram-integration-strategy.md) | Telegram Integration Strategy — Shared Parser + фазовый подход | 2026-02-25 | Принято |
+| [021](021-telegram-bot-infrastructure.md) | Telegram Bot Infrastructure — grammY + Webhook | 2026-02-26 | Принято |
+| [022](022-tool-call-guardian.md) | Tool Call Guardian — детектор галлюцинаций | 2026-02-26 | Принято |
+| [023](023-guardian-blocking-strategy.md) | Guardian Blocking Strategy — буферизация + блокировка | 2026-02-27 | Принято |
+| [024](024-research-engine-pattern.md) | Research Engine Pattern — Perplexity + verify + classify | 2026-02-27 | Принято |
+| [025](025-guardian-bypass-pattern.md) | Guardian Bypass Pattern — multi-step flows | 2026-02-27 | Принято |
+| [026](026-background-briefing-architecture.md) | Background Briefing Architecture — Vercel Cron + Pipeline | 2026-02-27 | Принято |
+| [027](027-lamejs-vercel-bundling.md) | lamejs Vercel Bundling — lazy loading + pnpm path + NFT | 2026-02-28 | Принято |
+| [028](028-telegram-closed-groups.md) | Telegram Closed Groups — group message ingestion | 2026-02-28 | Принято |
 
 ---
 
@@ -58,4 +66,4 @@
 
 ---
 
-**Обновлено:** 2026-02-25
+**Обновлено:** 2026-02-28

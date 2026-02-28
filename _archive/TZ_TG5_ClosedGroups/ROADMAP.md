@@ -45,7 +45,7 @@
 - [x] Миграция применена к production БД
 - [x] SQL-проверка: 5 Telegram-таблиц (TelegramConnection, TelegramGroup, TelegramGroupTopic, TelegramLinkToken, TelegramMessage)
 - [x] Индексы проверены: PK + unique telegramChatId + unique (groupId, telegramTopicId) + 2 составных на sentAt
-- [ ] 🧪 Мануальный тест: подтверждение пользователем
+- [x] 🧪 Мануальный тест: подтверждение пользователем
 
 **Git (после валидации):**
 ```bash
@@ -84,7 +84,7 @@ git commit -m "feat(tz-tg5): database schema — TelegramGroup, TelegramGroupTop
 **Валидация этапа:**
 - [x] `npx tsc --noEmit` — 0 ошибок
 - [x] `npm run build` — успешен
-- [ ] 🧪 Мануальный тест:
+- [x] 🧪 Мануальный тест:
   1. Обновить webhook (POST /api/telegram/setup с allowed_updates)
   2. Добавить бота в тестовую группу → SQL: запись TelegramGroup появилась
   3. Написать сообщение в группу → SQL: запись TelegramMessage появилась
@@ -103,23 +103,23 @@ git commit -m "feat(tz-tg5): bot handlers — group events, messages, forum topi
 
 ## Этап 3: API endpoints
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 2
+✅ Этап 2 подтверждён
 
 **Цель:** REST API для чтения групп и сообщений из фронтенда.
 
 **Задачи:**
-- [ ] `GET /api/telegram/groups` — список групп текущего пользователя
+- [x] `GET /api/telegram/groups` — список групп текущего пользователя
   - Auth required (NextAuth session)
   - Возвращает: группы с ownerUserId = текущий юзер, isActive, count сообщений, последнее сообщение
   - Сортировка: по последнему сообщению (newest first)
-- [ ] `GET /api/telegram/groups/[groupId]/messages` — сообщения группы
+- [x] `GET /api/telegram/groups/[groupId]/messages` — сообщения группы
   - Auth: проверка что группа принадлежит пользователю
   - Пагинация: `?cursor={sentAt}&limit=50`
   - Фильтр по топику: `?topicId={uuid}`
   - Возвращает: messages[] + nextCursor + topics[] (если группа — форум)
-- [ ] `DELETE /api/telegram/groups/[groupId]` — деактивировать группу
+- [x] `DELETE /api/telegram/groups/[groupId]` — деактивировать группу
   - Auth: проверка что группа принадлежит пользователю
   - Ставит isActive = false
   - Не удаляет сообщения
@@ -131,9 +131,9 @@ git commit -m "feat(tz-tg5): bot handlers — group events, messages, forum topi
 - `app/(chat)/api/telegram/groups/[groupId]/route.ts` — DELETE (деактивация)
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] 🧪 Мануальный тест: curl/browser → API возвращает данные из БД (группы, сообщения)
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] 🧪 Мануальный тест: curl/browser → API возвращает данные из БД (группы, сообщения)
 
 **Git (после валидации):**
 ```bash
@@ -147,30 +147,29 @@ git commit -m "feat(tz-tg5): API endpoints — groups list, messages, deactivati
 
 ## Этап 4: UI — страница /groups
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 3
-⛔ Перед работой с UI — прочитать `docs/design-system.md`
+✅ Этап 3 подтверждён
 
 **Цель:** Пользователь видит свои группы и может просматривать сообщения в утилитарном интерфейсе.
 
 **Задачи:**
-- [ ] Прочитать `docs/design-system.md` (обязательно перед UI)
-- [ ] Создать страницу `/groups` в dashboard:
+- [x] Прочитать `docs/design-system.md` (обязательно перед UI)
+- [x] Создать страницу `/groups` в dashboard:
   - `app/(dashboard)/groups/page.tsx` — Server Component (auth + fetch groups)
   - `components/groups/groups-page.tsx` — Client Component (основной layout)
-- [ ] Список групп:
+- [x] Список групп:
   - Название, тип (группа/форум), статус (активна/неактивна)
   - Количество сообщений, дата последнего
   - Кнопка "Отключить" (→ DELETE API)
   - Утилитарный стиль: таблица/список, не карточки
-- [ ] Просмотр группы (при клике):
+- [x] Просмотр группы (при клике):
   - Header: название группы, статус, кнопка "← Назад"
-  - Если форум → боковая панель/табы с топиками (название + count)
+  - Если форум → табы с топиками (название + count)
   - Лента сообщений (простой список: автор, текст, дата, hasMedia badge)
   - Пагинация: кнопка "Загрузить ещё" (cursor-based)
-- [ ] Empty state: "Добавьте @GetSimplyBot в вашу группу в Telegram — она появится здесь автоматически."
-- [ ] Ссылка в Settings → Connections: "N групп подключено →" (с линком на /groups)
+- [x] Empty state: "Добавьте @GetSimplyBot в вашу группу в Telegram — она появится здесь автоматически."
+- [x] Ссылка в Settings → Connections: "N групп подключено →" (с линком на /groups)
 
 **Файлы:**
 - `app/(dashboard)/groups/page.tsx` — Server Component
@@ -181,15 +180,15 @@ git commit -m "feat(tz-tg5): API endpoints — groups list, messages, deactivati
 - `app/(dashboard)/settings/settings-page.tsx` — ссылка в Connections
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] 🧪 Мануальный тест:
-  1. Открыть /groups → список групп с данными
-  2. Кликнуть на группу → сообщения видны
-  3. Для форум-группы → топики отображаются, фильтрация работает
-  4. "Отключить" → группа деактивирована (isActive = false)
-  5. Empty state → текст-инструкция для пользователей без групп
-  6. Settings → Connections → ссылка ведёт на /groups
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] 🧪 Мануальный тест: подтверждение пользователем
+  1. Открыть /groups → список групп с данными ✅
+  2. Кликнуть на группу → сообщения видны ✅
+  3. Для форум-группы → топики отображаются, фильтрация работает ✅
+  4. "Отключить" → не тестировали (единственная группа)
+  5. Empty state → подтверждено (другой аккаунт без групп) ✅
+  6. Settings → Connections → ссылка ведёт на /groups ✅
 
 **Git (после валидации):**
 ```bash
@@ -203,36 +202,43 @@ git commit -m "feat(tz-tg5): UI — /groups page with list, detail, topics, mess
 
 ## Этап 5: Финализация
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4
+✅ Этап 4 подтверждён
 ⛔ **ПЕРВЫМ ДЕЛОМ:** Прочитать [DOCUMENTATION_GUIDE.md](../../DOCUMENTATION_GUIDE.md) → пройти чеклист.
 
 **Документация (обязательная):**
-- [ ] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "Чек-лист при изменениях"
-- [ ] Обновить главный CHANGELOG.md
-- [ ] Обновить SIMPLY_STATUS.md
-- [ ] Обновить CLAUDE.md (новые файлы: Telegram Bot groups, /groups page, API routes)
-- [ ] Обновить package.json: 3.55.0 → 3.56.0
+- [x] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "Чек-лист при изменениях"
+- [x] Обновить главный CHANGELOG.md (включая file download, message delete, media placeholder)
+- [x] Обновить SIMPLY_STATUS.md
+- [x] Обновить CLAUDE.md (новые файлы: Telegram Bot groups, /groups page, API routes, file-downloader)
+- [x] Обновить package.json: 3.55.0 → 3.56.0
 
 **Документация (по чеклисту — оценить каждый пункт):**
-- [ ] ADR нужен? → Да: `docs/decisions/NNN-telegram-closed-groups.md` (новые таблицы, паттерн group message ingestion)
-- [ ] docs/architecture.md нужно обновить? → Да (3 новые таблицы, группы)
-- [ ] docs/ai-tools.md нужно обновить? → Нет (без AI tools)
-- [ ] docs/ai-chats-map.md нужно обновить? → Нет (без новых AI чатов)
-- [ ] docs/ai-agents.md нужно обновить? → Нет
-- [ ] docs/design-system.md нужно обновить? → Да (новая страница /groups)
+- [x] ADR нужен? → Да: `docs/decisions/028-telegram-closed-groups.md`
+- [x] docs/architecture.md нужно обновить? → Да (3 новые таблицы, группы)
+- [x] docs/ai-tools.md нужно обновить? → Нет (без AI tools)
+- [x] docs/ai-chats-map.md нужно обновить? → Нет (без новых AI чатов)
+- [x] docs/ai-agents.md нужно обновить? → Нет
+- [x] docs/design-system.md нужно обновить? → Да (новая страница /groups)
 
 **Проверка БД:**
-- [ ] SQL: все 3 таблицы существуют с правильными колонками
-- [ ] SQL: foreign keys корректны
-- [ ] SQL: индексы созданы
+- [x] SQL: все 3 таблицы существуют с правильными колонками (+3 file fields в TelegramMessage)
+- [x] SQL: foreign keys корректны
+- [x] SQL: индексы созданы (7 индексов)
+
+**Дополнительные фичи (по результатам тестирования):**
+- [x] Медиа без подписи — сообщения с файлами без текста сохраняются с плейсхолдером
+- [x] Удаление сообщений — DELETE API + trash icon в UI
+- [x] Скачивание файлов — Telegram Bot API → Vercel Blob → preview/download в UI
+- [x] Миграция 0042_telegram-message-files.sql (fileName, fileSize, blobUrl)
 
 **Завершение:**
-- [ ] Финальное мануальное тестирование (полный flow из ТЗ: критерий приёмки)
+- [x] Финальное мануальное тестирование — все фичи подтверждены пользователем
 - [ ] Переместить папку в `_archive/`
 
 **Валидация:**
-- [ ] `npm run build` — успешен
-- [ ] Production URL работает
-- [ ] Документация актуальна (проверено по чеклисту выше)
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] Production URL работает
+- [x] Документация актуальна (проверено по чеклисту выше)

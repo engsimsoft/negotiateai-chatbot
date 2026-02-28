@@ -12,6 +12,57 @@
 
 ---
 
+## [3.56.0] - 2026-02-28 - ClosedGroups
+
+**ТЗ-TG5**: Чтение закрытых групп через бота — бот, добавленный в группу Telegram, сохраняет сообщения в БД Simply. Данные доступны через API и в утилитарном UI.
+
+### Added
+- **DB schema** — 3 новые таблицы: `TelegramGroup` (группы), `TelegramGroupTopic` (топики форумов), `TelegramMessage` (сообщения). Индексы: `(groupId, sentAt)`, `(groupId, topicId, sentAt)` + unique telegramChatId + unique (groupId, telegramTopicId)
+- **Bot handlers** (`lib/telegram/bot.ts`): `my_chat_member` (добавление/удаление из групп, auto-owner через TelegramConnection), групповой message handler (text/caption + hasMedia + topic resolve), `forum_topic_created/edited` handler
+- **11 DB queries** (`lib/db/queries.ts`): CRUD для групп, топиков, сообщений (upsert, get, deactivate, list с messageCount)
+- **3 API endpoints**: `GET /api/telegram/groups` (список с messageCount), `GET /api/telegram/groups/[groupId]/messages` (cursor-pagination + topic filter), `DELETE /api/telegram/groups/[groupId]` (деактивация)
+- **UI /groups page** — ListDetailPage layout: GroupList + GroupDetail (табы топиков для форумов) + GroupMessageList (утилитарная лента) + empty state
+- **Settings → Connections** — ссылка «Группы Telegram — N групп подключено» с переходом на /groups
+- **Скачивание файлов** (`lib/telegram/file-downloader.ts`): Telegram Bot API → Vercel Blob upload. Документы, фото, видео, голосовые (до 20 МБ). Стикеры пропускаются
+- **Просмотр файлов в UI** — фото: inline preview (кликабельное), документы/видео/голосовые: карточка с именем и размером для скачивания
+- **Удаление сообщений** — `DELETE /api/telegram/groups/[groupId]/messages/[messageId]` + кнопка удаления в UI (hover)
+- **Медиа без подписи** — сообщения с файлами без текста сохраняются с плейсхолдером ([Документ], [Фото] и т.д.)
+
+### Changed
+- `app/api/telegram/setup/route.ts` — `allowed_updates: ["message", "my_chat_member"]`
+- `TelegramMessage` — +3 поля: `fileName`, `fileSize`, `blobUrl` (nullable, для файлов)
+
+### Technical
+- **ADR 028**: [Telegram Closed Groups](docs/decisions/028-telegram-closed-groups.md)
+- Миграции: `0041_telegram-groups.sql`, `0042_telegram-message-files.sql`
+
+---
+
+## [3.55.1] - 2026-02-28 - PodcastFromCron
+
+**HOTFIX**: Полноценная генерация подкаста из cron + доставка MP3 в Telegram. Исправлена критическая проблема: lamejs (MP3-кодер) не загружался в бандле cron-функции.
+
+### Fixed
+- **lamejs ENOENT в cron** — `audio-converter.ts` переведён на lazy loading с pnpm path resolution. `require.resolve` не работает (webpack подменяет на числовой ID), pnpm-симлинки не сохраняются на Vercel. Решение: `fs.existsSync(pnpmPath)` → fallback на symlink path
+- **outputFileTracingIncludes** — точный путь к `.pnpm/lamejs@1.2.1/...` вместо glob (glob через симлинку вызывает ошибку деплоя)
+
+### Added
+- **Audio Merger** (`lib/podcast/audio-merger.ts`): `mergeAndUploadPodcast()` — склейка per-section MP3 треков в один файл подкаста (Buffer.concat + Vercel Blob upload)
+- **Podcast pipeline в cron** — `runPodcastPipeline()` + `mergeAndUploadPodcast()` запускаются синхронно перед доставкой в Telegram (вместо non-blocking waitUntil)
+- **mergedAudioUrl** — новый параметр в `deliverBriefingToTelegram()`, приоритет отдаётся merged-файлу вместо отдельных треков
+
+### Changed
+- **Cron route** — подкаст генерируется синхронно внутри `generateAndDeliver()`, mergedAudioUrl передаётся в Telegram delivery
+- **briefing-delivery.ts** — убран notification-костыль «послушай в приложении», если audio format и подкаст не готов → `{ success: false, error: "podcast_not_ready" }`
+- **Cron schedule** — `0 5 * * *` (daily) вместо hourly для Hobby plan
+
+### Technical
+- **ADR 027**: [lamejs Vercel Bundling](docs/decisions/027-lamejs-vercel-bundling.md) — полная документация проблемы и решения
+- Тайминг cron: briefing ~30-60с + podcast ~60-90с + merge ~5с + delivery ~5с = **~100-160с** из 240с maxDuration
+- Потенциальная необходимость перехода на Vercel Pro при 5+ пользователях (maxDuration, cron frequency, Blob storage)
+
+---
+
 ## [3.55.0] - 2026-02-28 - TelegramDelivery
 
 **ТЗ-TG4b**: Доставка брифинга в Telegram — бот отправляет текстовую выжимку + аудио (если готово) пользователю.
@@ -19,7 +70,7 @@
 ### Added
 - **Delivery module** (`lib/telegram/briefing-delivery.ts`): `deliverBriefingToTelegram()` — форматирование BriefingArticle как HTML-дайджест + отправка через grammY `bot.api.sendMessage` + `sendAudio`
 - **Message formatting**: `formatBriefingMessage()` — заголовок с датой в таймзоне пользователя, до 7 секций с emoji + first sentence, inline-кнопки «Читать полностью» / «⚙️ Настроить»
-- **Audio delivery**: MP3 через `sendAudio` с caption если `audioStatus === "ready"` (known MVP limitation: из cron аудио обычно не готово)
+- **Audio delivery**: MP3 через `sendAudio` с caption если `audioStatus === "ready"`
 - **Error handling**: классификация ошибок Telegram API (403 blocked, 5xx unavailable), non-blocking для cron
 
 ### Changed

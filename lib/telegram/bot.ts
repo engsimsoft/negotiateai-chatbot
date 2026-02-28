@@ -1,4 +1,5 @@
 import { Bot } from "grammy";
+import type { Message } from "grammy/types";
 import {
   getTelegramLinkToken,
   deleteTelegramLinkToken,
@@ -13,6 +14,7 @@ import {
   getTelegramTopicByTelegramId,
   createTelegramMessage,
 } from "@/lib/db/queries";
+import { downloadAndUploadTelegramFile } from "./file-downloader";
 
 // ============================================================================
 // Bot instance (singleton per module load, reused in warm serverless invocations)
@@ -36,6 +38,28 @@ function simplyButton(text: string, path: string) {
       inline_keyboard: [[{ text, url: `${APP_URL}${path}` }]],
     },
   };
+}
+
+const MEDIA_LABELS: Record<string, string> = {
+  photo: "Фото",
+  video: "Видео",
+  document: "Документ",
+  voice: "Голосовое сообщение",
+  sticker: "Стикер",
+};
+
+function mediaPlaceholder(mediaType: string | null): string {
+  const label = mediaType ? MEDIA_LABELS[mediaType] || "Медиа" : "Медиа";
+  return `[${label}]`;
+}
+
+/** Extract the best file_id from a message (largest photo, or document/video/voice). */
+function extractFileId(msg: Message): string | null {
+  if (msg.photo) return msg.photo[msg.photo.length - 1].file_id;
+  if (msg.document) return msg.document.file_id;
+  if (msg.video) return msg.video.file_id;
+  if (msg.voice) return msg.voice.file_id;
+  return null;
 }
 
 // ============================================================================
@@ -284,10 +308,6 @@ bot.on("message", async (ctx) => {
     return; // Don't save service messages as regular messages
   }
 
-  // Extract text content: text or caption (for media with description)
-  const text = msg.text || msg.caption;
-  if (!text) return; // Skip messages without text content (media-only, service messages)
-
   // Determine media type
   let hasMedia = false;
   let mediaType: string | null = null;
@@ -307,6 +327,10 @@ bot.on("message", async (ctx) => {
     hasMedia = true;
     mediaType = "sticker";
   }
+
+  // Extract text: text > caption > media placeholder > skip
+  const text = msg.text || msg.caption || (hasMedia ? mediaPlaceholder(mediaType) : null);
+  if (!text) return; // Skip service messages without any content
 
   // Look up the group in DB
   const group = await getTelegramGroupByChatId({
@@ -332,6 +356,31 @@ bot.on("message", async (ctx) => {
     topicId = topic.id;
   }
 
+  // Download file if media present (skip stickers — no practical value)
+  let blobUrl: string | null = null;
+  let fileName: string | null = null;
+  let fileSize: number | null = null;
+
+  if (hasMedia && mediaType !== "sticker") {
+    const fileId = extractFileId(msg);
+    if (fileId) {
+      try {
+        const result = await downloadAndUploadTelegramFile(fileId, group.id, {
+          fileName: msg.document?.file_name,
+          mimeType: msg.document?.mime_type,
+        });
+        if (result) {
+          blobUrl = result.blobUrl;
+          fileName = result.fileName;
+          fileSize = result.fileSize;
+        }
+      } catch (err) {
+        console.error("[bot] File download failed:", err);
+        // Continue without file — message is still saved
+      }
+    }
+  }
+
   // Save message
   await createTelegramMessage({
     groupId: group.id,
@@ -344,6 +393,9 @@ bot.on("message", async (ctx) => {
     hasMedia,
     mediaType,
     sentAt: new Date(msg.date * 1000),
+    blobUrl,
+    fileName,
+    fileSize,
   });
 });
 

@@ -295,6 +295,13 @@
       "when": 1772323200000,
       "tag": "0041_telegram-groups",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1772409600000,
+      "tag": "0042_telegram-message-files",
+      "breakpoints": true
     }
   ]
 }

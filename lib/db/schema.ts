@@ -636,6 +636,9 @@ export const telegramMessage = pgTable(
     text: text("text").notNull(),
     hasMedia: boolean("hasMedia").notNull().default(false),
     mediaType: varchar("mediaType", { length: 20 }), // "photo"|"video"|"document"|"voice"|"sticker"
+    fileName: varchar("fileName", { length: 255 }),
+    fileSize: integer("fileSize"),
+    blobUrl: text("blobUrl"),
     sentAt: timestamp("sentAt").notNull(),
     createdAt: timestamp("createdAt").notNull(),
   },

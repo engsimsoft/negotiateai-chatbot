@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.55.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.56.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -216,19 +216,32 @@
 - `lib/telegram/utils.ts` — normalizeChannelUrl, extractChannelHandle
 - `lib/telegram/parser.ts` — parseTelegramChannel (cheerio, hasMedia, isValid, freshness, redirects)
 
-**Telegram Bot (v3.49.0 — ТЗ-TG3):**
-- `lib/telegram/bot.ts` — grammY бот (@GetSimplyBot): /start (deep link + cold + return), /stop, /help, unknown. Inline URL-кнопки
+**Telegram Bot (v3.49.0 — ТЗ-TG3, v3.56.0 — ТЗ-TG5):**
+- `lib/telegram/bot.ts` — grammY бот (@GetSimplyBot): /start (deep link + cold + return), /stop, /help, unknown. Inline URL-кнопки. Group handlers: my_chat_member (add/remove), message (text/caption/media), forum_topic_created/edited
 - `app/api/telegram/webhook/route.ts` — Webhook endpoint (webhookCallback, secret validation)
-- `app/api/telegram/setup/route.ts` — Admin: POST setWebhook, GET getWebhookInfo (Bearer auth)
+- `app/api/telegram/setup/route.ts` — Admin: POST setWebhook, GET getWebhookInfo (Bearer auth), allowed_updates: message + my_chat_member
 - `app/(chat)/api/telegram/link/route.ts` — Link API: POST (generate deep link), GET (status), DELETE (unlink)
-- `app/(dashboard)/settings/settings-page.tsx` — +секция "Подключения" (ConnectionsSection: QR, polling, connect/disconnect)
+- `app/(chat)/api/telegram/groups/route.ts` — GET: список групп пользователя (messageCount, lastMessageAt)
+- `app/(chat)/api/telegram/groups/[groupId]/messages/route.ts` — GET: сообщения группы (cursor-pagination, topic filter)
+- `app/(chat)/api/telegram/groups/[groupId]/route.ts` — DELETE: деактивация группы
+- `app/(chat)/api/telegram/groups/[groupId]/messages/[messageId]/route.ts` — DELETE: удаление сообщения
+- `lib/telegram/file-downloader.ts` — Скачивание файлов: Telegram Bot API getFile → Vercel Blob upload (до 20 МБ, стикеры пропускаются)
+- `app/(dashboard)/settings/settings-page.tsx` — +секция "Подключения" (ConnectionsSection: QR, polling, connect/disconnect) + ссылка «Группы Telegram» → /groups
 
-**Background Briefing (v3.54.0 — ТЗ-TG4a, v3.55.0 — ТЗ-TG4b):**
+**Telegram Groups UI (v3.56.0 — ТЗ-TG5):**
+- `app/(dashboard)/groups/page.tsx` — Server Component (auth + fetch groups)
+- `components/groups/groups-page.tsx` — Client Component (ListDetailPage layout, деактивация, state)
+- `components/groups/group-list.tsx` — Список групп (название, тип, форум badge, статус, сообщения, дата, «Отключить»)
+- `components/groups/group-detail.tsx` — Просмотр группы (header, табы топиков для форумов, лента сообщений, cursor-based «Загрузить ещё», удаление)
+- `components/groups/group-message-list.tsx` — Утилитарная лента (автор, текст, дата, media icon, file preview/download, trash on hover)
+
+**Background Briefing (v3.54.0 — ТЗ-TG4a, v3.55.0 — ТЗ-TG4b, v3.55.1 — PodcastFromCron):**
 - `vercel.json` — Vercel Cron config (daily: `0 5 * * *` Hobby plan)
-- `app/api/cron/briefing/route.ts` — Cron handler: CRON_SECRET auth, getUsersForDelivery, p-limit(3), идемпотентность, waitUntil(podcast), Telegram delivery (v3.55.0)
+- `app/api/cron/briefing/route.ts` — Cron handler: CRON_SECRET auth, getUsersForDelivery, p-limit(3), идемпотентность, синхронный podcast + merge, Telegram delivery
 - `lib/briefing/briefing-pipeline.ts` — Core pipeline (browser + background)
 - `lib/podcast/podcast-pipeline.ts` — Core podcast pipeline (browser + background)
-- `lib/telegram/briefing-delivery.ts` — Доставка брифинга в Telegram: formatBriefingMessage (HTML), deliverBriefingToTelegram (text + audio), error handling (v3.55.0)
+- `lib/podcast/audio-merger.ts` — Склейка per-section MP3 → один файл → Vercel Blob ← v3.55.1
+- `lib/telegram/briefing-delivery.ts` — Доставка брифинга в Telegram: formatBriefingMessage (HTML), deliverBriefingToTelegram (text + mergedAudioUrl), error handling
 - `app/(chat)/api/briefing/delivery/route.ts` — GET/PATCH delivery settings + telegram status
 - `components/briefing/briefing-delivery-settings.tsx` — UI настроек доставки (Popover)
 
@@ -306,7 +319,8 @@
 - `lib/podcast/index.ts` — Public API: generatePodcastSegment()
 - `lib/podcast/script-generator.ts` — Gemini 2.5 Flash: generateScript() (@ai-sdk/google)
 - `lib/podcast/tts-gemini.ts` — Gemini 2.5 Flash TTS: synthesizeSpeech() (@google/genai, multi-speaker: Kore + Puck)
-- `lib/podcast/audio-converter.ts` — PCM → MP3 (lamejs via new Function)
+- `lib/podcast/audio-converter.ts` — PCM → MP3 (lamejs, lazy loading + pnpm path resolution) ← v3.55.1 ADR 027
+- `lib/podcast/audio-merger.ts` — Склейка MP3 треков + upload в Vercel Blob ← v3.55.1
 - `lib/podcast/types.ts` — Все типы (VoiceConfig, PodcastSegment, AudioResult, PodcastProgressEvent)
 - `lib/podcast/lamejs.d.ts` — TypeScript declarations для lamejs
 - `lib/podcast/podcast-pipeline.ts` — Core podcast pipeline (browser + background) ← v3.54.0
@@ -334,7 +348,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-TG4b (v3.55.0 — TelegramDelivery), ТЗ-TG4a (v3.54.0 — BackgroundBriefing), ТЗ-FIX3 (v3.53.0 — OnboardingRestore), ТЗ-FIX2 (v3.52.0 — ResearchProgressMode), ТЗ-FIX1.2 (v3.51.0 — GuardianBlocking), ТЗ-FIX1 (v3.50.0 — ToolCallGuardian), ТЗ-TG3 (v3.49.0 — TelegramBotInfrastructure), ТЗ-TG2 (v3.48.0 — OnboardingTelegram), ТЗ-TG1 (v3.47.0 — TelegramPhase1), ТЗ-OPT1 (v3.46.0 — UsageLogging + SonnetMigration), PATCH-podcast (v3.45.1 — PodcastFixes), ТЗ-BF5 (v3.45.0 — BriefingDedup), ТЗ-Б2 (v3.44.0 — PodcastUI), ТЗ-Б1 (v3.43.0 — PodcastEngine), ТЗ-BF4 (v3.42.0 — PerSectionRefresh), ТЗ-BF3 (v3.41.0 — BriefingSidebarRedesign), ТЗ-BF2 (v3.40.0 — SimplyNews), ТЗ-BF1 (v3.39.0 — BriefingUIRefactor), ТЗ-BRIEFING-AUTHOR-CLAUDE (v3.38.0 — BriefingAuthorClaude), PATCH-volume (v3.37.1 — BriefingVolumePromptEnforcement), ТЗ-BF1-fix (v3.37.0 — BriefingItemIdFix), ТЗ-BRIEFING-VOLUME (v3.36.0 — BriefingVolume), ТЗ-WS2 (v3.35.0 — JinaReader), ТЗ-WS1 (v3.34.0 — CharsetUnification), ТЗ-HF1 (v3.33.1 — BriefingPEUpdate), ТЗ-А5 (v3.33.0 — BriefingProgress), ТЗ-А4 (v3.32.0 — BriefingIssuePage), ТЗ-А3 (v3.31.0 — BriefingAuthor), ТЗ-A2 (v3.30.0 — BriefingOnboarding), ТЗ-PX+FU (v3.29.0 — DeepResearch + FetchUrl), ТЗ-A1 (v3.28.0 — BriefingLanding), ТЗ-BR3 (v3.27.1 — PromptIntegration), ТЗ-BR2 (v3.27.0 — BriefingUI), ТЗ-BR1 (v3.26.0 — MorningBriefingBackend), ТЗ-RG (v3.25.0 — RouteGroups), ТЗ-DV2 (v3.24.0 — DashboardV2), ТЗ-C4 (v3.23.0 — AnthropicProviderSwitch), ТЗ-C3 (v3.22.0 — ChatContextManagement), ТЗ-08CS (v3.21.0 — ChatSidebar + RightSidebar), ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-TG5 (v3.56.0 — ClosedGroups), HOTFIX-PodcastFromCron (v3.55.1 — ADR 027), ТЗ-TG4b (v3.55.0 — TelegramDelivery), ТЗ-TG4a (v3.54.0 — BackgroundBriefing), ТЗ-FIX3 (v3.53.0 — OnboardingRestore), ТЗ-FIX2 (v3.52.0 — ResearchProgressMode), ТЗ-FIX1.2 (v3.51.0 — GuardianBlocking), ТЗ-FIX1 (v3.50.0 — ToolCallGuardian), ТЗ-TG3 (v3.49.0 — TelegramBotInfrastructure), ТЗ-TG2 (v3.48.0 — OnboardingTelegram), ТЗ-TG1 (v3.47.0 — TelegramPhase1), ТЗ-OPT1 (v3.46.0 — UsageLogging + SonnetMigration), PATCH-podcast (v3.45.1 — PodcastFixes), ТЗ-BF5 (v3.45.0 — BriefingDedup), ТЗ-Б2 (v3.44.0 — PodcastUI), ТЗ-Б1 (v3.43.0 — PodcastEngine), ТЗ-BF4 (v3.42.0 — PerSectionRefresh), ТЗ-BF3 (v3.41.0 — BriefingSidebarRedesign), ТЗ-BF2 (v3.40.0 — SimplyNews), ТЗ-BF1 (v3.39.0 — BriefingUIRefactor), ТЗ-BRIEFING-AUTHOR-CLAUDE (v3.38.0 — BriefingAuthorClaude), PATCH-volume (v3.37.1 — BriefingVolumePromptEnforcement), ТЗ-BF1-fix (v3.37.0 — BriefingItemIdFix), ТЗ-BRIEFING-VOLUME (v3.36.0 — BriefingVolume), ТЗ-WS2 (v3.35.0 — JinaReader), ТЗ-WS1 (v3.34.0 — CharsetUnification), ТЗ-HF1 (v3.33.1 — BriefingPEUpdate), ТЗ-А5 (v3.33.0 — BriefingProgress), ТЗ-А4 (v3.32.0 — BriefingIssuePage), ТЗ-А3 (v3.31.0 — BriefingAuthor), ТЗ-A2 (v3.30.0 — BriefingOnboarding), ТЗ-PX+FU (v3.29.0 — DeepResearch + FetchUrl), ТЗ-A1 (v3.28.0 — BriefingLanding), ТЗ-BR3 (v3.27.1 — PromptIntegration), ТЗ-BR2 (v3.27.0 — BriefingUI), ТЗ-BR1 (v3.26.0 — MorningBriefingBackend), ТЗ-RG (v3.25.0 — RouteGroups), ТЗ-DV2 (v3.24.0 — DashboardV2), ТЗ-C4 (v3.23.0 — AnthropicProviderSwitch), ТЗ-C3 (v3.22.0 — ChatContextManagement), ТЗ-08CS (v3.21.0 — ChatSidebar + RightSidebar), ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**

@@ -133,6 +133,9 @@
 - `SavedBriefingTopics` — сохранённые темы брифинга (topicId, topicName, emoji, content, sources, briefingGeneratedAt)
 - `TelegramConnection` — связка Simply ↔ Telegram (userId unique, telegramUserId bigint unique, isActive)
 - `TelegramLinkToken` — эфемерные токены линковки (token PK, userId FK, expiresAt = +10 min)
+- `TelegramGroup` — группы Telegram (telegramChatId unique, title, type, isForum, ownerUserId FK, isActive)
+- `TelegramGroupTopic` — топики форумов (groupId FK, telegramTopicId, name, unique по groupId+telegramTopicId)
+- `TelegramMessage` — сообщения из групп (groupId FK, topicId FK, fromUserId, text, hasMedia, mediaType, sentAt; индексы: group+sentAt, group+topic+sentAt)
 - `ai_usage_log` — учёт потребления AI (modelId, tokens, costUsd, chatMode, guardianFlags JSONB)
 - `Vote_v2` — голосование за сообщения
 - NextAuth таблицы (Account, Session, VerificationToken)

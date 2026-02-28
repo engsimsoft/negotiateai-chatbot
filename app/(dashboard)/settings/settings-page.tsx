@@ -1,10 +1,11 @@
 "use client";
 
+import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import useSWR from "swr";
-import { ArrowLeft, User, Monitor, Palette, Link, Loader2 } from "lucide-react";
+import { ArrowLeft, User, Monitor, Palette, Link, Loader2, Users, ChevronRight } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -540,7 +541,44 @@ function ConnectionsSection() {
           </div>
         )}
       </div>
+
+      {/* ТЗ-TG5: Link to /groups */}
+      {status?.connected && <GroupsLink />}
     </div>
+  );
+}
+
+function GroupsLink() {
+  const { data } = useSWR<{ groups: { id: string; isActive: boolean }[] }>(
+    "/api/telegram/groups",
+    (url: string) => fetch(url).then((r) => r.json()),
+  );
+
+  const activeCount = data?.groups?.filter((g) => g.isActive).length ?? 0;
+  const totalCount = data?.groups?.length ?? 0;
+
+  if (!data) return null;
+
+  return (
+    <NextLink
+      href="/groups"
+      className="flex items-center justify-between rounded-md border p-4 transition-colors hover:bg-muted/60"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
+          <Users className="size-5 text-muted-foreground" />
+        </div>
+        <div>
+          <h3 className="text-sm font-medium">Группы Telegram</h3>
+          <p className="text-xs text-muted-foreground">
+            {totalCount === 0
+              ? "Нет подключённых групп"
+              : `${activeCount} ${activeCount === 1 ? "группа" : activeCount >= 2 && activeCount <= 4 ? "группы" : "групп"} подключено`}
+          </p>
+        </div>
+      </div>
+      <ChevronRight className="size-4 text-muted-foreground" />
+    </NextLink>
   );
 }
 
