@@ -76,12 +76,22 @@ const MODEL_PRICING_RUB: Record<string, ModelPricing> = {
   // Sonnet: $3/1M in, $15/1M out, $0.30/1M cached
   // Opus:   $15/1M in, $75/1M out, $1.50/1M cached
   "claude-sonnet-4-6":           { input: 0.30,  output: 1.50,  cached: 0.030 },
+  "claude-sonnet-4-5-20250929":  { input: 0.30,  output: 1.50,  cached: 0.030 }, // fallback
   "claude-haiku-4-5-20251001":   { input: 0.08,  output: 0.40,  cached: 0.008 },
   "claude-opus-4-6":             { input: 1.50,  output: 7.50,  cached: 0.150 },
   // Aliases (myProvider keys → same pricing)
   "claude-sonnet":               { input: 0.30,  output: 1.50,  cached: 0.030 },
   "claude-haiku":                { input: 0.08,  output: 0.40,  cached: 0.008 },
   "claude-opus":                 { input: 1.50,  output: 7.50,  cached: 0.150 },
+
+  // Google Gemini (USD prices × 100)
+  // Flash 2.0:  $0.10/1M in, $0.40/1M out
+  // Flash 2.5:  $0.15/1M in, $0.60/1M out
+  "gemini-2.0-flash":            { input: 0.01,  output: 0.04,  cached: 0.003 },
+  "gemini-2.5-flash":            { input: 0.015, output: 0.06,  cached: 0.004 },
+
+  // Perplexity Sonar Pro ($3/1M in, $15/1M out)
+  "sonar-pro":                   { input: 0.30,  output: 1.50,  cached: 0 },
 };
 
 export interface TokenUsageForPricing {
@@ -102,4 +112,16 @@ export function calculateCostRub(
   const cachedCost = ((usage.cachedInputTokens ?? 0) / 1000) * pricing.cached;
 
   return Math.round((inputCost + outputCost + cachedCost) * 100) / 100;
+}
+
+// ---------------------------------------------------------------------------
+// TTS Pricing (Google Gemini TTS — priced per audio second)
+// Google charges per character (~$4/1M chars). Average: ~15 chars/sec of speech.
+// Rough estimate: $0.06/1K seconds → ₽0.006/second at 100 RUB/USD
+// ---------------------------------------------------------------------------
+
+const TTS_COST_RUB_PER_SECOND = 0.006;
+
+export function calculateTtsCostRub(durationSeconds: number): number {
+  return Math.round(durationSeconds * TTS_COST_RUB_PER_SECOND * 100) / 100;
 }
