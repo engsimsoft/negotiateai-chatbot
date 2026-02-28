@@ -1,11 +1,12 @@
-// ТЗ-BF4: Generate a single briefing section using Claude Sonnet
-// Lightweight version of briefing-author.ts for per-section refresh
+// ТЗ-BF4 + ТЗ-DEV2: Generate a single briefing section using Claude Sonnet
 
 import fs from "fs";
 import path from "path";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
+import { calculateCostRub } from "@/lib/ai/providers";
+import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { AUTHOR_MODEL, AUTHOR_MODEL_FALLBACK } from "./briefing-config";
 import type { FilteredItem } from "./briefing-filter";
 import type { RawContent } from "./source-fetchers/types";
@@ -88,7 +89,7 @@ interface SectionAuthorInput {
  */
 export async function generateSection(
   input: SectionAuthorInput,
-): Promise<{ section: BriefingArticleSection; tokensUsed: number }> {
+): Promise<{ section: BriefingArticleSection; tokensUsed: number; trace?: PipelineStageTrace }> {
   const { candidates, fullTexts, tierMap, topic, otherTopicNames, volume, previousTopicHeadlines, previousUrls } = input;
 
   if (candidates.length === 0) {
@@ -116,8 +117,17 @@ export async function generateSection(
     previousUrls,
   );
 
+  const startTime = Date.now();
+  const warnings: string[] = [];
+
   let object: BriefingArticleSection;
-  let tokensUsed = 0;
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let finishReason = "stop";
+  let usedModel = AUTHOR_MODEL;
+  let retryCount = 0;
+  let fallbackUsed: string | undefined;
+  let primaryError: string | undefined;
 
   try {
     const result = await generateObject({
@@ -128,13 +138,21 @@ export async function generateSection(
       maxOutputTokens: 8192,
     });
     object = result.object;
-    tokensUsed = result.usage?.totalTokens ?? 0;
+    promptTokens = result.usage?.inputTokens ?? 0;
+    completionTokens = result.usage?.outputTokens ?? 0;
+    finishReason = result.finishReason ?? "stop";
     console.log(`[Section Author] model=${AUTHOR_MODEL} usage:`, JSON.stringify(result.usage));
   } catch (err) {
+    primaryError = err instanceof Error ? err.message : String(err);
     console.warn(
       `[Section Author] Primary model ${AUTHOR_MODEL} failed, trying ${AUTHOR_MODEL_FALLBACK}:`,
-      err instanceof Error ? err.message : err,
+      primaryError,
     );
+    retryCount = 1;
+    fallbackUsed = AUTHOR_MODEL_FALLBACK;
+    usedModel = AUTHOR_MODEL_FALLBACK;
+    warnings.push(`Primary model ${AUTHOR_MODEL} failed: ${primaryError}`);
+
     const result = await generateObject({
       model: anthropic(AUTHOR_MODEL_FALLBACK),
       schema: sectionSchema,
@@ -143,10 +161,38 @@ export async function generateSection(
       maxOutputTokens: 8192,
     });
     object = result.object;
-    tokensUsed = result.usage?.totalTokens ?? 0;
+    promptTokens = result.usage?.inputTokens ?? 0;
+    completionTokens = result.usage?.outputTokens ?? 0;
+    finishReason = result.finishReason ?? "stop";
   }
 
-  return { section: object, tokensUsed };
+  const totalTokens = promptTokens + completionTokens;
+  const durationMs = Date.now() - startTime;
+
+  const trace: PipelineStageTrace = {
+    stage: "section-refresh",
+    startedAt: new Date(startTime).toISOString(),
+    durationMs,
+    ai: {
+      modelId: usedModel,
+      promptPreview: userMessage.slice(0, 500),
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      costRub: calculateCostRub(usedModel, {
+        inputTokens: promptTokens,
+        outputTokens: completionTokens,
+      }),
+      finishReason,
+      retryCount,
+      fallbackUsed,
+      error: primaryError,
+    },
+    errors: [],
+    warnings,
+  };
+
+  return { section: object, tokensUsed: totalTokens, trace };
 }
 
 // --- Volume instruction for single section ---

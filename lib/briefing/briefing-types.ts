@@ -77,6 +77,8 @@ export interface BriefingPipelineResult {
   duplicatesRemoved: number;
   tokensUsed: number;
   error?: string;
+  /** ТЗ-DEV2: Trace summary for cron metadata storage */
+  traceSummary?: import("@/lib/ai/pipeline-trace").PipelineTraceSummary;
 }
 
 // ТЗ-А5: Streaming progress events (client-safe)

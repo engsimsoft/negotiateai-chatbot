@@ -1,8 +1,10 @@
-// ТЗ-BR1: Stage 1 — Filter & deduplicate using Gemini 2.0 Flash
+// ТЗ-BR1 + ТЗ-DEV2: Stage 1 — Filter & deduplicate using Gemini 2.0 Flash
 
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
+import { calculateCostRub } from "@/lib/ai/providers";
+import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { FILTER_MODEL, MAX_FILTER_CANDIDATES } from "./briefing-config";
 import type { RawContent } from "./source-fetchers/types";
 
@@ -35,10 +37,14 @@ const filterResultSchema = z.object({
 export async function filterContent(
   items: RawContent[],
   topicIds: string[],
-): Promise<{ candidates: FilteredItem[]; tokensUsed: number }> {
+): Promise<{ candidates: FilteredItem[]; tokensUsed: number; trace?: PipelineStageTrace }> {
   if (items.length === 0) {
     return { candidates: [], tokensUsed: 0 };
   }
+
+  const startTime = Date.now();
+  const warnings: string[] = [];
+  const errors: string[] = [];
 
   // Prepare articles for the prompt
   const articlesText = items
@@ -51,6 +57,8 @@ Published: ${item.publishedAt?.toISOString() || "unknown"}
 Content: ${item.content}`,
     )
     .join("\n\n---\n\n");
+
+  const userPrompt = `Filter these ${items.length} articles:\n\n${articlesText}`;
 
   const { object, usage } = await generateObject({
     model: google(FILTER_MODEL),
@@ -71,11 +79,65 @@ Rules:
 8. sourceItemId is REQUIRED. Return the EXACT itemId from the square brackets [src-N] of the source article the news was extracted from. For example, if the news comes from [src-3], set sourceItemId to "src-3".
 
 Output JSON with "candidates" array.`,
-    prompt: `Filter these ${items.length} articles:\n\n${articlesText}`,
+    prompt: userPrompt,
   });
 
+  const candidates = object.candidates.slice(0, MAX_FILTER_CANDIDATES);
+
+  // ТЗ-DEV2: Post-generation validation
+  const inputItemIds = new Set(items.map((it) => it.itemId).filter(Boolean));
+  const inputUrls = new Map(items.map((it) => [it.itemId, it.url]));
+
+  for (const c of candidates) {
+    // Validate sourceItemId exists in input
+    if (!inputItemIds.has(c.sourceItemId)) {
+      warnings.push(`sourceItemId "${c.sourceItemId}" not found in input items`);
+    }
+    // Validate URL matches the source item
+    const expectedUrl = inputUrls.get(c.sourceItemId);
+    if (expectedUrl && c.url !== expectedUrl) {
+      warnings.push(`URL mismatch for ${c.sourceItemId}: filter="${c.url}" vs input="${expectedUrl}"`);
+    }
+    // Validate topicId is in allowed list
+    if (!topicIds.includes(c.topicId)) {
+      warnings.push(`topicId "${c.topicId}" not in allowed list [${topicIds.join(", ")}]`);
+    }
+  }
+
+  const durationMs = Date.now() - startTime;
+  const promptTokens = usage?.inputTokens ?? 0;
+  const completionTokens = usage?.outputTokens ?? 0;
+  const totalTokens = promptTokens + completionTokens;
+
+  const trace: PipelineStageTrace = {
+    stage: "filter",
+    startedAt: new Date(startTime).toISOString(),
+    durationMs,
+    ai: {
+      modelId: FILTER_MODEL,
+      promptPreview: userPrompt.slice(0, 500),
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      costRub: calculateCostRub(FILTER_MODEL, {
+        inputTokens: promptTokens,
+        outputTokens: completionTokens,
+      }),
+      finishReason: "stop",
+      retryCount: 0,
+    },
+    dataFlow: {
+      inputCount: items.length,
+      outputCount: candidates.length,
+      droppedCount: items.length - candidates.length,
+    },
+    errors,
+    warnings,
+  };
+
   return {
-    candidates: object.candidates.slice(0, MAX_FILTER_CANDIDATES),
-    tokensUsed: usage?.totalTokens ?? 0,
+    candidates,
+    tokensUsed: totalTokens,
+    trace,
   };
 }

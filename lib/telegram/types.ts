@@ -22,6 +22,8 @@ export interface TelegramParseResult {
   posts: TelegramPost[];
   /** Error description when isValid=false */
   error?: string;
+  /** ТЗ-DEV2: Per-post parse warnings (malformed HTML, missing fields) */
+  warnings?: string[];
 }
 
 export interface ParseTelegramOptions {

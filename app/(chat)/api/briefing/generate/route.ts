@@ -1,9 +1,11 @@
 // ТЗ-А5: POST /api/briefing/generate — streaming progress + generation pipeline
 // ТЗ-TG4a: Refactored to use shared runBriefingPipeline()
+// ТЗ-DEV2: +onTrace for pipeline observability in dev mode
 
 import { auth } from "@/app/(auth)/auth";
 import { runBriefingPipeline } from "@/lib/briefing/briefing-pipeline";
 import type { BriefingProgressEvent } from "@/lib/briefing/briefing-types";
+import { isSimplyDevMode } from "@/lib/constants";
 import { ChatSDKError } from "@/lib/errors";
 
 export const maxDuration = 90;
@@ -25,8 +27,15 @@ export async function POST() {
         controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
       };
 
+      // ТЗ-DEV2: Emit trace events into the same NDJSON stream (dev mode only)
+      const emitTrace = isSimplyDevMode
+        ? (data: Record<string, unknown>) => {
+            controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
+          }
+        : undefined;
+
       try {
-        await runBriefingPipeline({ userId, onProgress: emit });
+        await runBriefingPipeline({ userId, onProgress: emit, onTrace: emitTrace });
       } finally {
         controller.close();
       }

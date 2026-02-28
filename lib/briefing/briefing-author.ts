@@ -1,11 +1,12 @@
-// ТЗ-BRIEFING-AUTHOR-CLAUDE: Stage 2 — Generate article using Claude Sonnet 4.6
-// Replaces briefing-analyzer.ts (JSON cards → narrative article)
+// ТЗ-BRIEFING-AUTHOR-CLAUDE + ТЗ-DEV2: Stage 2 — Generate article using Claude Sonnet 4.6
 
 import fs from "fs";
 import path from "path";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
+import { calculateCostRub } from "@/lib/ai/providers";
+import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { AUTHOR_MODEL, AUTHOR_MODEL_FALLBACK } from "./briefing-config";
 import type { FilteredItem } from "./briefing-filter";
 import type { RawContent } from "./source-fetchers/types";
@@ -117,7 +118,7 @@ const MAX_TOKENS_BY_VOLUME: Record<string, number> = {
  */
 export async function generateArticle(
   input: AuthorInput,
-): Promise<{ article: BriefingArticle; tokensUsed: number }> {
+): Promise<{ article: BriefingArticle; tokensUsed: number; trace?: PipelineStageTrace }> {
   const { candidates, fullTexts, tierMap, userTopics, language, maxItems, volume, date, previousBriefing } =
     input;
 
@@ -147,9 +148,17 @@ export async function generateArticle(
   );
 
   const maxTokens = MAX_TOKENS_BY_VOLUME[volume ?? "standard"] ?? MAX_TOKENS_BY_VOLUME.standard;
+  const startTime = Date.now();
+  const warnings: string[] = [];
 
   let object: BriefingArticle;
-  let tokensUsed = 0;
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let finishReason = "stop";
+  let usedModel = AUTHOR_MODEL;
+  let retryCount = 0;
+  let fallbackUsed: string | undefined;
+  let primaryError: string | undefined;
 
   try {
     // Note: thinking/effort not used here — Anthropic prohibits thinking when
@@ -162,14 +171,22 @@ export async function generateArticle(
       maxOutputTokens: maxTokens,
     });
     object = result.object;
-    tokensUsed = result.usage?.totalTokens ?? 0;
+    promptTokens = result.usage?.inputTokens ?? 0;
+    completionTokens = result.usage?.outputTokens ?? 0;
+    finishReason = result.finishReason ?? "stop";
     console.log(`[Briefing Author] model=${AUTHOR_MODEL} maxOutputTokens=${maxTokens} usage:`, JSON.stringify(result.usage));
     console.log(`[Briefing Author] finishReason=${result.finishReason}`);
   } catch (err) {
+    primaryError = err instanceof Error ? err.message : String(err);
     console.warn(
       `[Briefing] Primary model ${AUTHOR_MODEL} failed, trying ${AUTHOR_MODEL_FALLBACK}:`,
-      err instanceof Error ? err.message : err,
+      primaryError,
     );
+    retryCount = 1;
+    fallbackUsed = AUTHOR_MODEL_FALLBACK;
+    usedModel = AUTHOR_MODEL_FALLBACK;
+    warnings.push(`Primary model ${AUTHOR_MODEL} failed: ${primaryError}`);
+
     const result = await generateObject({
       model: anthropic(AUTHOR_MODEL_FALLBACK),
       schema: briefingArticleSchema,
@@ -178,10 +195,38 @@ export async function generateArticle(
       maxOutputTokens: maxTokens,
     });
     object = result.object;
-    tokensUsed = result.usage?.totalTokens ?? 0;
+    promptTokens = result.usage?.inputTokens ?? 0;
+    completionTokens = result.usage?.outputTokens ?? 0;
+    finishReason = result.finishReason ?? "stop";
   }
 
-  return { article: object, tokensUsed };
+  const totalTokens = promptTokens + completionTokens;
+  const durationMs = Date.now() - startTime;
+
+  const trace: PipelineStageTrace = {
+    stage: "author",
+    startedAt: new Date(startTime).toISOString(),
+    durationMs,
+    ai: {
+      modelId: usedModel,
+      promptPreview: userMessage.slice(0, 500),
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      costRub: calculateCostRub(usedModel, {
+        inputTokens: promptTokens,
+        outputTokens: completionTokens,
+      }),
+      finishReason,
+      retryCount,
+      fallbackUsed,
+      error: primaryError,
+    },
+    errors: [],
+    warnings,
+  };
+
+  return { article: object, tokensUsed: totalTokens, trace };
 }
 
 // --- Volume instruction block (pressure point #2: top of user message) ---

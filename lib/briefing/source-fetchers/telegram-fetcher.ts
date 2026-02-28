@@ -1,6 +1,7 @@
-// ТЗ-BR1 → ТЗ-TG1: Telegram public channel fetcher (shared parser)
+// ТЗ-BR1 → ТЗ-TG1 + ТЗ-DEV2: Telegram public channel fetcher with trace
 
 import { parseTelegramChannel } from "@/lib/telegram/parser";
+import type { FetchTrace } from "@/lib/ai/pipeline-trace";
 import {
   FETCH_TIMEOUT_MS,
   FRESHNESS_HOURS,
@@ -19,6 +20,8 @@ export async function fetchTelegram(
 ): Promise<FetchResult> {
   const errors: string[] = [];
   const items: RawContent[] = [];
+  const warnings: string[] = [];
+  const startTime = Date.now();
 
   const cutoff = new Date(Date.now() - FRESHNESS_HOURS * 60 * 60 * 1000);
 
@@ -30,15 +33,38 @@ export async function fetchTelegram(
     followRedirects: true,
   });
 
+  // Collect parser-level warnings
+  if (result.warnings) {
+    warnings.push(...result.warnings);
+  }
+
   if (!result.isValid) {
     errors.push(
       `Telegram fetch failed [${sourceName}]: ${result.error ?? "unknown error"}`,
     );
-    return { items, errors };
+
+    const durationMs = Date.now() - startTime;
+    const trace: FetchTrace = {
+      url: channelUrl,
+      method: "telegram",
+      durationMs,
+      itemsExtracted: 0,
+      error: errors[0],
+      warnings,
+    };
+
+    return { items, errors, trace };
   }
 
+  // Count stats for trace
+  let mediaSkipped = 0;
+  let missingText = 0;
+
   for (const post of result.posts) {
-    if (!post.text) continue;
+    if (!post.text) {
+      missingText++;
+      continue;
+    }
 
     // Title = first line or first 100 chars
     const firstLine = post.text.split("\n")[0].trim();
@@ -55,5 +81,28 @@ export async function fetchTelegram(
     });
   }
 
-  return { items, errors };
+  // Count media-only posts (posts with media but no text — already excluded by includeMediaOnly: false)
+  mediaSkipped = result.posts.filter((p) => !p.text && p.hasMedia).length;
+
+  const durationMs = Date.now() - startTime;
+
+  const droppedReasons: Record<string, number> = {};
+  if (missingText) droppedReasons.missing_text = missingText;
+  if (mediaSkipped) droppedReasons.media_only = mediaSkipped;
+
+  const trace: FetchTrace = {
+    url: channelUrl,
+    method: "telegram",
+    durationMs,
+    itemsExtracted: items.length,
+    warnings,
+    dataFlow: {
+      inputCount: result.posts.length,
+      outputCount: items.length,
+      droppedCount: result.posts.length - items.length,
+      droppedReasons: Object.keys(droppedReasons).length > 0 ? droppedReasons : undefined,
+    },
+  };
+
+  return { items, errors, trace };
 }

@@ -38,13 +38,15 @@ export interface AiCallTrace {
 
 export interface FetchTrace {
   url: string;
-  method: "rss" | "telegram" | "jina" | "readability" | "perplexity" | "web";
+  method: "rss" | "telegram" | "jina" | "readability" | "semantic" | "perplexity" | "web";
   statusCode?: number;
   durationMs: number;
   responseSize?: number; // bytes
   itemsExtracted: number;
   error?: string;
   warnings: string[];
+  /** Per-fetch data flow breakdown (e.g. RSS entries: total → dropped → extracted) */
+  dataFlow?: DataFlowTrace;
 }
 
 // ---------------------------------------------------------------------------

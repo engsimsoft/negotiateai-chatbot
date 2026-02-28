@@ -1,5 +1,7 @@
 // ТЗ-BR1: Source fetcher types
 
+import type { FetchTrace } from "@/lib/ai/pipeline-trace";
+
 export interface RawContent {
   title: string;
   url: string;
@@ -15,4 +17,6 @@ export interface RawContent {
 export interface FetchResult {
   items: RawContent[];
   errors: string[];
+  /** ТЗ-DEV2: Trace data for observability (always populated, pipeline decides whether to store) */
+  trace?: FetchTrace;
 }

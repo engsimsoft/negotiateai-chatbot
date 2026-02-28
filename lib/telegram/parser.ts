@@ -87,6 +87,7 @@ export async function parseTelegramChannel(
     }
 
     const posts: TelegramPost[] = [];
+    const warnings: string[] = [];
 
     messageWraps.each((_, el) => {
       try {
@@ -124,12 +125,19 @@ export async function parseTelegramChannel(
           : rawText;
 
         posts.push({ text, date: datetime, url, hasMedia });
-      } catch {
-        // Skip malformed posts
+      } catch (e) {
+        // ТЗ-DEV2: surface per-post parse errors instead of silently swallowing
+        warnings.push(`Malformed post in @${channel}: ${e instanceof Error ? e.message : String(e)}`);
       }
     });
 
-    return { channel, channelUrl, isValid: true, posts };
+    return {
+      channel,
+      channelUrl,
+      isValid: true,
+      posts,
+      warnings: warnings.length > 0 ? warnings : undefined,
+    };
   } catch (err) {
     return {
       channel,

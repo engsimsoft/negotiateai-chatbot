@@ -1,7 +1,8 @@
-// ТЗ-BR1 + ТЗ-WS1 + ТЗ-WS2: Web page fetcher — delegates to shared fetchPage() utility
+// ТЗ-BR1 + ТЗ-WS1 + ТЗ-WS2 + ТЗ-DEV2: Web page fetcher with trace
 
 import { fetchPage } from "@/lib/ai/tools/fetch-page";
 import type { FetchPageOptions } from "@/lib/ai/tools/fetch-page";
+import type { FetchTrace } from "@/lib/ai/pipeline-trace";
 import { FETCH_TIMEOUT_MS, MAX_CONTENT_LENGTH } from "../briefing-config";
 import type { FetchResult, RawContent } from "./types";
 
@@ -21,6 +22,10 @@ export async function fetchWeb(
 ): Promise<FetchResult> {
   const errors: string[] = [];
   const items: RawContent[] = [];
+  const warnings: string[] = [];
+  const startTime = Date.now();
+
+  let fetchMethod: FetchTrace["method"] = "web";
 
   try {
     const result = await fetchPage(pageUrl, {
@@ -28,6 +33,12 @@ export async function fetchWeb(
       timeoutMs: FETCH_TIMEOUT_MS,
       forceJina: options?.forceJina,
     });
+
+    // Track which extraction method succeeded
+    fetchMethod = result.source;
+
+    // publishedAt is not available from web fetcher
+    warnings.push(`publishedAt not available for web source [${sourceName}]`);
 
     items.push({
       title: result.title || sourceName,
@@ -42,5 +53,16 @@ export async function fetchWeb(
     );
   }
 
-  return { items, errors };
+  const durationMs = Date.now() - startTime;
+
+  const trace: FetchTrace = {
+    url: pageUrl,
+    method: fetchMethod,
+    durationMs,
+    itemsExtracted: items.length,
+    error: errors[0],
+    warnings,
+  };
+
+  return { items, errors, trace };
 }

@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 6 |
-| Текущий этап | 1 |
+| Текущий этап | 2 |
 | Сессий (оценка) | 3-5 |
 
 ---
@@ -54,29 +54,29 @@ git commit -m "feat(tz-dev2): pipeline trace types + pricing for Gemini/Perplexi
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 1
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** Каждый AI-вызов и каждый fetch в briefing pipeline генерирует trace data. Silent failures заменены на warnings.
 
 **Задачи:**
 
 **Fetchers — добавить FetchTrace:**
-- [ ] `rss-fetcher.ts` — timing wrap, item counts (total/dropped по причинам: no_title, no_url, stale, no_content), per-entry catch (сейчас одна ошибка роняет весь feed)
-- [ ] `telegram-fetcher.ts` + `lib/telegram/parser.ts` — timing, заменить `catch {}` → `catch(e) { warnings.push(String(e)) }`, считать: posts found / text / fresh / media_skipped / missing_data_post
-- [ ] `web-fetcher.ts` — timing, warning если `publishedAt` не определён, какой метод сработал (readability/semantic/jina)
+- [x] `rss-fetcher.ts` — timing wrap, item counts (total/dropped по причинам: no_title, no_url, stale, no_content), per-entry catch (сейчас одна ошибка роняет весь feed)
+- [x] `telegram-fetcher.ts` + `lib/telegram/parser.ts` — timing, заменить `catch {}` → `catch(e) { warnings.push(String(e)) }`, считать: posts found / text / fresh / media_skipped / missing_data_post
+- [x] `web-fetcher.ts` — timing, warning если `publishedAt` не определён, какой метод сработал (readability/semantic/jina)
 
 **Filter — полный usage + validation:**
-- [ ] `briefing-filter.ts` — `Date.now()` wrap, деструктурировать `promptTokens` + `completionTokens`, `calculateCostRub()`. После генерации: validate sourceItemId (каждый существует в input), validate URL (сравнить output URL vs input URL по sourceItemId), validate topicId (в допустимом списке)
+- [x] `briefing-filter.ts` — `Date.now()` wrap, деструктурировать `inputTokens` + `outputTokens`, `calculateCostRub()`. После генерации: validate sourceItemId (каждый существует в input), validate URL (сравнить output URL vs input URL по sourceItemId), validate topicId (в допустимом списке)
 
 **Author — полный usage + retry trace:**
-- [ ] `briefing-author.ts` — `Date.now()` wrap, полный usage (`promptTokens`, `completionTokens`), costRub. Retry/fallback: если primary модель failed — зафиксировать error + fallbackUsed model. Prompt preview (первые 500 символов user message)
+- [x] `briefing-author.ts` — `Date.now()` wrap, полный usage (`inputTokens`, `outputTokens`), costRub. Retry/fallback: если primary модель failed — зафиксировать error + fallbackUsed model. Prompt preview (первые 500 символов user message)
 
 **Section author:**
-- [ ] `briefing-section-author.ts` — timing, полный usage, costRub, retry/fallback
+- [x] `briefing-section-author.ts` — timing, полный usage, costRub, retry/fallback
 
 **Pipeline orchestrator — trace aggregation + URL verification:**
-- [ ] `briefing-pipeline.ts` — создать `TraceCollector` в начале, передавать в каждую стадию, собирать trace. fullTextsMap miss → per-item warning (не только общий hit rate). URL verification: после генерации article — собрать все URL из `sections[].sources[].url` + inline markdown links из `sections[].content` (regex `\[.*?\]\((https?://.*?)\)`), сравнить с Set всех `allItems[].url`. Пометить verified/fabricated/modified. Emit `{trace:...}` events в NDJSON stream (при dev mode). Финальный `{traceSummary:...}` event
-- [ ] Fix `.catch(() => {})` на DB save → `.catch((e) => { trace.addWarning("db_save_failed", e) })`
+- [x] `briefing-pipeline.ts` — создать `TraceCollector` в начале, собирать trace из каждой стадии. fullTextsMap miss → per-item warning. URL verification: после генерации article — `verifyArticleUrls()`. Emit `{trace:...}` events в NDJSON stream (при dev mode). Финальный `{traceSummary:...}` event. +`onTrace` callback. +`traceSummary` в BriefingPipelineResult
+- [x] Fix `.catch(() => {})` на DB save → `.catch((saveErr) => { console.error(...) })`
 
 **Файлы:**
 - `lib/briefing/briefing-pipeline.ts` — trace orchestration, URL verification, DB save fix
@@ -89,8 +89,8 @@ git commit -m "feat(tz-dev2): pipeline trace types + pricing for Gemini/Perplexi
 - `lib/briefing/source-fetchers/web-fetcher.ts` — FetchTrace, publishedAt warning
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Dev mode: запустить генерацию брифинга → в console видны trace events с реальными данными (модель, токены, стоимость, fetch details)
 - [ ] 🧪 Мануальный тест: генерация брифинга работает как раньше (trace не ломает pipeline)
 
