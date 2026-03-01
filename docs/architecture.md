@@ -139,6 +139,7 @@
 - `TelegramMessage` — сообщения из групп (groupId FK, topicId FK, fromUserId, text, hasMedia, mediaType, sentAt; индексы: group+sentAt, group+topic+sentAt)
 - `ai_usage_log` — учёт потребления AI (modelId, tokens, costUsd, chatMode, guardianFlags JSONB)
 - `Vote_v2` — голосование за сообщения
+- `MeetingRecord` — записи встреч (userId FK, title, durationSeconds, speakerCount, summaryLevel, transcript, summary, metadata JSONB, createdAt)
 - NextAuth таблицы (Account, Session, VerificationToken)
 
 **Схема:** `lib/db/schema.ts` (SSOT)

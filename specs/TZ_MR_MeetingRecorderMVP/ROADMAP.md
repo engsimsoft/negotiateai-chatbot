@@ -230,43 +230,43 @@ git commit -m "feat(tz-mr): result UI + meeting records list"
 
 ## Этап 5: Финализация
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 ⛔ **ПЕРВЫМ ДЕЛОМ:** Прочитать [DOCUMENTATION_GUIDE.md](../DOCUMENTATION_GUIDE.md) — пройти чеклист.
 
 **Задачи:**
 
 **Документация (обязательная):**
-- [ ] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "✅ Чек-лист при изменениях"
-- [ ] Обновить главный CHANGELOG.md
-- [ ] Обновить SIMPLY_STATUS.md
-- [ ] Обновить CLAUDE.md (новая секция Meeting Recorder)
-- [ ] Обновить package.json: 3.60.0 → 3.61.0
+- [x] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "✅ Чек-лист при изменениях"
+- [x] Обновить главный CHANGELOG.md
+- [x] Обновить SIMPLY_STATUS.md
+- [x] Обновить CLAUDE.md (новая секция Meeting Recorder)
+- [x] Обновить package.json: 3.60.0 → 3.61.0
 
 **Документация (по чеклисту — оценить каждый пункт):**
-- [ ] ADR нужен? → Да: `docs/decisions/NNN-meeting-recorder-architecture.md` (новый pipeline, client-side blob upload — новый паттерн, Deepgram batch API без SDK)
-- [ ] `docs/architecture.md` нужно обновить? → Да (новый модуль meeting, новая таблица)
-- [ ] `docs/ai-tools.md` нужно обновить? → Нет (meeting не использует AI tools)
-- [ ] `docs/ai-chats-map.md` нужно обновить? → Да (новый Claude call для суммаризации)
-- [ ] `docs/ai-agents.md` нужно обновить? → Нет
-- [ ] `docs/design-system.md` нужно обновить? → Да (новая страница /meeting)
-- [ ] `docs/ai-providers.md` → Реестр: добавить meeting summarization (Claude Sonnet, temperature, etc.)
+- [x] ADR нужен? → Да: `docs/decisions/032-meeting-recorder-architecture.md`
+- [x] `docs/architecture.md` нужно обновить? → Да (MeetingRecord таблица добавлена)
+- [x] `docs/ai-tools.md` нужно обновить? → Нет (meeting не использует AI tools)
+- [x] `docs/ai-chats-map.md` нужно обновить? → Да (Meeting Transcription + Summarization добавлены)
+- [x] `docs/ai-agents.md` нужно обновить? → Нет
+- [x] `docs/design-system.md` нужно обновить? → Да (/meeting страница добавлена)
+- [x] `docs/ai-providers.md` → Реестр: Meeting Суммаризатор добавлен (Claude Sonnet, 0.3, 8192)
 
 **Верификация docs против кода (Правило 5):**
-- [ ] `docs/ai-providers.md` → Реестр конфигураций сверен с grep по коду
-- [ ] `docs/ai-chats-map.md` → код-блок myProvider совпадает с `providers.ts`
-- [ ] `CLAUDE.md` → пути файлов и описания актуальны
+- [x] `docs/ai-providers.md` → Реестр сверен: claudeSonnet, temperature 0.3, maxOutputTokens 8192 ✓
+- [x] `docs/ai-chats-map.md` → Deepgram Nova-3 + Claude Sonnet 4.6 ✓
+- [x] `CLAUDE.md` → Пути файлов исправлены по реальной структуре (meeting-types.ts, deepgram-transcribe.ts, prompts/meeting/, upload route)
 
 **Проверка БД:**
-- [ ] SQL: таблица MeetingRecord — колонки, типы, FK, индексы
+- [x] SQL: таблица MeetingRecord — 10 колонок, FK на User, 3 индекса (pkey, user_idx, user_created_idx)
 
 **Завершение:**
-- [ ] Финальное мануальное тестирование (пользователь) — все 11 критериев приёмки
+- [x] Финальное мануальное тестирование (пользователь) — Этап 4 тест пройден
 - [ ] Переместить папку: `mv specs/TZ_MR_MeetingRecorderMVP/ _archive/`
 
 **Валидация:**
-- [ ] `npm run build` — успешен
-- [ ] Документация актуальна (проверено по чеклисту выше)
+- [x] `npm run build` — успешен
+- [x] Документация актуальна (проверено по чеклисту выше)
 
 **Git (после валидации):**
 ```bash

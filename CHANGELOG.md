@@ -12,6 +12,29 @@
 
 ---
 
+## [3.61.0] - 2026-03-02 - MeetingRecorderMVP
+
+**ТЗ-MR**: Meeting Recorder MVP — запись и расшифровка встреч. Deepgram Nova-3 транскрипция → Claude Sonnet суммаризация → три формата документа.
+
+### Added
+- **Meeting Recorder** — новый инструмент на дашборде: запись аудио (MediaRecorder API) или загрузка файла (до 200MB), 3 формата суммаризации (Сводка / Протокол / Детальный)
+- **Deepgram batch API** — raw fetch транскрипция (Nova-3, русский язык, diarization, smart_format) без SDK
+- **Meeting Pipeline** — NDJSON streaming прогресса (паттерн briefing-pipeline): upload → transcribe → summarize → save
+- **3 промпта суммаризации** — compact (~1 стр), standard (~2-3 стр), detailed (полная хронология с тайм-кодами)
+- **Meeting Result UI** — MarkdownViewer + метаданные-пиллы + кликабельные тайм-коды `[HH:MM:SS]` → seek аудиоплеера + копирование
+- **Meeting Records List** — список предыдущих записей с навигацией, удалением, загрузкой из БД
+- **API routes** — `POST /api/meeting/upload`, `POST /api/meeting/process` (maxDuration: 300), `GET /api/meeting/records`, `GET/DELETE /api/meeting/records/[id]`
+- **Dashboard card** — карточка «Запись встречи» в секции Инструменты (title последней записи + количество)
+- **БД** — таблица `MeetingRecord` (10 колонок, FK на User, 2 индекса)
+
+### Technical
+- `generateText()` с Claude Sonnet 4.6, `temperature: 0.3`, `maxOutputTokens: 8192`
+- Blob cleanup после обработки (аудио удаляется, хранится только текст)
+- Только русский язык (`language: "ru"`)
+- **ADR:** [032-meeting-recorder-architecture](docs/decisions/032-meeting-recorder-architecture.md)
+
+---
+
 ## [3.60.0] - 2026-03-01 - PromptCaching
 
 **ТЗ-CACHE1**: Anthropic Prompt Caching — включение 5-минутного ephemeral кэширования для всех streaming routes. Кэшированные input-токены стоят 0.1× от базовой цены (экономия ~90% на повторных запросах).

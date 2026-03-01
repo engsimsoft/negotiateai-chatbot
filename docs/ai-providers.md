@@ -141,6 +141,7 @@
 | Project Summary | `api/projects/[id]/generate-summary/route.ts` | `claude-haiku` | — | — | Hardcoded |
 | **Briefing: Автор** | `lib/briefing/briefing-author.ts` | **`claude-sonnet-4-6`** | — | — | generateObject, maxOutputTokens по volume |
 | **Briefing: Fallback** | `lib/briefing/briefing-author.ts` | `claude-sonnet-4-5-20250929` | — | — | При ошибке primary |
+| **Meeting: Суммаризатор** | `lib/meeting/meeting-pipeline.ts` | **`claude-sonnet-4-6`** | 0.3 | 8192 | generateText, 3 уровня (compact/standard/detailed) |
 
 ### Google Gemini — Backend
 
