@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
 import { UserMenu } from "@/components/user-menu";
+import { MeetingPage as MeetingPageClient } from "@/components/meeting/meeting-page";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
@@ -31,18 +32,8 @@ export default async function MeetingPage() {
         </div>
       </header>
 
-      {/* Content — placeholder for Этап 2 */}
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-4 py-12">
-        <div className="text-center">
-          <span className="text-5xl">🎙️</span>
-          <h2 className="mt-4 font-serif text-xl font-semibold">
-            Запись встречи
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Запишите или загрузите аудио встречи и получите готовый протокол
-          </p>
-        </div>
-      </main>
+      {/* Content */}
+      <MeetingPageClient />
     </div>
   );
 }
