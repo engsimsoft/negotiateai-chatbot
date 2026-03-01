@@ -64,6 +64,8 @@ import {
   telegramLinkToken,
   telegramMessage,
   type TelegramMessage,
+  type MeetingRecord,
+  meetingRecord,
   type User,
   user,
   vote,
@@ -4330,6 +4332,133 @@ export async function deleteTelegramMessage({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to delete Telegram message",
+    );
+  }
+}
+
+// ============================================================================
+// Meeting Recorder (ТЗ-MR)
+// ============================================================================
+
+/**
+ * Save a new meeting record
+ */
+export async function saveMeetingRecord({
+  userId,
+  title,
+  durationSeconds,
+  speakerCount,
+  summaryLevel,
+  transcript,
+  summary,
+  metadata,
+}: {
+  userId: string;
+  title: string;
+  durationSeconds: number;
+  speakerCount: number;
+  summaryLevel: string;
+  transcript: string;
+  summary: string;
+  metadata?: Record<string, unknown> | null;
+}) {
+  try {
+    const [created] = await db
+      .insert(meetingRecord)
+      .values({
+        userId,
+        title,
+        durationSeconds,
+        speakerCount,
+        summaryLevel,
+        transcript,
+        summary,
+        metadata: metadata ?? null,
+        createdAt: new Date(),
+      })
+      .returning();
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to save meeting record",
+    );
+  }
+}
+
+/**
+ * Get meeting records for a user (newest first)
+ */
+export async function getMeetingRecords({
+  userId,
+  limit = 20,
+}: {
+  userId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select()
+      .from(meetingRecord)
+      .where(eq(meetingRecord.userId, userId))
+      .orderBy(desc(meetingRecord.createdAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get meeting records",
+    );
+  }
+}
+
+/**
+ * Get a single meeting record by ID (with user ownership check)
+ */
+export async function getMeetingRecordById({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    const [record] = await db
+      .select()
+      .from(meetingRecord)
+      .where(
+        and(eq(meetingRecord.id, id), eq(meetingRecord.userId, userId)),
+      )
+      .limit(1);
+    return record ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get meeting record",
+    );
+  }
+}
+
+/**
+ * Delete a meeting record (with user ownership check)
+ */
+export async function deleteMeetingRecord({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}): Promise<boolean> {
+  try {
+    const result = await db
+      .delete(meetingRecord)
+      .where(
+        and(eq(meetingRecord.id, id), eq(meetingRecord.userId, userId)),
+      );
+    return (result.rowCount ?? 0) > 0;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete meeting record",
     );
   }
 }

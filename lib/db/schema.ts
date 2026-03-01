@@ -658,3 +658,41 @@ export const telegramMessage = pgTable(
 );
 
 export type TelegramMessage = InferSelectModel<typeof telegramMessage>;
+
+// ============================================================================
+// Meeting Recorder (ТЗ-MR)
+// ============================================================================
+
+export const meetingRecord = pgTable(
+  "MeetingRecord",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    title: varchar("title", { length: 255 }).notNull(),
+    durationSeconds: integer("durationSeconds").notNull(),
+    speakerCount: integer("speakerCount").notNull().default(0),
+    summaryLevel: varchar("summaryLevel", { length: 20 }).notNull(), // "compact" | "standard" | "detailed"
+    transcript: text("transcript").notNull(),
+    summary: text("summary").notNull(),
+    metadata: jsonb("metadata").$type<{
+      modelId?: string;
+      inputTokens?: number;
+      outputTokens?: number;
+      costUsd?: number;
+      deepgramDurationMs?: number;
+      claudeDurationMs?: number;
+    } | null>(),
+    createdAt: timestamp("createdAt").notNull(),
+  },
+  (table) => ({
+    userIdx: index("meeting_record_user_idx").on(table.userId),
+    userCreatedAtIdx: index("meeting_record_user_created_idx").on(
+      table.userId,
+      table.createdAt
+    ),
+  })
+);
+
+export type MeetingRecord = InferSelectModel<typeof meetingRecord>;

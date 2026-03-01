@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
-import { getUserById, getGeneralChatsCount, getBriefingHistory, getBriefingSettings } from "@/lib/db/queries";
+import { getUserById, getGeneralChatsCount, getBriefingHistory, getBriefingSettings, getMeetingRecords } from "@/lib/db/queries";
 import { getSimplyNewsData } from "@/lib/briefing/simply-news-utils";
 import {
   GlavnayaHeader,
@@ -19,12 +19,13 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Get user profile, chat count, and latest briefing from database
-  const [userProfile, generalChatsCount, briefingHistoryRows, briefingSettings] = await Promise.all([
+  // Get user profile, chat count, latest briefing, and meeting records from database
+  const [userProfile, generalChatsCount, briefingHistoryRows, briefingSettings, meetingRecords] = await Promise.all([
     getUserById(session.user.id),
     getGeneralChatsCount({ userId: session.user.id }),
     getBriefingHistory({ userId: session.user.id, limit: 1 }),
     getBriefingSettings({ userId: session.user.id }),
+    getMeetingRecords({ userId: session.user.id, limit: 1 }),
   ]);
   const latestBriefing = briefingHistoryRows[0] ?? null;
 
@@ -62,7 +63,7 @@ export default async function DashboardPage() {
         <ModeCardsSection />
 
         {/* Tools */}
-        <ToolsSection latestBriefing={latestBriefing} hasSimplyUpdate={hasSimplyUpdate} />
+        <ToolsSection latestBriefing={latestBriefing} hasSimplyUpdate={hasSimplyUpdate} meetingRecordCount={meetingRecords.length} />
       </main>
     </div>
   );
