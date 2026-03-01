@@ -3,9 +3,10 @@ import { ArrowRight } from "lucide-react";
 
 interface MeetingCardProps {
   recordCount: number;
+  lastRecordTitle?: string | null;
 }
 
-export function MeetingCard({ recordCount }: MeetingCardProps) {
+export function MeetingCard({ recordCount, lastRecordTitle }: MeetingCardProps) {
   return (
     <Link
       href="/meeting"
@@ -14,9 +15,13 @@ export function MeetingCard({ recordCount }: MeetingCardProps) {
       <span className="text-xl">🎙️</span>
       <div className="min-w-0 flex-1">
         <div className="font-medium text-foreground">Запись встречи</div>
-        <div className="text-xs text-muted-foreground">
+        <div className="truncate text-xs text-muted-foreground">
           {recordCount > 0 ? (
-            <>{recordCount} {formatRecordsWord(recordCount)} · Открыть</>
+            <>
+              {lastRecordTitle
+                ? `${lastRecordTitle} · ${recordCount} ${formatRecordsWord(recordCount)}`
+                : `${recordCount} ${formatRecordsWord(recordCount)} · Открыть`}
+            </>
           ) : (
             <>Расшифровка и протокол · Попробовать</>
           )}

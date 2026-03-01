@@ -1,3 +1,5 @@
+// ТЗ-MR Этап 4: Main meeting page with records list, result view, and new recording flow
+
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -11,15 +13,15 @@ import {
   Loader2,
   AlertCircle,
   RotateCcw,
-  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { MarkdownViewer } from "@/components/markdown-viewer";
 import { useMeetingRecorder, formatDuration } from "@/hooks/use-meeting-recorder";
 import { useMeetingProcessing } from "@/hooks/use-meeting-processing";
 import { MeetingProgress } from "@/components/meeting/meeting-progress";
+import { MeetingResult } from "@/components/meeting/meeting-result";
+import { MeetingList, type MeetingListItem } from "@/components/meeting/meeting-list";
 
-type PageState = "input" | "ready" | "uploading" | "processing" | "result";
+type PageState = "input" | "ready" | "uploading" | "processing" | "result" | "viewing";
 type SummaryLevel = "compact" | "standard" | "detailed";
 
 const SUMMARY_OPTIONS: { value: SummaryLevel; label: string; description: string }[] = [
@@ -29,6 +31,16 @@ const SUMMARY_OPTIONS: { value: SummaryLevel; label: string; description: string
 ];
 
 const ACCEPTED_AUDIO_TYPES = ".mp3,.m4a,.wav,.webm,.ogg,.aac,.flac";
+
+interface ResultRecord {
+  id?: string;
+  title: string;
+  summary: string;
+  durationSeconds: number;
+  speakerCount: number;
+  summaryLevel: string;
+  createdAt?: string;
+}
 
 export function MeetingPage() {
   const recorder = useMeetingRecorder();
@@ -43,23 +55,47 @@ export function MeetingPage() {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [resultRecord, setResultRecord] = useState<{
-    title: string;
-    summary: string;
-    durationSeconds: number;
-    speakerCount: number;
-    summaryLevel: string;
-  } | null>(null);
+  const [resultRecord, setResultRecord] = useState<ResultRecord | null>(null);
+
+  // Records list state
+  const [records, setRecords] = useState<MeetingListItem[]>([]);
+  const [recordsLoaded, setRecordsLoaded] = useState(false);
+  const [viewingRecordLoading, setViewingRecordLoading] = useState(false);
 
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
+
+  // Load records list on mount
+  useEffect(() => {
+    fetch("/api/meeting/records")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: MeetingListItem[]) => {
+        setRecords(data);
+        setRecordsLoaded(true);
+      })
+      .catch(() => setRecordsLoaded(true));
+  }, []);
 
   // Transition: processing complete → fetch record → show result
   useEffect(() => {
     if (processing.recordId && pageState === "processing") {
       fetch(`/api/meeting/records/${processing.recordId}`)
-        .then((res) => res.ok ? res.json() : null)
+        .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (data) setResultRecord(data);
+          if (data) {
+            setResultRecord(data);
+            // Add to the local records list
+            setRecords((prev) => [
+              {
+                id: data.id,
+                title: data.title,
+                durationSeconds: data.durationSeconds,
+                speakerCount: data.speakerCount,
+                summaryLevel: data.summaryLevel,
+                createdAt: data.createdAt,
+              },
+              ...prev,
+            ]);
+          }
           setPageState("result");
         })
         .catch(() => {
@@ -69,32 +105,33 @@ export function MeetingPage() {
   }, [processing.recordId, pageState]);
 
   // Handle file selection
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-    if (file.size > 200 * 1024 * 1024) {
-      setError("Файл слишком большой. Максимум 200 МБ.");
-      return;
-    }
+      if (file.size > 200 * 1024 * 1024) {
+        setError("Файл слишком большой. Максимум 200 МБ.");
+        return;
+      }
 
-    setError(null);
-    setAudioFile(file);
-    const url = URL.createObjectURL(file);
-    setAudioUrl(url);
-    setPageState("ready");
+      setError(null);
+      setAudioFile(file);
+      const url = URL.createObjectURL(file);
+      setAudioUrl(url);
+      setPageState("ready");
 
-    // Get duration from audio element
-    const audio = new Audio(url);
-    audio.addEventListener("loadedmetadata", () => {
-      setAudioDuration(Math.round(audio.duration));
-    });
-  }, []);
+      const audio = new Audio(url);
+      audio.addEventListener("loadedmetadata", () => {
+        setAudioDuration(Math.round(audio.duration));
+      });
+    },
+    [],
+  );
 
   // Handle recorder stop → transition to ready
   const handleRecorderStop = useCallback(() => {
     recorder.stop();
-    // The recorder hook sets blob and audioUrl on stop
     setTimeout(() => {
       setPageState("ready");
     }, 100);
@@ -104,7 +141,6 @@ export function MeetingPage() {
   const handleCreateDocument = useCallback(async () => {
     setError(null);
 
-    // Determine the source: recorder blob or uploaded file
     const source = recorder.blob ?? audioFile;
     if (!source) {
       setError("Нет аудиофайла для обработки.");
@@ -115,7 +151,6 @@ export function MeetingPage() {
       setPageState("uploading");
       setUploadProgress(0);
 
-      // Upload to Vercel Blob via server-side FormData route
       const filename = audioFile?.name ?? `meeting-${Date.now()}.webm`;
       const formData = new FormData();
       formData.append("file", source);
@@ -135,10 +170,8 @@ export function MeetingPage() {
       setBlobUrl(url);
       setUploadProgress(100);
 
-      // Duration: from recorder elapsed or from file metadata
       const duration = recorder.elapsed > 0 ? recorder.elapsed : audioDuration;
 
-      // Transition to processing and trigger the pipeline
       setPageState("processing");
       processing.startProcessing({
         blobUrl: url,
@@ -147,12 +180,52 @@ export function MeetingPage() {
       });
     } catch (err) {
       console.error("[meeting] Upload error:", err);
-      setError(err instanceof Error ? err.message : "Ошибка загрузки файла. Попробуйте ещё раз.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Ошибка загрузки файла. Попробуйте ещё раз.",
+      );
       setPageState("ready");
     }
   }, [recorder.blob, recorder.elapsed, audioFile, audioDuration, summaryLevel, processing]);
 
-  // Reset everything
+  // View an existing record from the list
+  const handleSelectRecord = useCallback(async (id: string) => {
+    setViewingRecordLoading(true);
+    try {
+      const res = await fetch(`/api/meeting/records/${id}`);
+      if (!res.ok) throw new Error("Failed to load record");
+      const data = await res.json();
+      setResultRecord(data);
+      setPageState("viewing");
+    } catch {
+      setError("Не удалось загрузить запись.");
+    } finally {
+      setViewingRecordLoading(false);
+    }
+  }, []);
+
+  // Delete a record
+  const handleDeleteRecord = useCallback(async () => {
+    if (!resultRecord?.id) return;
+
+    const id = resultRecord.id;
+    try {
+      const res = await fetch(`/api/meeting/records/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+
+      // Remove from local list
+      setRecords((prev) => prev.filter((r) => r.id !== id));
+      setResultRecord(null);
+      setPageState("input");
+    } catch {
+      setError("Не удалось удалить запись.");
+    }
+  }, [resultRecord?.id]);
+
+  // Reset to input state (new recording)
   const handleReset = useCallback(() => {
     recorder.reset();
     processing.reset();
@@ -169,7 +242,14 @@ export function MeetingPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [recorder, processing, audioUrl]);
 
-  // Current audio URL (from recorder or file)
+  // Back to list from viewing a record
+  const handleBackToInput = useCallback(() => {
+    setResultRecord(null);
+    setPageState("input");
+    setError(null);
+  }, []);
+
+  // Current audio URL (from recorder or file — only for current session)
   const currentAudioUrl = recorder.audioUrl ?? audioUrl;
 
   return (
@@ -182,52 +262,69 @@ export function MeetingPage() {
         </div>
       )}
 
+      {/* Loading overlay for record viewing */}
+      {viewingRecordLoading && (
+        <div className="flex flex-1 items-center justify-center">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
       {/* ===== INPUT STATE ===== */}
-      {pageState === "input" && recorder.state === "idle" && (
-        <div className="flex flex-1 flex-col items-center justify-center gap-8">
-          {/* Record button */}
-          <div className="flex flex-col items-center gap-4">
-            <button
-              type="button"
-              onClick={recorder.start}
-              disabled={!recorder.isSupported}
-              className="relative flex size-28 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"
-            >
-              <Mic className="size-10" />
-            </button>
-            <p className="text-sm text-muted-foreground">
-              Нажмите для записи
-            </p>
+      {pageState === "input" && recorder.state === "idle" && !viewingRecordLoading && (
+        <div className="flex flex-1 flex-col gap-8">
+          {/* New recording section */}
+          <div className="flex flex-col items-center gap-8 pt-8">
+            {/* Record button */}
+            <div className="flex flex-col items-center gap-4">
+              <button
+                type="button"
+                onClick={recorder.start}
+                disabled={!recorder.isSupported}
+                className="relative flex size-28 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"
+              >
+                <Mic className="size-10" />
+              </button>
+              <p className="text-sm text-muted-foreground">
+                Нажмите для записи
+              </p>
+            </div>
+
+            {/* Divider */}
+            <div className="flex w-full max-w-xs items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-xs text-muted-foreground">или</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+
+            {/* File upload */}
+            <div className="flex flex-col items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                className="gap-2"
+              >
+                <Upload className="size-4" />
+                Загрузить аудиофайл
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                MP3, M4A, WAV, WebM, OGG — до 200 МБ
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_AUDIO_TYPES}
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
           </div>
 
-          {/* Divider */}
-          <div className="flex w-full max-w-xs items-center gap-3">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">или</span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-
-          {/* File upload */}
-          <div className="flex flex-col items-center gap-3">
-            <Button
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              className="gap-2"
-            >
-              <Upload className="size-4" />
-              Загрузить аудиофайл
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              MP3, M4A, WAV, WebM, OGG — до 200 МБ
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPTED_AUDIO_TYPES}
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-          </div>
+          {/* Records list */}
+          {recordsLoaded && records.length > 0 && (
+            <div className="mt-4">
+              <MeetingList records={records} onSelect={handleSelectRecord} />
+            </div>
+          )}
         </div>
       )}
 
@@ -380,52 +477,42 @@ export function MeetingPage() {
               processing.startProcessing({
                 blobUrl,
                 summaryLevel,
-                durationSeconds: recorder.elapsed > 0 ? recorder.elapsed : audioDuration,
+                durationSeconds:
+                  recorder.elapsed > 0 ? recorder.elapsed : audioDuration,
               });
             }
           }}
         />
       )}
 
-      {/* ===== RESULT STATE ===== */}
-      {pageState === "result" && (
-        <div className="flex flex-1 flex-col gap-6">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="font-serif text-lg font-semibold">
-                {resultRecord?.title ?? "Документ готов"}
-              </h2>
-              {resultRecord && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {Math.round(resultRecord.durationSeconds / 60)} мин
-                  {resultRecord.speakerCount > 0 && ` \u00B7 ${resultRecord.speakerCount} спикер(ов)`}
-                  {` \u00B7 ${SUMMARY_OPTIONS.find((o) => o.value === resultRecord.summaryLevel)?.label ?? resultRecord.summaryLevel}`}
-                </p>
-              )}
-            </div>
-            <Button variant="outline" size="sm" onClick={handleReset} className="shrink-0 gap-2">
-              <RotateCcw className="size-3.5" />
-              Новая запись
-            </Button>
-          </div>
+      {/* ===== RESULT STATE (just processed) ===== */}
+      {pageState === "result" && resultRecord && (
+        <MeetingResult
+          title={resultRecord.title}
+          summary={resultRecord.summary}
+          durationSeconds={resultRecord.durationSeconds}
+          speakerCount={resultRecord.speakerCount}
+          summaryLevel={resultRecord.summaryLevel}
+          createdAt={resultRecord.createdAt}
+          audioUrl={currentAudioUrl}
+          onNewRecording={handleReset}
+          onDelete={resultRecord.id ? handleDeleteRecord : undefined}
+        />
+      )}
 
-          {/* Document content */}
-          {resultRecord?.summary ? (
-            <div className="rounded-xl border bg-background p-5">
-              <MarkdownViewer content={resultRecord.summary} className="text-sm" />
-            </div>
-          ) : (
-            <div className="flex flex-1 items-center justify-center">
-              <div className="text-center">
-                <CheckCircle2 className="mx-auto size-12 text-green-600" />
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Запись обработана и сохранена
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+      {/* ===== VIEWING STATE (loaded from history) ===== */}
+      {pageState === "viewing" && resultRecord && (
+        <MeetingResult
+          title={resultRecord.title}
+          summary={resultRecord.summary}
+          durationSeconds={resultRecord.durationSeconds}
+          speakerCount={resultRecord.speakerCount}
+          summaryLevel={resultRecord.summaryLevel}
+          createdAt={resultRecord.createdAt}
+          audioUrl={null}
+          onNewRecording={handleBackToInput}
+          onDelete={handleDeleteRecord}
+        />
       )}
     </div>
   );

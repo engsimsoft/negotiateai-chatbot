@@ -4462,3 +4462,25 @@ export async function deleteMeetingRecord({
     );
   }
 }
+
+/**
+ * Get meeting records count for a user
+ */
+export async function getMeetingRecordsCount({
+  userId,
+}: {
+  userId: string;
+}): Promise<number> {
+  try {
+    const [result] = await db
+      .select({ count: count(meetingRecord.id) })
+      .from(meetingRecord)
+      .where(eq(meetingRecord.userId, userId));
+    return result?.count ?? 0;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get meeting records count",
+    );
+  }
+}
