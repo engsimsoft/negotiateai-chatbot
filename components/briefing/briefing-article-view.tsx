@@ -22,6 +22,7 @@ import type {
   BriefingArticleSection,
   SavedBriefingTopicClient,
 } from "@/lib/briefing/briefing-types";
+import type { PipelineTraceSummary } from "@/lib/ai/pipeline-trace";
 
 interface BriefingArticleViewProps {
   article: BriefingArticle;
@@ -41,6 +42,8 @@ interface BriefingArticleViewProps {
   onRefreshSection?: (topicId: string) => Promise<void>;
   /** ТЗ-BF4: Currently refreshing topic id */
   refreshingTopicId?: string | null;
+  /** ТЗ-DEV2: Per-section refresh trace summaries (dev mode only) */
+  sectionTraces?: Record<string, PipelineTraceSummary>;
 }
 
 /**
@@ -59,6 +62,7 @@ export function BriefingArticleView({
   scrollRoot,
   onRefreshSection,
   refreshingTopicId,
+  sectionTraces,
 }: BriefingArticleViewProps) {
   const callbackRef = useRef(onActiveSectionChange);
   callbackRef.current = onActiveSectionChange;
@@ -141,6 +145,7 @@ export function BriefingArticleView({
               }}
               onRefresh={onRefreshSection ? () => onRefreshSection(section.topicId) : undefined}
               isRefreshing={refreshingTopicId === section.topicId}
+              traceSummary={sectionTraces?.[section.topicId]}
             />
           );
         })}
@@ -164,6 +169,7 @@ function ArticleSection({
   onToggleBookmark,
   onRefresh,
   isRefreshing,
+  traceSummary,
 }: {
   section: BriefingArticleSection;
   isSaved: boolean;
@@ -172,6 +178,8 @@ function ArticleSection({
   onRefresh?: () => void;
   /** ТЗ-BF4: Whether this section is currently refreshing */
   isRefreshing?: boolean;
+  /** ТЗ-DEV2: Trace summary after section refresh (dev mode only) */
+  traceSummary?: PipelineTraceSummary;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -254,6 +262,22 @@ function ArticleSection({
       {/* Collapsible sources */}
       {section.sources?.length > 0 && (
         <CollapsibleSources sources={section.sources} />
+      )}
+
+      {/* ТЗ-DEV2: Compact trace badge after section refresh (dev mode only) */}
+      {traceSummary && (
+        <div className="mt-3 border-t pt-2">
+          <span className="font-mono text-[11px] text-muted-foreground">
+            {traceSummary.totalTokens > 1000
+              ? `${(traceSummary.totalTokens / 1000).toFixed(1)}K tok`
+              : `${traceSummary.totalTokens} tok`}
+            {" · "}₽{traceSummary.totalCostRub.toFixed(2)}
+            {" · "}{(traceSummary.totalDurationMs / 1000).toFixed(1)}s
+            {traceSummary.errorCount > 0 && (
+              <span className="text-destructive"> · {traceSummary.errorCount} err</span>
+            )}
+          </span>
+        </div>
       )}
     </section>
   );

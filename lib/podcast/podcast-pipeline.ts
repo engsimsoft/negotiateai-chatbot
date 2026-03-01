@@ -12,6 +12,7 @@ import type {
 import type { BriefingArticle } from "@/lib/briefing/briefing-types";
 import {
   TraceCollector,
+  type PipelineTrace,
   type PipelineTraceSummary,
 } from "@/lib/ai/pipeline-trace";
 import {
@@ -27,6 +28,7 @@ export interface PodcastPipelineResult {
   failedCount: number;
   totalSections: number;
   traceSummary?: PipelineTraceSummary;
+  fullTrace?: PipelineTrace;
 }
 
 /**
@@ -216,8 +218,9 @@ export async function runPodcastPipeline({
 
   await updateBriefingAudio({ userId, audioStatus: finalStatus });
 
-  // ТЗ-DEV2: Emit final trace summary
+  // ТЗ-DEV2: Emit final trace summary + compute full trace for DB
   const traceSummary = trace.isEnabled ? trace.getSummary() : undefined;
+  const fullTrace = trace.isEnabled ? trace.getFullTrace() : undefined;
   if (traceSummary) {
     emitTrace({ traceSummary });
   }
@@ -239,5 +242,6 @@ export async function runPodcastPipeline({
     failedCount,
     totalSections: sections.length,
     traceSummary,
+    fullTrace,
   };
 }

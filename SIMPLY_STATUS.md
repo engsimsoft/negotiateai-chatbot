@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.57.0
-**Дата:** 2026-02-28
+**Версия:** 3.58.0
+**Дата:** 2026-03-01
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -371,6 +371,26 @@ components/projects/
 - `next.config.ts` — env mapping
 
 **ADR:** [029-developer-panel](docs/decisions/029-developer-panel.md)
+
+### ТЗ-DEV2: Pipeline Observability — ✅ ЗАВЕРШЁН (v3.58.0)
+
+**Выполнено:**
+- **Pipeline Trace System** — типы `PipelineTrace`, `PipelineStageTrace`, `FetchTrace`, `UrlVerificationTrace`. `TraceCollector` класс (gated by `isSimplyDevMode`)
+- **Полное инструментирование pipeline** — Briefing (fetchers, filter, author, URL verification), Podcast (script, TTS), Section Refresh, Research Engine
+- **Extended Pricing** — +5 моделей в `MODEL_PRICING_RUB` (Gemini, Perplexity, Claude fallback). TTS pricing
+- **Pipeline Trace Footer** — compact monospace line: live status при генерации, итог после завершения. Persistent footer из DB metadata
+- **Pipeline Trace Drawer** — Sheet с 5 секциями: Summary, Cost Breakdown, Stages, Fetches, Raw JSON
+- **DB persistence** — full trace saved to `briefingHistory.metadata` (jsonb), loaded on page reload
+- **Silent failures → warnings** — `.catch(() => {})` заменены на proper logging
+
+**Ключевые файлы:**
+- `lib/ai/pipeline-trace.ts` — типы + TraceCollector + helpers
+- `components/dev-panel/pipeline-trace-footer.tsx` — compact footer
+- `components/dev-panel/pipeline-trace-drawer.tsx` — full trace drawer (Summary, Cost Breakdown, Stages, Fetches, Raw)
+- `lib/briefing/briefing-pipeline.ts` — trace orchestration
+- `lib/podcast/podcast-pipeline.ts` — podcast trace
+
+**ADR:** [030-pipeline-observability](docs/decisions/030-pipeline-observability.md)
 
 ### ТЗ-TG5: ClosedGroups — ✅ ЗАВЕРШЁН (v3.56.0)
 

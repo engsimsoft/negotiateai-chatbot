@@ -156,11 +156,11 @@ async function generateAndDeliver(
           `[cron/briefing] User ${userId}: podcast ${podcastStatus}`,
         );
 
-        // ТЗ-DEV2: Merge podcast trace into briefing metadata
-        if (podcastResult.traceSummary) {
+        // ТЗ-DEV2: Merge full podcast trace into briefing metadata
+        if (podcastResult.fullTrace) {
           await updateBriefingMetadata({
             briefingId,
-            metadata: { podcastTrace: podcastResult.traceSummary },
+            metadata: { podcastTrace: podcastResult.fullTrace },
           }).catch((err) => {
             console.warn(`[cron/briefing] User ${userId}: failed to save podcast trace:`, err);
           });

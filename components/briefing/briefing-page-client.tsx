@@ -13,6 +13,7 @@ import { BriefingIssueContent } from "./briefing-issue-content";
 import { BriefingSidebarMobile } from "./briefing-sidebar";
 import { NoBriefingsYet, SimplyContentView } from "./briefing-article-view";
 import { PodcastButton } from "./podcast-button";
+import { PipelineTraceFooter } from "@/components/dev-panel";
 import { BriefingModeToggle } from "./briefing-mode-toggle";
 import type { BriefingViewMode } from "./briefing-mode-toggle";
 import type {
@@ -23,6 +24,7 @@ import type {
   AudioUrls,
   AudioDurations,
 } from "@/lib/briefing/briefing-types";
+import type { PipelineTrace, PipelineTraceSummary } from "@/lib/ai/pipeline-trace";
 import type { SimplyContentType } from "./briefing-sidebar";
 
 /** ТЗ-BF2: Simply content data passed from server */
@@ -50,6 +52,9 @@ interface BriefingPageClientProps {
   initialAudioStatus?: AudioStatus;
   initialAudioUrls?: AudioUrls;
   initialAudioDurations?: AudioDurations;
+  /** ТЗ-DEV2: Full traces from DB metadata (persistent across page loads) */
+  initialBriefingTrace?: PipelineTrace | null;
+  initialPodcastTrace?: PipelineTrace | null;
 }
 
 export function BriefingPageClient({
@@ -61,8 +66,10 @@ export function BriefingPageClient({
   initialAudioStatus = "none",
   initialAudioUrls = {},
   initialAudioDurations = {},
+  initialBriefingTrace,
+  initialPodcastTrace,
 }: BriefingPageClientProps) {
-  const { steps, isGenerating, error, redirectUrl, startGeneration } =
+  const { steps, isGenerating, error, redirectUrl, startGeneration, traceStages, traceSummary } =
     useBriefingGeneration();
 
   // ТЗ-BF4: Article state (lifted from prop for per-section refresh mutation)
@@ -122,6 +129,9 @@ export function BriefingPageClient({
 
   // ТЗ-BF4: Per-section refresh state
   const [refreshingTopicId, setRefreshingTopicId] = useState<string | null>(null);
+
+  // ТЗ-DEV2: Per-section refresh trace (dev mode only)
+  const [sectionTraces, setSectionTraces] = useState<Record<string, PipelineTraceSummary>>({});
 
   // ТЗ-BF1: Saved topics state (lifted from BriefingIssueContent for sidebar sharing)
   const [savedTopics, setSavedTopics] =
@@ -218,7 +228,14 @@ export function BriefingPageClient({
 
         if (!res.ok) throw new Error("Failed to refresh");
 
-        const updatedSection: BriefingArticleSection = await res.json();
+        const data = await res.json();
+
+        // ТЗ-DEV2: Extract trace from dev mode response
+        const { _trace, ...updatedSection } = data as BriefingArticleSection & { _trace?: PipelineTraceSummary };
+
+        if (_trace) {
+          setSectionTraces((prev) => ({ ...prev, [topicId]: _trace }));
+        }
 
         setArticle((prev) => {
           if (!prev) return prev;
@@ -325,6 +342,8 @@ export function BriefingPageClient({
           isGenerating={isGenerating}
           error={error}
           onRetry={startGeneration}
+          traceStages={traceStages}
+          traceSummary={traceSummary}
         />
       </div>
     );
@@ -376,6 +395,7 @@ export function BriefingPageClient({
           simplyNewsUnread={simplyNewsUnread}
           onRefreshSection={handleRefreshSection}
           refreshingTopicId={refreshingTopicId}
+          sectionTraces={sectionTraces}
           audioStatus={audioStatus}
           viewMode={viewMode}
           playerProps={hasAudio ? {
@@ -411,6 +431,8 @@ export function BriefingPageClient({
             failedCount: podcast.failedCount,
             onRetry: () => handleStartPodcast(),
             onDismiss: handleDismissPodcastProgress,
+            traceStages: podcast.traceStages,
+            traceSummary: podcast.traceSummary,
           } : undefined}
         />
       ) : (
@@ -453,6 +475,22 @@ export function BriefingPageClient({
             </>
           )}
         </main>
+      )}
+
+      {/* ТЗ-DEV2: Persistent trace footer — loaded from DB metadata, survives page reload */}
+      {initialBriefingTrace && (
+        <div className="shrink-0 border-t px-3 py-1">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[10px] text-muted-foreground/50">Briefing</span>
+            <PipelineTraceFooter stages={initialBriefingTrace.stages} summary={initialBriefingTrace.summary} isGenerating={false} />
+            {initialPodcastTrace && (
+              <>
+                <span className="font-mono text-[10px] text-muted-foreground/50">Podcast</span>
+                <PipelineTraceFooter stages={initialPodcastTrace.stages} summary={initialPodcastTrace.summary} isGenerating={false} />
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -12,6 +12,43 @@
 
 ---
 
+## [3.58.0] - 2026-03-01 - PipelineObservability
+
+**ТЗ-DEV2**: Pipeline Observability — полная трассировка AI-pipeline (briefing, podcast, section refresh). Разработчик видит каждый AI-вызов, каждый fetch, каждую ошибку, верификацию URL, стоимость — в реальном времени при генерации и в сохранённой записи.
+
+### Added
+- **Pipeline Trace System** (`lib/ai/pipeline-trace.ts`): типы `PipelineTrace`, `PipelineStageTrace`, `FetchTrace`, `UrlVerificationTrace`. `TraceCollector` класс (accumulator, gated by `isSimplyDevMode`). Helpers: `buildAiCallTrace()`, `buildTtsTrace()`, `verifyArticleUrls()`
+- **Extended Pricing** (`lib/ai/providers.ts`): +5 моделей в `MODEL_PRICING_RUB` (Gemini 2.0 Flash, Gemini 2.5 Flash, Perplexity Sonar Pro, Claude Sonnet 4.5 fallback). `calculateTtsCostRub()` для Podcast TTS
+- **Pipeline Trace Footer** (`components/dev-panel/pipeline-trace-footer.tsx`): compact monospace line — live status при генерации (stages, tokens, cost, elapsed timer), итог после завершения (status icon, tokens, cost, duration, URL verification, errors). Opens drawer on click
+- **Pipeline Trace Drawer** (`components/dev-panel/pipeline-trace-drawer.tsx`): Sheet (right, 440px) — Summary, Cost Breakdown (per-stage cost bars with %), Stages (per-stage AI details), Fetches (URL/method/duration/items), Raw JSON
+- **Briefing History metadata** (`lib/db/schema.ts`): +metadata jsonb column. Migration `0043_briefing-history-metadata.sql`
+- **Full trace persistence**: briefing + podcast traces saved to DB metadata (full `PipelineTrace` with stages, not just summary). Loaded in server component, rendered as persistent footer after page reload
+
+### Changed
+- **Briefing Pipeline** (`lib/briefing/briefing-pipeline.ts`): full trace instrumentation — every fetch (RSS, Telegram, Web) records `FetchTrace`, filter/author AI calls record usage/timing/cost, `verifyArticleUrls()` after generation, trace emitted as NDJSON events in dev mode, full trace saved to DB metadata
+- **Podcast Pipeline** (`lib/podcast/podcast-pipeline.ts`): per-topic script + TTS traces, full trace returned in result and saved to DB
+- **Source Fetchers**: `rss-fetcher.ts` (FetchTrace, per-entry catch), `telegram-fetcher.ts` (FetchTrace, silent catch → warnings), `web-fetcher.ts` (FetchTrace, publishedAt warning)
+- **Briefing Filter** (`briefing-filter.ts`): full usage capture, timing, sourceItemId/URL/topicId validation
+- **Briefing Author** (`briefing-author.ts`): full usage, timing, retry/fallback trace
+- **Section Author** (`briefing-section-author.ts`): usage, timing, costRub
+- **Script Generator** (`lib/podcast/script-generator.ts`): usage capture (was ignored), timing, retry trace
+- **TTS Gemini** (`lib/podcast/tts-gemini.ts`): timing, audio duration metrics
+- **Research Engine** (`lib/briefing/research-engine.ts`): per-topic `PipelineStageTrace` with Perplexity/fetchPage/Telegram traces
+- **Perplexity Client** (`lib/ai/tools/perplexity-client.ts`): full usage capture (prompt + completion tokens)
+- **Cron** (`app/api/cron/briefing/route.ts`): saves full pipeline trace to metadata
+- **Client hooks**: `use-briefing-generation.ts` and `use-podcast-generation.ts` parse trace events from NDJSON stream (dev mode)
+- **Component tree**: trace threading through `briefing-page-client.tsx` → `briefing-issue-content.tsx` → `briefing-article-view.tsx` (section refresh badge) + `briefing-generation-progress.tsx` + `podcast-progress.tsx`
+- **Server component** (`app/(dashboard)/briefing/page.tsx`): loads trace from DB metadata with backwards-compatible normalization (old summary format → PipelineTrace shape)
+
+### Fixed
+- **Silent failures replaced with warnings**: `.catch(() => {})` on DB save → proper error logging. `catch {}` in telegram-fetcher → warnings array. Per-entry catch in RSS fetcher
+
+### Technical
+- **ADR 030**: [Pipeline Observability](docs/decisions/030-pipeline-observability.md)
+- Migration: `0043_briefing-history-metadata.sql`
+
+---
+
 ## [3.57.0] - 2026-02-28 - DeveloperPanel
 
 **ТЗ-DEV1**: Developer Panel — встроенная панель отладки AI-ответов. Под каждым ответом ассистента (в dev mode) отображается компактная строка с метриками, клик открывает drawer с полными деталями. Старый DEV mode (inline prefix в тексте) полностью удалён.

@@ -11,6 +11,10 @@ import { PodcastProgress } from "./podcast-progress";
 import { PodcastPlayer } from "./podcast-player";
 import type { SimplyContentType } from "./briefing-sidebar";
 import type { PodcastTopicStatus } from "@/hooks/use-podcast-generation";
+import type {
+  PipelineStageTrace,
+  PipelineTraceSummary,
+} from "@/lib/ai/pipeline-trace";
 import type { BriefingViewMode } from "./briefing-mode-toggle";
 import type {
   BriefingArticle,
@@ -55,6 +59,8 @@ interface BriefingIssueContentProps {
   onRefreshSection?: (topicId: string) => Promise<void>;
   /** ТЗ-BF4: Currently refreshing topic id */
   refreshingTopicId?: string | null;
+  /** ТЗ-DEV2: Per-section refresh trace summaries (dev mode only) */
+  sectionTraces?: Record<string, PipelineTraceSummary>;
   /** ТЗ-Б2: Current audio/podcast status */
   audioStatus?: AudioStatus;
   /** ТЗ-Б2 Этап 3: Current view mode (read article / listen to podcast) */
@@ -81,6 +87,8 @@ interface BriefingIssueContentProps {
     failedCount: number;
     onRetry: () => void;
     onDismiss: () => void;
+    traceStages?: PipelineStageTrace[];
+    traceSummary?: PipelineTraceSummary | null;
   };
 }
 
@@ -108,6 +116,7 @@ export function BriefingIssueContent({
   simplyNewsUnread,
   onRefreshSection,
   refreshingTopicId,
+  sectionTraces,
   audioStatus,
   viewMode,
   playerProps,
@@ -186,6 +195,7 @@ export function BriefingIssueContent({
             scrollRoot={mainRef}
             onRefreshSection={onRefreshSection}
             refreshingTopicId={refreshingTopicId}
+            sectionTraces={sectionTraces}
           />
         )}
       </main>

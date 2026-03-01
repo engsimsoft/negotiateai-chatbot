@@ -11,6 +11,7 @@ import { getSimplyNewsData, getSimplyOverviewContent } from "@/lib/briefing/simp
 import { BriefingPage } from "@/components/briefing/briefing-page";
 import { BriefingPageClient, type SimplyData } from "@/components/briefing/briefing-page-client";
 import type { BriefingArticle, SavedBriefingTopicClient, AudioStatus, AudioUrls, AudioDurations } from "@/lib/briefing/briefing-types";
+import type { PipelineTrace } from "@/lib/ai/pipeline-trace";
 
 export default async function BriefingRoute() {
   const session = await auth();
@@ -71,6 +72,23 @@ export default async function BriefingRoute() {
   const audioUrls = (latestBriefing?.audioUrls as AudioUrls) ?? {};
   const audioDurations = (latestBriefing?.audioDurations as AudioDurations) ?? {};
 
+  // ТЗ-DEV2: Extract full trace metadata for persistent dev panel
+  // Backwards-compatible: old records have PipelineTraceSummary, new have PipelineTrace (with .stages)
+  const metadata = latestBriefing?.metadata as Record<string, unknown> | null;
+  const rawBriefingTrace = metadata?.briefingTrace as (PipelineTrace | Record<string, unknown>) | undefined;
+  const rawPodcastTrace = metadata?.podcastTrace as (PipelineTrace | Record<string, unknown>) | undefined;
+  // Normalize: if old format (no .stages), wrap summary into PipelineTrace shape
+  const briefingTrace: PipelineTrace | null = rawBriefingTrace
+    ? "stages" in rawBriefingTrace && Array.isArray(rawBriefingTrace.stages)
+      ? rawBriefingTrace as PipelineTrace
+      : { traceId: "", pipeline: "briefing", startedAt: "", stages: [], summary: rawBriefingTrace as unknown as PipelineTrace["summary"] }
+    : null;
+  const podcastTrace: PipelineTrace | null = rawPodcastTrace
+    ? "stages" in rawPodcastTrace && Array.isArray(rawPodcastTrace.stages)
+      ? rawPodcastTrace as PipelineTrace
+      : { traceId: "", pipeline: "podcast", startedAt: "", stages: [], summary: rawPodcastTrace as unknown as PipelineTrace["summary"] }
+    : null;
+
   // ТЗ-BF1: serialize saved topics for client (Date → ISO string)
   const savedTopics: SavedBriefingTopicClient[] = savedTopicsRaw.map((t) => ({
     id: t.id,
@@ -95,6 +113,8 @@ export default async function BriefingRoute() {
       initialAudioStatus={audioStatus}
       initialAudioUrls={audioUrls}
       initialAudioDurations={audioDurations}
+      initialBriefingTrace={briefingTrace}
+      initialPodcastTrace={podcastTrace}
     />
   );
 }

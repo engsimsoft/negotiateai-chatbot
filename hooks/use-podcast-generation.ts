@@ -1,9 +1,15 @@
-// ТЗ-Б2: Hook for podcast generation with streaming progress
+// ТЗ-Б2 + ТЗ-DEV2: Hook for podcast generation with streaming progress + trace
 
 "use client";
 
 import { useState, useCallback, useRef } from "react";
 import type { PodcastProgressEvent, AudioUrls, AudioDurations } from "@/lib/podcast/types";
+import type {
+  PipelineStageTrace,
+  PipelineTraceSummary,
+} from "@/lib/ai/pipeline-trace";
+
+const IS_DEV_MODE = process.env.NEXT_PUBLIC_SIMPLY_DEV_MODE === "true";
 
 /** Per-topic generation status */
 export interface PodcastTopicStatus {
@@ -27,6 +33,10 @@ interface UsePodcastGenerationReturn {
   /** Start generation for given topicIds (empty = all) */
   startGeneration: (topicIds?: string[]) => void;
   reset: () => void;
+  /** ТЗ-DEV2: Accumulated stage traces (dev mode only) */
+  traceStages: PipelineStageTrace[];
+  /** ТЗ-DEV2: Final trace summary (dev mode only) */
+  traceSummary: PipelineTraceSummary | null;
 }
 
 export function usePodcastGeneration(
@@ -49,6 +59,10 @@ export function usePodcastGeneration(
     durations: {},
   });
 
+  // ТЗ-DEV2: Trace state (dev mode only)
+  const [traceStages, setTraceStages] = useState<PipelineStageTrace[]>([]);
+  const [traceSummary, setTraceSummary] = useState<PipelineTraceSummary | null>(null);
+
   const startGeneration = useCallback(
     (topicIds?: string[]) => {
       if (isGenerating) return;
@@ -68,6 +82,8 @@ export function usePodcastGeneration(
       setFailedCount(0);
       setIsGenerating(true);
       resultsRef.current = { urls: {}, durations: {} };
+      setTraceStages([]);
+      setTraceSummary(null);
 
       // Abort previous request
       abortRef.current?.abort();
@@ -103,7 +119,19 @@ export function usePodcastGeneration(
               if (!line.trim()) continue;
 
               try {
-                const event: PodcastProgressEvent = JSON.parse(line);
+                const parsed = JSON.parse(line);
+
+                // ТЗ-DEV2: Handle trace events (dev mode only)
+                if (IS_DEV_MODE && parsed.trace && !parsed.step) {
+                  setTraceStages((prev) => [...prev, parsed.trace as PipelineStageTrace]);
+                  continue;
+                }
+                if (IS_DEV_MODE && parsed.traceSummary && !parsed.step) {
+                  setTraceSummary(parsed.traceSummary as PipelineTraceSummary);
+                  continue;
+                }
+
+                const event = parsed as PodcastProgressEvent;
 
                 if (event.step === "error" && !event.topicId) {
                   // Global error — stop
@@ -178,6 +206,8 @@ export function usePodcastGeneration(
     setCompletionMessage(null);
     setReadyCount(0);
     setFailedCount(0);
+    setTraceStages([]);
+    setTraceSummary(null);
   }, []);
 
   return {
@@ -189,5 +219,7 @@ export function usePodcastGeneration(
     failedCount,
     startGeneration,
     reset,
+    traceStages,
+    traceSummary,
   };
 }

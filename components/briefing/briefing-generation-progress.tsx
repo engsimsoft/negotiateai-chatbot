@@ -1,4 +1,4 @@
-// ТЗ-А5: Briefing generation progress — shows live pipeline steps
+// ТЗ-А5 + ТЗ-DEV2: Briefing generation progress — shows live pipeline steps + trace footer
 
 "use client";
 
@@ -6,6 +6,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BriefingGenerationStep } from "@/hooks/use-briefing-generation";
+import type {
+  PipelineStageTrace,
+  PipelineTraceSummary,
+} from "@/lib/ai/pipeline-trace";
+import { PipelineTraceFooter } from "@/components/dev-panel/pipeline-trace-footer";
 
 const STEP_ICONS: Record<string, string> = {
   connecting: "\u{1F4E1}", // 📡
@@ -21,6 +26,10 @@ interface BriefingGenerationProgressProps {
   isGenerating: boolean;
   error: string | null;
   onRetry: () => void;
+  /** ТЗ-DEV2: Pipeline trace stages (dev mode only) */
+  traceStages?: PipelineStageTrace[];
+  /** ТЗ-DEV2: Pipeline trace summary (dev mode only) */
+  traceSummary?: PipelineTraceSummary | null;
 }
 
 export function BriefingGenerationProgress({
@@ -28,6 +37,8 @@ export function BriefingGenerationProgress({
   isGenerating,
   error,
   onRetry,
+  traceStages,
+  traceSummary,
 }: BriefingGenerationProgressProps) {
   return (
     <div className="flex flex-1 items-center justify-center p-4">
@@ -88,6 +99,15 @@ export function BriefingGenerationProgress({
               Попробовать снова
             </Button>
           </motion.div>
+        )}
+
+        {/* ТЗ-DEV2: Pipeline trace footer (dev mode only) */}
+        {traceStages && (
+          <PipelineTraceFooter
+            stages={traceStages}
+            summary={traceSummary ?? null}
+            isGenerating={isGenerating}
+          />
         )}
       </div>
     </div>

@@ -1,5 +1,26 @@
 # Changelog ТЗ-DEV2: Pipeline Observability
 
+## [Этап 5] — 2026-03-01
+
+### Создано
+- `components/dev-panel/pipeline-trace-footer.tsx` — compact monospace footer: live status during generation, final summary (tokens, cost, duration, URL verification, errors). Opens drawer on click. Gated by `IS_DEV_MODE`
+- `components/dev-panel/pipeline-trace-drawer.tsx` — Sheet (right, 440px): Summary, Stages (per-stage AI call details), Fetches (URL/method/duration/items), Raw JSON. Radix Collapsible sections
+
+### Изменено
+- `hooks/use-briefing-generation.ts` — parse `{trace:...}` and `{traceSummary:...}` from NDJSON stream (dev mode), return `traceStages` + `traceSummary`
+- `hooks/use-podcast-generation.ts` — same trace parsing pattern
+- `components/dev-panel/index.ts` — +exports: PipelineTraceFooter, PipelineTraceDrawer
+- `components/briefing/briefing-generation-progress.tsx` — +trace props, renders PipelineTraceFooter
+- `components/briefing/podcast-progress.tsx` — +trace props, renders PipelineTraceFooter
+- `components/briefing/briefing-page-client.tsx` — thread traceStages/traceSummary to progress components, capture `_trace` from section refresh response, store per-section traces
+- `components/briefing/briefing-issue-content.tsx` — +traceStages/traceSummary in podcastProgress type, +sectionTraces prop
+- `components/briefing/briefing-article-view.tsx` — +sectionTraces prop, compact trace badge after section refresh (tokens · cost · duration)
+- `app/(dashboard)/briefing/setup/briefing-setup-client.tsx` — pass trace props to BriefingGenerationProgress
+
+### Валидация
+- `npx tsc --noEmit` — 0 ошибок
+- `npm run build` — успешен
+
 ## [Этап 4] — 2026-03-01
 
 ### Создано

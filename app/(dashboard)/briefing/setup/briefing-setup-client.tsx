@@ -310,6 +310,8 @@ export function BriefingSetupClient({
             isGenerating={generation.isGenerating}
             error={generation.error}
             onRetry={generation.startGeneration}
+            traceStages={generation.traceStages}
+            traceSummary={generation.traceSummary}
           />
         </div>
       );

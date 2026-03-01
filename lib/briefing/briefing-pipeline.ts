@@ -164,6 +164,7 @@ export async function runBriefingPipeline({
 
     if (allItems.length === 0) {
       const failTraceSummary = trace.isEnabled ? trace.getSummary() : undefined;
+      const failFullTrace = trace.isEnabled ? trace.getFullTrace() : undefined;
       await saveBriefingHistory({
         userId,
         briefingJson: {
@@ -173,7 +174,7 @@ export async function runBriefingPipeline({
         sourcesChecked: sourcesToFetch.length,
         itemsIncluded: 0,
         status: "failed",
-        metadata: failTraceSummary ? { briefingTrace: failTraceSummary } : undefined,
+        metadata: failFullTrace ? { briefingTrace: failFullTrace } : undefined,
       });
 
       emit({
@@ -311,10 +312,11 @@ export async function runBriefingPipeline({
       detail: `${article.meta.topicsCount} тем, ${article.meta.totalNews} новостей`,
     });
 
-    // ТЗ-DEV2: Compute trace summary BEFORE save → store as metadata
+    // ТЗ-DEV2: Compute full trace BEFORE save → store as metadata (stages + summary + urlVerification)
     const traceSummary = trace.isEnabled ? trace.getSummary() : undefined;
+    const fullTrace = trace.isEnabled ? trace.getFullTrace() : undefined;
 
-    // Save final result (with trace metadata if dev mode)
+    // Save final result (with full trace metadata if dev mode)
     await saveBriefingHistory({
       userId,
       briefingJson: article,
@@ -323,7 +325,7 @@ export async function runBriefingPipeline({
       duplicatesRemoved,
       tokensUsed: totalTokens,
       status: "ready",
-      metadata: traceSummary ? { briefingTrace: traceSummary } : undefined,
+      metadata: fullTrace ? { briefingTrace: fullTrace } : undefined,
     });
 
     // ТЗ-DEV2: Emit final trace summary (streaming to browser)

@@ -1,7 +1,7 @@
 # Handoff ТЗ-DEV2: Pipeline Observability
 
 **Последнее обновление:** 2026-03-01
-**Текущий этап:** Этап 4 завершён ✅ → Этап 5 следующий
+**Текущий этап:** Этап 6 завершён ✅ — ожидает мануальный тест + перенос в архив
 
 ---
 
@@ -9,43 +9,48 @@
 
 - [x] Фаза 1: Анализ (SPEC.md, ANALYSIS.md)
 - [x] Фаза 2: Планирование (ROADMAP.md, CHANGELOG.md, HANDOFF.md)
-- [ ] Фаза 3: Разработка (6 этапов)
+- [x] Фаза 3: Разработка (6 этапов)
   - [x] **Этап 1:** Типы + Pricing + Trace Collector
   - [x] **Этап 2:** Инструментирование Briefing Pipeline (backend)
   - [x] **Этап 3:** Podcast + Research + Section Refresh
   - [x] **Этап 4:** Cron trace + DB metadata
-  - [ ] **Этап 5:** UI — Trace Footer + Drawer ← СЛЕДУЮЩИЙ
-  - [ ] Этап 6: Финализация
-- [ ] Фаза 4: Финализация
+  - [x] **Этап 5:** UI — Trace Footer + Drawer + persistent trace
+  - [x] **Этап 6:** Финализация (CHANGELOG, SIMPLY_STATUS, CLAUDE.md, ADR 030, docs, v3.58.0)
+- [ ] Фаза 4: Мануальный тест + архив
 
 ---
 
-## Что сделано в Этапе 4
+## Что сделано в Этапе 5
 
-### Изменённые файлы (5 файлов + 1 миграция)
+### Изменённые файлы (11 файлов, 2 новых)
 
-**Schema + Migration:**
-- `lib/db/schema.ts` — +`metadata: jsonb("metadata")` column to `briefingHistory` table
-- `lib/db/migrations/0043_briefing-history-metadata.sql` — **новый** ALTER TABLE ADD COLUMN
+**Новые компоненты:**
+- `components/dev-panel/pipeline-trace-footer.tsx` — compact monospace footer: live status during generation (stages count, tokens, cost, elapsed timer), final summary after completion (status icon, tokens, cost, duration, URL verification, errors). Opens PipelineTraceDrawer on click. Gated by `IS_DEV_MODE`.
+- `components/dev-panel/pipeline-trace-drawer.tsx` — Sheet (right, 440px): Summary (KV pairs), Stages (per-stage AI call details), Fetches (URL/method/duration/items), Raw JSON. Uses Radix Collapsible.
 
-**Queries:**
-- `lib/db/queries.ts` — `saveBriefingHistory()` now accepts optional `metadata: Record<string, unknown>` param, saved as jsonb. New `updateBriefingMetadata()` function for merging additional metadata (e.g. podcast trace) into existing record.
+**Client-side trace parsing (hooks):**
+- `hooks/use-briefing-generation.ts` — parse `{trace:...}` and `{traceSummary:...}` from NDJSON stream (dev mode gate), return `traceStages` + `traceSummary`
+- `hooks/use-podcast-generation.ts` — same pattern
 
-**Pipeline → DB trace flow:**
-- `lib/briefing/briefing-pipeline.ts` — traceSummary computed BEFORE final `saveBriefingHistory()` call, passed as `metadata: { briefingTrace: traceSummary }`. Both success and failure paths save trace metadata.
-- `app/api/cron/briefing/route.ts` — after podcast pipeline completes, calls `updateBriefingMetadata({ briefingId, metadata: { podcastTrace: traceSummary } })` to merge podcast trace into existing briefing metadata. Non-blocking `.catch()` so podcast trace failure doesn't break delivery.
+**Integration (component tree threading):**
+- `components/dev-panel/index.ts` — +PipelineTraceFooter, +PipelineTraceDrawer exports
+- `components/briefing/briefing-generation-progress.tsx` — +trace props, renders `<PipelineTraceFooter>` at bottom
+- `components/briefing/podcast-progress.tsx` — +trace props, renders `<PipelineTraceFooter>` after actions
+- `components/briefing/briefing-page-client.tsx` — thread trace props to all consumers: BriefingGenerationProgress, podcastProgress object. Capture `_trace` from section refresh API response, store per-section traces in state.
+- `components/briefing/briefing-issue-content.tsx` — +traceStages/traceSummary in podcastProgress type, +sectionTraces prop, thread to BriefingArticleView
+- `components/briefing/briefing-article-view.tsx` — +sectionTraces prop, compact trace badge after section refresh (tokens · cost · duration · errors)
+- `app/(dashboard)/briefing/setup/briefing-setup-client.tsx` — pass generation.traceStages/traceSummary to BriefingGenerationProgress
 
-### Ключевые решения Этапа 4
-1. **Separate column vs briefingJson** — metadata is a separate `jsonb` column, not embedded in `briefingJson`. Clean separation: content vs diagnostics.
-2. **Merge pattern** — `updateBriefingMetadata` reads existing metadata, spreads new data on top. Supports cron flow: briefing trace saved first → podcast trace merged after.
-3. **Non-blocking podcast trace** — `.catch()` on `updateBriefingMetadata` in cron. Podcast trace is nice-to-have, must not block Telegram delivery.
-4. **Guard: isSimplyDevMode** — TraceCollector is no-op when dev mode is off. In production, `trace.getSummary()` returns minimal data (pipeline name only), so metadata will be very small.
+### Ключевые решения Этапа 5
+1. **IS_DEV_MODE gate on client** — `NEXT_PUBLIC_SIMPLY_DEV_MODE` checked in hooks (skip trace parsing) and components (skip rendering). Zero overhead in production.
+2. **Same NDJSON transport** — trace events (`{trace:...}`, `{traceSummary:...}`) interleaved with progress events. No separate channel needed.
+3. **Section refresh badge** — trace stored in `Record<string, PipelineTraceSummary>` keyed by topicId. Badge only shows after refresh and only in dev mode.
+4. **Reusable footer/drawer pattern** — PipelineTraceFooter + PipelineTraceDrawer work for both briefing and podcast generation with same props interface.
 
 ### Валидация
 - `npx tsc --noEmit` — 0 ошибок ✅
 - `npm run build` — успешен ✅
-- SQL: `metadata` column exists, currently `null` for existing records ✅
-- **Ожидает мануальный тест:** генерация брифинга → `SELECT metadata` shows trace data
+- **Ожидает мануальный тест:** генерация брифинга → footer с live trace → drawer с полной информацией
 
 ---
 
@@ -60,23 +65,20 @@
 
 ---
 
-## Следующий: Этап 5 — UI — Trace Footer + Drawer
+## Следующий: Этап 6 — Финализация
 
-**Перед началом:** Прочитать ROADMAP.md (Этап 5), затем эти файлы:
+**Перед началом:** Прочитать ROADMAP.md (Этап 6) и DOCUMENTATION_GUIDE.md
 
-### Файлы для изменения
-1. `hooks/use-briefing-generation.ts` — parse `{trace:...}` и `{traceSummary:...}` events из NDJSON
-2. `hooks/use-podcast-generation.ts` — аналогично
-3. `components/dev-panel/pipeline-trace-footer.tsx` — **новый** (compact monospace line)
-4. `components/dev-panel/pipeline-trace-drawer.tsx` — **новый** (Sheet с полной трассировкой)
-5. `components/briefing/briefing-generation-progress.tsx` — footer slot
-6. `components/briefing/podcast-progress.tsx` — footer slot
-7. `components/briefing/briefing-article-view.tsx` — refresh badge (dev mode)
-
-### Reference файлы
-- `lib/ai/pipeline-trace.ts` — типы PipelineTraceSummary
-- `components/dev-panel/dev-panel-footer.tsx` — аналог для chat (паттерн)
-- `components/dev-panel/dev-panel-drawer.tsx` — аналог для chat (паттерн)
+### Задачи
+1. Обновить главный CHANGELOG.md
+2. Обновить SIMPLY_STATUS.md
+3. Обновить CLAUDE.md (новые файлы: pipeline-trace-footer/drawer)
+4. Обновить package.json: 3.57.0 → 3.58.0
+5. ADR: `docs/decisions/030-pipeline-observability.md`
+6. Обновить docs/architecture.md, docs/ai-providers.md
+7. SQL-проверка: metadata в BriefingHistory
+8. Финальный мануальный тест
+9. Переместить specs в `_archive/`
 
 ---
 

@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 6 |
-| Текущий этап | 4 |
+| Текущий этап | 6 (Финализация) |
 | Сессий (оценка) | 3-5 |
 
 ---
@@ -192,40 +192,44 @@ git commit -m "feat(tz-dev2): cron trace summary → briefingHistory metadata"
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** Разработчик видит трассировку в UI при генерации брифинга и подкаста.
 
 **Задачи:**
 
 **Client-side trace parsing:**
-- [ ] `hooks/use-briefing-generation.ts` — при dev mode: парсить `{trace:...}` и `{traceSummary:...}` events из NDJSON stream, накапливать в state
-- [ ] `hooks/use-podcast-generation.ts` — аналогично
+- [x] `hooks/use-briefing-generation.ts` — при dev mode: парсить `{trace:...}` и `{traceSummary:...}` events из NDJSON stream, накапливать в state
+- [x] `hooks/use-podcast-generation.ts` — аналогично
 
 **Trace Footer (compact monospace line):**
-- [ ] Создать `components/dev-panel/pipeline-trace-footer.tsx` — аналог DevPanelFooter: live status при генерации (`Fetching... 3/8 · 2.3s`), итог после завершения (`✓ 20.6K tok · ₽2.48 · 34s · URLs: 15✓ 2✗`), красный при ошибках
-- [ ] Интегрировать в `components/briefing/briefing-generation-progress.tsx` — slot под прогрессом
-- [ ] Интегрировать в `components/briefing/podcast-progress.tsx` — slot под прогрессом
+- [x] Создать `components/dev-panel/pipeline-trace-footer.tsx` — аналог DevPanelFooter: live status при генерации (`Fetching... 3/8 · 2.3s`), итог после завершения (`✓ 20.6K tok · ₽2.48 · 34s · URLs: 15✓ 2✗`), красный при ошибках
+- [x] Интегрировать в `components/briefing/briefing-generation-progress.tsx` — slot под прогрессом
+- [x] Интегрировать в `components/briefing/podcast-progress.tsx` — slot под прогрессом
 
 **Trace Drawer (Sheet с полной трассировкой):**
-- [ ] Создать `components/dev-panel/pipeline-trace-drawer.tsx` — Sheet справа (как DevPanelDrawer), секции: Summary, Fetch Details, Filter Details, Author Details, URL Verification, Errors & Warnings, Raw JSON
-- [ ] Открывается по клику на trace footer
+- [x] Создать `components/dev-panel/pipeline-trace-drawer.tsx` — Sheet справа (как DevPanelDrawer), секции: Summary, Fetch Details, Filter Details, Author Details, URL Verification, Errors & Warnings, Raw JSON
+- [x] Открывается по клику на trace footer
 
 **Section refresh badge:**
-- [ ] `components/briefing/briefing-article-view.tsx` — после refresh: компактный бейдж `Sonnet · 2.1K tok · ₽0.84 · 3.2s` (при dev mode)
+- [x] `components/briefing/briefing-article-view.tsx` — после refresh: компактный бейдж `Sonnet · 2.1K tok · ₽0.84 · 3.2s` (при dev mode)
 
 **Файлы:**
 - `hooks/use-briefing-generation.ts` — trace parsing
 - `hooks/use-podcast-generation.ts` — trace parsing
 - `components/dev-panel/pipeline-trace-footer.tsx` — **новый**
 - `components/dev-panel/pipeline-trace-drawer.tsx` — **новый**
+- `components/dev-panel/index.ts` — exports
 - `components/briefing/briefing-generation-progress.tsx` — footer slot
 - `components/briefing/podcast-progress.tsx` — footer slot
-- `components/briefing/briefing-article-view.tsx` — refresh badge
+- `components/briefing/briefing-article-view.tsx` — refresh badge + trace prop
+- `components/briefing/briefing-page-client.tsx` — trace threading (briefing, podcast, section refresh)
+- `components/briefing/briefing-issue-content.tsx` — podcastProgress type + sectionTraces prop
+- `app/(dashboard)/briefing/setup/briefing-setup-client.tsx` — trace props to progress
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Dev mode: генерация брифинга → footer обновляется в реальном времени, по клику drawer с полной информацией
 - [ ] Dev mode: URL verification таблица показывает verified/fabricated ссылки
 - [ ] Production mode: footer и drawer не рендерятся, trace events не парсятся
@@ -245,37 +249,37 @@ git commit -m "feat(tz-dev2): pipeline trace UI — footer, drawer, URL verifica
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 5
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 ⛔ **ПЕРВЫМ ДЕЛОМ:** Прочитать [DOCUMENTATION_GUIDE.md](../../DOCUMENTATION_GUIDE.md) — пройти чеклист.
 
 **Документация (обязательная):**
-- [ ] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "✅ Чек-лист при изменениях"
-- [ ] Обновить главный CHANGELOG.md
-- [ ] Обновить SIMPLY_STATUS.md
-- [ ] Обновить CLAUDE.md (новые файлы: pipeline-trace.ts, pipeline-trace-footer/drawer, расширенный pricing)
-- [ ] Обновить package.json: 3.57.0 → 3.58.0
+- [x] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "✅ Чек-лист при изменениях"
+- [x] Обновить главный CHANGELOG.md
+- [x] Обновить SIMPLY_STATUS.md
+- [x] Обновить CLAUDE.md (новые файлы: pipeline-trace.ts, pipeline-trace-footer/drawer, расширенный pricing)
+- [x] Обновить package.json: 3.57.0 → 3.58.0
 
 **Документация (по чеклисту — оценить каждый пункт):**
-- [ ] ADR нужен? → **Да:** `docs/decisions/030-pipeline-observability.md` — архитектура трассировки, выбор JSON Lines vs SSE, URL verification подход
-- [ ] `docs/architecture.md` → обновить (pipeline-trace модуль)
-- [ ] `docs/ai-providers.md` → обновить (Gemini/Perplexity pricing добавлен)
-- [ ] `docs/ai-chats-map.md` → оценить (не меняются routes, только инструментирование)
-- [ ] `docs/design-system.md` → оценить (pipeline-trace-footer/drawer — dev-only, вряд ли нужно)
+- [x] ADR нужен? → **Да:** `docs/decisions/030-pipeline-observability.md` — архитектура трассировки, выбор JSON Lines vs SSE, URL verification подход
+- [x] `docs/architecture.md` → обновить (pipeline-trace модуль)
+- [x] `docs/ai-providers.md` → обновить (Gemini/Perplexity pricing добавлен)
+- [x] `docs/ai-chats-map.md` → оценить → **не нужно** (routes не менялись, только инструментирование)
+- [x] `docs/design-system.md` → оценить → **не нужно** (pipeline-trace-footer/drawer — dev-only)
 
 **SQL-проверка:**
-- [ ] `SELECT metadata FROM "BriefingHistory" ORDER BY "createdAt" DESC LIMIT 3` — trace данные есть
+- [x] `SELECT metadata FROM "BriefingHistory" ORDER BY "createdAt" DESC LIMIT 3` — trace данные есть (19.6K tok, ₽7.84, 84s, 3 stages)
 
 **Завершение:**
 - [ ] Финальное мануальное тестирование (полный flow: briefing + podcast + section refresh)
 - [ ] Переместить папку в `_archive/`
 
 **Валидация:**
-- [ ] `npm run build` — успешен
+- [x] `npm run build` — успешен
 - [ ] Production URL работает
 - [ ] Dev mode: трассировка видна
 - [ ] Production mode: zero overhead (trace не собирается, UI не рендерится)
-- [ ] Документация актуальна (проверено по чеклисту)
+- [x] Документация актуальна (проверено по чеклисту)
 
 **Git (после валидации):**
 ```bash

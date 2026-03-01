@@ -1,4 +1,4 @@
-// ТЗ-Б2: Full-screen podcast generation progress view
+// ТЗ-Б2 + ТЗ-DEV2: Full-screen podcast generation progress view + trace footer
 // Replaces article content during generation — Apple-level "wow" experience
 
 "use client";
@@ -7,6 +7,11 @@ import { motion } from "framer-motion";
 import { Loader2, Circle, Check, X, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PodcastTopicStatus } from "@/hooks/use-podcast-generation";
+import type {
+  PipelineStageTrace,
+  PipelineTraceSummary,
+} from "@/lib/ai/pipeline-trace";
+import { PipelineTraceFooter } from "@/components/dev-panel/pipeline-trace-footer";
 
 interface PodcastProgressProps {
   topicStatuses: PodcastTopicStatus[];
@@ -17,6 +22,10 @@ interface PodcastProgressProps {
   failedCount: number;
   onRetry?: () => void;
   onDismiss?: () => void;
+  /** ТЗ-DEV2: Pipeline trace stages (dev mode only) */
+  traceStages?: PipelineStageTrace[];
+  /** ТЗ-DEV2: Pipeline trace summary (dev mode only) */
+  traceSummary?: PipelineTraceSummary | null;
 }
 
 function StepIcon({ step }: { step: PodcastTopicStatus["step"] }) {
@@ -94,6 +103,8 @@ export function PodcastProgress({
   failedCount,
   onRetry,
   onDismiss,
+  traceStages,
+  traceSummary,
 }: PodcastProgressProps) {
   if (topicStatuses.length === 0 && !error && !completionMessage) return null;
 
@@ -206,6 +217,15 @@ export function PodcastProgress({
             </Button>
           )}
         </motion.div>
+      )}
+
+      {/* ТЗ-DEV2: Pipeline trace footer (dev mode only) */}
+      {traceStages && (
+        <PipelineTraceFooter
+          stages={traceStages}
+          summary={traceSummary ?? null}
+          isGenerating={isGenerating}
+        />
       )}
     </div>
   );

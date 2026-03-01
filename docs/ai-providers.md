@@ -219,6 +219,22 @@ import { claudeHaiku, claudeSonnet, claudeOpus, getClaudeModel } from '@/lib/ai/
 const model = getClaudeModel('haiku');  // 'haiku' | 'sonnet' | 'opus'
 ```
 
+### Pricing и Cost Calculation (v3.58.0)
+
+```typescript
+import { calculateCostRub, calculateTtsCostRub } from '@/lib/ai/providers';
+
+// Стоимость AI-вызова (в рублях, курс 100 ₽/$)
+const cost = calculateCostRub('claude-sonnet-4-6', { inputTokens: 1000, outputTokens: 500 });
+
+// Стоимость TTS (Gemini, по секундам аудио)
+const ttsCost = calculateTtsCostRub(30); // 30 секунд
+```
+
+`MODEL_PRICING_RUB` поддерживает: Claude (Haiku, Sonnet, Opus, fallback Sonnet 4.5), Gemini (2.0 Flash, 2.5 Flash), Perplexity (Sonar Pro).
+
+Используется в Pipeline Observability (`lib/ai/pipeline-trace.ts`) для расчёта стоимости каждого этапа pipeline.
+
 ---
 
 ## Лимиты и квоты

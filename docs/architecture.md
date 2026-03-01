@@ -24,7 +24,8 @@
 │                            │                                │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  Business Logic (lib/)                               │  │
-│  │  ├── ai/providers.ts   - AI Provider config          │  │
+│  │  ├── ai/providers.ts   - AI Provider config + pricing  │  │
+│  │  ├── ai/pipeline-trace.ts - Pipeline trace (v3.58)    │  │
 │  │  ├── ai/tools/         - AI-инструменты              │  │
 │  │  ├── briefing/         - Briefing pipeline + types + research engine (v3.27, v3.52) │
 │  │  ├── podcast/          - Podcast Engine (v3.43)           │
