@@ -22,6 +22,9 @@ export interface DebugStepData {
   cachedTokens: number;
   reasoningTokens: number;
   finishReason: string;
+  /** Per-step cost in RUB, calculated server-side via TokenLens (SSOT).
+   *  Falls back to hardcoded MODEL_PRICING_RUB if TokenLens unavailable. */
+  stepCostRub?: number;
   toolCalls: Array<{
     toolName: string;
     args: Record<string, unknown>;
@@ -147,6 +150,61 @@ export function truncateForDebug(value: unknown, maxLen = 500): unknown {
   const str = JSON.stringify(value);
   if (str.length > maxLen) {
     return str.slice(0, maxLen) + "...";
+  }
+  return value;
+}
+
+/**
+ * Smart truncation for tool results: truncates large content/text fields
+ * but preserves metadata fields that are useful for debugging.
+ *
+ * Used in briefing-onboarding context where tool results contain structured
+ * data with important meta-fields (rssUrl, source, isValid, tier, etc.)
+ */
+const META_KEYS = new Set([
+  "rssUrl", "source", "isValid", "title", "tier", "fetchMethod",
+  "postCount", "sourceLanguage", "sourceName", "sourceUrl", "topicId",
+  "topicName", "emoji", "success", "error", "query", "depth",
+  "citationCount", "handle", "channelUrl", "briefingStyle",
+]);
+
+const CONTENT_KEYS = new Set(["content", "text", "markdown", "rawContent", "body"]);
+
+export function truncateToolResultSmart(
+  value: unknown,
+  contentMaxLen = 200,
+): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value === "string") {
+    return value.length > contentMaxLen
+      ? value.slice(0, contentMaxLen) + "..."
+      : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => truncateToolResultSmart(item, contentMaxLen));
+  }
+  if (typeof value === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      if (META_KEYS.has(key)) {
+        // Preserve meta values as-is (they're short)
+        result[key] = val;
+      } else if (CONTENT_KEYS.has(key) && typeof val === "string") {
+        // Truncate large content fields
+        result[key] = val.length > contentMaxLen
+          ? val.slice(0, contentMaxLen) + "..."
+          : val;
+      } else if (typeof val === "object" && val !== null) {
+        // Recurse into nested objects/arrays
+        result[key] = truncateToolResultSmart(val, contentMaxLen);
+      } else if (typeof val === "string" && val.length > contentMaxLen * 2) {
+        // Truncate unknown large strings
+        result[key] = val.slice(0, contentMaxLen) + "...";
+      } else {
+        result[key] = val;
+      }
+    }
+    return result;
   }
   return value;
 }

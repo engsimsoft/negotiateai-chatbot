@@ -1,21 +1,24 @@
+import { getStepCostRub } from "@/lib/ai/providers";
 import type { DevPanelMessageData } from "../dev-panel-provider";
 
 export function TokensSection({ data }: { data: DevPanelMessageData }) {
-  const f = data.finish;
-  const inputTokens =
-    f?.totalInputTokens ??
-    data.steps.reduce((s, st) => s + st.inputTokens, 0);
-  const outputTokens =
-    f?.totalOutputTokens ??
-    data.steps.reduce((s, st) => s + st.outputTokens, 0);
-  const cachedTokens =
-    f?.totalCachedTokens ??
-    data.steps.reduce((s, st) => s + st.cachedTokens, 0);
-  const reasoningTokens =
-    f?.totalReasoningTokens ??
-    data.steps.reduce((s, st) => s + st.reasoningTokens, 0);
-  const totalTokens = inputTokens + outputTokens;
-  const cost = f?.estimatedCostRub;
+  // Use per-step sums — these represent the actual billed amounts.
+  // finish.totalXxxTokens is the last step's cumulative, not the real sum.
+  const inputTokens = data.steps.reduce((s, st) => s + st.inputTokens, 0);
+  const outputTokens = data.steps.reduce((s, st) => s + st.outputTokens, 0);
+  const cachedTokens = data.steps.reduce((s, st) => s + st.cachedTokens, 0);
+  const reasoningTokens = data.steps.reduce(
+    (s, st) => s + st.reasoningTokens,
+    0,
+  );
+  const totalTokens = inputTokens + outputTokens + reasoningTokens;
+
+  // ТЗ-DEV3: Real cost = sum of per-step costs (each step is a separate API call).
+  // Uses server-calculated stepCostRub (TokenLens SSOT) with local fallback.
+  const cost =
+    data.steps.length > 0
+      ? data.steps.reduce((sum, step) => sum + getStepCostRub(step), 0)
+      : data.finish?.estimatedCostRub;
 
   return (
     <section>

@@ -13,6 +13,8 @@ import { TokensSection } from "./sections/tokens-section";
 import { TimelineSection } from "./sections/timeline-section";
 import { GuardianSection } from "./sections/guardian-section";
 import { PromptSection } from "./sections/prompt-section";
+import { ToolsSection } from "./sections/tools-section";
+import { CostBreakdownSection } from "./sections/cost-breakdown-section";
 import { RawSection } from "./sections/raw-section";
 
 export function DevPanelDrawer({
@@ -37,7 +39,9 @@ export function DevPanelDrawer({
         <div className="flex flex-col gap-5 py-4">
           <ModelSection data={data} />
           <TokensSection data={data} />
+          <CostBreakdownSection data={data} />
           <TimelineSection data={data} />
+          <ToolsSection data={data} />
           <GuardianSection data={data} />
           <PromptSection data={data} />
           <RawSection data={data} />

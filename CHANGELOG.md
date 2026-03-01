@@ -12,6 +12,36 @@
 
 ---
 
+## [3.59.0] - 2026-03-01 - OnboardingDevPanel
+
+**ТЗ-DEV3**: Developer Panel для Onboarding — расширение DevPanel (ТЗ-DEV1) для онбординга брифинга (`/briefing/setup`). Structured Tools section, Cost Breakdown с per-step bar chart, исправление расчёта стоимости (per-step sum вместо naive last-step cumulative).
+
+### Added
+- **Onboarding Debug Hook** (`hooks/use-onboarding-debug.ts`): сбор debug events из `useChat` onData callback (не DataStreamContext), localStorage persistence, bindToMessage
+- **Onboarding Debug Provider** (`components/dev-panel/onboarding-debug-provider.tsx`): мост useOnboardingDebug → DevPanelContext
+- **Tools Section** (`components/dev-panel/sections/tools-section.tsx`): structured display per tool type (deepResearch с Режим/Citations/URLs, fetchUrl с URL/Method/RSS, readTelegramChannel с Channel/Valid/Posts, updateBriefingPreview с Topics/Sources). Client-side warning detection (RSS не обнаружен, канал недоступен, мало постов)
+- **Cost Breakdown Section** (`components/dev-panel/sections/cost-breakdown-section.tsx`): per-step cost bar chart, reasoning tokens billed at output rate, delta warning vs server estimate
+- **Smart Truncation** (`lib/ai/debug-events.ts`): `truncateToolResultSmart()` — preserves metadata (rssUrl, source, isValid, title, tier) while truncating content to 200 chars
+
+### Changed
+- **Per-step cost calculation**: footer, TokensSection, CostBreakdownSection теперь суммируют per-step costs (каждый step = отдельный API call). Исправляет ~4x занижение стоимости для multi-step запросов
+- **SSOT Pricing**: стоимость рассчитывается на сервере через TokenLens (live prices), `stepCostRub` встраивается в debug events. Клиент использует `getStepCostRub()` (server value → fallback to hardcoded). Все 3 route files: chat, service-chat, projects/tasks/chat
+- **DevPanel Persistence**: debug данные сохраняются в localStorage per-chat (`simply-dev-chat-debug:{chatId}`), восстанавливаются при перезагрузке. `prevMapRef` предотвращает потерю данных при отправке следующего сообщения
+- **AI SDK v5 compatibility**: `tc.input ?? tc.args` и `tr.output ?? tr.result` в onStepFinish во всех 3 route files (service-chat, chat, projects/tasks/chat)
+- **DevPanel Drawer**: 6 → 8 секций (+Tools, +Cost Breakdown)
+
+### Fixed
+- **Billing undercount**: AI SDK `onFinish.usage` reports last step cumulative, not sum of all API calls. Real cost is ~4x higher for 3-step requests. Fixed by summing per-step costs
+- **Pricing discrepancy**: MODEL_PRICING_RUB had outdated prices (Haiku $0.80/$4 → $1/$5, Opus $15/$75 → $5/$25). Fixed + SSOT via TokenLens eliminates future drift
+- **DevPanel footer disappearing**: при отправке второго сообщения footer первого пропадал из-за transient batch→message remapping. Fixed с `prevMapRef`
+- **Tool results "Нет результата"**: AI SDK v5 renamed `toolResults[].result` → `toolResults[].output`. Fixed with fallback
+- **Tool call args empty**: AI SDK v5 renamed `toolCalls[].args` → `toolCalls[].input`. Fixed with fallback
+
+### Technical
+- **ADR 031**: [Onboarding Debug Architecture](docs/decisions/031-onboarding-debug-architecture.md)
+
+---
+
 ## [3.58.0] - 2026-03-01 - PipelineObservability
 
 **ТЗ-DEV2**: Pipeline Observability — полная трассировка AI-pipeline (briefing, podcast, section refresh). Разработчик видит каждый AI-вызов, каждый fetch, каждую ошибку, верификацию URL, стоимость — в реальном времени при генерации и в сохранённой записи.

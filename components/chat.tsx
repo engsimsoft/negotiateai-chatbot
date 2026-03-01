@@ -417,7 +417,7 @@ export function Chat({
   });
 
   return (
-    <DevPanelProvider messages={messages}>
+    <DevPanelProvider chatId={id} messages={messages}>
       <div className={cn(
         "overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-background",
         "transition-[margin] duration-200 ease-linear",

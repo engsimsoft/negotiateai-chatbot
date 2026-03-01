@@ -36,12 +36,14 @@ import { readTelegramChannel } from "@/lib/ai/tools/read-telegram-channel";
 import { createStepTracker } from "@/lib/ai/tool-call-guardian";
 import { isSimplyDevMode } from "@/lib/constants";
 import { calculateCostRub } from "@/lib/ai/providers";
+import { getTokenlensCatalog, calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
 import {
   emitDebugStep,
   emitDebugGuardian,
   emitDebugFinish,
   emitDebugPrompt,
   truncateForDebug,
+  truncateToolResultSmart,
   type DebugStepData,
 } from "@/lib/ai/debug-events";
 
@@ -736,6 +738,8 @@ export async function POST(request: Request) {
     // ТЗ-DEV1: Debug step tracking state
     let debugStepIndex = 0;
     const debugStepDataQueue: DebugStepData[] = [];
+    // SSOT: prefetch TokenLens catalog for per-step cost calculation
+    const tlProviders = isSimplyDevMode ? await getTokenlensCatalog() : undefined;
 
     // ТЗ-FIX1: Guardian step tracker for hallucination detection
     const guardianTracker = createStepTracker({ context });
@@ -788,22 +792,32 @@ export async function POST(request: Request) {
                 : toolResults && toolResults.length > 0
                   ? "tool-result"
                   : "initial";
+              const stepModelId = response?.modelId || "unknown";
+              const stepUsage = {
+                inputTokens: usage?.inputTokens ?? 0,
+                outputTokens: usage?.outputTokens ?? 0,
+                cachedInputTokens: (usage as any)?.cachedInputTokens ?? 0,
+                reasoningTokens: (usage as any)?.reasoningTokens ?? 0,
+              };
               const stepData: DebugStepData = {
                 stepIndex: debugStepIndex++,
                 stepType: inferredType,
-                modelId: response?.modelId || "unknown",
-                inputTokens: usage?.inputTokens ?? 0,
-                outputTokens: usage?.outputTokens ?? 0,
-                cachedTokens: (usage as any)?.cachedInputTokens ?? 0,
-                reasoningTokens: (usage as any)?.reasoningTokens ?? 0,
+                modelId: stepModelId,
+                inputTokens: stepUsage.inputTokens,
+                outputTokens: stepUsage.outputTokens,
+                cachedTokens: stepUsage.cachedInputTokens,
+                reasoningTokens: stepUsage.reasoningTokens,
                 finishReason: finishReason || "unknown",
+                stepCostRub: calcStepCostRub(stepModelId, stepUsage, tlProviders),
                 toolCalls: (toolCalls ?? []).map((tc: any) => ({
                   toolName: tc.toolName,
-                  args: tc.args as Record<string, unknown>,
+                  args: (tc.input ?? tc.args) as Record<string, unknown>,
                 })),
                 toolResults: (toolResults ?? []).map((tr: any) => ({
                   toolName: tr.toolName,
-                  result: truncateForDebug(tr.result),
+                  result: context === "briefing-onboarding"
+                    ? truncateToolResultSmart(tr.output ?? tr.result)
+                    : truncateForDebug(tr.output ?? tr.result),
                 })),
                 timestamp: Date.now(),
               };

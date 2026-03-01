@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useDevPanel } from "./dev-panel-provider";
 import { DevPanelDrawer } from "./dev-panel-drawer";
+import { getStepCostRub } from "@/lib/ai/providers";
 
 const MODEL_DISPLAY: Record<string, string> = {
   "claude-haiku-4-5-20251001": "Haiku 4.5",
@@ -58,12 +59,21 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
       ? (MODEL_DISPLAY[data.steps[0].modelId] ?? data.steps[0].modelId)
       : "...";
 
-  const totalTokens = data.finish
-    ? data.finish.totalInputTokens + data.finish.totalOutputTokens
-    : data.steps.reduce((sum, s) => sum + s.inputTokens + s.outputTokens, 0);
+  // ТЗ-DEV3: Sum per-step tokens (real total billed, not last step cumulative)
+  const totalTokens = data.steps.reduce(
+    (sum, s) => sum + s.inputTokens + s.outputTokens + s.reasoningTokens,
+    0,
+  );
 
-  const cost = data.finish?.estimatedCostRub;
+  // ТЗ-DEV3: Real cost = sum of per-step costs (each step is a separate API call).
+  // Uses server-calculated stepCostRub (TokenLens SSOT) with local fallback.
+  const cost = data.steps.length > 0
+    ? data.steps.reduce((sum, step) => sum + getStepCostRub(step), 0)
+    : data.finish?.estimatedCostRub;
   const duration = data.finish?.totalDurationMs;
+
+  // ТЗ-DEV3: Total tool call count across all steps
+  const toolCount = data.steps.reduce((sum, s) => sum + s.toolCalls.length, 0);
 
   return (
     <>
@@ -84,6 +94,12 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
           <>
             <span className={isError ? "text-destructive/30" : "text-muted-foreground/30"}>&middot;</span>
             <span>&#8381;{cost.toFixed(2)}</span>
+          </>
+        )}
+        {toolCount > 0 && (
+          <>
+            <span className={isError ? "text-destructive/30" : "text-muted-foreground/30"}>&middot;</span>
+            <span>{toolCount} tools</span>
           </>
         )}
         {duration != null && (

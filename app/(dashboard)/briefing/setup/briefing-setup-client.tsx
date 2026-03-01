@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { generateUUID } from "@/lib/utils";
 import { useBriefingGeneration } from "@/hooks/use-briefing-generation";
+import { useOnboardingDebug } from "@/hooks/use-onboarding-debug";
+import { OnboardingDebugProvider } from "@/components/dev-panel/onboarding-debug-provider";
 import { BriefingGenerationProgress } from "@/components/briefing/briefing-generation-progress";
 import {
   BriefingProfilePreview,
@@ -126,6 +128,9 @@ export function BriefingSetupClient({
   // ТЗ-FIX2 Этап 3: research progress state (data-research-progress events)
   const [researchProgress, setResearchProgress] = useState<Map<string, TopicProgress>>(new Map());
 
+  // ТЗ-DEV3: Debug events collection for DevPanel
+  const { debugMap, handleDataPart, bindToMessage } = useOnboardingDebug();
+
   // ТЗ-А5: streaming generation progress
   const generation = useBriefingGeneration();
 
@@ -178,6 +183,11 @@ export function BriefingSetupClient({
     onError: (err) => setError(err),
     // ТЗ-FIX2: Consume data stream events (research progress + model info)
     onData: (part) => {
+      // ТЗ-DEV3: Forward debug events to onboarding debug hook
+      if (part.type.startsWith("data-debug-")) {
+        handleDataPart(part as { type: string; data?: unknown });
+      }
+
       if (part.type === "data-research-progress") {
         const event = part.data as {
           topicId: string;
@@ -224,6 +234,17 @@ export function BriefingSetupClient({
     }
     return msgs;
   }, [chatMessages]);
+
+  // ТЗ-DEV3: Bind debug batch to the latest streaming assistant message
+  const boundDebugIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const assistantMsgs = chatMessages.filter((m) => m.role === "assistant");
+    const last = assistantMsgs[assistantMsgs.length - 1];
+    if (last && !boundDebugIdsRef.current.has(last.id)) {
+      boundDebugIdsRef.current.add(last.id);
+      bindToMessage(last.id);
+    }
+  }, [chatMessages, bindToMessage]);
 
   // Parse tool results and update preview in real-time
   const processedIdsRef = useRef<Set<string>>(new Set());
@@ -424,15 +445,18 @@ export function BriefingSetupClient({
         </header>
 
         {/* Chat panel */}
-        <BriefingChatPanel
-          messages={displayMessages}
-          input={input}
-          onInputChange={setInput}
-          onSend={handleSend}
-          isLoading={isLoading}
-          error={error}
-          researchTopics={activeResearchTopics}
-        />
+        <OnboardingDebugProvider debugMap={debugMap}>
+          <BriefingChatPanel
+            messages={displayMessages}
+            rawMessages={chatMessages}
+            input={input}
+            onInputChange={setInput}
+            onSend={handleSend}
+            isLoading={isLoading}
+            error={error}
+            researchTopics={activeResearchTopics}
+          />
+        </OnboardingDebugProvider>
       </main>
 
       {/* ТЗ-FIX3: Unsaved changes guard */}

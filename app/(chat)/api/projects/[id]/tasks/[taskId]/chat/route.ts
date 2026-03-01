@@ -37,7 +37,7 @@ import {
 } from "@/lib/db/queries";
 import { calcUsagePercent, SNAPSHOT_THRESHOLD, FALLBACK_MESSAGE_PAIRS } from "@/lib/ai/context-limits";
 import { createFallbackSnapshot } from "@/lib/ai/clerks/snapshot-creator";
-import { calcCostUsd } from "@/lib/ai/tokenlens-catalog";
+import { calcCostUsd, getTokenlensCatalog, calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
 import { createStepTracker } from "@/lib/ai/tool-call-guardian";
 import { ChatSDKError } from "@/lib/errors";
 import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages } from "@/lib/utils";
@@ -308,6 +308,8 @@ export async function POST(
         // ТЗ-DEV1: Debug step tracking state
         let debugStepIndex = 0;
         const debugStepDataQueue: DebugStepData[] = [];
+        // SSOT: prefetch TokenLens catalog for per-step cost calculation
+        const tlProviders = isSimplyDevMode ? await getTokenlensCatalog() : undefined;
 
         const result = streamText({
           model: modelToUse,
@@ -329,22 +331,30 @@ export async function POST(
                 : toolResults && toolResults.length > 0
                   ? "tool-result"
                   : "initial";
+              const stepModelId = response?.modelId || "unknown";
+              const stepUsage = {
+                inputTokens: usage?.inputTokens ?? 0,
+                outputTokens: usage?.outputTokens ?? 0,
+                cachedInputTokens: (usage as any)?.cachedInputTokens ?? 0,
+                reasoningTokens: (usage as any)?.reasoningTokens ?? 0,
+              };
               const stepData: DebugStepData = {
                 stepIndex: debugStepIndex++,
                 stepType: inferredType,
-                modelId: response?.modelId || "unknown",
-                inputTokens: usage?.inputTokens ?? 0,
-                outputTokens: usage?.outputTokens ?? 0,
-                cachedTokens: (usage as any)?.cachedInputTokens ?? 0,
-                reasoningTokens: (usage as any)?.reasoningTokens ?? 0,
+                modelId: stepModelId,
+                inputTokens: stepUsage.inputTokens,
+                outputTokens: stepUsage.outputTokens,
+                cachedTokens: stepUsage.cachedInputTokens,
+                reasoningTokens: stepUsage.reasoningTokens,
                 finishReason: finishReason || "unknown",
+                stepCostRub: calcStepCostRub(stepModelId, stepUsage, tlProviders),
                 toolCalls: (toolCalls ?? []).map((tc: any) => ({
                   toolName: tc.toolName,
-                  args: tc.args as Record<string, unknown>,
+                  args: (tc.input ?? tc.args) as Record<string, unknown>,
                 })),
                 toolResults: (toolResults ?? []).map((tr: any) => ({
                   toolName: tr.toolName,
-                  result: truncateForDebug(tr.result),
+                  result: truncateForDebug(tr.output ?? tr.result),
                 })),
                 timestamp: Date.now(),
               };

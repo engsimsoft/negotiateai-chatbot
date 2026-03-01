@@ -49,3 +49,56 @@ export async function calcCostUsd(
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Server-side per-step cost in RUB (SSOT: TokenLens → fallback to hardcoded)
+// Used by debug events in onStepFinish to embed pre-calculated cost.
+// ---------------------------------------------------------------------------
+
+import { calculateCostRub, RUB_PER_USD } from "./providers";
+
+/**
+ * Calculate per-step cost in RUB using TokenLens catalog (sync, requires pre-fetched catalog).
+ * Falls back to hardcoded MODEL_PRICING_RUB if catalog unavailable.
+ * Reasoning tokens are billed at output token rate.
+ */
+export function calcStepCostRub(
+  modelId: string,
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cachedInputTokens?: number;
+    reasoningTokens?: number;
+  },
+  providers: ModelCatalog | undefined,
+): number {
+  const effectiveOutput = usage.outputTokens + (usage.reasoningTokens ?? 0);
+
+  // Try TokenLens (SSOT — live prices from API)
+  if (providers) {
+    try {
+      const summary = getUsage({
+        modelId,
+        usage: {
+          inputTokens: usage.inputTokens,
+          outputTokens: effectiveOutput,
+          cachedInputTokens: usage.cachedInputTokens ?? 0,
+        } as LanguageModelUsage,
+        providers,
+      });
+      const totalUsd = summary?.costUSD?.totalUSD;
+      if (totalUsd != null && totalUsd > 0) {
+        return Math.round(totalUsd * RUB_PER_USD * 100) / 100;
+      }
+    } catch {
+      // Fall through to hardcoded
+    }
+  }
+
+  // Fallback: hardcoded pricing table
+  return calculateCostRub(modelId, {
+    inputTokens: usage.inputTokens,
+    outputTokens: effectiveOutput,
+    cachedInputTokens: usage.cachedInputTokens ?? 0,
+  });
+}

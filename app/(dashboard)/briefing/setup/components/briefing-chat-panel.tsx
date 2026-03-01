@@ -16,7 +16,10 @@ import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ServiceChatInput } from "@/components/input";
 import { cn } from "@/lib/utils";
+import { DevPanelFooter } from "@/components/dev-panel/dev-panel-footer";
 import { ResearchProgressCard, type TopicProgress } from "./research-progress-card";
+
+const IS_DEV_MODE = process.env.NEXT_PUBLIC_SIMPLY_DEV_MODE === "true";
 
 interface DisplayMessage {
   id: string;
@@ -24,8 +27,15 @@ interface DisplayMessage {
   content: string;
 }
 
+interface RawMessage {
+  id: string;
+  role: "user" | "assistant";
+}
+
 interface BriefingChatPanelProps {
   messages: DisplayMessage[];
+  /** ТЗ-DEV3: Raw messages with IDs for DevPanel footer mapping */
+  rawMessages?: RawMessage[];
   input: string;
   onInputChange: (value: string) => void;
   onSend: () => void;
@@ -37,6 +47,7 @@ interface BriefingChatPanelProps {
 
 export function BriefingChatPanel({
   messages,
+  rawMessages,
   input,
   onInputChange,
   onSend,
@@ -73,17 +84,25 @@ export function BriefingChatPanel({
                     S
                   </div>
                 )}
-                <div
-                  className={cn(
-                    "max-w-[80%] rounded-2xl px-4 py-3",
-                    message.role === "user"
-                      ? "rounded-tr-none bg-primary text-primary-foreground"
-                      : "rounded-tl-none bg-muted"
-                  )}
-                >
-                  <p className="whitespace-pre-wrap text-sm">
-                    {message.content}
-                  </p>
+                <div>
+                  <div
+                    className={cn(
+                      "max-w-[80%] rounded-2xl px-4 py-3",
+                      message.role === "user"
+                        ? "rounded-tr-none bg-primary text-primary-foreground"
+                        : "rounded-tl-none bg-muted"
+                    )}
+                  >
+                    <p className="whitespace-pre-wrap text-sm">
+                      {message.content}
+                    </p>
+                  </div>
+                  {/* ТЗ-DEV3: DevPanel footer for assistant messages (skip greeting) */}
+                  {IS_DEV_MODE &&
+                    message.role === "assistant" &&
+                    message.id !== "greeting" && (
+                      <DevPanelFooter messageId={message.id} />
+                    )}
                 </div>
               </motion.div>
             ))}
