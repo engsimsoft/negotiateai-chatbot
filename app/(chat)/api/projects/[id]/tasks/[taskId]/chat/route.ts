@@ -313,8 +313,11 @@ export async function POST(
 
         const result = streamText({
           model: modelToUse,
-          system: finalSystemPrompt,
-          messages: sanitizeCoreMessages(convertToCoreMessages(uiMessages)),
+          // ТЗ-CACHE1: system as message with per-message cacheControl (top-level providerOptions doesn't mark messages)
+          messages: [
+            { role: 'system' as const, content: finalSystemPrompt, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },
+            ...sanitizeCoreMessages(convertToCoreMessages(uiMessages)),
+          ],
           temperature: 1.0,
           stopWhen: stepCountIs(5),
           experimental_activeTools: getActiveToolNames(isProjectChat),

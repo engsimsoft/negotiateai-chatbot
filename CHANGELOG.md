@@ -12,6 +12,20 @@
 
 ---
 
+## [3.60.0] - 2026-03-01 - PromptCaching
+
+**ТЗ-CACHE1**: Anthropic Prompt Caching — включение 5-минутного ephemeral кэширования для всех streaming routes. Кэшированные input-токены стоят 0.1× от базовой цены (экономия ~90% на повторных запросах).
+
+### Changed
+- **Prompt Caching** для 3 streaming routes: `chat/route.ts`, `service-chat/route.ts`, `projects/[id]/tasks/[taskId]/chat/route.ts` — system prompt передаётся как message с `providerOptions.anthropic.cacheControl: { type: 'ephemeral' }` (per-message cacheControl, не top-level)
+- **Service-chat**: `providerOptions` для `thinking`/`effort` (briefing-onboarding) вынесены в conditional spread, `cacheControl` передаётся через system message
+
+### Technical
+- **Важное открытие:** Top-level `providerOptions.anthropic.cacheControl` в `streamText()` НЕ маркирует сообщения — `@ai-sdk/anthropic` читает `cacheControl` из `providerOptions` каждого отдельного сообщения. Поэтому system prompt передаётся не через `system:` параметр, а как `{ role: 'system', content, providerOptions }` в массиве `messages[]`
+- **НЕ затронуто:** `professor-pipeline.ts` (одноразовые вызовы, cache write без read = перерасход), Gemini endpoints, generateText/generateObject вызовы, UI, `calculateCostRub()`
+
+---
+
 ## [3.59.0] - 2026-03-01 - OnboardingDevPanel
 
 **ТЗ-DEV3**: Developer Panel для Onboarding — расширение DevPanel (ТЗ-DEV1) для онбординга брифинга (`/briefing/setup`). Structured Tools section, Cost Breakdown с per-step bar chart, исправление расчёта стоимости (per-step sum вместо naive last-step cumulative).

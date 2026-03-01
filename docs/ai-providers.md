@@ -1,7 +1,7 @@
 # AI-провайдеры и модели
 
-**Версия:** 3.1.1
-**Последнее обновление:** 2026-02-22
+**Версия:** 3.2.0
+**Последнее обновление:** 2026-03-01
 **Статус:** 3 провайдера, 4 модели Anthropic + 4 модели Gemini + 2 модели Perplexity
 
 ---
@@ -104,25 +104,28 @@
 
 | Функция | Файл | Модель | temperature | maxSteps | providerOptions | Примечание |
 |---------|------|--------|-------------|----------|-----------------|------------|
-| Чат (chatMode=chat) | `api/chat/route.ts` | `claude-haiku` | 1.0 | 5 | — | Via `getModelForChatMode()` |
-| Экспертиза (chatMode=expertise) | `api/chat/route.ts` | `claude-sonnet` | 1.0 | 5 | — | Via `getModelForChatMode()` |
-| Создание (chatMode=create) | `api/chat/route.ts` | `claude-sonnet` | 1.0 | 5 | — | Via `getModelForChatMode()` |
-| Проект: Исполнитель | `api/chat/route.ts` | `claude-haiku` | 1.0 | 5 | — | Via `getProjectModel("executor")` |
-| Проект: Эксперт | `api/chat/route.ts` | `claude-sonnet` | 1.0 | 5 | — | Via `getProjectModel("expert")` |
-| Проект: Профессор | `api/chat/route.ts` | `claude-opus` | 1.0 | 5 | — | Via `getProjectModel("professor")` |
-| Эксперт по задаче | `api/projects/[id]/tasks/[taskId]/chat/route.ts` | `claude-sonnet` (default) | 1.0 | 5 | — | Tier из ProjectTask, env: `EXPERT_MODEL` |
-| Professor Pipeline: Анализ | `lib/ai/professor-pipeline.ts` | `claude-opus` | 1.0 | — | — | Phase 1 (streamText) |
-| Professor Pipeline: Исполнение | `lib/ai/professor-pipeline.ts` | `claude-haiku` | 1.0 | — | — | Phase 2 (streamText) |
-| Professor Pipeline: Синтез | `lib/ai/professor-pipeline.ts` | `claude-opus` | 1.0 | — | — | Phase 3 (streamText) |
+| Чат (chatMode=chat) | `api/chat/route.ts` | `claude-haiku` | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Via `getModelForChatMode()` |
+| Экспертиза (chatMode=expertise) | `api/chat/route.ts` | `claude-sonnet` | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Via `getModelForChatMode()` |
+| Создание (chatMode=create) | `api/chat/route.ts` | `claude-sonnet` | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Via `getModelForChatMode()` |
+| Проект: Исполнитель | `api/chat/route.ts` | `claude-haiku` | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Via `getProjectModel("executor")` |
+| Проект: Эксперт | `api/chat/route.ts` | `claude-sonnet` | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Via `getProjectModel("expert")` |
+| Проект: Профессор | `api/chat/route.ts` | `claude-opus` | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Via `getProjectModel("professor")` |
+| Эксперт по задаче | `api/projects/[id]/tasks/[taskId]/chat/route.ts` | `claude-sonnet` (default) | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Tier из ProjectTask, env: `EXPERT_MODEL` |
+| Professor Pipeline: Анализ | `lib/ai/professor-pipeline.ts` | `claude-opus` | 1.0 | — | — | Phase 1 (streamText), без кэша ² |
+| Professor Pipeline: Исполнение | `lib/ai/professor-pipeline.ts` | `claude-haiku` | 1.0 | — | — | Phase 2 (streamText), без кэша ² |
+| Professor Pipeline: Синтез | `lib/ai/professor-pipeline.ts` | `claude-opus` | 1.0 | — | — | Phase 3 (streamText), без кэша ² |
+
+> ¹ **cacheControl: ephemeral** (v3.60.0) — передаётся через `providerOptions` на system message (per-message, не top-level `streamText()`). 5-минутный TTL, cached read = 0.1× базовой цены.
+> ² Professor Pipeline исключён: одноразовые вызовы с уникальными промптами — cache write без read = 25% перерасход на Opus.
 
 ### Anthropic Claude — Service чаты (streamText)
 
 | Функция | Файл | Модель | temperature | providerOptions | Примечание |
 |---------|------|--------|-------------|-----------------|------------|
-| Бен (❓) | `api/service-chat/route.ts` | `claude-haiku` | 1.0 | — | context: ben |
-| Секретарь (создание проекта) | `api/service-chat/route.ts` | `claude-sonnet` | 1.0 | — | context: project-creation |
-| Менеджер проекта | `api/service-chat/route.ts` | `claude-haiku` | 1.0 | — | context: project-manager |
-| **Briefing Онбординг** | `api/service-chat/route.ts` | **`claude-sonnet-4-6`** | 1.0 | `thinking adaptive, effort high` | context: briefing-onboarding |
+| Бен (❓) | `api/service-chat/route.ts` | `claude-haiku` | 1.0 | `cacheControl: ephemeral` ¹ | context: ben |
+| Секретарь (создание проекта) | `api/service-chat/route.ts` | `claude-sonnet` | 1.0 | `cacheControl: ephemeral` ¹ | context: project-creation |
+| Менеджер проекта | `api/service-chat/route.ts` | `claude-haiku` | 0.5 | `cacheControl: ephemeral` ¹ | context: project-manager |
+| **Briefing Онбординг** | `api/service-chat/route.ts` | **`claude-sonnet-4-6`** | 0.5 | `cacheControl: ephemeral` ¹ + `thinking adaptive, effort high` | context: briefing-onboarding |
 
 ### Anthropic Claude — Backend (generateText / generateObject)
 
@@ -294,6 +297,7 @@ PERPLEXITY_API_KEY=your_perplexity_api_key
 
 | Дата | Версия | Изменения |
 |------|--------|-----------|
+| 2026-03-01 | 3.2.0 | ТЗ-CACHE1: Prompt Caching (cacheControl: ephemeral) для всех streaming routes (per-message providerOptions на system message) |
 | 2026-02-22 | 3.1.1 | Добавлены Perplexity (sonar-pro, sonar-deep-research), Podcast модели (gemini-2.5-flash скрипт, gemini-2.5-flash-preview-tts TTS), `@google/genai` SDK для TTS |
 | 2026-02-21 | 3.1.0 | Briefing Author → Claude Sonnet 4.6 (из Gemini 3 Pro), effort для 3 точек (онбординг, профессор, ревьюер), Gemini остался только для фильтра + OCR |
 | 2026-02-21 | 3.0.0 | Добавлен Реестр конфигураций (SSOT), исправлены модели (claude-sonnet-4-6 для онбординга, gemini-2.5-flash для OCR), добавлен чеклист миграции |
@@ -305,4 +309,4 @@ PERPLEXITY_API_KEY=your_perplexity_api_key
 
 ---
 
-**Обновлено:** 2026-02-22
+**Обновлено:** 2026-03-01

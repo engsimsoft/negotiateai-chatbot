@@ -627,8 +627,11 @@ export async function POST(request: Request) {
         // Standard streaming mode (non-professor)
         const result = streamText({
           model: modelToUse,
-          system: systemPromptText,
-          messages: sanitizeCoreMessages(convertToCoreMessages(uiMessages)),
+          // ТЗ-CACHE1: system as message with per-message cacheControl (top-level providerOptions doesn't mark messages)
+          messages: [
+            { role: 'system' as const, content: systemPromptText, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },
+            ...sanitizeCoreMessages(convertToCoreMessages(uiMessages)),
+          ],
           temperature: 1.0,
           stopWhen: stepCountIs(5),
           // ТЗ-C1: Tools extracted to shared module (lib/ai/tools/chat-tools.ts)

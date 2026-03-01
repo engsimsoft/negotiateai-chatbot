@@ -770,13 +770,16 @@ export async function POST(request: Request) {
 
         const result = streamText({
           model: myProvider.languageModel(modelId),
-          system: systemPrompt,
-          messages: transformedMessages,
+          // ТЗ-CACHE1: system as message with per-message cacheControl (top-level providerOptions doesn't mark messages)
+          messages: [
+            { role: 'system' as const, content: systemPrompt, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },
+            ...transformedMessages,
+          ],
           tools: Object.keys(tools).length > 0 ? tools : undefined,
           stopWhen: stepCountIs(maxSteps),
           // ТЗ-FIX3: 0.5 for structured flows (manager, briefing). Note: ignored when adaptive thinking is enabled
           temperature: (context === "project-manager" || context === "briefing-onboarding") ? 0.5 : 1.0,
-          // Adaptive thinking for briefing-onboarding (Sonnet 4.6): multi-step tool calling, source evaluation
+          // Adaptive thinking for briefing-onboarding (Sonnet 4.6)
           ...(context === "briefing-onboarding" ? {
             providerOptions: {
               anthropic: {
