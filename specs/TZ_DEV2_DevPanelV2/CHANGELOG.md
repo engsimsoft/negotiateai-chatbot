@@ -1,5 +1,37 @@
 # Changelog ТЗ-DEV2: Pipeline Observability
 
+## [Этап 4] — 2026-03-01
+
+### Создано
+- `lib/db/migrations/0043_briefing-history-metadata.sql` — ALTER TABLE ADD COLUMN metadata jsonb
+
+### Изменено
+- `lib/db/schema.ts` — +`metadata: jsonb("metadata")` в briefingHistory
+- `lib/db/queries.ts` — `saveBriefingHistory()` +optional `metadata` param; new `updateBriefingMetadata()` (merge pattern for cron)
+- `lib/briefing/briefing-pipeline.ts` — traceSummary computed before save, passed as `metadata: { briefingTrace }`. Both success and failure paths.
+- `app/api/cron/briefing/route.ts` — +`updateBriefingMetadata({ briefingId, metadata: { podcastTrace } })` after podcast pipeline, non-blocking .catch()
+
+### Валидация
+- `npx tsc --noEmit` — 0 ошибок
+- `npm run build` — успешен
+- SQL: metadata column exists in BriefingHistory
+
+## [Этап 3] — 2026-03-01
+
+### Изменено (инструментирование)
+- `lib/podcast/script-generator.ts` — usage capture, timing, retry count, word count, PipelineStageTrace
+- `lib/podcast/tts-gemini.ts` — return type `Buffer` → `{ buffer, trace? }`, timing, audio duration, retry trace
+- `lib/podcast/index.ts` — +`segmentTrace?: SegmentTrace` return
+- `lib/podcast/podcast-pipeline.ts` — TraceCollector, per-topic trace, onTrace, traceSummary
+- `app/(chat)/api/briefing/podcast/generate/route.ts` — onTrace for dev mode NDJSON
+- `lib/ai/tools/perplexity-client.ts` — full usage (prompt + completion + total), timing
+- `lib/briefing/research-engine.ts` — per-topic PipelineStageTrace, verification traces
+- `app/(chat)/api/briefing/refresh-section/route.ts` — TraceCollector, _trace in response
+
+### Валидация
+- `npx tsc --noEmit` — 0 ошибок
+- `npm run build` — успешен
+
 ## [Этап 2] — 2026-03-01
 
 ### Изменено (инструментирование)

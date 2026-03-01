@@ -3012,6 +3012,7 @@ export async function saveBriefingHistory({
   duplicatesRemoved,
   tokensUsed,
   status,
+  metadata,
 }: {
   userId: string;
   briefingJson: unknown;
@@ -3020,6 +3021,7 @@ export async function saveBriefingHistory({
   duplicatesRemoved?: number;
   tokensUsed?: number;
   status: string;
+  metadata?: Record<string, unknown>;
 }) {
   try {
     const now = new Date();
@@ -3035,6 +3037,7 @@ export async function saveBriefingHistory({
         status,
         generatedAt: now,
         createdAt: now,
+        metadata: metadata ?? null,
       })
       .returning();
 
@@ -3450,6 +3453,42 @@ export async function updateBriefingAudio({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to update briefing audio",
+    );
+  }
+}
+
+/**
+ * ТЗ-DEV2: Merge additional metadata into a briefing history record.
+ * Used by cron to append podcast trace after briefing is already saved.
+ */
+export async function updateBriefingMetadata({
+  briefingId,
+  metadata,
+}: {
+  briefingId: string;
+  metadata: Record<string, unknown>;
+}) {
+  try {
+    const existing = await db
+      .select({ metadata: briefingHistory.metadata })
+      .from(briefingHistory)
+      .where(eq(briefingHistory.id, briefingId))
+      .limit(1);
+
+    const currentMetadata =
+      (existing[0]?.metadata as Record<string, unknown> | null) ?? {};
+    const merged = { ...currentMetadata, ...metadata };
+
+    await db
+      .update(briefingHistory)
+      .set({ metadata: merged })
+      .where(eq(briefingHistory.id, briefingId));
+
+    return merged;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update briefing metadata",
     );
   }
 }

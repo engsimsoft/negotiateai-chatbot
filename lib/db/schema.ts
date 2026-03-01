@@ -476,6 +476,8 @@ export const briefingHistory = pgTable(
     audioUrls: jsonb("audioUrls"),
     audioStatus: text("audioStatus").default("none"),
     audioDurations: jsonb("audioDurations"),
+    // ТЗ-DEV2: Pipeline trace metadata (jsonb, nullable)
+    metadata: jsonb("metadata"),
   },
   (table) => ({
     userIdx: index("briefing_history_user_idx").on(table.userId),

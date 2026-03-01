@@ -302,6 +302,13 @@
       "when": 1772409600000,
       "tag": "0042_telegram-message-files",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1772496000000,
+      "tag": "0043_briefing-history-metadata",
+      "breakpoints": true
     }
   ]
 }

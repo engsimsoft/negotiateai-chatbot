@@ -9,6 +9,7 @@ import {
   getBriefingHistory,
   getUsersForDelivery,
   updateBriefingDeliveryStatus,
+  updateBriefingMetadata,
 } from "@/lib/db/queries";
 import { deliverBriefingToTelegram } from "@/lib/telegram/briefing-delivery";
 import type { BriefingArticle } from "@/lib/briefing/briefing-types";
@@ -154,6 +155,16 @@ async function generateAndDeliver(
         console.log(
           `[cron/briefing] User ${userId}: podcast ${podcastStatus}`,
         );
+
+        // ТЗ-DEV2: Merge podcast trace into briefing metadata
+        if (podcastResult.traceSummary) {
+          await updateBriefingMetadata({
+            briefingId,
+            metadata: { podcastTrace: podcastResult.traceSummary },
+          }).catch((err) => {
+            console.warn(`[cron/briefing] User ${userId}: failed to save podcast trace:`, err);
+          });
+        }
 
         if (podcastResult.readyCount > 0) {
           // Re-read briefing with updated audioUrls

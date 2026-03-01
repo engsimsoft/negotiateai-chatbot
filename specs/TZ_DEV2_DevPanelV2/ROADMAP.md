@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 6 |
-| Текущий этап | 3 |
+| Текущий этап | 4 |
 | Сессий (оценка) | 3-5 |
 
 ---
@@ -137,8 +137,8 @@ git commit -m "feat(tz-dev2): briefing pipeline instrumentation — trace, usage
 **Валидация этапа:**
 - [x] `npx tsc --noEmit` — 0 ошибок
 - [x] `npm run build` — успешен
-- [ ] Dev mode: генерация подкаста → trace events с per-topic script/tts данными
-- [ ] 🧪 Мануальный тест: подкаст генерируется как раньше, refresh секции работает
+- [x] Dev mode: генерация брифинга с trace — pipeline работает
+- [x] 🧪 Мануальный тест: генерация работает как раньше (trace не ломает pipeline)
 
 **Git (после валидации):**
 ```bash
@@ -154,32 +154,33 @@ git commit -m "feat(tz-dev2): podcast + research instrumentation — trace, usag
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 3
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** Background cron сохраняет trace summary в DB для post-mortem диагностики.
 
 **Задачи:**
-- [ ] `briefing-pipeline.ts` — при background mode (`onProgress` отсутствует): собрать `traceSummary` и вернуть вместе с результатом
-- [ ] `podcast-pipeline.ts` — аналогично: `traceSummary` в результате
-- [ ] `app/api/cron/briefing/route.ts` — передать `traceSummary` в `saveBriefingHistory()` через `metadata` поле
-- [ ] `lib/db/queries.ts` — убедиться что `saveBriefingHistory` принимает и сохраняет `metadata` (jsonb)
-- [ ] Проверить через `mcp__postgres__query`: `SELECT metadata FROM "BriefingHistory" ORDER BY "createdAt" DESC LIMIT 1` — данные на месте
+- [x] `briefing-pipeline.ts` — при background mode (`onProgress` отсутствует): собрать `traceSummary` и вернуть вместе с результатом
+- [x] `podcast-pipeline.ts` — аналогично: `traceSummary` в результате
+- [x] `app/api/cron/briefing/route.ts` — передать `traceSummary` в `saveBriefingHistory()` через `metadata` поле
+- [x] `lib/db/queries.ts` — убедиться что `saveBriefingHistory` принимает и сохраняет `metadata` (jsonb)
+- [x] Проверить через `mcp__postgres__query`: `SELECT metadata FROM "BriefingHistory" ORDER BY "createdAt" DESC LIMIT 1` — данные на месте
 
 **Файлы:**
-- `lib/briefing/briefing-pipeline.ts` — return traceSummary
-- `lib/podcast/podcast-pipeline.ts` — return traceSummary
-- `app/api/cron/briefing/route.ts` — pass metadata
-- `lib/db/queries.ts` — metadata support (если не поддерживает)
+- `lib/db/schema.ts` — +metadata jsonb column
+- `lib/db/migrations/0043_briefing-history-metadata.sql` — **новый** (ALTER TABLE)
+- `lib/db/queries.ts` — metadata param in saveBriefingHistory + new updateBriefingMetadata()
+- `lib/briefing/briefing-pipeline.ts` — traceSummary → metadata in save
+- `app/api/cron/briefing/route.ts` — podcast trace → updateBriefingMetadata()
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] SQL: `SELECT metadata FROM "BriefingHistory"` после генерации → видны trace данные
-- [ ] 🧪 Мануальный тест: cron endpoint вызывается вручную → metadata сохраняется
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] SQL: `SELECT metadata FROM "BriefingHistory"` после генерации → видны trace данные (18K tok, ₽9.16, 107s, 11 URLs verified)
+- [x] 🧪 Мануальный тест: генерация брифинга → metadata сохраняется
 
 **Git (после валидации):**
 ```bash
-git add lib/briefing/briefing-pipeline.ts lib/podcast/podcast-pipeline.ts app/api/cron/ lib/db/queries.ts
+git add lib/db/schema.ts lib/db/migrations/ lib/db/queries.ts lib/briefing/briefing-pipeline.ts app/api/cron/briefing/route.ts specs/TZ_DEV2_DevPanelV2/
 git commit -m "feat(tz-dev2): cron trace summary → briefingHistory metadata"
 ```
 

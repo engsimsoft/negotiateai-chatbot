@@ -163,6 +163,7 @@ export async function runBriefingPipeline({
     }
 
     if (allItems.length === 0) {
+      const failTraceSummary = trace.isEnabled ? trace.getSummary() : undefined;
       await saveBriefingHistory({
         userId,
         briefingJson: {
@@ -172,6 +173,7 @@ export async function runBriefingPipeline({
         sourcesChecked: sourcesToFetch.length,
         itemsIncluded: 0,
         status: "failed",
+        metadata: failTraceSummary ? { briefingTrace: failTraceSummary } : undefined,
       });
 
       emit({
@@ -186,7 +188,7 @@ export async function runBriefingPipeline({
         duplicatesRemoved: 0,
         tokensUsed: 0,
         error: "No content fetched",
-        traceSummary: trace.isEnabled ? trace.getSummary() : undefined,
+        traceSummary: failTraceSummary,
       };
     }
 
@@ -309,7 +311,10 @@ export async function runBriefingPipeline({
       detail: `${article.meta.topicsCount} тем, ${article.meta.totalNews} новостей`,
     });
 
-    // Save final result
+    // ТЗ-DEV2: Compute trace summary BEFORE save → store as metadata
+    const traceSummary = trace.isEnabled ? trace.getSummary() : undefined;
+
+    // Save final result (with trace metadata if dev mode)
     await saveBriefingHistory({
       userId,
       briefingJson: article,
@@ -318,10 +323,10 @@ export async function runBriefingPipeline({
       duplicatesRemoved,
       tokensUsed: totalTokens,
       status: "ready",
+      metadata: traceSummary ? { briefingTrace: traceSummary } : undefined,
     });
 
-    // ТЗ-DEV2: Emit final trace summary
-    const traceSummary = trace.isEnabled ? trace.getSummary() : undefined;
+    // ТЗ-DEV2: Emit final trace summary (streaming to browser)
     if (traceSummary) {
       emitTrace({ traceSummary });
     }

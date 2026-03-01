@@ -1,7 +1,7 @@
 # Handoff ТЗ-DEV2: Pipeline Observability
 
 **Последнее обновление:** 2026-03-01
-**Текущий этап:** Этап 3 завершён ✅ → Этап 4 следующий
+**Текущий этап:** Этап 4 завершён ✅ → Этап 5 следующий
 
 ---
 
@@ -13,44 +13,39 @@
   - [x] **Этап 1:** Типы + Pricing + Trace Collector
   - [x] **Этап 2:** Инструментирование Briefing Pipeline (backend)
   - [x] **Этап 3:** Podcast + Research + Section Refresh
-  - [ ] **Этап 4:** Cron trace + DB metadata ← СЛЕДУЮЩИЙ
-  - [ ] Этап 5: UI — Trace Footer + Drawer
+  - [x] **Этап 4:** Cron trace + DB metadata
+  - [ ] **Этап 5:** UI — Trace Footer + Drawer ← СЛЕДУЮЩИЙ
   - [ ] Этап 6: Финализация
 - [ ] Фаза 4: Финализация
 
 ---
 
-## Что сделано в Этапе 3
+## Что сделано в Этапе 4
 
-### Изменённые файлы (8 файлов)
+### Изменённые файлы (5 файлов + 1 миграция)
 
-**Podcast instrumented (3 + 1 route):**
-- `lib/podcast/script-generator.ts` — usage capture (AI SDK v5: inputTokens/outputTokens), timing wrap, retry count accumulation across attempts, word count, PipelineStageTrace return
-- `lib/podcast/tts-gemini.ts` — `generateSpeechWithRetry` return changed: `Buffer` → `{ buffer, trace? }`, timing, PCM→audio duration (24kHz 16-bit mono = 48000 bytes/sec), retry trace via `buildTtsTrace()`
-- `lib/podcast/index.ts` — `generatePodcastSegment` returns `segmentTrace?: SegmentTrace` (scriptTrace + ttsTrace), updated for new `generateSpeechWithRetry` return type
-- `lib/podcast/podcast-pipeline.ts` — TraceCollector("podcast"), per-topic script+TTS trace collection, `onTrace` callback, `emitTrace()` pattern, `traceSummary` in PodcastPipelineResult
-- `app/(chat)/api/briefing/podcast/generate/route.ts` — `onTrace` for dev mode NDJSON streaming (gated by isSimplyDevMode)
+**Schema + Migration:**
+- `lib/db/schema.ts` — +`metadata: jsonb("metadata")` column to `briefingHistory` table
+- `lib/db/migrations/0043_briefing-history-metadata.sql` — **новый** ALTER TABLE ADD COLUMN
 
-**Research instrumented (2):**
-- `lib/ai/tools/perplexity-client.ts` — full usage (promptTokens + completionTokens + totalTokens), `durationMs` timing in result
-- `lib/briefing/research-engine.ts` — per-topic PipelineStageTrace with Perplexity AI call trace (model, tokens, cost), FetchTrace per verification (web + telegram), `verifySourceWithTrace` + `verifyTelegramChannelWithTrace` wrappers, traces[] in ResearchResult
+**Queries:**
+- `lib/db/queries.ts` — `saveBriefingHistory()` now accepts optional `metadata: Record<string, unknown>` param, saved as jsonb. New `updateBriefingMetadata()` function for merging additional metadata (e.g. podcast trace) into existing record.
 
-**Section refresh instrumented (1):**
-- `app/(chat)/api/briefing/refresh-section/route.ts` — TraceCollector("section-refresh"), filter + author trace collection, `_trace` field in JSON response (dev mode only via isSimplyDevMode)
+**Pipeline → DB trace flow:**
+- `lib/briefing/briefing-pipeline.ts` — traceSummary computed BEFORE final `saveBriefingHistory()` call, passed as `metadata: { briefingTrace: traceSummary }`. Both success and failure paths save trace metadata.
+- `app/api/cron/briefing/route.ts` — after podcast pipeline completes, calls `updateBriefingMetadata({ briefingId, metadata: { podcastTrace: traceSummary } })` to merge podcast trace into existing briefing metadata. Non-blocking `.catch()` so podcast trace failure doesn't break delivery.
 
-### Ключевые решения Этапа 3
-1. **generateSpeechWithRetry return type changed** — `Buffer` → `{ buffer, trace? }`. Breaking for callers, but only `index.ts` calls it (updated simultaneously)
-2. **SegmentTrace type** — new interface in `lib/podcast/index.ts` grouping scriptTrace + ttsTrace. Pipeline collects both via `trace.addStage()`
-3. **PCM audio duration** — `buffer.length / 48000` (24kHz, 16-bit, mono = 48000 bytes/sec)
-4. **Research trace wrappers** — `verifySourceWithTrace` / `verifyTelegramChannelWithTrace` wrap originals to record FetchTrace without modifying logic
-5. **Perplexity usage expanded** — was `{ totalTokens }`, now `{ promptTokens, completionTokens, totalTokens }`. Backward compatible
-6. **Section refresh _trace** — underscore prefix = dev metadata, only when `isSimplyDevMode`
+### Ключевые решения Этапа 4
+1. **Separate column vs briefingJson** — metadata is a separate `jsonb` column, not embedded in `briefingJson`. Clean separation: content vs diagnostics.
+2. **Merge pattern** — `updateBriefingMetadata` reads existing metadata, spreads new data on top. Supports cron flow: briefing trace saved first → podcast trace merged after.
+3. **Non-blocking podcast trace** — `.catch()` on `updateBriefingMetadata` in cron. Podcast trace is nice-to-have, must not block Telegram delivery.
+4. **Guard: isSimplyDevMode** — TraceCollector is no-op when dev mode is off. In production, `trace.getSummary()` returns minimal data (pipeline name only), so metadata will be very small.
 
 ### Валидация
 - `npx tsc --noEmit` — 0 ошибок ✅
 - `npm run build` — успешен ✅
-- **Ожидает мануальный тест:** подкаст генерируется как раньше, refresh секции работает
-- **Git commit НЕ сделан** — нужно после мануального теста
+- SQL: `metadata` column exists, currently `null` for existing records ✅
+- **Ожидает мануальный тест:** генерация брифинга → `SELECT metadata` shows trace data
 
 ---
 
@@ -65,20 +60,23 @@
 
 ---
 
-## Следующий: Этап 4 — Cron trace + Briefing History metadata
+## Следующий: Этап 5 — UI — Trace Footer + Drawer
 
-**Перед началом:** Прочитать ROADMAP.md (Этап 4), затем эти файлы:
+**Перед началом:** Прочитать ROADMAP.md (Этап 5), затем эти файлы:
 
 ### Файлы для изменения
-1. `lib/briefing/briefing-pipeline.ts` — проверить что traceSummary возвращается в background mode (уже делает)
-2. `lib/podcast/podcast-pipeline.ts` — traceSummary уже в результате (добавлен в Этапе 3)
-3. `app/api/cron/briefing/route.ts` — передать traceSummary в saveBriefingHistory metadata
-4. `lib/db/queries.ts` — убедиться что saveBriefingHistory принимает metadata (jsonb)
+1. `hooks/use-briefing-generation.ts` — parse `{trace:...}` и `{traceSummary:...}` events из NDJSON
+2. `hooks/use-podcast-generation.ts` — аналогично
+3. `components/dev-panel/pipeline-trace-footer.tsx` — **новый** (compact monospace line)
+4. `components/dev-panel/pipeline-trace-drawer.tsx` — **новый** (Sheet с полной трассировкой)
+5. `components/briefing/briefing-generation-progress.tsx` — footer slot
+6. `components/briefing/podcast-progress.tsx` — footer slot
+7. `components/briefing/briefing-article-view.tsx` — refresh badge (dev mode)
 
 ### Reference файлы
-- `lib/ai/pipeline-trace.ts` — типы и TraceCollector
-- `lib/briefing/briefing-pipeline.ts` — уже возвращает traceSummary
-- `lib/podcast/podcast-pipeline.ts` — уже возвращает traceSummary
+- `lib/ai/pipeline-trace.ts` — типы PipelineTraceSummary
+- `components/dev-panel/dev-panel-footer.tsx` — аналог для chat (паттерн)
+- `components/dev-panel/dev-panel-drawer.tsx` — аналог для chat (паттерн)
 
 ---
 
