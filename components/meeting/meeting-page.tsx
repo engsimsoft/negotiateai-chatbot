@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   Mic,
   Square,
@@ -11,9 +11,13 @@ import {
   Loader2,
   AlertCircle,
   RotateCcw,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MarkdownViewer } from "@/components/markdown-viewer";
 import { useMeetingRecorder, formatDuration } from "@/hooks/use-meeting-recorder";
+import { useMeetingProcessing } from "@/hooks/use-meeting-processing";
+import { MeetingProgress } from "@/components/meeting/meeting-progress";
 
 type PageState = "input" | "ready" | "uploading" | "processing" | "result";
 type SummaryLevel = "compact" | "standard" | "detailed";
@@ -28,6 +32,7 @@ const ACCEPTED_AUDIO_TYPES = ".mp3,.m4a,.wav,.webm,.ogg,.aac,.flac";
 
 export function MeetingPage() {
   const recorder = useMeetingRecorder();
+  const processing = useMeetingProcessing();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [pageState, setPageState] = useState<PageState>("input");
@@ -38,8 +43,30 @@ export function MeetingPage() {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [resultRecord, setResultRecord] = useState<{
+    title: string;
+    summary: string;
+    durationSeconds: number;
+    speakerCount: number;
+    summaryLevel: string;
+  } | null>(null);
 
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
+
+  // Transition: processing complete → fetch record → show result
+  useEffect(() => {
+    if (processing.recordId && pageState === "processing") {
+      fetch(`/api/meeting/records/${processing.recordId}`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (data) setResultRecord(data);
+          setPageState("result");
+        })
+        .catch(() => {
+          setPageState("result");
+        });
+    }
+  }, [processing.recordId, pageState]);
 
   // Handle file selection
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,21 +138,24 @@ export function MeetingPage() {
       // Duration: from recorder elapsed or from file metadata
       const duration = recorder.elapsed > 0 ? recorder.elapsed : audioDuration;
 
-      // TODO Этап 3: trigger /api/meeting/process with blobUrl + summaryLevel + duration
-      console.log("[meeting] Uploaded to blob:", url, "level:", summaryLevel, "duration:", duration);
-
-      // For now, show success placeholder
-      setPageState("result");
+      // Transition to processing and trigger the pipeline
+      setPageState("processing");
+      processing.startProcessing({
+        blobUrl: url,
+        summaryLevel,
+        durationSeconds: duration,
+      });
     } catch (err) {
       console.error("[meeting] Upload error:", err);
       setError(err instanceof Error ? err.message : "Ошибка загрузки файла. Попробуйте ещё раз.");
       setPageState("ready");
     }
-  }, [recorder.blob, recorder.elapsed, audioFile, audioDuration, summaryLevel]);
+  }, [recorder.blob, recorder.elapsed, audioFile, audioDuration, summaryLevel, processing]);
 
   // Reset everything
   const handleReset = useCallback(() => {
     recorder.reset();
+    processing.reset();
     setPageState("input");
     setSummaryLevel("standard");
     setAudioFile(null);
@@ -135,8 +165,9 @@ export function MeetingPage() {
     setBlobUrl(null);
     setUploadProgress(0);
     setError(null);
+    setResultRecord(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [recorder, audioUrl]);
+  }, [recorder, processing, audioUrl]);
 
   // Current audio URL (from recorder or file)
   const currentAudioUrl = recorder.audioUrl ?? audioUrl;
@@ -338,27 +369,62 @@ export function MeetingPage() {
         </div>
       )}
 
-      {/* ===== RESULT PLACEHOLDER (for Этап 3-4) ===== */}
+      {/* ===== PROCESSING STATE ===== */}
+      {pageState === "processing" && (
+        <MeetingProgress
+          steps={processing.steps}
+          isProcessing={processing.isProcessing}
+          error={processing.error}
+          onRetry={() => {
+            if (blobUrl) {
+              processing.startProcessing({
+                blobUrl,
+                summaryLevel,
+                durationSeconds: recorder.elapsed > 0 ? recorder.elapsed : audioDuration,
+              });
+            }
+          }}
+        />
+      )}
+
+      {/* ===== RESULT STATE ===== */}
       {pageState === "result" && (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4">
-          <div className="text-center">
-            <span className="text-4xl">✅</span>
-            <h2 className="mt-3 font-serif text-lg font-semibold">
-              Аудио загружено
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Обработка будет реализована в Этапе 3
-            </p>
-            {blobUrl && (
-              <p className="mt-2 break-all text-xs text-muted-foreground">
-                {blobUrl}
-              </p>
-            )}
+        <div className="flex flex-1 flex-col gap-6">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-serif text-lg font-semibold">
+                {resultRecord?.title ?? "Документ готов"}
+              </h2>
+              {resultRecord && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {Math.round(resultRecord.durationSeconds / 60)} мин
+                  {resultRecord.speakerCount > 0 && ` \u00B7 ${resultRecord.speakerCount} спикер(ов)`}
+                  {` \u00B7 ${SUMMARY_OPTIONS.find((o) => o.value === resultRecord.summaryLevel)?.label ?? resultRecord.summaryLevel}`}
+                </p>
+              )}
+            </div>
+            <Button variant="outline" size="sm" onClick={handleReset} className="shrink-0 gap-2">
+              <RotateCcw className="size-3.5" />
+              Новая запись
+            </Button>
           </div>
-          <Button variant="outline" onClick={handleReset} className="mt-4 gap-2">
-            <RotateCcw className="size-4" />
-            Новая запись
-          </Button>
+
+          {/* Document content */}
+          {resultRecord?.summary ? (
+            <div className="rounded-xl border bg-background p-5">
+              <MarkdownViewer content={resultRecord.summary} className="text-sm" />
+            </div>
+          ) : (
+            <div className="flex flex-1 items-center justify-center">
+              <div className="text-center">
+                <CheckCircle2 className="mx-auto size-12 text-green-600" />
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Запись обработана и сохранена
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
