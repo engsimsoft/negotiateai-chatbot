@@ -1,6 +1,8 @@
-// ТЗ-BF4: POST /api/briefing/refresh-section — refresh a single topic section
+// ТЗ-BF4 + ТЗ-DEV2: POST /api/briefing/refresh-section — refresh a single topic section
 
 import { auth } from "@/app/(auth)/auth";
+import { isSimplyDevMode } from "@/lib/constants";
+import { TraceCollector } from "@/lib/ai/pipeline-trace";
 import { generateSection } from "@/lib/briefing/briefing-section-author";
 import { filterContent } from "@/lib/briefing/briefing-filter";
 import { fetchSource } from "@/lib/briefing/source-fetchers";
@@ -123,8 +125,16 @@ export async function POST(request: Request) {
 
     console.log(`[Refresh Section] fetched ${allItems.length} items`);
 
+    // ТЗ-DEV2: Trace collector for section refresh
+    const trace = new TraceCollector("section-refresh");
+
     // 4. Filter (Gemini Flash, single topic)
-    const { candidates } = await filterContent(allItems, [topicId]);
+    const { candidates, trace: filterTrace } = await filterContent(allItems, [topicId]);
+
+    // ТЗ-DEV2: Collect filter trace
+    if (trace.isEnabled && filterTrace) {
+      trace.addStage(filterTrace);
+    }
 
     console.log(`[Refresh Section] ${candidates.length} candidates after filter`);
 
@@ -154,7 +164,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const { section, tokensUsed } = await generateSection({
+    const { section, tokensUsed, trace: authorTrace } = await generateSection({
       candidates,
       fullTexts: fullTextsMap,
       tierMap,
@@ -164,6 +174,11 @@ export async function POST(request: Request) {
       previousTopicHeadlines,
       previousUrls,
     });
+
+    // ТЗ-DEV2: Collect author trace
+    if (trace.isEnabled && authorTrace) {
+      trace.addStage(authorTrace);
+    }
 
     console.log(`[Refresh Section] generated section, tokens=${tokensUsed}`);
 
@@ -183,8 +198,12 @@ export async function POST(request: Request) {
       }
     }
 
-    // 7. Return updated section to client
-    return new Response(JSON.stringify(section), {
+    // 7. Return updated section to client (+ trace in dev mode)
+    const responseBody = isSimplyDevMode
+      ? { ...section, _trace: trace.getSummary() }
+      : section;
+
+    return new Response(JSON.stringify(responseBody), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {

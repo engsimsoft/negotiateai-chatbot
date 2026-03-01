@@ -1,10 +1,17 @@
-// ТЗ-Б1: Podcast Engine — public API
+// ТЗ-Б1 + ТЗ-DEV2: Podcast Engine — public API
 
+import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import type { BriefingArticleSection } from "@/lib/briefing/briefing-types";
 import { generateScript } from "./script-generator";
 import { generateSpeechWithRetry, DEFAULT_VOICES } from "./tts-gemini";
 import { pcmToMp3, calculateDuration } from "./audio-converter";
 import type { ScriptContext, PodcastSegment } from "./types";
+
+/** Per-topic trace data from script + TTS stages */
+export interface SegmentTrace {
+  scriptTrace?: PipelineStageTrace;
+  ttsTrace?: PipelineStageTrace;
+}
 
 /**
  * Generate a podcast segment from a briefing section.
@@ -12,14 +19,14 @@ import type { ScriptContext, PodcastSegment } from "./types";
  *
  * @param section - Briefing article section (topicId, content, etc.)
  * @param context - Script context (isFirst, isLast, sectionTitles, briefingDate)
- * @returns PodcastSegment with MP3 buffer, duration, and replica count
+ * @returns PodcastSegment with MP3 buffer, duration, replica count, and trace data
  */
 export async function generatePodcastSegment(
   section: BriefingArticleSection,
   context: ScriptContext,
-): Promise<PodcastSegment> {
+): Promise<PodcastSegment & { segmentTrace?: SegmentTrace }> {
   // Step 1: Generate dialogue script
-  const { script, replicaCount } = await generateScript(section, context);
+  const { script, replicaCount, trace: scriptTrace } = await generateScript(section, context);
 
   const wordCount = script.split(/\s+/).length;
   console.log(
@@ -27,7 +34,7 @@ export async function generatePodcastSegment(
   );
 
   // Step 2: Generate speech (PCM) via Gemini TTS with retry
-  const pcmBuffer = await generateSpeechWithRetry(script, DEFAULT_VOICES);
+  const { buffer: pcmBuffer, trace: ttsTrace } = await generateSpeechWithRetry(script, DEFAULT_VOICES);
 
   // Step 3: Convert PCM → MP3
   const mp3Buffer = pcmToMp3(pcmBuffer);
@@ -42,6 +49,7 @@ export async function generatePodcastSegment(
     mp3Buffer,
     durationSeconds,
     replicaCount,
+    segmentTrace: { scriptTrace, ttsTrace },
   };
 }
 

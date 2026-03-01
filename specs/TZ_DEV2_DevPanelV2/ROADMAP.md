@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 6 |
-| Текущий этап | 2 |
+| Текущий этап | 3 |
 | Сессий (оценка) | 3-5 |
 
 ---
@@ -91,8 +91,8 @@ git commit -m "feat(tz-dev2): pipeline trace types + pricing for Gemini/Perplexi
 **Валидация этапа:**
 - [x] `npx tsc --noEmit` — 0 ошибок
 - [x] `npm run build` — успешен
-- [ ] Dev mode: запустить генерацию брифинга → в console видны trace events с реальными данными (модель, токены, стоимость, fetch details)
-- [ ] 🧪 Мануальный тест: генерация брифинга работает как раньше (trace не ломает pipeline)
+- [x] Dev mode: запустить генерацию брифинга → в console видны trace events с реальными данными (модель, токены, стоимость, fetch details)
+- [x] 🧪 Мануальный тест: генерация брифинга работает как раньше (trace не ломает pipeline)
 
 **Git (после валидации):**
 ```bash
@@ -108,23 +108,23 @@ git commit -m "feat(tz-dev2): briefing pipeline instrumentation — trace, usage
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 2
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** Podcast pipeline и research engine генерируют trace data.
 
 **Задачи:**
 
 **Podcast:**
-- [ ] `script-generator.ts` — деструктурировать `usage` из `generateText()` (сейчас полностью игнорируется!), timing, retry count + word count per attempt, costRub
-- [ ] `tts-gemini.ts` — timing, audio duration (из buffer size: MP3 bitrate → seconds), `usageMetadata` если доступно, retry trace
-- [ ] `podcast-pipeline.ts` — создать TraceCollector, per-topic trace (script + tts), emit `{trace:...}` events в NDJSON stream (dev mode), финальный `{traceSummary:...}`
+- [x] `script-generator.ts` — деструктурировать `usage` из `generateText()` (сейчас полностью игнорируется!), timing, retry count + word count per attempt, costRub
+- [x] `tts-gemini.ts` — timing, audio duration (из buffer size: PCM 24kHz 16-bit mono → seconds), retry trace
+- [x] `podcast-pipeline.ts` — создать TraceCollector, per-topic trace (script + tts), emit `{trace:...}` events в NDJSON stream (dev mode), финальный `{traceSummary:...}`
 
 **Research:**
-- [ ] `perplexity-client.ts` — захватить `prompt_tokens` + `completion_tokens` (сейчас только total), timing
-- [ ] `research-engine.ts` — per-topic trace: Perplexity query time/tokens, fetchPage calls (url, success/fail, time), Telegram parse (channel, posts found)
+- [x] `perplexity-client.ts` — захватить `prompt_tokens` + `completion_tokens` (сейчас только total), timing
+- [x] `research-engine.ts` — per-topic trace: Perplexity query time/tokens, fetchPage calls (url, success/fail, time), Telegram parse (channel, posts found)
 
 **Section refresh:**
-- [ ] `app/(chat)/api/briefing/refresh-section/route.ts` — добавить trace в JSON response (dev mode): filter + author usage/timing/cost
+- [x] `app/(chat)/api/briefing/refresh-section/route.ts` — добавить trace в JSON response (dev mode): filter + author usage/timing/cost
 
 **Файлы:**
 - `lib/podcast/script-generator.ts` — usage capture, timing, retry trace
@@ -135,8 +135,8 @@ git commit -m "feat(tz-dev2): briefing pipeline instrumentation — trace, usage
 - `app/(chat)/api/briefing/refresh-section/route.ts` — trace in response
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Dev mode: генерация подкаста → trace events с per-topic script/tts данными
 - [ ] 🧪 Мануальный тест: подкаст генерируется как раньше, refresh секции работает
 

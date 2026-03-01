@@ -46,9 +46,13 @@ export interface PerplexityCallResult {
   content: string;
   citations: PerplexityCitation[];
   usage?: {
+    promptTokens: number;
+    completionTokens: number;
     totalTokens: number;
     searchQueries?: number;
   };
+  /** ТЗ-DEV2: Duration of the API call in milliseconds */
+  durationMs?: number;
 }
 
 const DEFAULT_MODEL: PerplexityModel = "sonar-pro";
@@ -82,6 +86,8 @@ export async function callPerplexity(
     (hasCyrillic
       ? "Отвечай на русском языке. Будь точным и структурированным."
       : "Be precise and well-structured.");
+
+  const startTime = Date.now();
 
   const response = await fetch("https://api.perplexity.ai/chat/completions", {
     method: "POST",
@@ -126,14 +132,19 @@ export async function callPerplexity(
     }
   }
 
+  const durationMs = Date.now() - startTime;
+
   return {
     content,
     citations,
     usage: data.usage
       ? {
+          promptTokens: data.usage.prompt_tokens,
+          completionTokens: data.usage.completion_tokens,
           totalTokens: data.usage.total_tokens,
           searchQueries: data.usage.search_queries,
         }
       : undefined,
+    durationMs,
   };
 }

@@ -12,6 +12,8 @@
 import pLimit from "p-limit";
 
 import { callPerplexity } from "@/lib/ai/tools/perplexity-client";
+import { calculateCostRub } from "@/lib/ai/providers";
+import type { PipelineStageTrace, FetchTrace } from "@/lib/ai/pipeline-trace";
 import { fetchPage } from "@/lib/ai/tools/fetch-page";
 import { parseTelegramChannel } from "@/lib/telegram/parser";
 
@@ -55,6 +57,8 @@ export interface TopicResearchResult {
   sources: VerifiedSource[];
   sourcesChecked: number;
   sourcesVerified: number;
+  /** ТЗ-DEV2: Per-topic trace data */
+  trace?: PipelineStageTrace;
 }
 
 export interface ResearchResult {
@@ -63,6 +67,8 @@ export interface ResearchResult {
   totalSources: number;
   totalVerified: number;
   error?: string;
+  /** ТЗ-DEV2: All per-topic traces */
+  traces?: PipelineStageTrace[];
 }
 
 // ---------------------------------------------------------------------------
@@ -164,11 +170,17 @@ export async function researchTopics(
       0,
     );
 
+    // ТЗ-DEV2: Collect per-topic traces
+    const traces = results
+      .map((r) => r.trace)
+      .filter((t): t is PipelineStageTrace => !!t);
+
     return {
       success: true,
       results,
       totalSources,
       totalVerified,
+      traces: traces.length > 0 ? traces : undefined,
     };
   } catch (error) {
     return {
@@ -201,6 +213,10 @@ async function researchSingleTopic(
     onProgress?.({ topicId, topicName, emoji, phase, ...extra });
   };
 
+  const startTime = Date.now();
+  const warnings: string[] = [];
+  const fetchTraces: FetchTrace[] = [];
+
   try {
     // Phase 1: Perplexity search — combined query for web sources + telegram channels
     progress("searching");
@@ -211,6 +227,17 @@ async function researchSingleTopic(
       model: "sonar-pro",
       timeoutMs: 30_000,
     });
+
+    // ТЗ-DEV2: Perplexity fetch trace
+    if (perplexityResult.durationMs) {
+      fetchTraces.push({
+        url: "perplexity://sonar-pro",
+        method: "perplexity",
+        durationMs: perplexityResult.durationMs,
+        itemsExtracted: perplexityResult.citations.length,
+        warnings: [],
+      });
+    }
 
     // Phase 2: Extract URLs and telegram handles
     const citationUrls = extractCitations(perplexityResult.citations, perplexityResult.content);
@@ -224,11 +251,11 @@ async function researchSingleTopic(
 
     const urlVerifications = citationUrls
       .slice(0, MAX_CITATIONS_PER_TOPIC)
-      .map((url) => verifyLimit(() => verifySource(url)));
+      .map((url) => verifyLimit(() => verifySourceWithTrace(url, fetchTraces, warnings)));
 
     const telegramVerifications = telegramHandles
       .slice(0, MAX_TELEGRAM_PER_TOPIC)
-      .map((handle) => verifyLimit(() => verifyTelegramChannel(handle)));
+      .map((handle) => verifyLimit(() => verifyTelegramChannelWithTrace(handle, fetchTraces, warnings)));
 
     const [urlResults, telegramResults] = await Promise.all([
       Promise.allSettled(urlVerifications),
@@ -258,6 +285,39 @@ async function researchSingleTopic(
       verified: sources.length,
     });
 
+    // ТЗ-DEV2: Build per-topic trace
+    const durationMs = Date.now() - startTime;
+    const promptTokens = perplexityResult.usage?.promptTokens ?? 0;
+    const completionTokens = perplexityResult.usage?.completionTokens ?? 0;
+    const totalTokens = perplexityResult.usage?.totalTokens ?? (promptTokens + completionTokens);
+
+    const trace: PipelineStageTrace = {
+      stage: "research",
+      startedAt: new Date(startTime).toISOString(),
+      durationMs,
+      ai: {
+        modelId: "sonar-pro",
+        promptPreview: query.slice(0, 500),
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        costRub: calculateCostRub("sonar-pro", {
+          inputTokens: promptTokens,
+          outputTokens: completionTokens,
+        }),
+        finishReason: "stop",
+        retryCount: 0,
+      },
+      fetches: fetchTraces,
+      dataFlow: {
+        inputCount: totalFound,
+        outputCount: sources.length,
+        droppedCount: sourcesChecked - sources.length,
+      },
+      errors: [],
+      warnings,
+    };
+
     return {
       topicId,
       topicName,
@@ -265,6 +325,7 @@ async function researchSingleTopic(
       sources,
       sourcesChecked,
       sourcesVerified: sources.length,
+      trace,
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
@@ -368,6 +429,62 @@ const SKIP_HANDLES = new Set([
   "throws",
   "typedef",
 ]);
+
+/**
+ * ТЗ-DEV2: Verify a web URL with trace recording.
+ */
+async function verifySourceWithTrace(
+  url: string,
+  fetchTraces: FetchTrace[],
+  warnings: string[],
+): Promise<VerifiedSource | null> {
+  const startTime = Date.now();
+  const result = await verifySource(url);
+  const durationMs = Date.now() - startTime;
+
+  fetchTraces.push({
+    url,
+    method: "web",
+    durationMs,
+    itemsExtracted: result ? 1 : 0,
+    error: result ? undefined : `Verification failed for ${url}`,
+    warnings: [],
+  });
+
+  if (!result) {
+    warnings.push(`verifySource failed: ${url}`);
+  }
+
+  return result;
+}
+
+/**
+ * ТЗ-DEV2: Verify a Telegram channel with trace recording.
+ */
+async function verifyTelegramChannelWithTrace(
+  handle: string,
+  fetchTraces: FetchTrace[],
+  warnings: string[],
+): Promise<VerifiedSource | null> {
+  const startTime = Date.now();
+  const result = await verifyTelegramChannel(handle);
+  const durationMs = Date.now() - startTime;
+
+  fetchTraces.push({
+    url: `https://t.me/${handle}`,
+    method: "telegram",
+    durationMs,
+    itemsExtracted: result ? 1 : 0,
+    error: result ? undefined : `Verification failed for @${handle}`,
+    warnings: [],
+  });
+
+  if (!result) {
+    warnings.push(`verifyTelegramChannel failed: @${handle}`);
+  }
+
+  return result;
+}
 
 /**
  * Verify a web URL: fetch page, extract content, discover RSS.

@@ -1,6 +1,8 @@
-// ТЗ-Б1: Gemini TTS Provider — native multi-speaker TTS via @google/genai
+// ТЗ-Б1 + ТЗ-DEV2: Gemini TTS Provider — native multi-speaker TTS via @google/genai
 
 import { GoogleGenAI } from "@google/genai";
+import { buildTtsTrace } from "@/lib/ai/pipeline-trace";
+import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import type { TTSProvider, VoiceConfig } from "./types";
 
 const TTS_MODEL = "gemini-2.5-flash-preview-tts";
@@ -56,19 +58,54 @@ export const geminiTTS: TTSProvider = {
 
 /**
  * Generate speech with retry (1 attempt on failure).
+ * Returns PCM buffer and optional trace data.
  */
 export async function generateSpeechWithRetry(
   script: string,
   voices: VoiceConfig[] = DEFAULT_VOICES,
-): Promise<Buffer> {
+): Promise<{ buffer: Buffer; trace?: PipelineStageTrace }> {
+  const startTime = Date.now();
+  let retryCount = 0;
+  let errorMsg: string | undefined;
+
   try {
-    return await geminiTTS.generateSpeech(script, voices);
+    const buffer = await geminiTTS.generateSpeech(script, voices);
+    const durationMs = Date.now() - startTime;
+    // PCM: 24kHz, 16-bit mono → 48000 bytes/sec
+    const audioDurationSeconds = Math.round(buffer.length / 48000);
+
+    const trace: PipelineStageTrace = {
+      stage: "tts",
+      startedAt: new Date(startTime).toISOString(),
+      durationMs,
+      ai: buildTtsTrace({ durationMs, audioDurationSeconds, retryCount: 0 }),
+      errors: [],
+      warnings: [],
+    };
+
+    return { buffer, trace };
   } catch (error) {
     // Retry once
+    retryCount = 1;
+    errorMsg = error instanceof Error ? error.message : String(error);
     console.warn(
       "[podcast/tts] First TTS attempt failed, retrying:",
-      error instanceof Error ? error.message : error,
+      errorMsg,
     );
-    return await geminiTTS.generateSpeech(script, voices);
+
+    const buffer = await geminiTTS.generateSpeech(script, voices);
+    const durationMs = Date.now() - startTime;
+    const audioDurationSeconds = Math.round(buffer.length / 48000);
+
+    const trace: PipelineStageTrace = {
+      stage: "tts",
+      startedAt: new Date(startTime).toISOString(),
+      durationMs,
+      ai: buildTtsTrace({ durationMs, audioDurationSeconds, retryCount }),
+      errors: [],
+      warnings: [`First attempt failed: ${errorMsg}`],
+    };
+
+    return { buffer, trace };
   }
 }

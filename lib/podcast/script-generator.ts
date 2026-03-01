@@ -1,9 +1,11 @@
-// ТЗ-Б1: Script Generator — Gemini Flash generates dialogue script from article section
+// ТЗ-Б1 + ТЗ-DEV2: Script Generator — Gemini Flash generates dialogue script from article section
 
 import fs from "fs";
 import path from "path";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
+import { calculateCostRub } from "@/lib/ai/providers";
+import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import type { BriefingArticleSection } from "@/lib/briefing/briefing-types";
 import type { ScriptContext } from "./types";
 
@@ -80,29 +82,38 @@ const RETRY_REINFORCEMENT =
 
 /**
  * Generate a dialogue script from a briefing section.
- * Returns the raw script text and replica count.
+ * Returns the raw script text, replica count, and optional trace data.
  * Retries automatically if Gemini produces a truncated/short script,
  * adding a reinforcement prompt on attempts 2+.
  */
 export async function generateScript(
   section: BriefingArticleSection,
   context: ScriptContext,
-): Promise<{ script: string; replicaCount: number }> {
+): Promise<{ script: string; replicaCount: number; trace?: PipelineStageTrace }> {
   const baseMessage = buildScriptwriterMessage(section, context);
+  const startTime = Date.now();
+  let totalPromptTokens = 0;
+  let totalCompletionTokens = 0;
+  let lastFinishReason = "unknown";
 
   for (let attempt = 0; attempt <= MAX_SCRIPT_RETRIES; attempt++) {
     // Add reinforcement on retry attempts 2+ (after 2 consecutive failures)
     const prompt =
       attempt >= 2 ? baseMessage + RETRY_REINFORCEMENT : baseMessage;
 
-    const { text } = await generateText({
+    const result = await generateText({
       model: google(SCRIPT_MODEL),
       system: SYSTEM_PROMPT,
       prompt,
       maxOutputTokens: 2048,
     });
 
-    const script = text.trim();
+    // ТЗ-DEV2: Accumulate usage across retries (AI SDK v5: inputTokens/outputTokens)
+    totalPromptTokens += result.usage?.inputTokens ?? 0;
+    totalCompletionTokens += result.usage?.outputTokens ?? 0;
+    lastFinishReason = result.finishReason ?? "unknown";
+
+    const script = result.text.trim();
     const replicaCount = countReplicas(script);
     const wordCount = script.split(/\s+/).length;
 
@@ -120,7 +131,39 @@ export async function generateScript(
       );
     }
 
-    return { script, replicaCount };
+    const durationMs = Date.now() - startTime;
+    const totalTokens = totalPromptTokens + totalCompletionTokens;
+
+    const trace: PipelineStageTrace = {
+      stage: "script",
+      startedAt: new Date(startTime).toISOString(),
+      durationMs,
+      ai: {
+        modelId: SCRIPT_MODEL,
+        promptPreview: baseMessage.slice(0, 500),
+        promptTokens: totalPromptTokens,
+        completionTokens: totalCompletionTokens,
+        totalTokens,
+        costRub: calculateCostRub(SCRIPT_MODEL, {
+          inputTokens: totalPromptTokens,
+          outputTokens: totalCompletionTokens,
+        }),
+        finishReason: lastFinishReason,
+        retryCount: attempt,
+      },
+      dataFlow: {
+        inputCount: 1,
+        outputCount: 1,
+        droppedCount: 0,
+        droppedReasons: wordCount < MIN_SCRIPT_WORDS ? { too_short: 1 } : undefined,
+      },
+      errors: [],
+      warnings: attempt > 0
+        ? [`Retried ${attempt} time(s), final wordCount=${wordCount}`]
+        : [],
+    };
+
+    return { script, replicaCount, trace };
   }
 
   // Unreachable, but TypeScript needs it

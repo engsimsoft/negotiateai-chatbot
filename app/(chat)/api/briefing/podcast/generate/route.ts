@@ -1,7 +1,8 @@
-// ТЗ-Б1 + ТЗ-TG4a: POST /api/briefing/podcast/generate — streaming podcast generation
+// ТЗ-Б1 + ТЗ-TG4a + ТЗ-DEV2: POST /api/briefing/podcast/generate — streaming podcast generation
 // Thin wrapper: auth + stream. Core logic in lib/podcast/podcast-pipeline.ts
 
 import { auth } from "@/app/(auth)/auth";
+import { isSimplyDevMode } from "@/lib/constants";
 import type { PodcastProgressEvent } from "@/lib/podcast/types";
 import { runPodcastPipeline } from "@/lib/podcast/podcast-pipeline";
 import { updateBriefingAudio } from "@/lib/db/queries";
@@ -28,10 +29,18 @@ export async function POST(request: Request) {
       };
 
       try {
+        // ТЗ-DEV2: Pass onTrace for dev mode NDJSON streaming
+        const onTrace = isSimplyDevMode
+          ? (data: Record<string, unknown>) => {
+              controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
+            }
+          : undefined;
+
         await runPodcastPipeline({
           userId,
           topicIds: body.topicIds,
           onProgress: emit,
+          onTrace,
         });
 
         controller.close();

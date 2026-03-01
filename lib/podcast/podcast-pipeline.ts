@@ -1,4 +1,4 @@
-// ТЗ-TG4a: Reusable podcast generation pipeline
+// ТЗ-TG4a + ТЗ-DEV2: Reusable podcast generation pipeline with trace instrumentation
 // Extracted from app/(chat)/api/briefing/podcast/generate/route.ts
 // Can be called with onProgress (browser streaming) or without (background/cron)
 
@@ -11,6 +11,10 @@ import type {
 } from "@/lib/podcast/types";
 import type { BriefingArticle } from "@/lib/briefing/briefing-types";
 import {
+  TraceCollector,
+  type PipelineTraceSummary,
+} from "@/lib/ai/pipeline-trace";
+import {
   getBriefingHistory,
   updateBriefingAudio,
 } from "@/lib/db/queries";
@@ -22,6 +26,7 @@ export interface PodcastPipelineResult {
   readyCount: number;
   failedCount: number;
   totalSections: number;
+  traceSummary?: PipelineTraceSummary;
 }
 
 /**
@@ -33,20 +38,25 @@ export interface PodcastPipelineResult {
  * @param topicIds - Optional filter: only generate for these topics (re-record mode)
  * @param onProgress - Optional callback for streaming progress events (browser mode).
  *                     If omitted, pipeline runs silently (background/cron mode).
- * @returns Pipeline result with counts
+ * @param onTrace - Optional callback for streaming trace events (dev mode only).
+ * @returns Pipeline result with counts and traceSummary
  */
 export async function runPodcastPipeline({
   userId,
   briefingId,
   topicIds,
   onProgress,
+  onTrace,
 }: {
   userId: string;
   briefingId?: string;
   topicIds?: string[];
   onProgress?: (event: PodcastProgressEvent) => void;
+  onTrace?: (data: Record<string, unknown>) => void;
 }): Promise<PodcastPipelineResult> {
   const emit = onProgress ?? (() => {});
+  const trace = new TraceCollector("podcast");
+  const emitTrace = onTrace ?? (() => {});
 
   // 1. Load briefing (by ID or latest ready)
   let article: BriefingArticle;
@@ -135,6 +145,18 @@ export async function runPodcastPipeline({
 
         const segment = await generatePodcastSegment(section, context);
 
+        // ТЗ-DEV2: Collect per-topic script + TTS traces
+        if (trace.isEnabled && segment.segmentTrace) {
+          if (segment.segmentTrace.scriptTrace) {
+            trace.addStage(segment.segmentTrace.scriptTrace);
+            emitTrace({ trace: trace.getLatestStage() });
+          }
+          if (segment.segmentTrace.ttsTrace) {
+            trace.addStage(segment.segmentTrace.ttsTrace);
+            emitTrace({ trace: trace.getLatestStage() });
+          }
+        }
+
         emit({
           step: "recording",
           topicId: section.topicId,
@@ -194,6 +216,12 @@ export async function runPodcastPipeline({
 
   await updateBriefingAudio({ userId, audioStatus: finalStatus });
 
+  // ТЗ-DEV2: Emit final trace summary
+  const traceSummary = trace.isEnabled ? trace.getSummary() : undefined;
+  if (traceSummary) {
+    emitTrace({ traceSummary });
+  }
+
   // 7. Complete event
   emit({
     step: "complete",
@@ -210,5 +238,6 @@ export async function runPodcastPipeline({
     readyCount,
     failedCount,
     totalSections: sections.length,
+    traceSummary,
   };
 }

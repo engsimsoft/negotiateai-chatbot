@@ -1,7 +1,7 @@
 # Handoff ТЗ-DEV2: Pipeline Observability
 
 **Последнее обновление:** 2026-03-01
-**Текущий этап:** Этап 2 завершён ✅ → Этап 3 следующий
+**Текущий этап:** Этап 3 завершён ✅ → Этап 4 следующий
 
 ---
 
@@ -12,49 +12,44 @@
 - [ ] Фаза 3: Разработка (6 этапов)
   - [x] **Этап 1:** Типы + Pricing + Trace Collector
   - [x] **Этап 2:** Инструментирование Briefing Pipeline (backend)
-  - [ ] **Этап 3:** Podcast + Research ← СЛЕДУЮЩИЙ
-  - [ ] Этап 4: Cron trace + DB metadata
+  - [x] **Этап 3:** Podcast + Research + Section Refresh
+  - [ ] **Этап 4:** Cron trace + DB metadata ← СЛЕДУЮЩИЙ
   - [ ] Этап 5: UI — Trace Footer + Drawer
   - [ ] Этап 6: Финализация
 - [ ] Фаза 4: Финализация
 
 ---
 
-## Что сделано в Этапе 2
+## Что сделано в Этапе 3
 
-### Изменённые файлы (13 файлов)
+### Изменённые файлы (8 файлов)
 
-**Types extended:**
-- `lib/briefing/source-fetchers/types.ts` — +`trace?: FetchTrace` в FetchResult
-- `lib/telegram/types.ts` — +`warnings?: string[]` в TelegramParseResult
-- `lib/briefing/briefing-types.ts` — +`traceSummary?: PipelineTraceSummary` в BriefingPipelineResult
-- `lib/ai/pipeline-trace.ts` — +`"semantic"` в FetchTrace.method, +`dataFlow?` в FetchTrace
+**Podcast instrumented (3 + 1 route):**
+- `lib/podcast/script-generator.ts` — usage capture (AI SDK v5: inputTokens/outputTokens), timing wrap, retry count accumulation across attempts, word count, PipelineStageTrace return
+- `lib/podcast/tts-gemini.ts` — `generateSpeechWithRetry` return changed: `Buffer` → `{ buffer, trace? }`, timing, PCM→audio duration (24kHz 16-bit mono = 48000 bytes/sec), retry trace via `buildTtsTrace()`
+- `lib/podcast/index.ts` — `generatePodcastSegment` returns `segmentTrace?: SegmentTrace` (scriptTrace + ttsTrace), updated for new `generateSpeechWithRetry` return type
+- `lib/podcast/podcast-pipeline.ts` — TraceCollector("podcast"), per-topic script+TTS trace collection, `onTrace` callback, `emitTrace()` pattern, `traceSummary` in PodcastPipelineResult
+- `app/(chat)/api/briefing/podcast/generate/route.ts` — `onTrace` for dev mode NDJSON streaming (gated by isSimplyDevMode)
 
-**Fetchers instrumented (3):**
-- `rss-fetcher.ts` — timing, per-entry try/catch, drop counters, FetchTrace+dataFlow
-- `telegram-fetcher.ts` — timing, warnings from parser, dataFlow, FetchTrace
-- `web-fetcher.ts` — timing, FetchPageSource tracking, publishedAt warning, FetchTrace
-- `lib/telegram/parser.ts` — `catch {}` → `catch(e) { warnings.push() }`
+**Research instrumented (2):**
+- `lib/ai/tools/perplexity-client.ts` — full usage (promptTokens + completionTokens + totalTokens), `durationMs` timing in result
+- `lib/briefing/research-engine.ts` — per-topic PipelineStageTrace with Perplexity AI call trace (model, tokens, cost), FetchTrace per verification (web + telegram), `verifySourceWithTrace` + `verifyTelegramChannelWithTrace` wrappers, traces[] in ResearchResult
 
-**AI stages instrumented (3):**
-- `briefing-filter.ts` — PipelineStageTrace: timing, inputTokens/outputTokens, costRub, post-gen validation (sourceItemId, URL, topicId)
-- `briefing-author.ts` — PipelineStageTrace: timing, usage, retry/fallback trace, prompt preview 500 chars
-- `briefing-section-author.ts` — PipelineStageTrace: timing, usage, retry/fallback trace
+**Section refresh instrumented (1):**
+- `app/(chat)/api/briefing/refresh-section/route.ts` — TraceCollector("section-refresh"), filter + author trace collection, `_trace` field in JSON response (dev mode only via isSimplyDevMode)
 
-**Orchestrator + Route:**
-- `briefing-pipeline.ts` — TraceCollector, fetch/filter/author stage collection, per-item miss warnings, URL verification, onTrace callback, traceSummary in result, .catch fix
-- `app/(chat)/api/briefing/generate/route.ts` — +onTrace for dev mode NDJSON streaming
-
-### Ключевые решения Этапа 2
-1. **AI SDK v5 usage** — свойства `inputTokens`/`outputTokens` (не `promptTokens`/`completionTokens`)
-2. **Trace data always collected** — timing/counts in fetchers are always populated (near-zero cost). TraceCollector gating (`isSimplyDevMode`) determines whether stages are stored/emitted
-3. **FetchTrace.dataFlow** — добавлен optional field для per-fetch breakdown (RSS entries, Telegram posts)
-4. **Trace return pattern** — каждая функция возвращает `trace?: PipelineStageTrace` рядом с основными данными. Pipeline собирает через `TraceCollector`
+### Ключевые решения Этапа 3
+1. **generateSpeechWithRetry return type changed** — `Buffer` → `{ buffer, trace? }`. Breaking for callers, but only `index.ts` calls it (updated simultaneously)
+2. **SegmentTrace type** — new interface in `lib/podcast/index.ts` grouping scriptTrace + ttsTrace. Pipeline collects both via `trace.addStage()`
+3. **PCM audio duration** — `buffer.length / 48000` (24kHz, 16-bit, mono = 48000 bytes/sec)
+4. **Research trace wrappers** — `verifySourceWithTrace` / `verifyTelegramChannelWithTrace` wrap originals to record FetchTrace without modifying logic
+5. **Perplexity usage expanded** — was `{ totalTokens }`, now `{ promptTokens, completionTokens, totalTokens }`. Backward compatible
+6. **Section refresh _trace** — underscore prefix = dev metadata, only when `isSimplyDevMode`
 
 ### Валидация
 - `npx tsc --noEmit` — 0 ошибок ✅
 - `npm run build` — успешен ✅
-- **Ожидает мануальный тест:** генерация брифинга работает как раньше (trace не ломает pipeline)
+- **Ожидает мануальный тест:** подкаст генерируется как раньше, refresh секции работает
 - **Git commit НЕ сделан** — нужно после мануального теста
 
 ---
@@ -70,22 +65,20 @@
 
 ---
 
-## Следующий: Этап 3 — Инструментирование Podcast Pipeline + Research
+## Следующий: Этап 4 — Cron trace + Briefing History metadata
 
-**Перед началом:** Прочитать ROADMAP.md (Этап 3), затем эти файлы:
+**Перед началом:** Прочитать ROADMAP.md (Этап 4), затем эти файлы:
 
-### Файлы для инструментирования
-1. `lib/podcast/script-generator.ts` — usage capture (сейчас полностью игнорируется!), timing, retry count + word count
-2. `lib/podcast/tts-gemini.ts` — timing, audio duration, retry trace
-3. `lib/podcast/podcast-pipeline.ts` — TraceCollector, per-topic trace, emit events
-4. `lib/ai/tools/perplexity-client.ts` — полный usage (prompt_tokens + completion_tokens)
-5. `lib/briefing/research-engine.ts` — per-topic trace: Perplexity + fetchPage
-6. `app/(chat)/api/briefing/refresh-section/route.ts` — trace in JSON response
+### Файлы для изменения
+1. `lib/briefing/briefing-pipeline.ts` — проверить что traceSummary возвращается в background mode (уже делает)
+2. `lib/podcast/podcast-pipeline.ts` — traceSummary уже в результате (добавлен в Этапе 3)
+3. `app/api/cron/briefing/route.ts` — передать traceSummary в saveBriefingHistory metadata
+4. `lib/db/queries.ts` — убедиться что saveBriefingHistory принимает metadata (jsonb)
 
 ### Reference файлы
 - `lib/ai/pipeline-trace.ts` — типы и TraceCollector
-- `lib/briefing/briefing-pipeline.ts` — reference pattern (Этап 2)
-- `lib/briefing/briefing-author.ts` — reference pattern for AI stage tracing
+- `lib/briefing/briefing-pipeline.ts` — уже возвращает traceSummary
+- `lib/podcast/podcast-pipeline.ts` — уже возвращает traceSummary
 
 ---
 
