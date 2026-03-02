@@ -12,6 +12,29 @@
 
 ---
 
+## [3.63.0] - 2026-03-03 - UnifiedUsageLogging
+
+**ТЗ-CACHE2**: Unified Usage Logging — единая утилита `logUsage()` для всех AI-вызовов в системе. Полная видимость расходов по всем провайдерам (Anthropic, Gemini, Perplexity, Deepgram, TTS).
+
+### Added
+- **`lib/ai/usage-utils.ts`** — утилиты `extractUsageFields()` + `logUsage()` (fire-and-forget), извлечение 5 полей (inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, thinkingTokens)
+- **Usage logging для ~20 новых endpoints**: service-chat, ben, professor (planner/reviewer), clerks (summarizer/snapshot/file-analyzer/project-summary), briefing (author/filter/section-author), podcast (script/tts), meeting (transcribe/summarize), deep-research, vision-ocr, generate-title, auto-naming
+- **chatMode конвенция**: `service:*`, `professor:*`, `clerk:*`, `briefing:*`, `podcast:*`, `tool:*`, `meeting:*`, `util:*`, `legacy:*`, `project:*`
+
+### Changed
+- **6 существующих logging points** переведены на `extractUsageFields()`: chat/route.ts, task-chat/route.ts, professor-pipeline.ts (3 фазы) — теперь передают cacheReadTokens и thinkingTokens
+
+### Fixed
+- **Deepgram modelId** — Deepgram API возвращал UUID вместо имени модели, исправлено на `"deepgram-nova-3"`
+
+### Technical
+- Perplexity маппинг: `promptTokens → inputTokens`, `completionTokens → outputTokens`
+- Non-AI-SDK providers (Deepgram, TTS): zero tokens, durationMs для cost tracking
+- userId проброшен через все pipeline chains (briefing, podcast, meeting, deep-research)
+- `util:generate-title` в actions.ts — мёртвый код (заменён на `autoNameChat`)
+
+---
+
 ## [3.62.0] - 2026-03-02 - MeetingRegenerate+PDF
 
 **ТЗ-MR2**: Регенерация + инструкции + PDF для Meeting Recorder. Пользователь может добавить контекст встречи, создать несколько документов по одному транскрипту, и скачать PDF.

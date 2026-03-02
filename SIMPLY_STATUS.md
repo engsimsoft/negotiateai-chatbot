@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.62.0
-**Дата:** 2026-03-02
+**Версия:** 3.63.0
+**Дата:** 2026-03-03
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -467,7 +467,23 @@ components/projects/
 
 **Детали:** [_archive/TZ_BF5_BriefingDedup/](_archive/TZ_BF5_BriefingDedup/)
 
-### ТЗ-OPT1: UsageLogging + SonnetMigration — ✅ ЗАВЕРШЁН
+### ТЗ-CACHE2: UnifiedUsageLogging — ✅ ЗАВЕРШЁН
+
+**Выполнено:**
+- **`lib/ai/usage-utils.ts`** — утилиты `extractUsageFields()` + `logUsage()`: единая точка логирования для всех AI-вызовов
+- **~20 новых endpoints** покрыты usage logging: service-chat, ben, professors, clerks, briefing, podcast, meeting, deep-research, vision-ocr
+- **chatMode конвенция** для всех точек: `service:*`, `professor:*`, `clerk:*`, `briefing:*`, `podcast:*`, `tool:*`, `meeting:*`, `util:*`, `project:*`
+- **6 существующих points** переведены на `extractUsageFields()` (cacheReadTokens, thinkingTokens)
+- **userId проброс** через все pipeline chains (briefing, podcast, meeting, deep-research)
+- **Фикс Deepgram modelId** — UUID → `"deepgram-nova-3"`
+
+**Ключевые файлы:**
+- `lib/ai/usage-utils.ts` — extractUsageFields(), logUsage()
+- ~28 файлов с добавлением logUsage()
+
+**Детали:** [specs/TZ_CACHE2_UnifiedUsageLogging/](specs/TZ_CACHE2_UnifiedUsageLogging/)
+
+
 
 **Выполнено:**
 - **Таблица `ai_usage_log`** — 13 колонок (modelId, 5 token counters, costUsd numeric(10,6), chatMode, durationMs), 2 индекса, chatId nullable FK
