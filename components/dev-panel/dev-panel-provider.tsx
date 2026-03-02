@@ -103,11 +103,11 @@ export function DevPanelProvider({
       : new Map();
   }
 
-  // Previous map — prevents losing entries during transient re-computation.
-  // When msg2 assistant appears but its debug events haven't arrived yet,
-  // the batch→message matching briefly shifts. prevMapRef preserves msg1's
-  // entry until the correct mapping is re-established.
-  const prevMapRef = useRef<Map<string, DevPanelMessageData>>(new Map());
+  // Stable batch→messageId assignments. Populated incrementally: once a batch
+  // is assigned to a message, the mapping never changes. This prevents the
+  // offset-shift bug where a new assistant message appears in `messages` before
+  // its debug events arrive, causing all previous mappings to shift by 1.
+  const batchAssignmentsRef = useRef<string[]>([]);
 
   const debugDataMap = useMemo(() => {
     // Skip all processing in production — no debug events will ever arrive
@@ -115,11 +115,6 @@ export function DevPanelProvider({
 
     // Start with restored data from localStorage
     const map = new Map<string, DevPanelMessageData>(restoredRef.current!);
-
-    // Merge entries from previous computation (prevents transient loss)
-    for (const [key, value] of prevMapRef.current) {
-      if (!map.has(key)) map.set(key, value);
-    }
 
     const debugEvents = dataStream.filter((e) =>
       e.type.startsWith("data-debug-"),
@@ -160,21 +155,31 @@ export function DevPanelProvider({
       // Still-streaming batch (no finish yet)
       if (current) batches.push(current);
 
-      // Match batches to the LATEST assistant messages (debug events only exist
-      // for messages generated in the current session, not historical ones)
+      // Stable incremental assignment: each batch is assigned to a message
+      // ONCE and the mapping never changes. This prevents the offset-shift bug
+      // where a new assistant message appears before its debug events arrive.
+      //
+      // We use `offset` only for NEW batch assignments (when batches.length grows).
+      // Previously locked assignments are never recalculated — they survive
+      // transient states where offset would be wrong.
       const assistantMessages = messages.filter((m) => m.role === "assistant");
-      const offset = assistantMessages.length - batches.length;
-      for (
-        let i = 0;
-        i < Math.min(batches.length, assistantMessages.length);
-        i++
-      ) {
-        map.set(assistantMessages[offset + i].id, batches[i]);
+      const assignments = batchAssignmentsRef.current;
+      const offset = Math.max(0, assistantMessages.length - batches.length);
+
+      // Assign only NEW batches (index >= assignments.length)
+      for (let i = assignments.length; i < batches.length; i++) {
+        const msgIdx = offset + i;
+        if (msgIdx >= 0 && msgIdx < assistantMessages.length) {
+          assignments.push(assistantMessages[msgIdx].id);
+        }
+      }
+
+      // Build map from stable assignments
+      for (let i = 0; i < Math.min(assignments.length, batches.length); i++) {
+        map.set(assignments[i], batches[i]);
       }
     }
 
-    // Save for next computation cycle
-    prevMapRef.current = map;
     return map;
   }, [dataStream, messages]);
 
