@@ -13,6 +13,8 @@ import {
   Loader2,
   AlertCircle,
   RotateCcw,
+  Plus,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMeetingRecorder, formatDuration } from "@/hooks/use-meeting-recorder";
@@ -49,6 +51,8 @@ export function MeetingPage() {
 
   const [pageState, setPageState] = useState<PageState>("input");
   const [summaryLevel, setSummaryLevel] = useState<SummaryLevel>("standard");
+  const [userInstructions, setUserInstructions] = useState("");
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioDuration, setAudioDuration] = useState<number>(0);
@@ -177,6 +181,7 @@ export function MeetingPage() {
         blobUrl: url,
         summaryLevel,
         durationSeconds: duration,
+        userInstructions: userInstructions.trim() || null,
       });
     } catch (err) {
       console.error("[meeting] Upload error:", err);
@@ -187,7 +192,7 @@ export function MeetingPage() {
       );
       setPageState("ready");
     }
-  }, [recorder.blob, recorder.elapsed, audioFile, audioDuration, summaryLevel, processing]);
+  }, [recorder.blob, recorder.elapsed, audioFile, audioDuration, summaryLevel, userInstructions, processing]);
 
   // View an existing record from the list
   const handleSelectRecord = useCallback(async (id: string) => {
@@ -231,6 +236,8 @@ export function MeetingPage() {
     processing.reset();
     setPageState("input");
     setSummaryLevel("standard");
+    setUserInstructions("");
+    setInstructionsOpen(false);
     setAudioFile(null);
     if (audioUrl && !recorder.audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
@@ -443,6 +450,35 @@ export function MeetingPage() {
             </div>
           </div>
 
+          {/* User instructions (collapsible) */}
+          <div className="rounded-xl border border-dashed bg-background p-5">
+            <button
+              type="button"
+              onClick={() => setInstructionsOpen((prev) => !prev)}
+              className="flex w-full items-center gap-2 text-sm font-medium text-foreground"
+            >
+              {instructionsOpen ? (
+                <ChevronUp className="size-4 text-primary" />
+              ) : (
+                <Plus className="size-4 text-primary" />
+              )}
+              Добавить контекст встречи
+              <span className="text-xs font-normal text-muted-foreground">
+                (необязательно)
+              </span>
+            </button>
+            {instructionsOpen && (
+              <textarea
+                value={userInstructions}
+                onChange={(e) => setUserInstructions(e.target.value)}
+                maxLength={2000}
+                rows={4}
+                placeholder={`Примеры:\n\n«Это собеседование на позицию маркетолога. Оцени компетенции кандидата.»\n\n«Этот отчёт для моего партнёра Алексея. Фокус на его задачах.»\n\n«Встреча с инвестором. Выжимка: прогресс, цифры, риски.»`}
+                className="mt-3 w-full resize-none rounded-lg border bg-muted/30 p-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            )}
+          </div>
+
           {/* Actions */}
           <div className="flex gap-3">
             <Button variant="outline" onClick={handleReset} className="gap-2">
@@ -479,6 +515,7 @@ export function MeetingPage() {
                 summaryLevel,
                 durationSeconds:
                   recorder.elapsed > 0 ? recorder.elapsed : audioDuration,
+                userInstructions: userInstructions.trim() || null,
               });
             }
           }}

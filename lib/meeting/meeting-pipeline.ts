@@ -104,10 +104,15 @@ export async function runMeetingPipeline(
 
     const systemPrompt = loadPrompt(input.summaryLevel);
 
+    // ТЗ-MR2: prepend user instructions to transcript if provided
+    const userMessage = input.userInstructions
+      ? `Дополнительные инструкции от участника встречи:\n${input.userInstructions}\n\n---\n\n${transcription.transcript}`
+      : transcription.transcript;
+
     const { text: rawSummary, usage } = await generateText({
       model: claudeSonnet,
       system: systemPrompt,
-      prompt: transcription.transcript,
+      prompt: userMessage,
       temperature: 0.3,
       maxOutputTokens: 8192,
     });
@@ -140,6 +145,7 @@ export async function runMeetingPipeline(
       summaryLevel: input.summaryLevel,
       transcript: transcription.transcript,
       summary,
+      userInstructions: input.userInstructions,
       metadata: {
         modelId: "claude-sonnet-4-6",
         inputTokens: usage?.inputTokens,

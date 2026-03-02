@@ -22,6 +22,7 @@ interface UseMeetingProcessingReturn {
     blobUrl: string;
     summaryLevel: SummaryLevel;
     durationSeconds: number;
+    userInstructions?: string | null;
   }) => void;
   reset: () => void;
 }
@@ -38,6 +39,7 @@ export function useMeetingProcessing(): UseMeetingProcessingReturn {
       blobUrl: string;
       summaryLevel: SummaryLevel;
       durationSeconds: number;
+      userInstructions?: string | null;
     }) => {
       if (isProcessing) return;
 

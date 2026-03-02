@@ -28,6 +28,7 @@ export interface MeetingPipelineInput {
   summaryLevel: SummaryLevel;
   durationSeconds: number;
   userId: string;
+  userInstructions?: string | null;
 }
 
 /** Pipeline result returned after completion */

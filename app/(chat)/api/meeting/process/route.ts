@@ -18,10 +18,11 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { blobUrl, summaryLevel, durationSeconds } = body as {
+  const { blobUrl, summaryLevel, durationSeconds, userInstructions } = body as {
     blobUrl?: string;
     summaryLevel?: string;
     durationSeconds?: number;
+    userInstructions?: string;
   };
 
   if (!blobUrl || typeof blobUrl !== "string") {
@@ -34,6 +35,15 @@ export async function POST(request: Request) {
   if (!summaryLevel || !VALID_LEVELS.includes(summaryLevel as SummaryLevel)) {
     return new Response(
       JSON.stringify({ error: "Invalid summaryLevel" }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // ТЗ-MR2: validate userInstructions length
+  const trimmedInstructions = userInstructions?.trim() || null;
+  if (trimmedInstructions && trimmedInstructions.length > 2000) {
+    return new Response(
+      JSON.stringify({ error: "userInstructions too long (max 2000)" }),
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
@@ -54,6 +64,7 @@ export async function POST(request: Request) {
             summaryLevel: summaryLevel as SummaryLevel,
             durationSeconds: durationSeconds ?? 0,
             userId,
+            userInstructions: trimmedInstructions,
           },
           emit,
         );

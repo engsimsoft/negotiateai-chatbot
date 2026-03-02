@@ -676,6 +676,7 @@ export const meetingRecord = pgTable(
     summaryLevel: varchar("summaryLevel", { length: 20 }).notNull(), // "compact" | "standard" | "detailed"
     transcript: text("transcript").notNull(),
     summary: text("summary").notNull(),
+    userInstructions: text("userInstructions"), // ТЗ-MR2: optional user instructions for AI
     metadata: jsonb("metadata").$type<{
       modelId?: string;
       inputTokens?: number;

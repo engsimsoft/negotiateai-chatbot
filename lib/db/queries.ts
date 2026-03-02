@@ -4351,6 +4351,7 @@ export async function saveMeetingRecord({
   summaryLevel,
   transcript,
   summary,
+  userInstructions,
   metadata,
 }: {
   userId: string;
@@ -4360,6 +4361,7 @@ export async function saveMeetingRecord({
   summaryLevel: string;
   transcript: string;
   summary: string;
+  userInstructions?: string | null;
   metadata?: Record<string, unknown> | null;
 }) {
   try {
@@ -4373,6 +4375,7 @@ export async function saveMeetingRecord({
         summaryLevel,
         transcript,
         summary,
+        userInstructions: userInstructions ?? null,
         metadata: metadata ?? null,
         createdAt: new Date(),
       })
