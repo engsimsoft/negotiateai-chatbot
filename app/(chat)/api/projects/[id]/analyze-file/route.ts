@@ -15,6 +15,7 @@ import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
 import { myProvider } from "@/lib/ai/providers";
+import { logUsage } from "@/lib/ai/usage-utils";
 import {
   getProjectById,
   getProjectFileById,
@@ -119,11 +120,21 @@ ${preview}
 ${folderNames.length > 0 ? JSON.stringify(folderNames) : "[]"}
 </existing_folders>`;
 
+    const resolvedModelId = myProvider.languageModel("claude-haiku").modelId;
+
     const result = await generateText({
       model: myProvider.languageModel("claude-haiku"),
       system: CLERK_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.1,
+    });
+
+    // ТЗ-CACHE2: Usage logging
+    logUsage({
+      userId: session.user.id!,
+      usage: result.usage,
+      modelId: resolvedModelId,
+      chatMode: "clerk:file-analyzer",
     });
 
     // Parse JSON response

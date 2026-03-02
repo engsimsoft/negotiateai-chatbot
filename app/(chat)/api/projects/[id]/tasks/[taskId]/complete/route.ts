@@ -66,6 +66,7 @@ export async function POST(
       taskTitle: task.title,
       taskGoal: task.goal || "",
       chatMessages,
+      userId: session.user.id,
     });
 
     // 3. Optionally run reviewer (if task needs review)
@@ -83,6 +84,7 @@ export async function POST(
           expectedOutput: task.expectedOutput || "",
         },
         outputSummary: JSON.stringify(taskSummary),
+        userId: session.user.id,
       });
     }
 

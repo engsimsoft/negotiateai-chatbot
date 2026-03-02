@@ -16,6 +16,7 @@ import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { myProvider } from "@/lib/ai/providers";
 import { getProjectById, updateProjectPlan } from "@/lib/db/queries";
+import { logUsage } from "@/lib/ai/usage-utils";
 import {
   professorPlanJsonSchema,
   MVP_TOOLS_MANIFEST,
@@ -171,6 +172,15 @@ export async function POST(
           effort: "high" as const,
         },
       },
+    });
+
+    // ТЗ-CACHE2: Usage logging (fire-and-forget)
+    const resolvedModelId = myProvider.languageModel(modelId).modelId;
+    logUsage({
+      userId: session.user.id!,
+      usage: result.usage,
+      modelId: resolvedModelId,
+      chatMode: "professor:planner",
     });
 
     // Extract XML tags from response

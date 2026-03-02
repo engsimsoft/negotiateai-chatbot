@@ -145,7 +145,7 @@ export async function runPodcastPipeline({
           message: `Пишем сценарий: ${section.emoji} ${section.topicName}`,
         });
 
-        const segment = await generatePodcastSegment(section, context);
+        const segment = await generatePodcastSegment(section, context, userId);
 
         // ТЗ-DEV2: Collect per-topic script + TTS traces
         if (trace.isEnabled && segment.segmentTrace) {

@@ -5,6 +5,7 @@ import path from "path";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { calculateCostRub } from "@/lib/ai/providers";
+import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import type { BriefingArticleSection } from "@/lib/briefing/briefing-types";
 import type { ScriptContext } from "./types";
@@ -89,6 +90,8 @@ const RETRY_REINFORCEMENT =
 export async function generateScript(
   section: BriefingArticleSection,
   context: ScriptContext,
+  /** ТЗ-CACHE2: userId for usage logging */
+  userId?: string,
 ): Promise<{ script: string; replicaCount: number; trace?: PipelineStageTrace }> {
   const baseMessage = buildScriptwriterMessage(section, context);
   const startTime = Date.now();
@@ -133,6 +136,17 @@ export async function generateScript(
 
     const durationMs = Date.now() - startTime;
     const totalTokens = totalPromptTokens + totalCompletionTokens;
+
+    // ТЗ-CACHE2: Usage logging (accumulated across retries)
+    if (userId) {
+      logUsage({
+        userId,
+        usage: { inputTokens: totalPromptTokens, outputTokens: totalCompletionTokens, totalTokens } as any,
+        modelId: SCRIPT_MODEL,
+        chatMode: "podcast:script",
+        durationMs,
+      });
+    }
 
     const trace: PipelineStageTrace = {
       stage: "script",

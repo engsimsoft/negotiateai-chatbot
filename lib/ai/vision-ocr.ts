@@ -9,6 +9,7 @@
 
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
+import { logUsage } from "@/lib/ai/usage-utils";
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
@@ -41,7 +42,9 @@ export interface VisionOCRResult {
  */
 export async function extractTextFromImage(
   imageBuffer: Buffer,
-  mediaType: "image/png" | "image/jpeg"
+  mediaType: "image/png" | "image/jpeg",
+  /** ТЗ-CACHE2: userId for usage logging (optional — not available from tool context) */
+  userId?: string,
 ): Promise<string> {
   console.log(`[Vision OCR] Processing image (${Math.round(imageBuffer.length / 1024)}KB, ${mediaType})`);
   const startTime = Date.now();
@@ -51,7 +54,7 @@ export async function extractTextFromImage(
     const base64Image = imageBuffer.toString("base64");
     const dataUrl = `data:${mediaType};base64,${base64Image}`;
 
-    const { text } = await generateText({
+    const { text, usage } = await generateText({
       model: google("gemini-2.5-flash"),
       messages: [
         {
@@ -76,6 +79,17 @@ export async function extractTextFromImage(
       `[Vision OCR] Image processed in ${processingTime}ms, extracted ${text.length} chars`
     );
 
+    // ТЗ-CACHE2: Usage logging (userId not available from tool context)
+    if (userId) {
+      logUsage({
+        userId,
+        usage,
+        modelId: "gemini-2.5-flash",
+        chatMode: "util:vision-ocr",
+        durationMs: processingTime,
+      });
+    }
+
     return text;
   } catch (error) {
     const processingTime = Date.now() - startTime;
@@ -94,13 +108,15 @@ export async function extractTextFromImage(
  * @returns OCR result with text and metadata
  */
 export async function extractTextFromPDF(
-  pdfBuffer: Buffer
+  pdfBuffer: Buffer,
+  /** ТЗ-CACHE2: userId for usage logging (optional — not available from tool context) */
+  userId?: string,
 ): Promise<VisionOCRResult> {
   console.log(`[Vision OCR] Processing PDF (${Math.round(pdfBuffer.length / 1024)}KB)`);
   const startTime = Date.now();
 
   try {
-    const { text } = await generateText({
+    const { text, usage } = await generateText({
       model: google("gemini-2.5-flash"),
       messages: [
         {
@@ -128,6 +144,17 @@ export async function extractTextFromPDF(
     console.log(
       `[Vision OCR] PDF processed in ${processingTime}ms, extracted ${text.length} chars`
     );
+
+    // ТЗ-CACHE2: Usage logging (userId not available from tool context)
+    if (userId) {
+      logUsage({
+        userId,
+        usage,
+        modelId: "gemini-2.5-flash",
+        chatMode: "util:vision-ocr",
+        durationMs: processingTime,
+      });
+    }
 
     return {
       text,

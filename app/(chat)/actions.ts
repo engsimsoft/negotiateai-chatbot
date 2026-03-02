@@ -4,6 +4,7 @@ import { generateText, type UIMessage } from "ai";
 import { cookies } from "next/headers";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { myProvider } from "@/lib/ai/providers";
+import { logUsage } from "@/lib/ai/usage-utils";
 import {
   deleteMessagesByChatIdAfterTimestamp,
   getMessageById,
@@ -17,10 +18,14 @@ export async function saveChatModelAsCookie(model: string) {
 
 export async function generateTitleFromUserMessage({
   message,
+  userId,
 }: {
   message: UIMessage;
+  userId?: string;
 }) {
-  const { text: title } = await generateText({
+  const resolvedModelId = myProvider.languageModel("title-model").modelId;
+
+  const { text: title, usage } = await generateText({
     model: myProvider.languageModel("title-model"),
     system: `\n
     - you will generate a short title based on the first message a user begins a conversation with
@@ -29,6 +34,16 @@ export async function generateTitleFromUserMessage({
     - do not use quotes or colons`,
     prompt: JSON.stringify(message),
   });
+
+  // ТЗ-CACHE2: Usage logging
+  if (userId) {
+    logUsage({
+      userId,
+      usage,
+      modelId: resolvedModelId,
+      chatMode: "util:generate-title",
+    });
+  }
 
   return title;
 }

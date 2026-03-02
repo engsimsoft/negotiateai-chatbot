@@ -6,6 +6,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { calculateCostRub } from "@/lib/ai/providers";
+import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { AUTHOR_MODEL, AUTHOR_MODEL_FALLBACK } from "./briefing-config";
 import type { FilteredItem } from "./briefing-filter";
@@ -101,6 +102,8 @@ interface AuthorInput {
   date: string;
   /** ТЗ-BF5: Previous briefing for dedup (null = first generation) */
   previousBriefing?: PreviousBriefing | null;
+  /** ТЗ-CACHE2: userId for usage logging */
+  userId?: string;
 }
 
 // --- Max output tokens by volume (detailed needs room for 3000-6000 words) ---
@@ -119,7 +122,7 @@ const MAX_TOKENS_BY_VOLUME: Record<string, number> = {
 export async function generateArticle(
   input: AuthorInput,
 ): Promise<{ article: BriefingArticle; tokensUsed: number; trace?: PipelineStageTrace }> {
-  const { candidates, fullTexts, tierMap, userTopics, language, maxItems, volume, date, previousBriefing } =
+  const { candidates, fullTexts, tierMap, userTopics, language, maxItems, volume, date, previousBriefing, userId } =
     input;
 
   if (candidates.length === 0) {
@@ -202,6 +205,17 @@ export async function generateArticle(
 
   const totalTokens = promptTokens + completionTokens;
   const durationMs = Date.now() - startTime;
+
+  // ТЗ-CACHE2: Usage logging
+  if (userId) {
+    logUsage({
+      userId,
+      usage: { inputTokens: promptTokens, outputTokens: completionTokens, totalTokens } as any,
+      modelId: usedModel,
+      chatMode: "briefing:author",
+      durationMs,
+    });
+  }
 
   const trace: PipelineStageTrace = {
     stage: "author",

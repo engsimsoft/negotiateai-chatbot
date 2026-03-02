@@ -24,9 +24,11 @@ export interface SegmentTrace {
 export async function generatePodcastSegment(
   section: BriefingArticleSection,
   context: ScriptContext,
+  /** ТЗ-CACHE2: userId for usage logging */
+  userId?: string,
 ): Promise<PodcastSegment & { segmentTrace?: SegmentTrace }> {
   // Step 1: Generate dialogue script
-  const { script, replicaCount, trace: scriptTrace } = await generateScript(section, context);
+  const { script, replicaCount, trace: scriptTrace } = await generateScript(section, context, userId);
 
   const wordCount = script.split(/\s+/).length;
   console.log(
@@ -34,7 +36,7 @@ export async function generatePodcastSegment(
   );
 
   // Step 2: Generate speech (PCM) via Gemini TTS with retry
-  const { buffer: pcmBuffer, trace: ttsTrace } = await generateSpeechWithRetry(script, DEFAULT_VOICES);
+  const { buffer: pcmBuffer, trace: ttsTrace } = await generateSpeechWithRetry(script, DEFAULT_VOICES, userId);
 
   // Step 3: Convert PCM → MP3
   const mp3Buffer = pcmToMp3(pcmBuffer);

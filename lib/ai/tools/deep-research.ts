@@ -11,6 +11,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 
+import { logUsage } from "@/lib/ai/usage-utils";
 import {
   callPerplexity,
   type PerplexityModel,
@@ -36,7 +37,7 @@ const PERPLEXITY_TIMEOUTS: Record<ResearchDepth, number> = {
  * (dev-mode UI switcher). When provided, the tool uses it instead of letting
  * the model pick depth via inputSchema.
  */
-export const deepResearch = ({ defaultDepth }: { defaultDepth?: ResearchDepth } = {}) =>
+export const deepResearch = ({ defaultDepth, userId }: { defaultDepth?: ResearchDepth; /** ТЗ-CACHE2 */ userId?: string } = {}) =>
   tool({
     description: `Глубокое исследование темы через Perplexity. Используй вместо webSearch когда:
 - Нужен мультишаговый анализ (не один факт, а картина целиком)
@@ -102,6 +103,20 @@ export const deepResearch = ({ defaultDepth }: { defaultDepth?: ResearchDepth } 
             citationsCount: result.citations.length,
             usage: result.usage,
           });
+
+          // ТЗ-CACHE2: Usage logging (Perplexity raw API → map to LanguageModelUsage)
+          if (userId && result.usage) {
+            logUsage({
+              userId,
+              usage: {
+                inputTokens: result.usage.promptTokens,
+                outputTokens: result.usage.completionTokens,
+                totalTokens: result.usage.totalTokens,
+              } as any,
+              modelId: model,
+              chatMode: "tool:deep-research",
+            });
+          }
 
           return {
             query,

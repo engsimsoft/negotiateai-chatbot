@@ -19,6 +19,7 @@ import {
   type TaskSummary,
 } from "@/lib/ai/task-completion-types";
 import type { DBMessage } from "@/lib/db/schema";
+import { logUsage } from "@/lib/ai/usage-utils";
 
 // Load clerk prompt from .md file (cached at module level)
 const SUMMARIZER_PROMPT_PATH = path.join(
@@ -47,6 +48,8 @@ interface SummarizeTaskInput {
     type: string;
     contentPreview?: string;
   }>;
+  /** ТЗ-CACHE2: userId for usage logging */
+  userId?: string;
 }
 
 // --- Helpers ---
@@ -143,12 +146,24 @@ export async function summarizeTask(
   try {
     const userMessage = buildUserMessage(input);
 
+    const resolvedModelId = myProvider.languageModel(modelId).modelId;
+
     const result = await generateText({
       model: myProvider.languageModel(modelId),
       system: SUMMARIZER_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.1,
     });
+
+    // ТЗ-CACHE2: Usage logging
+    if (input.userId) {
+      logUsage({
+        userId: input.userId,
+        usage: result.usage,
+        modelId: resolvedModelId,
+        chatMode: "clerk:summarizer",
+      });
+    }
 
     // Parse JSON response
     const jsonText = stripCodeBlocks(result.text);

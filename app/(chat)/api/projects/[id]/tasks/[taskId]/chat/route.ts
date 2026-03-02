@@ -218,6 +218,7 @@ export async function POST(
           taskTitle: task.title,
           taskGoal: task.goal || "",
           chatMessages: messagesFromDb,
+          userId: session.user.id,
         });
 
         if (fallbackResult) {

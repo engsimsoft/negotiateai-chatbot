@@ -73,6 +73,7 @@ export async function POST(request: Request) {
       sourceRecord.transcript,
       summaryLevel as SummaryLevel,
       trimmedInstructions,
+      userId,
     );
 
     // Save as new record linked to root

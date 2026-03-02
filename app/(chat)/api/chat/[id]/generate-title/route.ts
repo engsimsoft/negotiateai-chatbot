@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
 import { myProvider } from "@/lib/ai/providers";
+import { logUsage } from "@/lib/ai/usage-utils";
 import {
   getChatById,
   getMessagesByChatId,
@@ -75,8 +76,10 @@ export async function POST(
       })
       .join("\n");
 
+    const resolvedModelId = myProvider.languageModel("title-model").modelId;
+
     // Generate title and summary using Claude Haiku (fast and cheap)
-    const { object } = await generateObject({
+    const { object, usage } = await generateObject({
       model: myProvider.languageModel("title-model"),
       schema: z.object({
         title: z.string().describe("Короткое название чата (2-4 слова)"),
@@ -101,6 +104,15 @@ export async function POST(
 - Опиши о чём конкретно шёл разговор
 - Используй нейтральный тон`,
       prompt: `Проанализируй этот чат и сгенерируй название и краткое описание:\n\n${contextSummary}`,
+    });
+
+    // ТЗ-CACHE2: Usage logging
+    logUsage({
+      userId: session.user.id!,
+      usage,
+      modelId: resolvedModelId,
+      chatMode: "util:auto-naming",
+      chatId,
     });
 
     // Clean up the title (remove quotes, colons, etc.)

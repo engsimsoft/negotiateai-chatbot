@@ -129,7 +129,7 @@ export async function POST(request: Request) {
     const trace = new TraceCollector("section-refresh");
 
     // 4. Filter (Gemini Flash, single topic)
-    const { candidates, trace: filterTrace } = await filterContent(allItems, [topicId]);
+    const { candidates, trace: filterTrace } = await filterContent(allItems, [topicId], userId);
 
     // ТЗ-DEV2: Collect filter trace
     if (trace.isEnabled && filterTrace) {
@@ -173,6 +173,7 @@ export async function POST(request: Request) {
       volume: settings?.volume ?? "standard",
       previousTopicHeadlines,
       previousUrls,
+      userId,
     });
 
     // ТЗ-DEV2: Collect author trace

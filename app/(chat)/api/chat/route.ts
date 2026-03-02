@@ -10,7 +10,7 @@ import {
 } from "ai";
 import { z } from "zod";
 import { getTokenlensCatalog, getUsage, calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
-import { extractUsageFields } from "@/lib/ai/usage-utils";
+import { extractUsageFields, logUsage } from "@/lib/ai/usage-utils";
 import { auth } from "@/app/(auth)/auth";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import { getModelForChatMode } from "@/lib/ai/chat-mode-config";
@@ -77,7 +77,7 @@ export const maxDuration = 180; // 3 minutes - increased for complex document ge
  * Eliminates race condition where client calls generate-title
  * before assistant messages are persisted to DB.
  */
-async function autoNameChat(chatId: string): Promise<void> {
+async function autoNameChat(chatId: string, userId: string): Promise<void> {
   const chat = await getChatById({ id: chatId });
   if (!chat || chat.isRenamed) return;
 
@@ -102,7 +102,9 @@ async function autoNameChat(chatId: string): Promise<void> {
     })
     .join("\n");
 
-  const { object } = await generateObject({
+  const resolvedModelId = myProvider.languageModel("title-model").modelId;
+
+  const { object, usage } = await generateObject({
     model: myProvider.languageModel("title-model"),
     schema: z.object({
       title: z.string().describe("Короткое название чата (2-4 слова)"),
@@ -138,6 +140,16 @@ async function autoNameChat(chatId: string): Promise<void> {
     .slice(0, 300);
 
   await updateChatTitleAndSummary({ chatId, title: cleanTitle, summary: cleanSummary });
+
+  // ТЗ-CACHE2: Usage logging
+  logUsage({
+    userId,
+    usage,
+    modelId: resolvedModelId,
+    chatMode: "util:auto-naming",
+    chatId,
+  });
+
   console.log(`[generate-title] Server-side success for ${chatId}: "${cleanTitle}"`);
 }
 
@@ -499,6 +511,7 @@ export async function POST(request: Request) {
             const fallbackResult = await createFallbackSnapshot({
               chatTitle: chat?.title || undefined,
               chatMessages: messagesFromDb,
+              userId: session.user.id,
             });
 
             if (fallbackResult) {
@@ -1025,7 +1038,7 @@ export async function POST(request: Request) {
 
         // ТЗ-07A: Server-side auto-naming (fire-and-forget, after messages saved)
         if (!projectId) {
-          void autoNameChat(id).catch((err) =>
+          void autoNameChat(id, session.user.id!).catch((err) =>
             console.error("[generate-title] Background error:", err)
           );
         }

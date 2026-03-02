@@ -7,6 +7,7 @@ import {
   updateProjectSummary,
 } from "@/lib/db/queries";
 import { myProvider } from "@/lib/ai/providers";
+import { logUsage } from "@/lib/ai/usage-utils";
 import { ChatSDKError } from "@/lib/errors";
 
 /**
@@ -68,7 +69,9 @@ export async function POST(
       })
       .join("\n");
 
-    const { text } = await generateText({
+    const resolvedModelId = myProvider.languageModel("claude-haiku").modelId;
+
+    const { text, usage } = await generateText({
       model: myProvider.languageModel("claude-haiku"),
       prompt: `Ты — менеджер проекта. На основе итогов задач напиши краткий статус проекта.
 
@@ -84,6 +87,14 @@ ${taskList}
 - Что дальше (если понятно из контекста)
 
 Пиши кратко, по делу, на русском. Не используй маркированные списки, только связный текст.`,
+    });
+
+    // ТЗ-CACHE2: Usage logging
+    logUsage({
+      userId: session.user.id!,
+      usage,
+      modelId: resolvedModelId,
+      chatMode: "clerk:project-summary",
     });
 
     // Save the summary

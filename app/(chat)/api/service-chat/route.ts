@@ -37,6 +37,7 @@ import { createStepTracker } from "@/lib/ai/tool-call-guardian";
 import { isSimplyDevMode } from "@/lib/constants";
 import { calculateCostRub } from "@/lib/ai/providers";
 import { getTokenlensCatalog, calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
+import { logUsage } from "@/lib/ai/usage-utils";
 import {
   emitDebugStep,
   emitDebugGuardian,
@@ -683,7 +684,7 @@ export async function POST(request: Request) {
       });
 
       // ТЗ-FIX3: Unified tools for both create/edit modes
-      tools.deepResearch = deepResearch({ defaultDepth: "pro" });
+      tools.deepResearch = deepResearch({ defaultDepth: "pro", userId: session.user?.id });
       tools.fetchUrl = fetchUrl;
       tools.readTelegramChannel = readTelegramChannel;
 
@@ -830,6 +831,17 @@ export async function POST(request: Request) {
           onFinish: async ({ usage }) => {
             const totalTime = Date.now() - startTime;
             if (firstTokenTime === null) firstTokenTime = totalTime;
+
+            // ТЗ-CACHE2: Usage logging (fire-and-forget)
+            const resolvedModelId = myProvider.languageModel(modelId).modelId;
+            logUsage({
+              userId,
+              usage,
+              modelId: resolvedModelId,
+              chatMode: `service:${context}`,
+              chatId: managerChatId ?? null,
+              durationMs: totalTime,
+            });
 
             // ТЗ-DEV1: Emit debug finish summary
             emitDebugFinish(dataStream, {

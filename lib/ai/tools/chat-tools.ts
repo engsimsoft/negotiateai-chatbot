@@ -68,7 +68,7 @@ export function getStandardTools({
     requestSuggestions: requestSuggestions({ session, dataStream }),
     webSearch,
     fetchUrl,
-    deepResearch: deepResearch({ defaultDepth: researchDepth }),
+    deepResearch: deepResearch({ defaultDepth: researchDepth, userId: session.user?.id }),
     parseExcel,
     loadSkill,
     readTelegramChannel,

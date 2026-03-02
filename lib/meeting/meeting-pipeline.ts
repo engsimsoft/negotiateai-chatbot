@@ -8,6 +8,7 @@ import path from "path";
 import { generateText } from "ai";
 import { del } from "@vercel/blob";
 import { claudeSonnet } from "@/lib/ai/providers";
+import { logUsage } from "@/lib/ai/usage-utils";
 import { saveMeetingRecord } from "@/lib/db/queries";
 import { transcribeAudio } from "./deepgram-transcribe";
 import type {
@@ -73,6 +74,8 @@ export async function summarizeTranscript(
   transcript: string,
   summaryLevel: SummaryLevel,
   userInstructions?: string | null,
+  /** ТЗ-CACHE2: userId for usage logging */
+  userId?: string,
 ): Promise<{ title: string; summary: string; usage: { inputTokens?: number; outputTokens?: number } }> {
   const systemPrompt = loadPrompt(summaryLevel);
 
@@ -89,6 +92,16 @@ export async function summarizeTranscript(
   });
 
   const { title, summary } = parseTitleAndSummary(rawSummary);
+
+  // ТЗ-CACHE2: Usage logging
+  if (userId) {
+    logUsage({
+      userId,
+      usage,
+      modelId: "claude-sonnet-4-6",
+      chatMode: "meeting:summarize",
+    });
+  }
 
   return {
     title,
@@ -122,7 +135,7 @@ export async function runMeetingPipeline(
       message: "Транскрибируем аудио...",
     });
 
-    const transcription = await transcribeAudio(input.blobUrl);
+    const transcription = await transcribeAudio(input.blobUrl, input.userId);
 
     emit({
       step: "transcribing",
@@ -141,6 +154,7 @@ export async function runMeetingPipeline(
       transcription.transcript,
       input.summaryLevel,
       input.userInstructions,
+      input.userId,
     );
 
     emit({

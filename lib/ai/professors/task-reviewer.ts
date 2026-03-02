@@ -18,6 +18,7 @@ import {
   professorVerdictSchema,
   type ProfessorVerdict,
 } from "@/lib/ai/task-completion-types";
+import { logUsage } from "@/lib/ai/usage-utils";
 
 // Load professor review prompt from .md file (cached at module level)
 const REVIEWER_PROMPT_PATH = path.join(
@@ -48,6 +49,8 @@ interface ReviewTaskInput {
     type: string;
     contentPreview?: string;
   }>;
+  /** ТЗ-CACHE2: userId for usage logging */
+  userId?: string;
 }
 
 // --- Helpers ---
@@ -136,6 +139,17 @@ export async function reviewTask(
         },
       },
     });
+
+    // ТЗ-CACHE2: Usage logging
+    if (input.userId) {
+      const resolvedModelId = myProvider.languageModel(modelId).modelId;
+      logUsage({
+        userId: input.userId,
+        usage: result.usage,
+        modelId: resolvedModelId,
+        chatMode: "professor:reviewer",
+      });
+    }
 
     // Extract XML tags from response
     const fullAnalysis = extractTag(result.text, "review_analysis");

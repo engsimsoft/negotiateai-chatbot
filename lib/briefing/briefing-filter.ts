@@ -4,6 +4,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { calculateCostRub } from "@/lib/ai/providers";
+import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { FILTER_MODEL, MAX_FILTER_CANDIDATES } from "./briefing-config";
 import type { RawContent } from "./source-fetchers/types";
@@ -37,6 +38,8 @@ const filterResultSchema = z.object({
 export async function filterContent(
   items: RawContent[],
   topicIds: string[],
+  /** ТЗ-CACHE2: userId for usage logging */
+  userId?: string,
 ): Promise<{ candidates: FilteredItem[]; tokensUsed: number; trace?: PipelineStageTrace }> {
   if (items.length === 0) {
     return { candidates: [], tokensUsed: 0 };
@@ -108,6 +111,17 @@ Output JSON with "candidates" array.`,
   const promptTokens = usage?.inputTokens ?? 0;
   const completionTokens = usage?.outputTokens ?? 0;
   const totalTokens = promptTokens + completionTokens;
+
+  // ТЗ-CACHE2: Usage logging
+  if (userId) {
+    logUsage({
+      userId,
+      usage: usage ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 } as any,
+      modelId: FILTER_MODEL,
+      chatMode: "briefing:filter",
+      durationMs,
+    });
+  }
 
   const trace: PipelineStageTrace = {
     stage: "filter",

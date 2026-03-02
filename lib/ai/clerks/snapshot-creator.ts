@@ -15,6 +15,7 @@ import { z } from "zod";
 
 import { myProvider } from "@/lib/ai/providers";
 import type { DBMessage } from "@/lib/db/schema";
+import { logUsage } from "@/lib/ai/usage-utils";
 
 // Load clerk prompt from .md file (cached at module level)
 const PROMPT_PATH = path.join(
@@ -148,6 +149,8 @@ interface CreateFallbackSnapshotInput {
   /** Chat title (regular chat context). Used when no task context. */
   chatTitle?: string;
   chatMessages: DBMessage[];
+  /** ТЗ-CACHE2: userId for usage logging */
+  userId?: string;
 }
 
 /**
@@ -167,12 +170,24 @@ export async function createFallbackSnapshot(
       chatTitle: input.chatTitle,
     });
 
+    const resolvedModelId = myProvider.languageModel(modelId).modelId;
+
     const result = await generateText({
       model: myProvider.languageModel(modelId),
       system: SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.1,
     });
+
+    // ТЗ-CACHE2: Usage logging
+    if (input.userId) {
+      logUsage({
+        userId: input.userId,
+        usage: result.usage,
+        modelId: resolvedModelId,
+        chatMode: "clerk:snapshot",
+      });
+    }
 
     const jsonText = stripCodeBlocks(result.text);
     const rawJson = JSON.parse(jsonText);

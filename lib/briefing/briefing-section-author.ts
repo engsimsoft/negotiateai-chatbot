@@ -6,6 +6,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { calculateCostRub } from "@/lib/ai/providers";
+import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { AUTHOR_MODEL, AUTHOR_MODEL_FALLBACK } from "./briefing-config";
 import type { FilteredItem } from "./briefing-filter";
@@ -82,6 +83,8 @@ interface SectionAuthorInput {
   previousTopicHeadlines?: string | null;
   /** ТЗ-BF5: URLs from previous briefing section sources (for candidate marking) */
   previousUrls?: Set<string>;
+  /** ТЗ-CACHE2: userId for usage logging */
+  userId?: string;
 }
 
 /**
@@ -90,7 +93,7 @@ interface SectionAuthorInput {
 export async function generateSection(
   input: SectionAuthorInput,
 ): Promise<{ section: BriefingArticleSection; tokensUsed: number; trace?: PipelineStageTrace }> {
-  const { candidates, fullTexts, tierMap, topic, otherTopicNames, volume, previousTopicHeadlines, previousUrls } = input;
+  const { candidates, fullTexts, tierMap, topic, otherTopicNames, volume, previousTopicHeadlines, previousUrls, userId } = input;
 
   if (candidates.length === 0) {
     return {
@@ -168,6 +171,17 @@ export async function generateSection(
 
   const totalTokens = promptTokens + completionTokens;
   const durationMs = Date.now() - startTime;
+
+  // ТЗ-CACHE2: Usage logging
+  if (userId) {
+    logUsage({
+      userId,
+      usage: { inputTokens: promptTokens, outputTokens: completionTokens, totalTokens } as any,
+      modelId: usedModel,
+      chatMode: "briefing:section-author",
+      durationMs,
+    });
+  }
 
   const trace: PipelineStageTrace = {
     stage: "section-refresh",

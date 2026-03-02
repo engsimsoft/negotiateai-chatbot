@@ -2,6 +2,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { buildTtsTrace } from "@/lib/ai/pipeline-trace";
+import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import type { TTSProvider, VoiceConfig } from "./types";
 
@@ -63,6 +64,8 @@ export const geminiTTS: TTSProvider = {
 export async function generateSpeechWithRetry(
   script: string,
   voices: VoiceConfig[] = DEFAULT_VOICES,
+  /** ТЗ-CACHE2: userId for usage logging */
+  userId?: string,
 ): Promise<{ buffer: Buffer; trace?: PipelineStageTrace }> {
   const startTime = Date.now();
   let retryCount = 0;
@@ -73,6 +76,17 @@ export async function generateSpeechWithRetry(
     const durationMs = Date.now() - startTime;
     // PCM: 24kHz, 16-bit mono → 48000 bytes/sec
     const audioDurationSeconds = Math.round(buffer.length / 48000);
+
+    // ТЗ-CACHE2: Usage logging (TTS has no token usage, log for cost tracking)
+    if (userId) {
+      logUsage({
+        userId,
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } as any,
+        modelId: TTS_MODEL,
+        chatMode: "podcast:tts",
+        durationMs,
+      });
+    }
 
     const trace: PipelineStageTrace = {
       stage: "tts",
@@ -96,6 +110,17 @@ export async function generateSpeechWithRetry(
     const buffer = await geminiTTS.generateSpeech(script, voices);
     const durationMs = Date.now() - startTime;
     const audioDurationSeconds = Math.round(buffer.length / 48000);
+
+    // ТЗ-CACHE2: Usage logging (retry path)
+    if (userId) {
+      logUsage({
+        userId,
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } as any,
+        modelId: TTS_MODEL,
+        chatMode: "podcast:tts",
+        durationMs,
+      });
+    }
 
     const trace: PipelineStageTrace = {
       stage: "tts",

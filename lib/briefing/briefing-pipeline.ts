@@ -219,6 +219,7 @@ export async function runBriefingPipeline({
     const { candidates, tokensUsed: filterTokens, trace: filterTrace } = await filterContent(
       allItems,
       topicIds,
+      userId,
     );
 
     // ТЗ-DEV2: Add filter stage trace
@@ -271,6 +272,7 @@ export async function runBriefingPipeline({
       volume: settings?.volume ?? "standard",
       date: today,
       previousBriefing,
+      userId,
     });
 
     // ТЗ-DEV2: Add author stage trace

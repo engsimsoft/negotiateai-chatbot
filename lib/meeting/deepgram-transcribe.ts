@@ -2,6 +2,8 @@
 
 import "server-only";
 
+import { logUsage } from "@/lib/ai/usage-utils";
+
 const DEEPGRAM_API_URL = "https://api.deepgram.com/v1/listen";
 
 interface DeepgramWord {
@@ -81,6 +83,8 @@ function formatTimestamp(seconds: number): string {
  */
 export async function transcribeAudio(
   audioUrl: string,
+  /** ТЗ-CACHE2: userId for usage logging */
+  userId?: string,
 ): Promise<TranscriptionResult> {
   const apiKey = process.env.DEEPGRAM_API_KEY;
   if (!apiKey) {
@@ -143,6 +147,17 @@ export async function transcribeAudio(
       // Last fallback: plain transcript
       formattedLines = [alt?.transcript ?? ""];
     }
+  }
+
+  // ТЗ-CACHE2: Usage logging (Deepgram has no token usage, log for cost tracking)
+  if (userId) {
+    logUsage({
+      userId,
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } as any,
+      modelId: data.metadata.models?.[0] ?? "nova-3",
+      chatMode: "meeting:transcribe",
+      durationMs,
+    });
   }
 
   return {
