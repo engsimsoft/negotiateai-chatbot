@@ -13,6 +13,8 @@ import {
   Copy,
   Check,
   FileAudio,
+  Download,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkdownViewer } from "@/components/markdown-viewer";
@@ -40,6 +42,8 @@ interface MeetingResultProps {
   speakerCount: number;
   summaryLevel: string;
   createdAt?: string;
+  /** Record ID for PDF export */
+  recordId?: string;
   /** Local audio URL (only available for current session recordings) */
   audioUrl?: string | null;
   onNewRecording: () => void;
@@ -55,6 +59,7 @@ export function MeetingResult({
   speakerCount,
   summaryLevel,
   createdAt,
+  recordId,
   audioUrl,
   onNewRecording,
   onDelete,
@@ -63,6 +68,7 @@ export function MeetingResult({
   const audioRef = useRef<HTMLAudioElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   // Format duration as "X мин" or "X ч Y мин"
   const durationLabel = useMemo(() => {
@@ -166,6 +172,37 @@ export function MeetingResult({
     }
   }, [summary]);
 
+  // ТЗ-MR2: Download PDF
+  const handleDownloadPdf = useCallback(async () => {
+    if (!recordId || pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      const res = await fetch("/api/meeting/export-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recordId }),
+      });
+      if (!res.ok) throw new Error("PDF generation failed");
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      // Extract filename from Content-Disposition or fallback
+      const disposition = res.headers.get("Content-Disposition");
+      const match = disposition?.match(/filename="(.+?)"/);
+      a.download = match?.[1] ?? "meeting.pdf";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // Ignore — silent fail for download
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [recordId, pdfLoading]);
+
   return (
     <div className="flex flex-1 flex-col gap-5">
       {/* Header */}
@@ -242,6 +279,22 @@ export function MeetingResult({
           )}
           {copied ? "Скопировано" : "Копировать"}
         </Button>
+        {recordId && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadPdf}
+            disabled={pdfLoading}
+            className="gap-2"
+          >
+            {pdfLoading ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Download className="size-3.5" />
+            )}
+            {pdfLoading ? "Создаём..." : "Скачать PDF"}
+          </Button>
+        )}
         {onRegenerate && (
           <Button
             variant="outline"

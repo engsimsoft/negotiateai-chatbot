@@ -127,29 +127,29 @@ git commit -m "feat(tz-mr2): meeting regeneration with format/instructions"
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 2
 
-**Статус:** ⬜ Не начат
+**Статус:** ⏳ В работе (ожидает мануальный тест)
 
 **Цель:** Кнопка "Скачать PDF" на экране результата. Серверная генерация PDF с кириллицей, markdown formatting, футером "Создано в Simply".
 
 **Задачи:**
 
 **Setup:**
-- [ ] Установить `pdfmake` (`npm install pdfmake @types/pdfmake`)
-- [ ] Подготовить шрифт Source Sans 3 для VFS pdfmake (Regular, Bold, Italic, BoldItalic). Fallback: Noto Sans если Source Sans 3 проблематичен
+- [x] Установить `pdfmake` (`npm install pdfmake @types/pdfmake`)
+- [x] Шрифт: Roboto (встроен в pdfmake, поддерживает кириллицу). Source Sans 3 недоступен в .ttf для serverless, Roboto — надёжный fallback.
 
 **Backend:**
-- [ ] Создать `lib/meeting/pdf-generator.ts` — конвертер markdown → pdfmake docDefinition:
-  - Parse markdown в AST (через `remark` или `marked` — уже есть `remark-gfm` в проекте)
+- [x] Создать `lib/meeting/pdf-generator.ts` — конвертер markdown → pdfmake docDefinition:
+  - Parse markdown в AST (unified + remark-parse + remark-gfm)
   - Walk AST → pdfmake content nodes (headings, paragraphs, bold/italic, tables, lists, blockquotes, code)
   - Document header: title + дата
-  - Footer на каждой странице: "Создано в Simply"
+  - Footer на каждой странице: "Создано в Simply" + нумерация
   - Размер: A4
-- [ ] Создать `app/(chat)/api/meeting/export-pdf/route.ts` — POST с `recordId`, auth, загрузка из БД, генерация PDF, возврат Response с `Content-Type: application/pdf` и `Content-Disposition: attachment`
-- [ ] Утилита транслитерации для имени файла (`{title}.pdf` → `{transliterated_title}.pdf`)
+- [x] Создать `app/(chat)/api/meeting/export-pdf/route.ts` — POST с `recordId`, auth, загрузка из БД, генерация PDF, возврат Response с `Content-Type: application/pdf` и `Content-Disposition: attachment`
+- [x] Утилита транслитерации для имени файла (`transliterate()` в pdf-generator.ts)
 
 **UI:**
-- [ ] Добавить кнопку "📄 Скачать PDF" в `meeting-result.tsx` между "Копировать" и "Создать другой отчёт"
-- [ ] Handler: fetch POST → получить blob → trigger download через `URL.createObjectURL` + `<a>` click
+- [x] Добавить кнопку "Скачать PDF" в `meeting-result.tsx` между "Копировать" и "Создать другой отчёт" (с loading state)
+- [x] Handler: fetch POST → получить blob → trigger download через `URL.createObjectURL` + `<a>` click
 
 **Файлы:**
 - `lib/meeting/pdf-generator.ts` — **новый** (markdown → PDF)
@@ -163,8 +163,8 @@ git commit -m "feat(tz-mr2): meeting regeneration with format/instructions"
 - Пустой summary — edge case, проверить gracefully
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Браузер: на экране результата видна кнопка "Скачать PDF" → скачивается файл → открывается → кириллица корректна → заголовки, таблицы, списки, blockquotes отображаются → футер "Создано в Simply" на каждой странице
 - [ ] Проверить PDF для всех трёх форматов (compact, standard, detailed)
 - [ ] 🧪 Мануальный тест пользователем

@@ -1,4 +1,7 @@
-import { put } from "@vercel/blob";
+// Client-side upload handler for Vercel Blob
+// Files go directly from browser → Vercel Blob (no server body size limit)
+
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/app/(auth)/auth";
@@ -12,28 +15,38 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const body = (await request.json()) as HandleUploadBody;
+
   try {
-    const formData = await request.formData();
-    const file = formData.get("file") as Blob | null;
-    const filename = (formData.get("filename") as string) || `meeting-${Date.now()}.webm`;
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (pathname) => {
+        // Only allow audio uploads under meeting-audio/
+        if (!pathname.startsWith("meeting-audio/")) {
+          throw new Error("Invalid upload path");
+        }
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "File too large. Maximum 200MB." },
-        { status: 400 },
-      );
-    }
-
-    const blob = await put(`meeting-audio/${session.user.id}/${filename}`, file, {
-      access: "public",
-      contentType: file.type || "audio/webm",
+        return {
+          maximumSizeInBytes: MAX_FILE_SIZE,
+          allowedContentTypes: [
+            "audio/webm",
+            "audio/mp4",
+            "audio/mpeg",
+            "audio/ogg",
+            "audio/wav",
+            "audio/x-m4a",
+            "audio/mp3",
+            "video/webm",
+          ],
+        };
+      },
+      onUploadCompleted: async () => {
+        // No post-upload processing needed
+      },
     });
 
-    return NextResponse.json({ url: blob.url, size: file.size });
+    return NextResponse.json(jsonResponse);
   } catch (error) {
     console.error("[meeting/upload] Error:", error);
     return NextResponse.json(

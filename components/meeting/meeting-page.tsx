@@ -17,6 +17,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { upload } from "@vercel/blob/client";
 import { useMeetingRecorder, formatDuration } from "@/hooks/use-meeting-recorder";
 import { useMeetingProcessing } from "@/hooks/use-meeting-processing";
 import { MeetingProgress } from "@/components/meeting/meeting-progress";
@@ -159,29 +160,25 @@ export function MeetingPage() {
       setUploadProgress(0);
 
       const filename = audioFile?.name ?? `meeting-${Date.now()}.webm`;
-      const formData = new FormData();
-      formData.append("file", source);
-      formData.append("filename", filename);
 
-      const res = await fetch("/api/meeting/upload", {
-        method: "POST",
-        body: formData,
-      });
+      // Client-side upload: file goes directly to Vercel Blob (no server body size limit)
+      const blob = await upload(
+        `meeting-audio/${filename}`,
+        source,
+        {
+          access: "public",
+          handleUploadUrl: "/api/meeting/upload",
+        },
+      );
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Upload failed");
-      }
-
-      const { url } = await res.json();
-      setBlobUrl(url);
+      setBlobUrl(blob.url);
       setUploadProgress(100);
 
       const duration = recorder.elapsed > 0 ? recorder.elapsed : audioDuration;
 
       setPageState("processing");
       processing.startProcessing({
-        blobUrl: url,
+        blobUrl: blob.url,
         summaryLevel,
         durationSeconds: duration,
         userInstructions: userInstructions.trim() || null,
@@ -578,6 +575,7 @@ export function MeetingPage() {
           speakerCount={resultRecord.speakerCount}
           summaryLevel={resultRecord.summaryLevel}
           createdAt={resultRecord.createdAt}
+          recordId={resultRecord.id}
           audioUrl={currentAudioUrl}
           onNewRecording={handleReset}
           onDelete={resultRecord.id ? handleDeleteRecord : undefined}
@@ -594,6 +592,7 @@ export function MeetingPage() {
           speakerCount={resultRecord.speakerCount}
           summaryLevel={resultRecord.summaryLevel}
           createdAt={resultRecord.createdAt}
+          recordId={resultRecord.id}
           audioUrl={null}
           onNewRecording={handleBackToInput}
           onDelete={handleDeleteRecord}
