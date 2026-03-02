@@ -12,6 +12,28 @@
 
 ---
 
+## [3.62.0] - 2026-03-02 - MeetingRegenerate+PDF
+
+**ТЗ-MR2**: Регенерация + инструкции + PDF для Meeting Recorder. Пользователь может добавить контекст встречи, создать несколько документов по одному транскрипту, и скачать PDF.
+
+### Added
+- **User Instructions** — поле «Контекст встречи» перед генерацией документа: collapsible textarea с подсказкой, инструкции передаются в Claude и сохраняются в БД
+- **Regeneration** — кнопка «Создать другой отчёт» на экране результата: модалка с выбором формата и инструкциями, генерация без повторной транскрипции, каждая версия — отдельная запись в БД с `originalRecordId` → root
+- **PDF Export** — кнопка «Скачать PDF» (pdfmake + Roboto/Cyrillic): markdown → AST → pdfmake, A4, header (title + date), footer «Создано в Simply» + нумерация страниц
+- **API routes** — `POST /api/meeting/regenerate`, `POST /api/meeting/export-pdf`
+- **БД** — +2 колонки: `userInstructions TEXT NULL`, `originalRecordId UUID NULL` (self-ref FK, ON DELETE SET NULL)
+
+### Changed
+- **Upload** — переход на client-side Vercel Blob upload (`@vercel/blob/client`): файл идёт напрямую в Blob, нет лимита ~4.5MB на body. Исправлена загрузка аудио >3 минут
+
+### Technical
+- pdfmake v0.3.5 server-side (PdfPrinter from `pdfmake/js/Printer`, async `createPdfKitDocument`)
+- `summarizeTranscript()` извлечена из pipeline как reusable функция
+- Flat chain structure: `originalRecordId` всегда указывает на root record
+- **ADR:** [033-pdfmake-serverless-pdf](docs/decisions/033-pdfmake-serverless-pdf.md)
+
+---
+
 ## [3.61.0] - 2026-03-02 - MeetingRecorderMVP
 
 **ТЗ-MR**: Meeting Recorder MVP — запись и расшифровка встреч. Deepgram Nova-3 транскрипция → Claude Sonnet суммаризация → три формата документа.
