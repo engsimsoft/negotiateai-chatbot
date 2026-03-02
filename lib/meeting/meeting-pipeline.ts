@@ -66,6 +66,41 @@ function parseTitleAndSummary(text: string): { title: string; summary: string } 
 }
 
 /**
+ * ТЗ-MR2: Reusable summarization function.
+ * Used by both runMeetingPipeline (initial generation) and regenerate route.
+ */
+export async function summarizeTranscript(
+  transcript: string,
+  summaryLevel: SummaryLevel,
+  userInstructions?: string | null,
+): Promise<{ title: string; summary: string; usage: { inputTokens?: number; outputTokens?: number } }> {
+  const systemPrompt = loadPrompt(summaryLevel);
+
+  const userMessage = userInstructions
+    ? `Дополнительные инструкции от участника встречи:\n${userInstructions}\n\n---\n\n${transcript}`
+    : transcript;
+
+  const { text: rawSummary, usage } = await generateText({
+    model: claudeSonnet,
+    system: systemPrompt,
+    prompt: userMessage,
+    temperature: 0.3,
+    maxOutputTokens: 8192,
+  });
+
+  const { title, summary } = parseTitleAndSummary(rawSummary);
+
+  return {
+    title,
+    summary,
+    usage: {
+      inputTokens: usage?.inputTokens,
+      outputTokens: usage?.outputTokens,
+    },
+  };
+}
+
+/**
  * Run the full meeting processing pipeline.
  *
  * Steps: transcribe (Deepgram) → summarize (Claude Sonnet) → save DB → delete blob
@@ -96,28 +131,17 @@ export async function runMeetingPipeline(
       detail: `${transcription.speakerCount} спикер(ов), ${Math.round(transcription.durationSeconds / 60)} мин`,
     });
 
-    // Step 2: Summarize with Claude Sonnet
+    // Step 2: Summarize with Claude Sonnet (using extracted reusable function)
     emit({
       step: "summarizing",
       message: "Создаём документ...",
     });
 
-    const systemPrompt = loadPrompt(input.summaryLevel);
-
-    // ТЗ-MR2: prepend user instructions to transcript if provided
-    const userMessage = input.userInstructions
-      ? `Дополнительные инструкции от участника встречи:\n${input.userInstructions}\n\n---\n\n${transcription.transcript}`
-      : transcription.transcript;
-
-    const { text: rawSummary, usage } = await generateText({
-      model: claudeSonnet,
-      system: systemPrompt,
-      prompt: userMessage,
-      temperature: 0.3,
-      maxOutputTokens: 8192,
-    });
-
-    const { title, summary } = parseTitleAndSummary(rawSummary);
+    const { title, summary, usage } = await summarizeTranscript(
+      transcription.transcript,
+      input.summaryLevel,
+      input.userInstructions,
+    );
 
     emit({
       step: "summarizing",

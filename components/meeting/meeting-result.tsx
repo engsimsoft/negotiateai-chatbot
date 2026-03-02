@@ -8,6 +8,7 @@ import {
   Users,
   FileText,
   RotateCcw,
+  RefreshCw,
   Trash2,
   Copy,
   Check,
@@ -43,6 +44,8 @@ interface MeetingResultProps {
   audioUrl?: string | null;
   onNewRecording: () => void;
   onDelete?: () => void;
+  /** ТЗ-MR2: callback to open regenerate modal */
+  onRegenerate?: () => void;
 }
 
 export function MeetingResult({
@@ -55,6 +58,7 @@ export function MeetingResult({
   audioUrl,
   onNewRecording,
   onDelete,
+  onRegenerate,
 }: MeetingResultProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -238,6 +242,17 @@ export function MeetingResult({
           )}
           {copied ? "Скопировано" : "Копировать"}
         </Button>
+        {onRegenerate && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRegenerate}
+            className="gap-2"
+          >
+            <RefreshCw className="size-3.5" />
+            Создать другой отчёт
+          </Button>
+        )}
         {onDelete && (
           <Button
             variant="ghost"

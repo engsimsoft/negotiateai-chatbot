@@ -677,6 +677,7 @@ export const meetingRecord = pgTable(
     transcript: text("transcript").notNull(),
     summary: text("summary").notNull(),
     userInstructions: text("userInstructions"), // ТЗ-MR2: optional user instructions for AI
+    originalRecordId: uuid("originalRecordId"), // ТЗ-MR2: self-ref to root record for regeneration
     metadata: jsonb("metadata").$type<{
       modelId?: string;
       inputTokens?: number;
@@ -693,6 +694,11 @@ export const meetingRecord = pgTable(
       table.userId,
       table.createdAt
     ),
+    // ТЗ-MR2: self-referencing FK for regeneration chain (always points to root)
+    originalRecordRef: foreignKey({
+      columns: [table.originalRecordId],
+      foreignColumns: [table.id],
+    }).onDelete("set null"),
   })
 );
 

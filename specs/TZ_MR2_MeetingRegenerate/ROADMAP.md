@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 4 |
-| Текущий этап | 1 |
+| Текущий этап | 3 |
 | Сессий (оценка) | 2-3 |
 
 ---
@@ -72,27 +72,27 @@ git commit -m "feat(tz-mr2): user instructions for meeting summary"
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 1
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** На экране результата кнопка "Создать другой отчёт" открывает модалку с выбором формата и инструкциями. Генерация без повторной транскрипции, новая запись в БД со ссылкой на оригинал (root).
 
 **Задачи:**
 
 **DB + Backend:**
-- [ ] Добавить `originalRecordId UUID NULL REFERENCES "MeetingRecord"("id") ON DELETE SET NULL` в схему `meetingRecord`
-- [ ] Создать Drizzle миграцию
-- [ ] Обновить `saveMeetingRecord` — принимать `originalRecordId`
-- [ ] Извлечь `summarizeTranscript(transcript, summaryLevel, userInstructions?)` из `meeting-pipeline.ts` в reusable функцию (используется и в pipeline, и в regenerate)
-- [ ] Рефакторить `runMeetingPipeline` — использовать `summarizeTranscript()` вместо inline кода
-- [ ] Создать `POST /api/meeting/regenerate/route.ts` — принимает `recordId`, `summaryLevel`, `userInstructions`; загружает transcript из БД; вызывает `summarizeTranscript`; сохраняет новую запись с `originalRecordId` = root; возвращает новую запись
-- [ ] Логика определения root: если `originalRecordId` у исходной записи не null — использовать его, иначе — `recordId` самой записи
+- [x] Добавить `originalRecordId UUID NULL REFERENCES "MeetingRecord"("id") ON DELETE SET NULL` в схему `meetingRecord`
+- [x] Создать Drizzle миграцию (`0046_meeting-original-record-id.sql`)
+- [x] Обновить `saveMeetingRecord` — принимать `originalRecordId`
+- [x] Извлечь `summarizeTranscript(transcript, summaryLevel, userInstructions?)` из `meeting-pipeline.ts` в reusable функцию (используется и в pipeline, и в regenerate)
+- [x] Рефакторить `runMeetingPipeline` — использовать `summarizeTranscript()` вместо inline кода
+- [x] Создать `POST /api/meeting/regenerate/route.ts` — принимает `recordId`, `summaryLevel`, `userInstructions`; загружает transcript из БД; вызывает `summarizeTranscript`; сохраняет новую запись с `originalRecordId` = root; возвращает новую запись
+- [x] Логика определения root: если `originalRecordId` у исходной записи не null — использовать его, иначе — `recordId` самой записи
 
 **UI:**
-- [ ] Создать `components/meeting/regenerate-modal.tsx` — Dialog (shadcn) с: radio-выбор формата (предвыбран текущий), textarea инструкций (предзаполнена прошлыми), кнопка "Создать", loading state (Loader2 + "Создаём документ...")
-- [ ] Добавить кнопку "🔄 Создать другой отчёт" в `meeting-result.tsx` в секцию Actions
-- [ ] Обновить `MeetingResultProps` — добавить `recordId`, `userInstructions`, `onRegenerate` callback
-- [ ] В `meeting-page.tsx` — state для модалки (open/close), handler `handleRegenerate` (fetch POST → обновить resultRecord + добавить в records list), передать props в MeetingResult
-- [ ] После успешной регенерации — закрыть модалку, показать новый результат, добавить в list
+- [x] Создать `components/meeting/regenerate-modal.tsx` — Dialog (shadcn) с: radio-выбор формата (предвыбран текущий), textarea инструкций (предзаполнена прошлыми), кнопка "Создать", loading state (Loader2 + "Создаём документ...")
+- [x] Добавить кнопку "Создать другой отчёт" в `meeting-result.tsx` в секцию Actions
+- [x] Обновить `MeetingResultProps` — добавить `userInstructions`, `onRegenerate` callback
+- [x] В `meeting-page.tsx` — state для модалки (open/close), handler `handleRegenerate` (fetch POST → обновить resultRecord + добавить в records list), передать props в MeetingResult
+- [x] После успешной регенерации — закрыть модалку, показать новый результат, добавить в list
 
 **Файлы:**
 - `lib/db/schema.ts` — +column `originalRecordId`
@@ -105,13 +105,13 @@ git commit -m "feat(tz-mr2): user instructions for meeting summary"
 - `drizzle/` — новая миграция
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Браузер: на экране результата видна кнопка "Создать другой отчёт" → модалка с форматом и инструкциями → "Создать" → loading → новый документ отображается → старый не удалён
-- [ ] Браузер: в списке записей обе версии видны (плоский список)
-- [ ] Браузер: регенерация от регенерации → `originalRecordId` указывает на root
-- [ ] SQL: `SELECT id, "originalRecordId", "summaryLevel" FROM "MeetingRecord" ORDER BY "createdAt" DESC LIMIT 5` — связи корректны
-- [ ] 🧪 Мануальный тест пользователем
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] Браузер: на экране результата видна кнопка "Создать другой отчёт" → модалка с форматом и инструкциями → "Создать" → loading → новый документ отображается → старый не удалён
+- [x] Браузер: в списке записей обе версии видны (плоский список)
+- [x] Браузер: регенерация от регенерации → `originalRecordId` указывает на root
+- [x] SQL: `SELECT id, "originalRecordId", "summaryLevel" FROM "MeetingRecord" ORDER BY "createdAt" DESC LIMIT 5` — связи корректны
+- [x] 🧪 Мануальный тест пользователем
 
 **Git (после валидации):**
 ```bash

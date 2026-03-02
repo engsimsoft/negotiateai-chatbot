@@ -21,6 +21,7 @@ import { useMeetingRecorder, formatDuration } from "@/hooks/use-meeting-recorder
 import { useMeetingProcessing } from "@/hooks/use-meeting-processing";
 import { MeetingProgress } from "@/components/meeting/meeting-progress";
 import { MeetingResult } from "@/components/meeting/meeting-result";
+import { RegenerateModal } from "@/components/meeting/regenerate-modal";
 import { MeetingList, type MeetingListItem } from "@/components/meeting/meeting-list";
 
 type PageState = "input" | "ready" | "uploading" | "processing" | "result" | "viewing";
@@ -42,6 +43,7 @@ interface ResultRecord {
   speakerCount: number;
   summaryLevel: string;
   createdAt?: string;
+  userInstructions?: string | null;
 }
 
 export function MeetingPage() {
@@ -65,6 +67,7 @@ export function MeetingPage() {
   const [records, setRecords] = useState<MeetingListItem[]>([]);
   const [recordsLoaded, setRecordsLoaded] = useState(false);
   const [viewingRecordLoading, setViewingRecordLoading] = useState(false);
+  const [regenerateOpen, setRegenerateOpen] = useState(false);
 
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
 
@@ -255,6 +258,50 @@ export function MeetingPage() {
     setPageState("input");
     setError(null);
   }, []);
+
+  // ТЗ-MR2: Regenerate handler — POST to /api/meeting/regenerate, update result + list
+  const handleRegenerate = useCallback(
+    async (newSummaryLevel: string, newInstructions: string | null) => {
+      if (!resultRecord?.id) return;
+
+      const res = await fetch("/api/meeting/regenerate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recordId: resultRecord.id,
+          summaryLevel: newSummaryLevel,
+          userInstructions: newInstructions,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Regeneration failed");
+      }
+
+      const newRecord = await res.json();
+
+      // Update displayed result
+      setResultRecord(newRecord);
+
+      // Add to records list
+      setRecords((prev) => [
+        {
+          id: newRecord.id,
+          title: newRecord.title,
+          durationSeconds: newRecord.durationSeconds,
+          speakerCount: newRecord.speakerCount,
+          summaryLevel: newRecord.summaryLevel,
+          createdAt: newRecord.createdAt,
+        },
+        ...prev,
+      ]);
+
+      // Close modal
+      setRegenerateOpen(false);
+    },
+    [resultRecord?.id],
+  );
 
   // Current audio URL (from recorder or file — only for current session)
   const currentAudioUrl = recorder.audioUrl ?? audioUrl;
@@ -534,6 +581,7 @@ export function MeetingPage() {
           audioUrl={currentAudioUrl}
           onNewRecording={handleReset}
           onDelete={resultRecord.id ? handleDeleteRecord : undefined}
+          onRegenerate={resultRecord.id ? () => setRegenerateOpen(true) : undefined}
         />
       )}
 
@@ -549,6 +597,18 @@ export function MeetingPage() {
           audioUrl={null}
           onNewRecording={handleBackToInput}
           onDelete={handleDeleteRecord}
+          onRegenerate={() => setRegenerateOpen(true)}
+        />
+      )}
+
+      {/* ТЗ-MR2: Regenerate modal */}
+      {resultRecord && (
+        <RegenerateModal
+          open={regenerateOpen}
+          onOpenChange={setRegenerateOpen}
+          currentSummaryLevel={resultRecord.summaryLevel}
+          currentInstructions={resultRecord.userInstructions}
+          onRegenerate={handleRegenerate}
         />
       )}
     </div>
