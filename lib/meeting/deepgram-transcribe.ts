@@ -154,7 +154,7 @@ export async function transcribeAudio(
     logUsage({
       userId,
       usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } as any,
-      modelId: data.metadata.models?.[0] ?? "nova-3",
+      modelId: "deepgram-nova-3",
       chatMode: "meeting:transcribe",
       durationMs,
     });
