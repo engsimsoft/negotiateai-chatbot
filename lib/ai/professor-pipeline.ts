@@ -19,6 +19,7 @@ import { generateText, streamText, type CoreMessage } from "ai";
 import { myProvider } from "./providers";
 import { saveAiUsageLog } from "@/lib/db/queries";
 import { calcCostUsd } from "./tokenlens-catalog";
+import { extractUsageFields } from "./usage-utils";
 
 const analyzeModel = myProvider.languageModel("claude-opus");
 const executeModel = myProvider.languageModel("claude-haiku");
@@ -214,15 +215,14 @@ export async function executeProfessorPipeline(
       abortSignal: signal,
     });
 
-    // ТЗ-OPT1: Log analyze phase usage
+    // ТЗ-OPT1+CACHE2: Log analyze phase usage
     if (userId && analyzeResult.usage) {
       const costUsd = await calcCostUsd(analyzeModel.modelId, analyzeResult.usage);
       saveAiUsageLog({
         chatId,
         userId,
         modelId: analyzeModel.modelId,
-        inputTokens: analyzeResult.usage.inputTokens ?? 0,
-        outputTokens: analyzeResult.usage.outputTokens ?? 0,
+        ...extractUsageFields(analyzeResult.usage),
         costUsd,
         chatMode: "project:professor",
       }).catch(() => {});
@@ -304,15 +304,14 @@ export async function executeProfessorPipeline(
           abortSignal: signal,
         });
 
-        // ТЗ-OPT1: Log execute phase usage
+        // ТЗ-OPT1+CACHE2: Log execute phase usage
         if (userId && executeResult.usage) {
           const costUsd = await calcCostUsd(executeModel.modelId, executeResult.usage);
           saveAiUsageLog({
             chatId,
             userId,
             modelId: executeModel.modelId,
-            inputTokens: executeResult.usage.inputTokens ?? 0,
-            outputTokens: executeResult.usage.outputTokens ?? 0,
+            ...extractUsageFields(executeResult.usage),
             costUsd,
             chatMode: "project:professor",
           }).catch(() => {});
@@ -373,7 +372,7 @@ export async function executeProfessorPipeline(
       onEvent({ type: "professor-content", content: chunk });
     }
 
-    // ТЗ-OPT1: Log synthesize phase usage
+    // ТЗ-OPT1+CACHE2: Log synthesize phase usage
     if (userId) {
       const synthUsage = await synthesizeStream.usage;
       if (synthUsage) {
@@ -382,8 +381,7 @@ export async function executeProfessorPipeline(
           chatId,
           userId,
           modelId: synthesizeModel.modelId,
-          inputTokens: synthUsage.inputTokens ?? 0,
-          outputTokens: synthUsage.outputTokens ?? 0,
+          ...extractUsageFields(synthUsage),
           costUsd,
           chatMode: "project:professor",
         }).catch(() => {});

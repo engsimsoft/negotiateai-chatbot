@@ -10,6 +10,7 @@ import {
 } from "ai";
 import { z } from "zod";
 import { getTokenlensCatalog, getUsage, calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
+import { extractUsageFields } from "@/lib/ai/usage-utils";
 import { auth } from "@/app/(auth)/auth";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import { getModelForChatMode } from "@/lib/ai/chat-mode-config";
@@ -401,7 +402,17 @@ export async function POST(request: Request) {
 
     let finalMergedUsage: AppUsage | undefined;
     let guardianFlags: GuardianFlags | null = null;
-    let usageLogMeta: { modelId: string; inputTokens: number; outputTokens: number; costUsd: number | null; chatMode: string; durationMs: number } | null = null;
+    let usageLogMeta: {
+      modelId: string;
+      inputTokens: number;
+      outputTokens: number;
+      cacheReadTokens: number;
+      cacheWriteTokens: number;
+      thinkingTokens: number;
+      costUsd: number | null;
+      chatMode: string;
+      durationMs: number;
+    } | null = null;
 
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
@@ -722,13 +733,13 @@ export async function POST(request: Request) {
               dataStream.write({ type: "data-usage", data: finalMergedUsage });
             }
 
-            // ТЗ-OPT1+FIX1: Store usage data for logging after guardian analysis completes
+            // ТЗ-OPT1+FIX1+CACHE2: Store usage data for logging after guardian analysis completes
             const logModelId = resolvedModelId || (isProjectChat ? `project:${tier}` : chatMode);
             const logChatMode = isProjectChat ? `project:${tier}` : chatMode;
+            const usageFields = extractUsageFields(usage);
             usageLogMeta = {
               modelId: logModelId,
-              inputTokens: usage.inputTokens ?? 0,
-              outputTokens: usage.outputTokens ?? 0,
+              ...usageFields,
               costUsd,
               chatMode: logChatMode,
               durationMs: totalTime,
