@@ -7,7 +7,7 @@
  * Uses new Skills + Agents architecture (v2).
  */
 
-import { convertToCoreMessages, streamText } from "ai";
+import { convertToModelMessages, streamText } from "ai";
 import { auth } from "@/app/(auth)/auth";
 import { myProvider } from "@/lib/ai/providers";
 import { buildBenPrompt } from "@/lib/prompts/server";
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const result = streamText({
       model: myProvider.languageModel(prompt.model),
       system: prompt.systemPrompt,
-      messages: convertToCoreMessages(messages),
+      messages: await convertToModelMessages(messages),
       temperature: 1.0,
       onFinish: async ({ usage }) => {
         // ТЗ-CACHE2: Usage logging (skip if no auth)

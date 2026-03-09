@@ -1,6 +1,6 @@
 import { geolocation } from "@vercel/functions";
 import {
-  convertToCoreMessages,
+  convertToModelMessages,
   createUIMessageStream,
   generateObject,
   JsonToSseTransformStream,
@@ -601,7 +601,7 @@ export async function POST(request: Request) {
             .join("\n");
 
           // Convert UI messages to CoreMessage format for pipeline
-          const coreMessages = sanitizeCoreMessages(convertToCoreMessages(uiMessages.slice(0, -1))); // Exclude current message
+          const coreMessages = sanitizeCoreMessages(await convertToModelMessages(uiMessages.slice(0, -1))); // Exclude current message
 
           try {
             let accumulatedContent = "";
@@ -654,7 +654,7 @@ export async function POST(request: Request) {
           // ТЗ-CACHE1: system as message with per-message cacheControl (top-level providerOptions doesn't mark messages)
           messages: [
             { role: 'system' as const, content: systemPromptText, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },
-            ...sanitizeCoreMessages(convertToCoreMessages(uiMessages)),
+            ...sanitizeCoreMessages(await convertToModelMessages(uiMessages)),
           ],
           temperature: 1.0,
           stopWhen: stepCountIs(5),

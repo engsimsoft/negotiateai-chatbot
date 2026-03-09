@@ -1,5 +1,5 @@
 import {
-  convertToCoreMessages,
+  convertToModelMessages,
   createUIMessageStream,
   JsonToSseTransformStream,
   smoothStream,
@@ -318,7 +318,7 @@ export async function POST(
           // ТЗ-CACHE1: system as message with per-message cacheControl (top-level providerOptions doesn't mark messages)
           messages: [
             { role: 'system' as const, content: finalSystemPrompt, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },
-            ...sanitizeCoreMessages(convertToCoreMessages(uiMessages)),
+            ...sanitizeCoreMessages(await convertToModelMessages(uiMessages)),
           ],
           temperature: 1.0,
           stopWhen: stepCountIs(5),

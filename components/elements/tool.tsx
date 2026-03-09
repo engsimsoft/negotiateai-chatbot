@@ -36,19 +36,24 @@ export type ToolHeaderProps = {
 };
 
 const getStatusBadge = (status: ToolUIPart["state"]) => {
-  // AI SDK 5 tool states
   const labels: Record<ToolUIPart["state"], string> = {
     "input-streaming": "Pending",
     "input-available": "Running",
+    "approval-requested": "Approval",
+    "approval-responded": "Approved",
     "output-available": "Completed",
     "output-error": "Error",
+    "output-denied": "Denied",
   };
 
   const icons: Record<ToolUIPart["state"], React.ReactNode> = {
     "input-streaming": <CircleIcon className="size-4" />,
     "input-available": <ClockIcon className="size-4 animate-pulse" />,
+    "approval-requested": <ClockIcon className="size-4 animate-pulse text-yellow-600" />,
+    "approval-responded": <CheckCircleIcon className="size-4 text-blue-600" />,
     "output-available": <CheckCircleIcon className="size-4 text-green-600" />,
     "output-error": <XCircleIcon className="size-4 text-red-600" />,
+    "output-denied": <XCircleIcon className="size-4 text-red-600" />,
   };
 
   return (

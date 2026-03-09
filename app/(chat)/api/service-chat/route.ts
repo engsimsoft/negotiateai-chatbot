@@ -866,7 +866,7 @@ export async function POST(request: Request) {
         // ТЗ-A3: Save assistant response after streaming completes
         if (managerChatId) {
           const chatId = managerChatId;
-          result.text.then(async (fullText) => {
+          Promise.resolve(result.text).then(async (fullText) => {
             if (fullText) {
               await saveMessages({
                 messages: [{

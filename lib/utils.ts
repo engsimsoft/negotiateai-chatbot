@@ -1,6 +1,6 @@
 import type {
-  CoreAssistantMessage,
-  CoreToolMessage,
+  AssistantModelMessage,
+  ToolModelMessage,
   ModelMessage,
   UIMessage,
   UIMessagePart,
@@ -86,7 +86,7 @@ export function getChatUrl(
   }
 }
 
-type ResponseMessageWithoutId = CoreToolMessage | CoreAssistantMessage;
+type ResponseMessageWithoutId = ToolModelMessage | AssistantModelMessage;
 type ResponseMessage = ResponseMessageWithoutId & { id: string };
 
 export function getMostRecentUserMessage(messages: UIMessage[]) {

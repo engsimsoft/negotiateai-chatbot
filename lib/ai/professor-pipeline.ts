@@ -15,7 +15,7 @@
  * - professor-error: Error occurred
  */
 
-import { generateText, streamText, type CoreMessage } from "ai";
+import { generateText, streamText, type ModelMessage } from "ai";
 import { myProvider } from "./providers";
 import { saveAiUsageLog } from "@/lib/db/queries";
 import { calcCostUsd } from "./tokenlens-catalog";
@@ -68,7 +68,7 @@ export interface ProfessorPipelineOptions {
   /** User message to process */
   userMessage: string;
   /** Conversation history */
-  messages: CoreMessage[];
+  messages: ModelMessage[];
   /** Callback to emit events */
   onEvent: (event: PipelineEvent) => void;
   /** Maximum retry attempts per subtask */

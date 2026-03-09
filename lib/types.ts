@@ -85,6 +85,8 @@ export type CustomUIDataTypes = {
   "research-depth": {
     depth: string;
   };
+  // ТЗ-C3: Context usage indicator
+  "context-usage": { percent: number; tokens: number };
   // ТЗ-DEV1: Developer Panel debug events (transient, dev-mode only)
   "debug-prompt": DebugPromptData;
   "debug-step": DebugStepData;
