@@ -20,6 +20,7 @@ import {
   updateBriefingSection,
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
+import { getTokenlensCatalog } from "@/lib/ai/tokenlens-catalog";
 
 export const maxDuration = 60;
 
@@ -125,11 +126,14 @@ export async function POST(request: Request) {
 
     console.log(`[Refresh Section] fetched ${allItems.length} items`);
 
+    // ТЗ-CACHE3: Fetch TokenLens catalog once for SSOT cost calculation
+    const catalog = await getTokenlensCatalog();
+
     // ТЗ-DEV2: Trace collector for section refresh
-    const trace = new TraceCollector("section-refresh");
+    const trace = new TraceCollector("section-refresh", catalog);
 
     // 4. Filter (Gemini Flash, single topic)
-    const { candidates, trace: filterTrace } = await filterContent(allItems, [topicId], userId);
+    const { candidates, trace: filterTrace } = await filterContent(allItems, [topicId], userId, catalog);
 
     // ТЗ-DEV2: Collect filter trace
     if (trace.isEnabled && filterTrace) {
@@ -174,6 +178,7 @@ export async function POST(request: Request) {
       previousTopicHeadlines,
       previousUrls,
       userId,
+      catalog,
     });
 
     // ТЗ-DEV2: Collect author trace

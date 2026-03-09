@@ -5,7 +5,8 @@ import path from "path";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { calculateCostRub } from "@/lib/ai/providers";
+import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
+import type { ModelCatalog } from "tokenlens/core";
 import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { AUTHOR_MODEL, AUTHOR_MODEL_FALLBACK } from "./briefing-config";
@@ -104,6 +105,8 @@ interface AuthorInput {
   previousBriefing?: PreviousBriefing | null;
   /** ТЗ-CACHE2: userId for usage logging */
   userId?: string;
+  /** ТЗ-CACHE3: TokenLens catalog for SSOT cost calculation */
+  catalog?: ModelCatalog;
 }
 
 // --- Max output tokens by volume (detailed needs room for 3000-6000 words) ---
@@ -122,7 +125,7 @@ const MAX_TOKENS_BY_VOLUME: Record<string, number> = {
 export async function generateArticle(
   input: AuthorInput,
 ): Promise<{ article: BriefingArticle; tokensUsed: number; trace?: PipelineStageTrace }> {
-  const { candidates, fullTexts, tierMap, userTopics, language, maxItems, volume, date, previousBriefing, userId } =
+  const { candidates, fullTexts, tierMap, userTopics, language, maxItems, volume, date, previousBriefing, userId, catalog } =
     input;
 
   if (candidates.length === 0) {
@@ -227,10 +230,10 @@ export async function generateArticle(
       promptTokens,
       completionTokens,
       totalTokens,
-      costRub: calculateCostRub(usedModel, {
+      costRub: calcStepCostRub(usedModel, {
         inputTokens: promptTokens,
         outputTokens: completionTokens,
-      }),
+      }, catalog),
       finishReason,
       retryCount,
       fallbackUsed,

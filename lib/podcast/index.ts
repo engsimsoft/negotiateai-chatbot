@@ -2,6 +2,7 @@
 
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import type { BriefingArticleSection } from "@/lib/briefing/briefing-types";
+import type { ModelCatalog } from "tokenlens/core";
 import { generateScript } from "./script-generator";
 import { generateSpeechWithRetry, DEFAULT_VOICES } from "./tts-gemini";
 import { pcmToMp3, calculateDuration } from "./audio-converter";
@@ -26,9 +27,11 @@ export async function generatePodcastSegment(
   context: ScriptContext,
   /** ТЗ-CACHE2: userId for usage logging */
   userId?: string,
+  /** ТЗ-CACHE3: TokenLens catalog for SSOT cost calculation */
+  catalog?: ModelCatalog,
 ): Promise<PodcastSegment & { segmentTrace?: SegmentTrace }> {
   // Step 1: Generate dialogue script
-  const { script, replicaCount, trace: scriptTrace } = await generateScript(section, context, userId);
+  const { script, replicaCount, trace: scriptTrace } = await generateScript(section, context, userId, catalog);
 
   const wordCount = script.split(/\s+/).length;
   console.log(

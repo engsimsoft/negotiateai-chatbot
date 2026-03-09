@@ -21,6 +21,7 @@ import {
 } from "@/lib/db/queries";
 import { put } from "@vercel/blob";
 import pLimit from "p-limit";
+import { getTokenlensCatalog } from "@/lib/ai/tokenlens-catalog";
 
 export interface PodcastPipelineResult {
   status: "ready" | "partial" | "failed";
@@ -57,7 +58,9 @@ export async function runPodcastPipeline({
   onTrace?: (data: Record<string, unknown>) => void;
 }): Promise<PodcastPipelineResult> {
   const emit = onProgress ?? (() => {});
-  const trace = new TraceCollector("podcast");
+  // ТЗ-CACHE3: Fetch TokenLens catalog once for SSOT cost calculation
+  const catalog = await getTokenlensCatalog();
+  const trace = new TraceCollector("podcast", catalog);
   const emitTrace = onTrace ?? (() => {});
 
   // 1. Load briefing (by ID or latest ready)
@@ -145,7 +148,7 @@ export async function runPodcastPipeline({
           message: `Пишем сценарий: ${section.emoji} ${section.topicName}`,
         });
 
-        const segment = await generatePodcastSegment(section, context, userId);
+        const segment = await generatePodcastSegment(section, context, userId, catalog);
 
         // ТЗ-DEV2: Collect per-topic script + TTS traces
         if (trace.isEnabled && segment.segmentTrace) {

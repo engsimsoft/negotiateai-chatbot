@@ -13,7 +13,9 @@
  */
 
 import { isSimplyDevMode } from "@/lib/constants";
-import { calculateCostRub, calculateTtsCostRub } from "./providers";
+import { calculateTtsCostRub } from "./providers";
+import { calcStepCostRub } from "./tokenlens-catalog";
+import type { ModelCatalog } from "tokenlens/core";
 
 // ---------------------------------------------------------------------------
 // Types: AI call trace
@@ -148,13 +150,16 @@ export class TraceCollector {
   private readonly startTime: number;
   private stages: PipelineStageTrace[] = [];
   private urlVerification?: UrlVerificationTrace;
+  /** ТЗ-CACHE3: TokenLens catalog for SSOT cost calculation */
+  readonly catalog?: ModelCatalog;
 
-  constructor(pipeline: PipelineTrace["pipeline"]) {
+  constructor(pipeline: PipelineTrace["pipeline"], catalog?: ModelCatalog) {
     this.enabled = isSimplyDevMode;
     this.traceId = generateTraceId();
     this.pipeline = pipeline;
     this.startedAt = new Date().toISOString();
     this.startTime = Date.now();
+    this.catalog = catalog;
   }
 
   /** Check if tracing is active */
@@ -246,7 +251,7 @@ export interface AiResultForTrace {
   durationMs: number;
 }
 
-export function buildAiCallTrace(result: AiResultForTrace): AiCallTrace {
+export function buildAiCallTrace(result: AiResultForTrace, catalog?: ModelCatalog): AiCallTrace {
   const promptTokens = result.usage?.promptTokens ?? 0;
   const completionTokens = result.usage?.completionTokens ?? 0;
   const totalTokens = result.usage?.totalTokens ?? (promptTokens + completionTokens);
@@ -257,10 +262,10 @@ export function buildAiCallTrace(result: AiResultForTrace): AiCallTrace {
     promptTokens,
     completionTokens,
     totalTokens,
-    costRub: calculateCostRub(result.modelId, {
+    costRub: calcStepCostRub(result.modelId, {
       inputTokens: promptTokens,
       outputTokens: completionTokens,
-    }),
+    }, catalog),
     finishReason: result.finishReason ?? "unknown",
     retryCount: result.retryCount ?? 0,
     fallbackUsed: result.fallbackUsed,

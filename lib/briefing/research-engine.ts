@@ -12,7 +12,8 @@
 import pLimit from "p-limit";
 
 import { callPerplexity } from "@/lib/ai/tools/perplexity-client";
-import { calculateCostRub } from "@/lib/ai/providers";
+import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
+import type { ModelCatalog } from "tokenlens/core";
 import type { PipelineStageTrace, FetchTrace } from "@/lib/ai/pipeline-trace";
 import { fetchPage } from "@/lib/ai/tools/fetch-page";
 import { parseTelegramChannel } from "@/lib/telegram/parser";
@@ -154,13 +155,15 @@ const RESPECTED_DOMAINS = new Set([
 export async function researchTopics(
   topics: ResearchTopic[],
   onProgress?: (event: ResearchProgressEvent) => void,
+  /** ТЗ-CACHE3: TokenLens catalog for SSOT cost calculation */
+  catalog?: ModelCatalog,
 ): Promise<ResearchResult> {
   const limit = pLimit(TOPIC_CONCURRENCY);
 
   try {
     const results = await Promise.all(
       topics.map((topic) =>
-        limit(() => researchSingleTopic(topic, onProgress)),
+        limit(() => researchSingleTopic(topic, onProgress, catalog)),
       ),
     );
 
@@ -203,6 +206,7 @@ export async function researchTopics(
 async function researchSingleTopic(
   topic: ResearchTopic,
   onProgress?: (event: ResearchProgressEvent) => void,
+  catalog?: ModelCatalog,
 ): Promise<TopicResearchResult> {
   const { topicId, topicName, emoji, briefingStyle } = topic;
 
@@ -301,10 +305,10 @@ async function researchSingleTopic(
         promptTokens,
         completionTokens,
         totalTokens,
-        costRub: calculateCostRub("sonar-pro", {
+        costRub: calcStepCostRub("sonar-pro", {
           inputTokens: promptTokens,
           outputTokens: completionTokens,
-        }),
+        }, catalog),
         finishReason: "stop",
         retryCount: 0,
       },

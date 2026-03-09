@@ -28,6 +28,7 @@ import {
   getPreviousBriefing,
   saveBriefingHistory,
 } from "@/lib/db/queries";
+import { getTokenlensCatalog } from "@/lib/ai/tokenlens-catalog";
 
 /**
  * Run the full briefing generation pipeline.
@@ -48,7 +49,9 @@ export async function runBriefingPipeline({
   onTrace?: (data: Record<string, unknown>) => void;
 }): Promise<BriefingPipelineResult> {
   const emit = onProgress ?? (() => {});
-  const trace = new TraceCollector("briefing");
+  // ТЗ-CACHE3: Fetch TokenLens catalog once for SSOT cost calculation
+  const catalog = await getTokenlensCatalog();
+  const trace = new TraceCollector("briefing", catalog);
   const emitTrace = onTrace ?? (() => {});
 
   try {
@@ -220,6 +223,7 @@ export async function runBriefingPipeline({
       allItems,
       topicIds,
       userId,
+      catalog,
     );
 
     // ТЗ-DEV2: Add filter stage trace
@@ -273,6 +277,7 @@ export async function runBriefingPipeline({
       date: today,
       previousBriefing,
       userId,
+      catalog,
     });
 
     // ТЗ-DEV2: Add author stage trace

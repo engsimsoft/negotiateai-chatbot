@@ -5,7 +5,8 @@ import path from "path";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { calculateCostRub } from "@/lib/ai/providers";
+import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
+import type { ModelCatalog } from "tokenlens/core";
 import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { AUTHOR_MODEL, AUTHOR_MODEL_FALLBACK } from "./briefing-config";
@@ -85,6 +86,8 @@ interface SectionAuthorInput {
   previousUrls?: Set<string>;
   /** ТЗ-CACHE2: userId for usage logging */
   userId?: string;
+  /** ТЗ-CACHE3: TokenLens catalog for SSOT cost calculation */
+  catalog?: ModelCatalog;
 }
 
 /**
@@ -93,7 +96,7 @@ interface SectionAuthorInput {
 export async function generateSection(
   input: SectionAuthorInput,
 ): Promise<{ section: BriefingArticleSection; tokensUsed: number; trace?: PipelineStageTrace }> {
-  const { candidates, fullTexts, tierMap, topic, otherTopicNames, volume, previousTopicHeadlines, previousUrls, userId } = input;
+  const { candidates, fullTexts, tierMap, topic, otherTopicNames, volume, previousTopicHeadlines, previousUrls, userId, catalog } = input;
 
   if (candidates.length === 0) {
     return {
@@ -193,10 +196,10 @@ export async function generateSection(
       promptTokens,
       completionTokens,
       totalTokens,
-      costRub: calculateCostRub(usedModel, {
+      costRub: calcStepCostRub(usedModel, {
         inputTokens: promptTokens,
         outputTokens: completionTokens,
-      }),
+      }, catalog),
       finishReason,
       retryCount,
       fallbackUsed,

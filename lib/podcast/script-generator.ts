@@ -4,7 +4,8 @@ import fs from "fs";
 import path from "path";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
-import { calculateCostRub } from "@/lib/ai/providers";
+import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
+import type { ModelCatalog } from "tokenlens/core";
 import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import type { BriefingArticleSection } from "@/lib/briefing/briefing-types";
@@ -92,6 +93,8 @@ export async function generateScript(
   context: ScriptContext,
   /** ТЗ-CACHE2: userId for usage logging */
   userId?: string,
+  /** ТЗ-CACHE3: TokenLens catalog for SSOT cost calculation */
+  catalog?: ModelCatalog,
 ): Promise<{ script: string; replicaCount: number; trace?: PipelineStageTrace }> {
   const baseMessage = buildScriptwriterMessage(section, context);
   const startTime = Date.now();
@@ -158,10 +161,10 @@ export async function generateScript(
         promptTokens: totalPromptTokens,
         completionTokens: totalCompletionTokens,
         totalTokens,
-        costRub: calculateCostRub(SCRIPT_MODEL, {
+        costRub: calcStepCostRub(SCRIPT_MODEL, {
           inputTokens: totalPromptTokens,
           outputTokens: totalCompletionTokens,
-        }),
+        }, catalog),
         finishReason: lastFinishReason,
         retryCount: attempt,
       },

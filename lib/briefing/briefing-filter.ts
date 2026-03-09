@@ -3,7 +3,8 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { calculateCostRub } from "@/lib/ai/providers";
+import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
+import type { ModelCatalog } from "tokenlens/core";
 import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { FILTER_MODEL, MAX_FILTER_CANDIDATES } from "./briefing-config";
@@ -40,6 +41,8 @@ export async function filterContent(
   topicIds: string[],
   /** ТЗ-CACHE2: userId for usage logging */
   userId?: string,
+  /** ТЗ-CACHE3: TokenLens catalog for SSOT cost calculation */
+  catalog?: ModelCatalog,
 ): Promise<{ candidates: FilteredItem[]; tokensUsed: number; trace?: PipelineStageTrace }> {
   if (items.length === 0) {
     return { candidates: [], tokensUsed: 0 };
@@ -133,10 +136,10 @@ Output JSON with "candidates" array.`,
       promptTokens,
       completionTokens,
       totalTokens,
-      costRub: calculateCostRub(FILTER_MODEL, {
+      costRub: calcStepCostRub(FILTER_MODEL, {
         inputTokens: promptTokens,
         outputTokens: completionTokens,
-      }),
+      }, catalog),
       finishReason: "stop",
       retryCount: 0,
     },
