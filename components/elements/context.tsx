@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
+import { RUB_PER_USD } from "@/lib/constants/pricing";
 
 export type ContextProps = ComponentProps<"button"> & {
   /** Optional full usage payload to enable breakdown view */
@@ -91,7 +92,10 @@ function InfoRow({
           costText !== null &&
           !Number.isNaN(Number.parseFloat(costText)) && (
             <span className="text-muted-foreground">
-              ${Number.parseFloat(costText).toFixed(6)}
+              {(() => {
+                const rub = Number.parseFloat(costText) * RUB_PER_USD;
+                return rub < 0.01 ? "< ₽0.01" : `₽${rub.toFixed(2)}`;
+              })()}
             </span>
           )}
       </div>
@@ -171,11 +175,12 @@ export const Context = ({ className, usage, ...props }: ContextProps) => {
                   <div className="flex items-center gap-2 font-mono">
                     <span className="min-w-[4ch] text-right" />
                     <span>
-                      {Number.isNaN(
-                        Number.parseFloat(usage.costUSD.totalUSD.toString())
-                      )
-                        ? "—"
-                        : `$${Number.parseFloat(usage.costUSD.totalUSD.toString()).toFixed(6)}`}
+                      {(() => {
+                        const parsed = Number.parseFloat(usage.costUSD.totalUSD.toString());
+                        if (Number.isNaN(parsed)) return "—";
+                        const rub = parsed * RUB_PER_USD;
+                        return rub < 0.01 ? "< ₽0.01" : `₽${rub.toFixed(2)}`;
+                      })()}
                     </span>
                   </div>
                 </div>

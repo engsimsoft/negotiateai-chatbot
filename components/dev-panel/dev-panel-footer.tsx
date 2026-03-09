@@ -30,6 +30,9 @@ const ERROR_REASONS = new Set(["error", "content-filter", "unknown"]);
 export function DevPanelFooter({ messageId }: { messageId: string }) {
   const data = useDevPanel(messageId);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   // Live elapsed timer during streaming
   const startRef = useRef<number>(0);
@@ -48,7 +51,7 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
     if (data?.finish) startRef.current = 0;
   }, [data?.finish]);
 
-  if (!data) return null;
+  if (!mounted || !data) return null;
 
   const finishReason = data.finish?.finishReason ?? data.steps.at(-1)?.finishReason;
   const isError = !!finishReason && ERROR_REASONS.has(finishReason);
@@ -67,6 +70,7 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
 
   // ТЗ-DEV3: Real cost = sum of per-step costs (each step is a separate API call).
   // Uses server-calculated stepCostRub (TokenLens SSOT) with local fallback.
+  const isCostFallback = data.steps.length === 0 && data.finish?.estimatedCostRub != null;
   const cost = data.steps.length > 0
     ? data.steps.reduce((sum, step) => sum + getStepCostRub(step), 0)
     : data.finish?.estimatedCostRub;
@@ -93,7 +97,7 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
         {cost != null && (
           <>
             <span className={isError ? "text-destructive/30" : "text-muted-foreground/30"}>&middot;</span>
-            <span>&#8381;{cost.toFixed(2)}</span>
+            <span>{isCostFallback ? "~" : ""}&#8381;{cost.toFixed(2)}</span>
           </>
         )}
         {toolCount > 0 && (

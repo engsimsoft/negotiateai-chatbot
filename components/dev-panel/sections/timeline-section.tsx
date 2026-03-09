@@ -52,7 +52,7 @@ function StepCard({
           <span className="text-muted-foreground/60">{modelShort}</span>
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
-          <span>{step.inputTokens + step.outputTokens} tok</span>
+          <span>{step.inputTokens + step.outputTokens + (step.reasoningTokens ?? 0)} tok</span>
           {durationMs != null && (
             <span>
               {durationMs < 1000

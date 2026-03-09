@@ -15,6 +15,7 @@ export function TokensSection({ data }: { data: DevPanelMessageData }) {
 
   // ТЗ-DEV3: Real cost = sum of per-step costs (each step is a separate API call).
   // Uses server-calculated stepCostRub (TokenLens SSOT) with local fallback.
+  const isCostFallback = data.steps.length === 0 && data.finish?.estimatedCostRub != null;
   const cost =
     data.steps.length > 0
       ? data.steps.reduce((sum, step) => sum + getStepCostRub(step), 0)
@@ -54,7 +55,7 @@ export function TokensSection({ data }: { data: DevPanelMessageData }) {
         {cost != null && (
           <>
             <span className="text-muted-foreground">Cost</span>
-            <span className="font-medium">&#8381;{cost.toFixed(2)}</span>
+            <span className="font-medium">{isCostFallback ? "~" : ""}&#8381;{cost.toFixed(2)}</span>
           </>
         )}
       </div>
