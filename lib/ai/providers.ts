@@ -60,10 +60,10 @@ export function getClaudeModel(name: "haiku" | "sonnet" | "opus") {
 }
 
 // ---------------------------------------------------------------------------
-// Exchange rate (manually managed)
+// Exchange rate — re-exported from shared constant
 // ---------------------------------------------------------------------------
 
-export const RUB_PER_USD = 100;
+export { RUB_PER_USD } from "@/lib/constants/pricing";
 
 // ---------------------------------------------------------------------------
 // Model Pricing (RUB per 1K tokens — fallback when TokenLens unavailable)

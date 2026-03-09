@@ -55,7 +55,8 @@ export async function calcCostUsd(
 // Used by debug events in onStepFinish to embed pre-calculated cost.
 // ---------------------------------------------------------------------------
 
-import { calculateCostRub, RUB_PER_USD } from "./providers";
+import { calculateCostRub } from "./providers";
+import { RUB_PER_USD } from "@/lib/constants/pricing";
 
 /**
  * Calculate per-step cost in RUB using TokenLens catalog (sync, requires pre-fetched catalog).
