@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.63.0
-**Дата:** 2026-03-03
+**Версия:** 3.64.0
+**Дата:** 2026-03-09
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -466,6 +466,23 @@ components/projects/
 - `docs/decisions/018-prompt-engineering-lessons.md` — ADR: уроки prompt-инженерии
 
 **Детали:** [_archive/TZ_BF5_BriefingDedup/](_archive/TZ_BF5_BriefingDedup/)
+
+### ТЗ-CACHE3: UnifiedCostUI — ✅ ЗАВЕРШЁН (v3.64.0)
+
+**Выполнено:**
+- **`lib/constants/pricing.ts`** — единый SSOT для `RUB_PER_USD = 100`
+- **Context dropdown** — стоимость переведена с USD (`$0.00XXXX`) на RUB (`₽X.XX`)
+- **DevPanel Footer/Tokens** — fallback-стоимость помечается `~₽X.XX` (когда steps=0)
+- **Timeline** — токены step включают reasoning tokens
+- **Pipeline traces** — все stages используют `calcStepCostRub()` (TokenLens → fallback)
+- **DevPanel first-message bug** — исправлено: AI SDK v5 shell-messages фильтруются из position matching
+
+**Ключевые файлы:**
+- `lib/constants/pricing.ts` — RUB_PER_USD SSOT
+- `components/elements/context.tsx` — USD → RUB
+- `components/dev-panel/dev-panel-provider.tsx` — shell filter + React 19 safe state
+- `components/dev-panel/dev-panel-footer.tsx` — fallback ~
+- `components/dev-panel/sections/timeline-section.tsx` — + reasoning tokens
 
 ### ТЗ-CACHE2: UnifiedUsageLogging — ✅ ЗАВЕРШЁН
 

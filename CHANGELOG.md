@@ -12,6 +12,29 @@
 
 ---
 
+## [3.64.0] - 2026-03-09 - UnifiedCostUI
+
+**ТЗ-CACHE3**: Единый SSOT отображения стоимости. Все UI-компоненты показывают стоимость в рублях через единую цепочку (TokenLens → hardcoded fallback). Исправлен баг DevPanel (не отображался для первого сообщения).
+
+### Added
+- **`lib/constants/pricing.ts`** — единственный источник `RUB_PER_USD = 100` (SSOT)
+- **`isVisibleAssistantMessage()`** в DevPanelProvider — фильтр пустых shell-сообщений AI SDK v5
+
+### Changed
+- **`components/elements/context.tsx`** — стоимость переведена с USD (`$0.00XXXX`) на RUB (`₽X.XX`), для значений `< ₽0.01` показывает `< ₽0.01`
+- **`components/dev-panel/dev-panel-footer.tsx`** — fallback-стоимость (steps=0) помечается `~₽X.XX`
+- **`components/dev-panel/sections/tokens-section.tsx`** — аналогичный `~` маркер при fallback
+- **`components/dev-panel/sections/timeline-section.tsx`** — токены step включают reasoning (+`step.reasoningTokens`)
+- **`components/dev-panel/dev-panel-provider.tsx`** — lock assignments через `useState` + `useEffect` вместо `useMemo` + mutable ref (React 19 Concurrent Mode safe); фильтрация shell-сообщений
+- **Pipeline traces** — все stages (briefing/podcast/research) используют `calcStepCostRub()` (TokenLens SSOT) вместо `calculateCostRub()` (только hardcoded)
+- **`lib/ai/providers.ts`** — `RUB_PER_USD` перенесён в `lib/constants/pricing.ts`, re-export сохранён
+- **`lib/ai/tokenlens-catalog.ts`** — источник импорта `RUB_PER_USD` сменён на `lib/constants/pricing`
+
+### Fixed
+- **DevPanel не появлялся для первого сообщения** — AI SDK v5 создаёт пустой shell-message в начале стриминга; `PreviewMessage` возвращал `null` для него, что вело к неправильному position-based matching батча → ID сообщения
+
+---
+
 ## [3.63.0] - 2026-03-03 - UnifiedUsageLogging
 
 **ТЗ-CACHE2**: Unified Usage Logging — единая утилита `logUsage()` для всех AI-вызовов в системе. Полная видимость расходов по всем провайдерам (Anthropic, Gemini, Perplexity, Deepgram, TTS).

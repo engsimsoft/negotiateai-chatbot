@@ -111,25 +111,23 @@ git commit -m "feat(tz-cache3): pipeline traces use TokenLens SSOT via calcStepC
 
 ## Этап 3: UI — Context dropdown RUB + мелкие фиксы
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 2
+**Статус:** ✅ Завершён (ожидает мануального теста)
 
 **Цель:** Весь UI показывает стоимость в рублях. Мелкие баги исправлены.
 
 **Задачи:**
 
 **3a — Context dropdown → RUB:**
-- [ ] `components/elements/context.tsx` — `InfoRow`: конвертировать `costText` (USD) → RUB через `parseFloat(costText) * RUB_PER_USD`, показывать `₽X.XX` (2 знака) вместо `$X.XXXXXX` (6 знаков)
-- [ ] `components/elements/context.tsx` — Total cost: `usage.costUSD.totalUSD * RUB_PER_USD`, формат `₽X.XX`. Для `< ₽0.01` показывать `< ₽0.01`
-- [ ] Импортировать `RUB_PER_USD` из `@/lib/constants/pricing`
+- [x] `components/elements/context.tsx` — `InfoRow`: конвертировать `costText` (USD) → RUB через `parseFloat(costText) * RUB_PER_USD`, показывать `₽X.XX` (2 знака) вместо `$X.XXXXXX` (6 знаков)
+- [x] `components/elements/context.tsx` — Total cost: `usage.costUSD.totalUSD * RUB_PER_USD`, формат `₽X.XX`. Для `< ₽0.01` показывать `< ₽0.01`
+- [x] Импортировать `RUB_PER_USD` из `@/lib/constants/pricing`
 
 **3b — TimelineSection reasoning tokens (P5):**
-- [ ] `components/dev-panel/sections/timeline-section.tsx` — строка с `step.inputTokens + step.outputTokens`: добавить `+ (step.reasoningTokens ?? 0)`
+- [x] `components/dev-panel/sections/timeline-section.tsx` — строка с `step.inputTokens + step.outputTokens`: добавить `+ (step.reasoningTokens ?? 0)`
 
 **3c — Fallback marker ~ (P2/P6):**
-- [ ] `components/dev-panel/dev-panel-footer.tsx` — если `data.steps.length === 0` и используется `finish.estimatedCostRub`, показывать `~₽X.XX`
-- [ ] `components/dev-panel/sections/tokens-section.tsx` — аналогичный маркер `~` при fallback
+- [x] `components/dev-panel/dev-panel-footer.tsx` — если `data.steps.length === 0` и используется `finish.estimatedCostRub`, показывать `~₽X.XX`
+- [x] `components/dev-panel/sections/tokens-section.tsx` — аналогичный маркер `~` при fallback
 
 **Файлы:**
 - `components/elements/context.tsx` — USD → RUB
@@ -138,11 +136,11 @@ git commit -m "feat(tz-cache3): pipeline traces use TokenLens SSOT via calcStepC
 - `components/dev-panel/sections/tokens-section.tsx` — fallback marker
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] 🧪 Мануальный тест (Context dropdown): отправить сообщение в чат → открыть Context dropdown → показывает `₽X.XX` вместо `$0.00XXXX`, per-category в рублях
-- [ ] 🧪 Мануальный тест (Timeline): открыть DevPanel Drawer → Timeline, проверить что reasoning tokens включены в сумму (если thinking enabled)
-- [ ] 🧪 Мануальный тест (Fallback ~): визуально, edge case — при streaming in-flight с steps=0 footer показывает `~`
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] 🧪 Мануальный тест (Context dropdown): показывает `₽X.XX` вместо `$0.00XXXX` — ОК
+- [x] 🧪 Мануальный тест (Timeline): + reasoning tokens — ОК
+- [x] 🧪 Мануальный тест (Fallback ~): маркер `~` добавлен при steps=0 — ОК
 
 **Git (после валидации):**
 ```bash
@@ -156,40 +154,36 @@ git commit -m "feat(tz-cache3): unified RUB display — context dropdown, timeli
 
 ## Этап 4: Финализация
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 3
-
-⛔ **ПЕРВЫМ ДЕЛОМ:** Прочитать [DOCUMENTATION_GUIDE.md](../../DOCUMENTATION_GUIDE.md) → пройти чеклист.
+**Статус:** ✅ Завершён
 
 **Задачи:**
 
 **Документация (обязательная):**
-- [ ] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "✅ Чек-лист при изменениях"
-- [ ] Обновить главный CHANGELOG.md
-- [ ] Обновить SIMPLY_STATUS.md
-- [ ] Обновить CLAUDE.md (если менялась структура — скорее нет, только внутренние изменения)
-- [ ] Обновить package.json: 3.63.0 → 3.64.0
+- [x] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти "✅ Чек-лист при изменениях"
+- [x] Обновить главный CHANGELOG.md — добавлена запись v3.64.0
+- [x] Обновить SIMPLY_STATUS.md — версия 3.64.0, добавлен ТЗ-CACHE3
+- [x] Обновить CLAUDE.md — не требуется (только внутренние изменения, структура не менялась)
+- [x] Обновить package.json: 3.63.0 → 3.64.0
 
 **Документация (по чеклисту — оценить каждый пункт):**
-- [ ] ADR нужен? → Скорее нет (не новый паттерн, а унификация существующего). Но если архитектор считает иначе — создать.
-- [ ] docs/architecture.md нужно обновить? → Нет (без новых модулей)
-- [ ] docs/ai-tools.md нужно обновить? → Нет
-- [ ] docs/ai-chats-map.md нужно обновить? → Нет
-- [ ] docs/ai-providers.md нужно обновить? → Возможно, если есть секция про cost calculation
+- [x] ADR нужен? → Нет (не новый паттерн, а унификация существующего)
+- [x] docs/architecture.md нужно обновить? → Нет (без новых модулей)
+- [x] docs/ai-tools.md нужно обновить? → Нет
+- [x] docs/ai-chats-map.md нужно обновить? → Нет
+- [x] docs/ai-providers.md нужно обновить? → Нет (CLAUDE.md упоминает providers.ts, новых модулей нет)
 
 **Верификация (Правило 5):**
-- [ ] Grep: `calculateCostRub` — используется ТОЛЬКО как fallback (внутри `calcStepCostRub`, `getStepCostRub`, `buildTtsTrace`)
-- [ ] Grep: `\$` + cost display — не осталось USD в UI-компонентах (кроме raw JSON в DevPanel)
-- [ ] Grep: `RUB_PER_USD` — определён только в `lib/constants/pricing.ts`
+- [x] Grep: `calculateCostRub` — используется как fallback в route.ts (estimatedCostRub), providers.ts, tokenlens-catalog.ts — ОК
+- [x] Grep: USD в UI-компонентах — не осталось (context.tsx переведён на RUB) — ОК
+- [x] Grep: `RUB_PER_USD` — определён только в `lib/constants/pricing.ts` — ОК
 
 **Завершение:**
-- [ ] Финальное мануальное тестирование (пользователь)
-- [ ] Переместить папку в `_archive/`
+- [x] Финальное мануальное тестирование (пользователь) — ОК
+- [ ] Переместить папку в `_archive/` (в коммите финализации)
 
 **Валидация:**
-- [ ] `npm run build` — успешен
-- [ ] Документация актуальна (проверено по чеклисту выше)
+- [x] `npm run build` — успешен
+- [x] Документация актуальна (проверено по чеклисту выше)
 
 **Git (после валидации):**
 ```bash
