@@ -182,7 +182,7 @@ WHERE "deliveryEnabled" = true
 - [x] `npx tsc --noEmit` — 0 ошибок
 - [ ] `npm run build` — успешен
 - [x] `npm run db:migrate` + прямой SQL — без ошибок
-- [ ] 🧪 Мануальный тест: ручной вызов cron → в `CronRunLog` появляется запись
+- [x] 🧪 Мануальный тест: ручной вызов cron → в `CronRunLog` появляется запись ✅
 - [ ] 🧪 Vercel deployment: вызвать cron через CRON_SECRET → записи в `ai_usage_log` появляются
 
 **Git:** `feat(tz-costctrl-p4): guaranteed usage logging via waitUntil + cron_run_log`
