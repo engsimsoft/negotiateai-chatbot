@@ -4670,13 +4670,13 @@ export async function getCostByPeriod(
 
   const rows = await db.execute(sql`
     SELECT
-      DATE_TRUNC(${safePeriod}, "createdAt") AS bucket,
+      DATE_TRUNC(${sql.raw(`'${safePeriod}'`)}, "createdAt") AS bucket,
       SUM(CAST("costUsd" AS numeric)) AS "totalUsd",
       COUNT(*) AS count
     FROM "ai_usage_log"
     WHERE "createdAt" > NOW() - INTERVAL '${sql.raw(String(safeRange))} ${sql.raw(intervalUnit)}'
-    GROUP BY DATE_TRUNC(${safePeriod}, "createdAt")
-    ORDER BY bucket DESC
+    GROUP BY 1
+    ORDER BY 1 DESC
   `);
   return rows.rows.map((r: any) => ({
     bucket: new Date(r.bucket).toISOString(),
