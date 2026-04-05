@@ -4647,3 +4647,81 @@ export async function getNullCostRecords(days = 30): Promise<NullCostRecord[]> {
     count: Number(r.count),
   }));
 }
+
+export type CostPeriod = "hour" | "day" | "month";
+
+export interface CostByPeriod {
+  bucket: string;  // ISO string of the truncated timestamp
+  totalUsd: number | null;
+  count: number;
+}
+
+/** Total cost grouped by hour/day/month for the last N units of that period */
+export async function getCostByPeriod(
+  period: CostPeriod,
+  range: number,
+): Promise<CostByPeriod[]> {
+  // Validate period to prevent SQL injection (only these 3 values are allowed)
+  const safePeriod = (["hour", "day", "month"] as const).includes(period as CostPeriod)
+    ? period
+    : "day";
+  const safeRange = Math.max(1, Math.min(range, 1000));
+  const intervalUnit = safePeriod === "hour" ? "hours" : safePeriod === "day" ? "days" : "months";
+
+  const rows = await db.execute(sql`
+    SELECT
+      DATE_TRUNC(${safePeriod}, "createdAt") AS bucket,
+      SUM(CAST("costUsd" AS numeric)) AS "totalUsd",
+      COUNT(*) AS count
+    FROM "ai_usage_log"
+    WHERE "createdAt" > NOW() - INTERVAL '${sql.raw(String(safeRange))} ${sql.raw(intervalUnit)}'
+    GROUP BY DATE_TRUNC(${safePeriod}, "createdAt")
+    ORDER BY bucket DESC
+  `);
+  return rows.rows.map((r: any) => ({
+    bucket: new Date(r.bucket).toISOString(),
+    totalUsd: r.totalUsd != null ? Number(r.totalUsd) : null,
+    count: Number(r.count),
+  }));
+}
+
+/** Total cost by chatMode for the last N days (used in audit with variable range) */
+export async function getCostByChatModeForRange(days: number): Promise<CostByChatMode[]> {
+  return getCostByChatMode(days);
+}
+
+/** Count of NULL costUsd records for variable range */
+export async function getNullCostRecordsForRange(days: number): Promise<NullCostRecord[]> {
+  return getNullCostRecords(days);
+}
+
+export interface CostByModel {
+  modelId: string;
+  totalUsd: number | null;
+  count: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/** Total cost grouped by modelId for last N days */
+export async function getCostByModel(days: number): Promise<CostByModel[]> {
+  const rows = await db.execute(sql`
+    SELECT
+      "modelId",
+      SUM(CAST("costUsd" AS numeric)) AS "totalUsd",
+      COUNT(*) AS count,
+      SUM("inputTokens") AS "inputTokens",
+      SUM("outputTokens") AS "outputTokens"
+    FROM "ai_usage_log"
+    WHERE "createdAt" > NOW() - INTERVAL '${sql.raw(String(days))} days'
+    GROUP BY "modelId"
+    ORDER BY "totalUsd" DESC NULLS LAST
+  `);
+  return rows.rows.map((r: any) => ({
+    modelId: String(r.modelId),
+    totalUsd: r.totalUsd != null ? Number(r.totalUsd) : null,
+    count: Number(r.count),
+    inputTokens: Number(r.inputTokens ?? 0),
+    outputTokens: Number(r.outputTokens ?? 0),
+  }));
+}
