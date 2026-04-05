@@ -2,8 +2,8 @@ import { auth } from "@/app/(auth)/auth";
 import {
   getBriefingSettings,
   getTelegramConnection,
-  upsertBriefingSettings,
 } from "@/lib/db/queries";
+import { setBriefingDelivery } from "@/lib/briefing/delivery-service";
 
 /**
  * GET /api/briefing/delivery
@@ -34,7 +34,11 @@ export async function GET() {
 /**
  * PATCH /api/briefing/delivery
  *
- * Update delivery settings (deliveryEnabled, deliveryFormat, generationTime, timezone).
+ * Update delivery settings. Delegates to setBriefingDelivery service
+ * which enforces the invariant:
+ *   deliveryEnabled=true ⇒ active TelegramConnection exists
+ *
+ * Returns 409 Conflict with error code if invariant violated.
  */
 export async function PATCH(request: Request) {
   const session = await auth();
@@ -44,45 +48,29 @@ export async function PATCH(request: Request) {
 
   const body = await request.json();
 
-  const update: {
-    deliveryEnabled?: boolean;
-    deliveryFormat?: string;
-    generationTime?: string;
-    timezone?: string;
-  } = {};
-
-  if (typeof body.deliveryEnabled === "boolean") {
-    update.deliveryEnabled = body.deliveryEnabled;
-  }
-  if (
-    typeof body.deliveryFormat === "string" &&
-    ["text", "audio", "text_audio"].includes(body.deliveryFormat)
-  ) {
-    update.deliveryFormat = body.deliveryFormat;
-  }
-  if (
-    typeof body.generationTime === "string" &&
-    /^\d{2}:\d{2}$/.test(body.generationTime)
-  ) {
-    update.generationTime = body.generationTime;
-  }
-  if (typeof body.timezone === "string" && body.timezone.length <= 50) {
-    update.timezone = body.timezone;
-  }
-
-  if (Object.keys(update).length === 0) {
-    return Response.json({ error: "No valid fields" }, { status: 400 });
-  }
-
-  const updated = await upsertBriefingSettings({
+  const result = await setBriefingDelivery({
     userId: session.user.id,
-    ...update,
+    enabled:
+      typeof body.deliveryEnabled === "boolean"
+        ? body.deliveryEnabled
+        : undefined,
+    format:
+      typeof body.deliveryFormat === "string"
+        ? (body.deliveryFormat as "text" | "audio" | "text_audio")
+        : undefined,
+    time: typeof body.generationTime === "string" ? body.generationTime : undefined,
+    timezone:
+      typeof body.timezone === "string" && body.timezone.length <= 50
+        ? body.timezone
+        : undefined,
   });
 
-  return Response.json({
-    deliveryEnabled: updated.deliveryEnabled,
-    deliveryFormat: updated.deliveryFormat,
-    generationTime: updated.generationTime,
-    timezone: updated.timezone,
-  });
+  if (!result.ok) {
+    return Response.json(
+      { error: result.code, message: result.message },
+      { status: 409 },
+    );
+  }
+
+  return Response.json(result.settings);
 }

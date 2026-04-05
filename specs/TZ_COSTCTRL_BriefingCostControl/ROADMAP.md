@@ -63,17 +63,17 @@ WHERE "deliveryEnabled" = true
 
 ## Этап 1 (Phase 1): Service layer + API invariant
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (2026-04-05)
 
 **Цель:** создать `delivery-service.ts` как единую точку изменения `deliveryEnabled`, enforced invariant #1 на API уровне.
 
 **Задачи:**
-- [ ] Создать `lib/briefing/delivery-service.ts` с функцией `setBriefingDelivery()`
-- [ ] Реализовать invariant: `enabled=true` требует активный TelegramConnection → возврат `{ok: false, code: "telegram_required"}`
-- [ ] Создать функцию `disableDeliveryOnTelegramDisconnect(userId)` для cascade
-- [ ] Обновить `app/(chat)/api/briefing/delivery/route.ts` PATCH: использовать service, возвращать 409 при invariant violation
-- [ ] Обновить `app/(chat)/api/telegram/link/route.ts` DELETE: cascade вызов `disableDeliveryOnTelegramDisconnect()`
-- [ ] `npx tsc --noEmit` — 0 ошибок
+- [x] Создать `lib/briefing/delivery-service.ts` с функцией `setBriefingDelivery()`
+- [x] Реализовать invariant: `enabled=true` требует активный TelegramConnection → возврат `{ok: false, code: "telegram_required"}`
+- [x] Создать функцию `disableDeliveryOnTelegramDisconnect(userId)` для cascade
+- [x] Обновить `app/(chat)/api/briefing/delivery/route.ts` PATCH: использовать service, возвращать 409 при invariant violation
+- [x] Обновить `app/(chat)/api/telegram/link/route.ts` DELETE: cascade вызов `disableDeliveryOnTelegramDisconnect()`
+- [x] `npx tsc --noEmit` — 0 ошибок
 
 **Файлы:**
 - `lib/briefing/delivery-service.ts` — новый
@@ -81,10 +81,10 @@ WHERE "deliveryEnabled" = true
 - `app/(chat)/api/telegram/link/route.ts` — добавить cascade в DELETE
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] 🧪 Мануальный тест: PATCH с `deliveryEnabled=true` без Telegram → 409 response
-- [ ] 🧪 Мануальный тест: DELETE /telegram/link → в БД `deliveryEnabled=false` автоматически
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] 🧪 Мануальный тест: PATCH с `deliveryEnabled=true` без Telegram → 409 response
+- [x] 🧪 Мануальный тест: DELETE /telegram/link → в БД `deliveryEnabled=false` автоматически
 
 **Git:** `feat(tz-costctrl-p1): delivery service + API invariant enforcement`
 
@@ -94,24 +94,24 @@ WHERE "deliveryEnabled" = true
 
 ## Этап 2 (Phase 2): UI state machine fix
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (2026-04-05)
 
 **Цель:** убрать mouse-trap — тоггл ВСЕГДА можно выключить, защита от включения без Telegram на уровне UX + обработка 409.
 
 **Задачи:**
-- [ ] Изменить `disabled` condition в `briefing-delivery-settings.tsx`: `saving || (!telegramOk && !enabled)` — escape hatch
-- [ ] Добавить tooltip "Подключите Telegram чтобы включить доставку" при hover над disabled switch (когда off + no Telegram)
-- [ ] Обработать 409 response из PATCH: toast + revert optimistic state + не менять switch
-- [ ] `npx tsc --noEmit` — 0 ошибок
+- [x] Изменить `disabled` condition в `briefing-delivery-settings.tsx`: `saving || (!telegramOk && !enabled)` — escape hatch
+- [x] Добавить tooltip "Подключите Telegram чтобы включить доставку" при hover над disabled switch (когда off + no Telegram)
+- [x] Обработать 409 response из PATCH: toast + revert optimistic state + не менять switch
+- [x] `npx tsc --noEmit` — 0 ошибок
 
 **Файлы:**
 - `components/briefing/briefing-delivery-settings.tsx`
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] 🧪 Мануальный тест под vladimir@family.local (после Phase 0 deliveryEnabled=false): switch можно кликнуть, но ON заблокирован → toast "Подключите Telegram"
-- [ ] 🧪 Мануальный тест: включить deliveryEnabled через dev tools (fetch PATCH) → затем открыть страницу → switch можно выключить (escape hatch работает)
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] 🧪 Мануальный тест под vladimir@family.local (после Phase 0 deliveryEnabled=false): switch можно кликнуть, но ON заблокирован → toast "Подключите Telegram"
+- [x] 🧪 Мануальный тест: включить deliveryEnabled через dev tools (fetch PATCH) → затем открыть страницу → switch можно выключить (escape hatch работает)
 
 **Git:** `feat(tz-costctrl-p2): UI escape hatch + 409 handling`
 

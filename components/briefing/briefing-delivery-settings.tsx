@@ -21,6 +21,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "@/components/toast";
 import { fetcher } from "@/lib/utils";
 
@@ -79,6 +85,19 @@ export function BriefingDeliverySettings() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
         });
+        if (res.status === 409) {
+          // Invariant violation — revert optimistic state and show toast
+          if (data) {
+            setEnabled(data.deliveryEnabled);
+            setFormat(data.deliveryFormat);
+            setTime(data.generationTime);
+          }
+          toast({
+            type: "error",
+            description: "Подключите Telegram в настройках для автоматической доставки",
+          });
+          return;
+        }
         if (!res.ok) throw new Error("Save failed");
         const updated = await res.json();
         mutate(
@@ -134,7 +153,10 @@ export function BriefingDeliverySettings() {
   }
 
   const telegramOk = data.telegramConnected;
-  const disabled = !telegramOk || saving;
+  // Escape hatch: user can always turn delivery OFF (even without Telegram).
+  // Turning ON requires active Telegram — enforced by API (409) + disabled state.
+  const switchDisabled = saving || (!telegramOk && !enabled);
+  const showTelegramTooltip = !telegramOk && !enabled;
 
   return (
     <div className="space-y-4">
@@ -170,22 +192,35 @@ export function BriefingDeliverySettings() {
       <div className="flex items-center justify-between">
         <Label
           htmlFor="delivery-toggle"
-          className={disabled ? "text-muted-foreground/50" : ""}
+          className={switchDisabled ? "text-muted-foreground/50" : ""}
         >
           Доставлять каждое утро
         </Label>
-        <Switch
-          id="delivery-toggle"
-          checked={enabled}
-          onCheckedChange={handleToggle}
-          disabled={disabled}
-        />
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={showTelegramTooltip ? 0 : undefined}>
+                <Switch
+                  id="delivery-toggle"
+                  checked={enabled}
+                  onCheckedChange={handleToggle}
+                  disabled={switchDisabled}
+                />
+              </span>
+            </TooltipTrigger>
+            {showTelegramTooltip && (
+              <TooltipContent side="left">
+                <p>Подключите Telegram чтобы включить доставку</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {/* Time picker */}
       <div className="space-y-1.5">
         <Label
-          className={!enabled || disabled ? "text-muted-foreground/50" : ""}
+          className={!enabled || switchDisabled ? "text-muted-foreground/50" : ""}
         >
           <Clock className="mr-1.5 inline h-3.5 w-3.5" />
           Время доставки
@@ -193,7 +228,7 @@ export function BriefingDeliverySettings() {
         <Select
           value={time}
           onValueChange={handleTimeChange}
-          disabled={!enabled || disabled}
+          disabled={!enabled || switchDisabled}
         >
           <SelectTrigger className="w-full">
             <SelectValue />
@@ -216,14 +251,14 @@ export function BriefingDeliverySettings() {
       {/* Format selector */}
       <div className="space-y-1.5">
         <Label
-          className={!enabled || disabled ? "text-muted-foreground/50" : ""}
+          className={!enabled || switchDisabled ? "text-muted-foreground/50" : ""}
         >
           Формат
         </Label>
         <Select
           value={format}
           onValueChange={handleFormatChange}
-          disabled={!enabled || disabled}
+          disabled={!enabled || switchDisabled}
         >
           <SelectTrigger className="w-full">
             <SelectValue />

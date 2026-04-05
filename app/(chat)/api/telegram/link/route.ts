@@ -4,6 +4,7 @@ import {
   createTelegramLinkToken,
   deleteTelegramConnection,
 } from "@/lib/db/queries";
+import { disableDeliveryOnTelegramDisconnect } from "@/lib/briefing/delivery-service";
 import { ChatSDKError } from "@/lib/errors";
 
 const BOT_USERNAME = "GetSimplyBot";
@@ -85,6 +86,10 @@ export async function DELETE() {
     }
 
     await deleteTelegramConnection({ userId: session.user.id });
+
+    // ТЗ-COSTCTRL Phase 1: Cascade — disable delivery to maintain invariant
+    //   deliveryEnabled=true ⇒ active TelegramConnection exists
+    await disableDeliveryOnTelegramDisconnect(session.user.id);
 
     return Response.json({ success: true });
   } catch (error) {
