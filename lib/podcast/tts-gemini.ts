@@ -2,6 +2,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { buildTtsTrace } from "@/lib/ai/pipeline-trace";
+import { waitUntil } from "@vercel/functions";
 import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import type { TTSProvider, VoiceConfig } from "./types";
@@ -77,15 +78,15 @@ export async function generateSpeechWithRetry(
     // PCM: 24kHz, 16-bit mono → 48000 bytes/sec
     const audioDurationSeconds = Math.round(buffer.length / 48000);
 
-    // ТЗ-CACHE2: Usage logging (TTS has no token usage, log for cost tracking)
+    // ТЗ-CACHE2: Usage logging — waitUntil ensures completion on Vercel serverless
     if (userId) {
-      logUsage({
+      waitUntil(logUsage({
         userId,
         usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } as any,
         modelId: TTS_MODEL,
         chatMode: "podcast:tts",
         durationMs,
-      });
+      }));
     }
 
     const trace: PipelineStageTrace = {
@@ -111,15 +112,15 @@ export async function generateSpeechWithRetry(
     const durationMs = Date.now() - startTime;
     const audioDurationSeconds = Math.round(buffer.length / 48000);
 
-    // ТЗ-CACHE2: Usage logging (retry path)
+    // ТЗ-CACHE2: Usage logging (retry path) — waitUntil ensures completion on Vercel serverless
     if (userId) {
-      logUsage({
+      waitUntil(logUsage({
         userId,
         usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } as any,
         modelId: TTS_MODEL,
         chatMode: "podcast:tts",
         durationMs,
-      });
+      }));
     }
 
     const trace: PipelineStageTrace = {

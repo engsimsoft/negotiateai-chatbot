@@ -7,6 +7,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
 import type { ModelCatalog } from "tokenlens/core";
+import { waitUntil } from "@vercel/functions";
 import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { AUTHOR_MODEL, AUTHOR_MODEL_FALLBACK } from "./briefing-config";
@@ -175,15 +176,15 @@ export async function generateSection(
   const totalTokens = promptTokens + completionTokens;
   const durationMs = Date.now() - startTime;
 
-  // ТЗ-CACHE2: Usage logging
+  // ТЗ-CACHE2: Usage logging — waitUntil ensures completion on Vercel serverless
   if (userId) {
-    logUsage({
+    waitUntil(logUsage({
       userId,
       usage: { inputTokens: promptTokens, outputTokens: completionTokens, totalTokens } as any,
       modelId: usedModel,
       chatMode: "briefing:section-author",
       durationMs,
-    });
+    }));
   }
 
   const trace: PipelineStageTrace = {

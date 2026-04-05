@@ -703,3 +703,34 @@ export const meetingRecord = pgTable(
 );
 
 export type MeetingRecord = InferSelectModel<typeof meetingRecord>;
+
+// ============================================================================
+// Cron Run Log (ТЗ-COSTCTRL Phase 4)
+// ============================================================================
+
+export const cronRunLog = pgTable("CronRunLog", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  /** Cron job name, e.g. "briefing" */
+  cronName: varchar("cronName", { length: 64 }).notNull(),
+  /** UTC timestamp when the cron run started */
+  startedAt: timestamp("startedAt").notNull(),
+  /** UTC timestamp when the cron run finished */
+  finishedAt: timestamp("finishedAt").notNull(),
+  /** Number of users processed (pipeline started) */
+  usersProcessed: integer("usersProcessed").notNull().default(0),
+  /** Number of users skipped (no Telegram, idempotency, etc.) */
+  usersSkipped: integer("usersSkipped").notNull().default(0),
+  /** Number of users that resulted in an error */
+  usersFailed: integer("usersFailed").notNull().default(0),
+  /** Structured results per user */
+  results: jsonb("results").$type<Array<{
+    userId: string;
+    status: string;
+    deliveryStatus?: string;
+    error?: string;
+  }>>(),
+  /** Total wall-clock duration in ms */
+  durationMs: integer("durationMs").notNull(),
+});
+
+export type CronRunLog = InferSelectModel<typeof cronRunLog>;

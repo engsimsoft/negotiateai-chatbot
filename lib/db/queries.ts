@@ -66,6 +66,8 @@ import {
   type TelegramMessage,
   type MeetingRecord,
   meetingRecord,
+  type CronRunLog,
+  cronRunLog,
   type User,
   user,
   vote,
@@ -4497,5 +4499,44 @@ export async function getMeetingRecordsCount({
       "bad_request:database",
       "Failed to get meeting records count",
     );
+  }
+}
+
+// ============================================================================
+// Cron Run Log (ТЗ-COSTCTRL Phase 4)
+// ============================================================================
+
+export async function saveCronRunLog({
+  cronName,
+  startedAt,
+  finishedAt,
+  usersProcessed,
+  usersSkipped,
+  usersFailed,
+  results,
+}: {
+  cronName: string;
+  startedAt: Date;
+  finishedAt: Date;
+  usersProcessed: number;
+  usersSkipped: number;
+  usersFailed: number;
+  results: CronRunLog["results"];
+}): Promise<void> {
+  try {
+    const durationMs = finishedAt.getTime() - startedAt.getTime();
+    await db.insert(cronRunLog).values({
+      cronName,
+      startedAt,
+      finishedAt,
+      usersProcessed,
+      usersSkipped,
+      usersFailed,
+      results,
+      durationMs,
+    });
+  } catch (error) {
+    // Non-blocking: log warning but never throw (cron must complete regardless)
+    console.warn("[saveCronRunLog] Failed to save cron run log:", error);
   }
 }

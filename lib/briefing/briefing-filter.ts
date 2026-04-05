@@ -5,6 +5,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
 import type { ModelCatalog } from "tokenlens/core";
+import { waitUntil } from "@vercel/functions";
 import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { FILTER_MODEL, MAX_FILTER_CANDIDATES } from "./briefing-config";
@@ -115,15 +116,15 @@ Output JSON with "candidates" array.`,
   const completionTokens = usage?.outputTokens ?? 0;
   const totalTokens = promptTokens + completionTokens;
 
-  // ТЗ-CACHE2: Usage logging
+  // ТЗ-CACHE2: Usage logging — waitUntil ensures completion on Vercel serverless
   if (userId) {
-    logUsage({
+    waitUntil(logUsage({
       userId,
       usage: usage ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 } as any,
       modelId: FILTER_MODEL,
       chatMode: "briefing:filter",
       durationMs,
-    });
+    }));
   }
 
   const trace: PipelineStageTrace = {

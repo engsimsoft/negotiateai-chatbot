@@ -9,6 +9,7 @@ import {
   getBriefingHistory,
   getTelegramConnection,
   getUsersForDelivery,
+  saveCronRunLog,
   updateBriefingDeliveryStatus,
   updateBriefingMetadata,
 } from "@/lib/db/queries";
@@ -29,14 +30,24 @@ export async function GET(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const now = new Date();
-  console.log(`[cron/briefing] Triggered at ${now.toISOString()}`);
+  const startedAt = new Date();
+  console.log(`[cron/briefing] Triggered at ${startedAt.toISOString()}`);
 
-  // Find users due for delivery (Hobby: all with deliveryEnabled=true)
-  const users = await getUsersForDelivery({ currentUtcTime: now });
+  // Find users due for delivery (Hobby: all with deliveryEnabled=true + active Telegram)
+  const users = await getUsersForDelivery({ currentUtcTime: startedAt });
 
   if (users.length === 0) {
     console.log("[cron/briefing] No users due for delivery");
+    const finishedAt = new Date();
+    await saveCronRunLog({
+      cronName: "briefing",
+      startedAt,
+      finishedAt,
+      usersProcessed: 0,
+      usersSkipped: 0,
+      usersFailed: 0,
+      results: [],
+    });
     return Response.json({ ok: true, usersProcessed: 0 });
   }
 
@@ -66,7 +77,23 @@ export async function GET(request: Request) {
 
   await Promise.allSettled(tasks);
 
+  const finishedAt = new Date();
+  const usersProcessed = results.filter((r) => r.status === "generated").length;
+  const usersSkipped = results.filter((r) => r.status === "skipped").length;
+  const usersFailed = results.filter((r) => r.status === "failed" || r.status === "error").length;
+
   console.log("[cron/briefing] Results:", results);
+
+  // ТЗ-COSTCTRL Phase 4: Save cron run forensics log
+  await saveCronRunLog({
+    cronName: "briefing",
+    startedAt,
+    finishedAt,
+    usersProcessed,
+    usersSkipped,
+    usersFailed,
+    results,
+  });
 
   return Response.json({
     ok: true,

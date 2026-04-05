@@ -6,6 +6,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
 import type { ModelCatalog } from "tokenlens/core";
+import { waitUntil } from "@vercel/functions";
 import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import type { BriefingArticleSection } from "@/lib/briefing/briefing-types";
@@ -140,15 +141,15 @@ export async function generateScript(
     const durationMs = Date.now() - startTime;
     const totalTokens = totalPromptTokens + totalCompletionTokens;
 
-    // ТЗ-CACHE2: Usage logging (accumulated across retries)
+    // ТЗ-CACHE2: Usage logging — waitUntil ensures completion on Vercel serverless
     if (userId) {
-      logUsage({
+      waitUntil(logUsage({
         userId,
         usage: { inputTokens: totalPromptTokens, outputTokens: totalCompletionTokens, totalTokens } as any,
         modelId: SCRIPT_MODEL,
         chatMode: "podcast:script",
         durationMs,
-      });
+      }));
     }
 
     const trace: PipelineStageTrace = {

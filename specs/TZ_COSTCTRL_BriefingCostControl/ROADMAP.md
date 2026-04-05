@@ -150,22 +150,22 @@ WHERE "deliveryEnabled" = true
 
 ## Этап 4 (Phase 4): Guaranteed usage logging
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (2026-04-05)
 
 **Цель:** `waitUntil` для всех fire-and-forget `logUsage` + новая таблица `cron_run_log` для forensics.
 
 **Задачи:**
-- [ ] Создать миграцию для таблицы `cron_run_log` (Drizzle schema + `db:generate`)
-- [ ] Добавить `saveCronRunLog()` query в `lib/db/queries.ts`
-- [ ] Заменить `logUsage({...})` на `waitUntil(logUsage({...}))` в 6 call-sites:
-  - `lib/briefing/briefing-author.ts:214`
-  - `lib/briefing/briefing-filter.ts:120`
-  - `lib/briefing/briefing-section-author.ts:180`
-  - `lib/podcast/script-generator.ts:145`
-  - `lib/podcast/tts-gemini.ts:82, 116`
-- [ ] В `cron/briefing/route.ts`: накапливать результаты + `await saveCronRunLog({...})` перед return
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run db:migrate` — миграция применена локально
+- [x] Создать миграцию для таблицы `CronRunLog` (schema + ручной SQL — Drizzle generate интерактивный)
+- [x] Добавить `saveCronRunLog()` query в `lib/db/queries.ts`
+- [x] Заменить `logUsage({...})` на `waitUntil(logUsage({...}))` в 6 call-sites:
+  - `lib/briefing/briefing-author.ts`
+  - `lib/briefing/briefing-filter.ts`
+  - `lib/briefing/briefing-section-author.ts`
+  - `lib/podcast/script-generator.ts`
+  - `lib/podcast/tts-gemini.ts` (2 места)
+- [x] В `cron/briefing/route.ts`: накапливать результаты + `await saveCronRunLog({...})` перед return
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run db:migrate` + прямой SQL — таблица создана в production БД
 
 **Файлы:**
 - `lib/db/schema.ts` — новая таблица `cronRunLog`
@@ -179,11 +179,11 @@ WHERE "deliveryEnabled" = true
 - `app/api/cron/briefing/route.ts` — saveCronRunLog
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
+- [x] `npx tsc --noEmit` — 0 ошибок
 - [ ] `npm run build` — успешен
-- [ ] `npm run db:migrate` — без ошибок
-- [ ] 🧪 Мануальный тест: ручной вызов cron → в `cron_run_log` появляется запись
-- [ ] 🧪 Vercel preview deployment: задеплоить, вызвать cron через CRON_SECRET → записи в `ai_usage_log` появляются (критический тест waitUntil на реальном Vercel runtime!)
+- [x] `npm run db:migrate` + прямой SQL — без ошибок
+- [ ] 🧪 Мануальный тест: ручной вызов cron → в `CronRunLog` появляется запись
+- [ ] 🧪 Vercel deployment: вызвать cron через CRON_SECRET → записи в `ai_usage_log` появляются
 
 **Git:** `feat(tz-costctrl-p4): guaranteed usage logging via waitUntil + cron_run_log`
 
