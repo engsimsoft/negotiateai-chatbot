@@ -236,15 +236,18 @@
 - `components/groups/group-detail.tsx` — Просмотр группы (header, табы топиков для форумов, лента сообщений, cursor-based «Загрузить ещё», удаление)
 - `components/groups/group-message-list.tsx` — Утилитарная лента (автор, текст, дата, media icon, file preview/download, trash on hover)
 
-**Background Briefing (v3.54.0 — ТЗ-TG4a, v3.55.0 — ТЗ-TG4b, v3.55.1 — PodcastFromCron):**
+**Background Briefing (v3.54.0 — ТЗ-TG4a, v3.55.0 — ТЗ-TG4b, v3.55.1 — PodcastFromCron, v3.66.0 — ТЗ-COSTCTRL):**
 - `vercel.json` — Vercel Cron config (daily: `0 5 * * *` Hobby plan)
-- `app/api/cron/briefing/route.ts` — Cron handler: CRON_SECRET auth, getUsersForDelivery, p-limit(3), идемпотентность, синхронный podcast + merge, Telegram delivery
+- `app/api/cron/briefing/route.ts` — Cron handler: CRON_SECRET auth, getUsersForDelivery (INNER JOIN Telegram), pre-flight check, p-limit(3), waitUntil(logUsage), saveCronRunLog
+- `lib/briefing/delivery-service.ts` — Единая точка мутации deliveryEnabled: setBriefingDelivery (invariant: требует активный Telegram → 409), disableDeliveryOnTelegramDisconnect (cascade) ← v3.66.0
 - `lib/briefing/briefing-pipeline.ts` — Core pipeline (browser + background)
 - `lib/podcast/podcast-pipeline.ts` — Core podcast pipeline (browser + background)
 - `lib/podcast/audio-merger.ts` — Склейка per-section MP3 → один файл → Vercel Blob ← v3.55.1
 - `lib/telegram/briefing-delivery.ts` — Доставка брифинга в Telegram: formatBriefingMessage (HTML), deliverBriefingToTelegram (text + mergedAudioUrl), error handling
-- `app/(chat)/api/briefing/delivery/route.ts` — GET/PATCH delivery settings + telegram status
-- `components/briefing/briefing-delivery-settings.tsx` — UI настроек доставки (Popover)
+- `app/(chat)/api/briefing/delivery/route.ts` — GET/PATCH delivery settings + telegram status (PATCH через delivery-service, 409 при invariant violation)
+- `components/briefing/briefing-delivery-settings.tsx` — UI настроек доставки: escape hatch (выключить всегда можно), tooltip без Telegram, 409 handling
+- `app/api/admin/cost-audit/route.ts` — JSON API cost audit (gated: isSimplyDevMode) ← v3.66.0
+- `app/(dashboard)/admin/cost-audit/page.tsx` — Cost audit dashboard: period selector (24ч/7д/30д/3м/12м), by model/chatMode/period, null cost, cron history ← v3.66.0
 
 **Tool Call Guardian (v3.50.0 — ТЗ-FIX1, v3.51.0 — ТЗ-FIX1.2, v3.53.0 — Guardian Bypass):**
 - `lib/ai/tool-call-guardian.ts` — Детектор галлюцинаций tool calls (паттерны RU/EN, `detectToolHallucination()`, `createStepTracker()`, `findToolMentions()`)

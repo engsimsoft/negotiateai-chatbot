@@ -235,7 +235,19 @@ const cost = calculateCostRub('claude-sonnet-4-6', { inputTokens: 1000, outputTo
 const ttsCost = calculateTtsCostRub(30); // 30 секунд
 ```
 
-`MODEL_PRICING_RUB` поддерживает: Claude (Haiku, Sonnet, Opus, fallback Sonnet 4.5), Gemini (2.0 Flash, 2.5 Flash), Perplexity (Sonar Pro).
+`MODEL_PRICING_RUB` поддерживает: Claude (Haiku, Sonnet, Opus, fallback Sonnet 4.5), Gemini (2.0 Flash, 2.5 Flash), Perplexity (Sonar Pro, Sonar Deep Research).
+
+Non-token провайдеры (v3.66.0):
+```typescript
+import { calculateDeepgramCostUsd, calculateGeminiTtsCostUsd } from '@/lib/ai/providers';
+
+// Deepgram Nova-3: $0.0043/min batch
+const dgCost = calculateDeepgramCostUsd(audioSeconds);
+
+// Gemini TTS: $4/1M chars
+const ttsCost = calculateGeminiTtsCostUsd(script.length);
+```
+Передаются через `costUsdOverride` в `logUsage()` — обходят `calcCostUsd()` для non-token pricing.
 
 Используется в Pipeline Observability (`lib/ai/pipeline-trace.ts`) для расчёта стоимости каждого этапа pipeline.
 
