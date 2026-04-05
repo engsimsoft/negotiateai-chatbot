@@ -4699,11 +4699,17 @@ export interface CostByModel {
   modelId: string;
   totalUsd: number | null;
   count: number;
+  /** Total billable input tokens (= fresh + cache_read + cache_write). */
   inputTokens: number;
+  /** Fresh input tokens (= inputTokens - cacheReadTokens - cacheWriteTokens). */
+  freshInputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
   outputTokens: number;
+  reasoningTokens: number;
 }
 
-/** Total cost grouped by modelId for last N days */
+/** Total cost grouped by modelId for last N days. ТЗ-TOKENS1 Этап 7: breakdown by cache type. */
 export async function getCostByModel(days: number): Promise<CostByModel[]> {
   const rows = await db.execute(sql`
     SELECT
@@ -4711,17 +4717,30 @@ export async function getCostByModel(days: number): Promise<CostByModel[]> {
       SUM(CAST("costUsd" AS numeric)) AS "totalUsd",
       COUNT(*) AS count,
       SUM("inputTokens") AS "inputTokens",
-      SUM("outputTokens") AS "outputTokens"
+      SUM("cacheReadTokens") AS "cacheReadTokens",
+      SUM("cacheWriteTokens") AS "cacheWriteTokens",
+      SUM("outputTokens") AS "outputTokens",
+      SUM("thinkingTokens") AS "reasoningTokens"
     FROM "ai_usage_log"
     WHERE "createdAt" > NOW() - INTERVAL '${sql.raw(String(days))} days'
     GROUP BY "modelId"
     ORDER BY "totalUsd" DESC NULLS LAST
   `);
-  return rows.rows.map((r: any) => ({
-    modelId: String(r.modelId),
-    totalUsd: r.totalUsd != null ? Number(r.totalUsd) : null,
-    count: Number(r.count),
-    inputTokens: Number(r.inputTokens ?? 0),
-    outputTokens: Number(r.outputTokens ?? 0),
-  }));
+  return rows.rows.map((r: any) => {
+    const inputTokens = Number(r.inputTokens ?? 0);
+    const cacheReadTokens = Number(r.cacheReadTokens ?? 0);
+    const cacheWriteTokens = Number(r.cacheWriteTokens ?? 0);
+    const freshInputTokens = Math.max(0, inputTokens - cacheReadTokens - cacheWriteTokens);
+    return {
+      modelId: String(r.modelId),
+      totalUsd: r.totalUsd != null ? Number(r.totalUsd) : null,
+      count: Number(r.count),
+      inputTokens,
+      freshInputTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
+      outputTokens: Number(r.outputTokens ?? 0),
+      reasoningTokens: Number(r.reasoningTokens ?? 0),
+    };
+  });
 }

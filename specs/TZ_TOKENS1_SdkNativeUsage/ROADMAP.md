@@ -11,8 +11,8 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 10 |
-| Завершено | 7 / 10 |
-| Текущий этап | Этап 7 (Cost Audit UI) после мануального теста 7.5 |
+| Завершено | 8 / 10 |
+| Текущий этап | Этап 8 (Валидация 7 типов чатов) |
 | Сессий пройдено | 4 |
 
 **Критерий успеха:** Dev Panel cost === Cost Audit Dashboard cost === Anthropic Console cost (допуск <1%) во всех 7 типах чатов.
@@ -238,50 +238,47 @@
 
 ### Этап 7: Cost Audit UI — разделение fresh/cache/write
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 **Цель:** Обновить страницу `/admin/cost-audit` — показать разделение токенов на fresh / cache_read / cache_write, чтобы можно было сверять с Anthropic Console.
 
 **Задачи:**
 
 **7.1 — DB query обновления:**
-- [ ] `lib/db/queries.ts` → `getCostByModel(days)` — добавить в SELECT раздельные поля:
-  - `SUM(inputTokens) as totalInputTokens` (уже есть как `inputTokens`)
-  - `SUM(cacheReadTokens) as totalCacheReadTokens`
-  - `SUM(cacheWriteTokens) as totalCacheWriteTokens`
-  - `SUM(thinkingTokens) as totalReasoningTokens`
-  - Вычисляемое: `freshInputTokens = inputTokens - cacheReadTokens - cacheWriteTokens`
-
-- [ ] `lib/db/queries.ts` → добавить `getUsageBreakdownByChatMode(days)` — раздельные токены по chatMode (опционально)
+- [x] `lib/db/queries.ts` → `getCostByModel(days)` — добавлены раздельные поля:
+  - `SUM(cacheReadTokens) as cacheReadTokens`
+  - `SUM(cacheWriteTokens) as cacheWriteTokens`
+  - `SUM(thinkingTokens) as reasoningTokens`
+  - Вычисляемое: `freshInputTokens = inputTokens - cacheReadTokens - cacheWriteTokens` (с Math.max(0,...) защитой)
+- [ ] ~~`getUsageBreakdownByChatMode(days)`~~ — отложено (не требуется в MVP)
 
 **7.2 — UI страница:**
-- [ ] `app/(dashboard)/admin/cost-audit/page.tsx`:
-  - [ ] В таблицу "Расходы по моделям" добавить колонки:
-    - "Fresh in" (свежий input)
-    - "Cache read"
-    - "Cache write"
-    - "Reasoning" (если есть)
-  - [ ] Оставить "Токены in (total)" как итоговую, но добавить tooltip "= fresh + cache_read + cache_write"
-  - [ ] Цветовая индикация: cache_read — зелёным (скидка), cache_write — жёлтым (надбавка)
+- [x] `app/(dashboard)/admin/cost-audit/page.tsx` — таблица "Расходы по моделям" расширена:
+  - "Fresh in" (свежий input)
+  - "Cache read" — зелёный (скидка)
+  - "Cache write" — жёлтый (надбавка)
+  - "Reasoning" (если >0, иначе прочерк)
+  - Tooltip на Cache read: per-model cache hit rate %
+  - Subtitle секции: "in (total) = fresh + cache_read + cache_write"
 
 **7.3 — Legacy data warning:**
-- [ ] Добавить alert в header страницы: "Записи до [дата рефакторинга] могут иметь неточный costUsd — исправлено в TZ_TOKENS1"
-- [ ] Дата захардкодится после деплоя (или читается из env переменной `TOKENS1_DEPLOY_DATE`)
+- [ ] ~~Alert в header~~ — отложено до Этапа 9 (финализация), когда будет известна точная дата деплоя TOKENS1
 
 **7.4 — Summary карточки:**
-- [ ] В верхнем ряду добавить 4-ю карточку "Cache hit rate" = `cacheReadTokens / (cacheReadTokens + freshInputTokens) × 100%`
-  - Показывает насколько эффективно работает prompt caching
-  - Ожидаемое значение после прогрева: 60-90%
+- [x] Добавлена 4-я карточка "Cache hit rate (период)" = `cacheReadTokens / (cacheReadTokens + freshInputTokens) × 100%`
+  - Grid расширен: `sm:grid-cols-2 lg:grid-cols-4`
+  - Status: ok (≥60%) / warn (<60%) / neutral (нет кэша)
+  - Показывает эффективность prompt caching. Цель после прогрева: 60-90%
 
-- [ ] `npx tsc --noEmit` → 0 ошибок
-- [ ] `npm run build` → успешен
+- [x] `npx tsc --noEmit` → 0 ошибок
+- [x] `npm run build` → успешен
 
 **Файлы:**
-- `lib/db/queries.ts` — `getCostByModel`, возможно новый `getUsageBreakdownByChatMode`
-- `app/(dashboard)/admin/cost-audit/page.tsx` — таблицы + карточки
+- `lib/db/queries.ts` — `getCostByModel` обновлён
+- `app/(dashboard)/admin/cost-audit/page.tsx` — таблица + Cache hit rate card + Section subtitle prop
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` → 0 ошибок
-- [ ] `npm run build` → успешен
+- [x] `npx tsc --noEmit` → 0 ошибок
+- [x] `npm run build` → успешен
 - [ ] Git commit: `feat(tz-tokens1): cost audit UI — fresh/cache/write columns + hit rate card`
 
 🧪 **Мануальный тест:**

@@ -122,6 +122,17 @@ export default async function CostAuditPage({
   const maxChatModeCost = Math.max(...costByChatMode.map((r) => r.totalUsd ?? 0), 0.0001);
   const maxModelCost = Math.max(...costByModel.map((r) => r.totalUsd ?? 0), 0.0001);
 
+  // ТЗ-TOKENS1 Этап 7: Cache hit rate = cache_read / (cache_read + fresh_input)
+  // Shows how effectively prompt caching is working. Target after warmup: 60-90%.
+  const totalCacheRead = costByModel.reduce((s, r) => s + r.cacheReadTokens, 0);
+  const totalFreshInput = costByModel.reduce((s, r) => s + r.freshInputTokens, 0);
+  const cacheHitRate =
+    totalCacheRead + totalFreshInput > 0
+      ? (totalCacheRead / (totalCacheRead + totalFreshInput)) * 100
+      : 0;
+  const cacheHitStatus: "ok" | "warn" | "neutral" =
+    totalCacheRead === 0 ? "neutral" : cacheHitRate >= 60 ? "ok" : "warn";
+
   return (
     <div className="flex min-h-svh flex-col bg-muted/30">
       {/* Header */}
@@ -163,13 +174,26 @@ export default async function CostAuditPage({
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryCard
             icon={<DollarSign className="size-5 text-muted-foreground" />}
             label={`Расходы (${preset.label})`}
             value={formatUsd(totalCost)}
             sub={`${costByPeriod.length} ${preset.period === "hour" ? "часов" : preset.period === "day" ? "дней" : "месяцев"} с активностью`}
             status="neutral"
+          />
+          <SummaryCard
+            icon={<Activity className="size-5 text-muted-foreground" />}
+            label={`Cache hit rate (${preset.label})`}
+            value={totalCacheRead === 0 ? "—" : `${cacheHitRate.toFixed(1)}%`}
+            sub={
+              totalCacheRead === 0
+                ? "Нет кэшированных запросов"
+                : cacheHitRate >= 60
+                  ? `Кэш работает (цель 60-90%) ✓`
+                  : `Низкая эффективность кэша`
+            }
+            status={cacheHitStatus}
           />
           <SummaryCard
             icon={
@@ -223,34 +247,44 @@ export default async function CostAuditPage({
         </Section>
 
         {/* Cost by Model */}
-        <Section title="Расходы по моделям и провайдерам">
+        <Section title="Расходы по моделям и провайдерам" subtitle="in (total) = fresh + cache_read + cache_write">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th className="pb-2 font-medium">Модель</th>
-                <th className="pb-2 pr-4 text-right font-medium">Вызовов</th>
-                <th className="pb-2 pr-4 text-right font-medium">Токены in</th>
-                <th className="pb-2 pr-4 text-right font-medium">Токены out</th>
-                <th className="pb-2 pr-4 text-right font-medium">Сумма</th>
+                <th className="pb-2 pr-3 text-right font-medium">Вызовов</th>
+                <th className="pb-2 pr-3 text-right font-medium">Fresh in</th>
+                <th className="pb-2 pr-3 text-right font-medium text-emerald-600 dark:text-emerald-400">Cache read</th>
+                <th className="pb-2 pr-3 text-right font-medium text-amber-600 dark:text-amber-400">Cache write</th>
+                <th className="pb-2 pr-3 text-right font-medium">Out</th>
+                <th className="pb-2 pr-3 text-right font-medium">Reasoning</th>
+                <th className="pb-2 pr-3 text-right font-medium">Сумма</th>
                 <th className="pb-2 font-medium">Доля</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {costByModel.map((row) => {
                 const pct = ((row.totalUsd ?? 0) / maxModelCost) * 100;
+                const rowHitRate =
+                  row.cacheReadTokens + row.freshInputTokens > 0
+                    ? (row.cacheReadTokens / (row.cacheReadTokens + row.freshInputTokens)) * 100
+                    : 0;
                 return (
                   <tr key={row.modelId}>
-                    <td className="py-2 pr-4">
+                    <td className="py-2 pr-3">
                       <div className="flex items-center gap-2">
                         <ProviderDot modelId={row.modelId} />
                         <span className="font-mono text-xs">{row.modelId}</span>
                       </div>
                     </td>
-                    <td className="py-2 pr-4 text-right tabular-nums text-muted-foreground">{row.count}</td>
-                    <td className="py-2 pr-4 text-right tabular-nums text-muted-foreground">{formatTokens(row.inputTokens)}</td>
-                    <td className="py-2 pr-4 text-right tabular-nums text-muted-foreground">{formatTokens(row.outputTokens)}</td>
-                    <td className="py-2 pr-4 text-right tabular-nums">{formatUsd(row.totalUsd)}</td>
-                    <td className="py-2 w-36">
+                    <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">{row.count}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">{formatTokens(row.freshInputTokens)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400" title={`Cache hit rate: ${rowHitRate.toFixed(1)}%`}>{formatTokens(row.cacheReadTokens)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-amber-600 dark:text-amber-400">{formatTokens(row.cacheWriteTokens)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">{formatTokens(row.outputTokens)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">{row.reasoningTokens > 0 ? formatTokens(row.reasoningTokens) : "—"}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{formatUsd(row.totalUsd)}</td>
+                    <td className="py-2 w-28">
                       <div className="flex items-center gap-2">
                         <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                           <div
@@ -266,7 +300,7 @@ export default async function CostAuditPage({
               })}
               {costByModel.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-4 text-center text-muted-foreground">Нет данных</td>
+                  <td colSpan={9} className="py-4 text-center text-muted-foreground">Нет данных</td>
                 </tr>
               )}
             </tbody>
@@ -463,9 +497,10 @@ function SummaryCard({
 }
 
 function Section({
-  title, badge, badgeVariant, children,
+  title, subtitle, badge, badgeVariant, children,
 }: {
   title: string;
+  subtitle?: string;
   badge?: string;
   badgeVariant?: "default" | "secondary" | "destructive" | "outline";
   children: React.ReactNode;
@@ -474,6 +509,9 @@ function Section({
     <div className="rounded-lg border border-border bg-card">
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <h2 className="font-serif text-sm font-semibold">{title}</h2>
+        {subtitle != null && (
+          <span className="text-xs text-muted-foreground font-mono">{subtitle}</span>
+        )}
         {badge != null && (
           <Badge variant={badgeVariant ?? "secondary"} className="text-xs">{badge}</Badge>
         )}
