@@ -81,3 +81,31 @@ lib/ai/tokenlens-catalog.ts:91 — same
 **TSC state:** 3 routes — 0 ошибок ✅. Остаётся 12 ошибок (pipelines Этап 6, UI Этап 5).
 
 **Решение:** `npm run build` + мануальный тест перенесены на конец Этапа 6 (нельзя собрать с битыми pipelines).
+
+---
+
+## Сессия 3 — 2026-04-05
+
+### Этап 4: Debug events schema v2 + localStorage migration ✅
+
+**Files modified:**
+- `lib/ai/debug-events.ts`:
+  - Экспорт `DEBUG_EVENT_SCHEMA_VERSION = 2`
+  - `DebugStepData` — disjoint поля: `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens` + `schemaVersion`
+  - `DebugFinishData` — disjoint поля: `totalNoCacheInputTokens`, `totalCacheReadTokens`, `totalCacheWriteTokens`, `totalOutputTokens`, `totalReasoningTokens` + `schemaVersion`
+- `lib/ai/providers.ts`:
+  - `getStepCostRub(step)` — читает disjoint поля напрямую (убрана bridge-логика с субтракцией)
+- `components/dev-panel/dev-panel-provider.tsx`:
+  - `StoredPayload` = `{ schemaVersion, entries[] }`. При mismatch → wipe + `console.warn("[DevPanel] Clearing legacy debug cache...")`
+- `hooks/use-onboarding-debug.ts`:
+  - Аналогичный StoredPayload с version check + warn
+- `app/(chat)/api/chat/route.ts`, `service-chat/route.ts`, `projects/[id]/tasks/[taskId]/chat/route.ts`:
+  - `DebugStepData`/`DebugFinishData` заполняются новыми именами полей + `schemaVersion`
+  - `emitDebugFinish` — `finishUsage = extractUsageForPricing(usage)` вызывается один раз, переиспользуется
+
+**TSC state:** 17 ошибок, все ожидаемые для Этапов 5-6:
+- 5 в DevPanel UI секциях (tokens-section, cost-breakdown-section, timeline-section, dev-panel-footer) — Этап 5
+- 2 в pipeline-trace-drawer — Этап 5
+- 10 в pipelines (briefing/*, podcast/script-generator) — Этап 6
+
+Все ошибки в зоне Этапа 4 (lib/ai/, dev-panel-provider.tsx, 3 routes) устранены.

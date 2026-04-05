@@ -10,11 +10,12 @@ import {
   type ReactNode,
 } from "react";
 import { useDataStream } from "@/components/data-stream-provider";
-import type {
-  DebugStepData,
-  DebugFinishData,
-  DebugGuardianData,
-  DebugPromptData,
+import {
+  DEBUG_EVENT_SCHEMA_VERSION,
+  type DebugStepData,
+  type DebugFinishData,
+  type DebugGuardianData,
+  type DebugPromptData,
 } from "@/lib/ai/debug-events";
 import type { ChatMessage } from "@/lib/types";
 
@@ -54,6 +55,11 @@ function storageKey(chatId: string): string {
   return `${STORAGE_PREFIX}${chatId}`;
 }
 
+interface StoredPayload {
+  schemaVersion: number;
+  entries: [string, DevPanelMessageData][];
+}
+
 function saveToStorage(
   chatId: string,
   map: Map<string, DevPanelMessageData>,
@@ -61,7 +67,11 @@ function saveToStorage(
   try {
     const entries = Array.from(map.entries()).filter(([, v]) => !!v.finish);
     if (entries.length === 0) return;
-    localStorage.setItem(storageKey(chatId), JSON.stringify(entries));
+    const payload: StoredPayload = {
+      schemaVersion: DEBUG_EVENT_SCHEMA_VERSION,
+      entries,
+    };
+    localStorage.setItem(storageKey(chatId), JSON.stringify(payload));
   } catch {
     // Silently fail (quota, SSR, etc.)
   }
@@ -71,8 +81,21 @@ function loadFromStorage(chatId: string): Map<string, DevPanelMessageData> {
   try {
     const raw = localStorage.getItem(storageKey(chatId));
     if (!raw) return new Map();
-    const entries: [string, DevPanelMessageData][] = JSON.parse(raw);
-    return new Map(entries);
+    const parsed = JSON.parse(raw);
+    // Schema migration: wipe legacy (unversioned/older) data
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      parsed.schemaVersion !== DEBUG_EVENT_SCHEMA_VERSION ||
+      !Array.isArray(parsed.entries)
+    ) {
+      console.warn(
+        `[DevPanel] Clearing legacy debug cache for chat ${chatId} (schema mismatch)`,
+      );
+      localStorage.removeItem(storageKey(chatId));
+      return new Map();
+    }
+    return new Map(parsed.entries as [string, DevPanelMessageData][]);
   } catch {
     return new Map();
   }

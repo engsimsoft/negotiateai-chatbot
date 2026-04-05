@@ -1,8 +1,8 @@
 # Передача сессии ТЗ-TOKENS1
 
 **Дата:** 2026-04-05
-**Последняя сессия:** 2 (Этапы 1-3 завершены)
-**Следующая сессия:** начать **Этап 4**
+**Последняя сессия:** 3 (Этап 4 завершён)
+**Следующая сессия:** начать **Этап 5**
 
 ---
 
@@ -13,8 +13,8 @@
 - [x] **Этап 1:** Базовый контракт — commit `dd411aa`
 - [x] **Этап 2:** Обновление ядра (tokenlens + pipeline-trace) — commit `d9cdf31`
 - [x] **Этап 3:** 3 chat routes (chat, service-chat, task-chat) — commit `cb04b30`
-- [ ] **Этап 4:** Debug events v2 + localStorage migration ← **НАЧАТЬ ЗДЕСЬ**
-- [ ] Этап 5: DevPanel UI
+- [x] **Этап 4:** Debug events v2 + localStorage migration — commit TBD
+- [ ] **Этап 5:** DevPanel UI ← **НАЧАТЬ ЗДЕСЬ**
 - [ ] Этап 6: Pipelines + fake usage fix
 - [ ] Этап 7: Cost Audit UI (fresh/cache/write колонки)
 - [ ] Этап 8: Валидация (7 типов чатов)
@@ -24,22 +24,27 @@
 
 ## ⛔ Текущее состояние компиляции
 
-**TSC (`npx tsc --noEmit`):** 12 ошибок, все ожидаемые:
+**TSC (`npx tsc --noEmit`):** 17 ошибок, все ожидаемые:
 
 ```
-components/dev-panel/pipeline-trace-drawer.tsx:171  (2 ошибки — Этап 5)
-lib/briefing/briefing-author.ts:231,235             (2 — Этап 6)
-lib/briefing/briefing-filter.ts:137,141             (2 — Этап 6)
-lib/briefing/briefing-section-author.ts:197,201     (2 — Этап 6)
-lib/briefing/research-engine.ts:305,309             (2 — Этап 6)
-lib/podcast/script-generator.ts:162,166             (2 — Этап 6)
+components/dev-panel/dev-panel-footer.tsx:67                   (1 — Этап 5)
+components/dev-panel/pipeline-trace-drawer.tsx:171             (2 — Этап 5)
+components/dev-panel/sections/cost-breakdown-section.tsx:54,57 (2 — Этап 5)
+components/dev-panel/sections/timeline-section.tsx:55          (1 — Этап 5)
+components/dev-panel/sections/tokens-section.tsx:7,9           (2 — Этап 5)
+lib/briefing/briefing-author.ts:231,235                        (2 — Этап 6)
+lib/briefing/briefing-filter.ts:137,141                        (2 — Этап 6)
+lib/briefing/briefing-section-author.ts:197,201                (2 — Этап 6)
+lib/briefing/research-engine.ts:305,309                        (2 — Этап 6)
+lib/podcast/script-generator.ts:162,166                        (2 — Этап 6)
 ```
 
 **Все ошибки однотипные:**
-- `'promptTokens'/'completionTokens' does not exist in type 'AiCallTrace'` (AiCallTrace был обновлён в Этапе 2)
-- `'inputTokens' does not exist in type 'TokenUsageForPricing'` (контракт обновлён в Этапе 1)
+- DevPanel UI: обращения к legacy полям `inputTokens`/`cachedTokens` на `DebugStepData` (теперь `noCacheInputTokens`/`cacheReadTokens`)
+- pipeline-trace-drawer: legacy поля `promptTokens`/`completionTokens` на `AiCallTrace`
+- pipelines: передают legacy shape в `AiCallTrace`/`TokenUsageForPricing` (Этап 6)
 
-**Build и manual test отложены** до окончания Этапа 6 (нельзя собрать с битыми pipelines).
+**Build и manual test отложены** до окончания Этапа 6.
 
 ---
 
@@ -49,76 +54,57 @@ lib/podcast/script-generator.ts:162,166             (2 — Этап 6)
 
 1. `specs/WORKFLOW.md` — правила работы по ТЗ
 2. `specs/TZ_TOKENS1_SdkNativeUsage/SPEC.md` — само ТЗ (9 требований)
-3. `specs/TZ_TOKENS1_SdkNativeUsage/ANALYSIS.md` — код-ревью, риски
-4. `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` — **рабочий чеклист** (Этап 4 и далее)
-5. `specs/TZ_TOKENS1_SdkNativeUsage/CHANGELOG.md` — история сессий 1-2
+3. `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` — **рабочий чеклист** (Этап 5 и далее)
+4. `specs/TZ_TOKENS1_SdkNativeUsage/CHANGELOG.md` — история сессий 1-3
 
 ---
 
-## Что уже сделано (Этапы 1-3)
+## Что уже сделано (Этапы 1-4)
 
-### Этап 1: Базовый контракт
+### Этап 4: Debug events schema v2
+- `lib/ai/debug-events.ts`:
+  - `DEBUG_EVENT_SCHEMA_VERSION = 2`
+  - `DebugStepData` disjoint поля: `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens` + `schemaVersion`
+  - `DebugFinishData` disjoint поля: `totalNoCacheInputTokens`, `totalCacheReadTokens`, `totalCacheWriteTokens`, `totalOutputTokens`, `totalReasoningTokens` + `schemaVersion`
 - `lib/ai/providers.ts`:
-  - `TokenUsageForPricing` — disjoint поля: `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens?`
-  - `calculateCostRub()` — без ручной субтракции, reasoning билится по output rate
-  - `getStepCostRub()` — временный bridge до Этапа 4
-- `lib/ai/usage-utils.ts`:
-  - Новый helper `extractUsageForPricing(usage)` → `TokenUsageForPricing`
-  - Читает `inputTokenDetails.{noCacheTokens, cacheReadTokens, cacheWriteTokens}` + `outputTokenDetails.reasoningTokens`
-
-### Этап 2: Ядро (lib/ai/)
-- `lib/ai/tokenlens-catalog.ts`:
-  - `calcCostUsd()` — использует `extractUsageForPricing`
-  - `calcStepCostRub()` — signature: `(modelId, usage: TokenUsageForPricing, providers?)`
-- `lib/ai/pipeline-trace.ts`:
-  - `AiCallTrace` — legacy `promptTokens/completionTokens` убраны, добавлены disjoint поля (`noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens`), `totalTokens` — derived
-  - `AiResultForTrace.usage` — тип `LanguageModelUsage` (SDK v6 native)
-  - `buildAiCallTrace`, `buildTtsTrace` обновлены
-
-### Этап 3: 3 chat routes
-- `app/(chat)/api/chat/route.ts`
-- `app/(chat)/api/service-chat/route.ts`
-- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`
-
-Во всех: `onStepFinish` и `onFinish` используют `extractUsageForPricing(usage)` для построения `TokenUsageForPricing` перед вызовом `calcStepCostRub`/`calculateCostRub`.
-
-⚠️ **Важно:** `DebugStepData` в этих routes пока заполняется **legacy-именами** (`inputTokens` = total, `cachedTokens` = cacheRead). Это намеренно — переименование схемы в Этапе 4.
+  - `getStepCostRub(step)` читает disjoint поля напрямую (bridge-логика убрана)
+- `components/dev-panel/dev-panel-provider.tsx`:
+  - localStorage payload wrapper `{ schemaVersion, entries[] }`. Mismatch → wipe + `console.warn`
+- `hooks/use-onboarding-debug.ts` — то же
+- 3 routes: `DebugStepData`/`DebugFinishData` заполняются новыми именами + `schemaVersion`
 
 ---
 
-## Следующий шаг: Этап 4
+## Следующий шаг: Этап 5 — DevPanel UI
 
-**Цель:** Переписать типы debug events + мягкая миграция localStorage.
+**Цель:** Обновить UI компоненты DevPanel чтобы читать новые disjoint поля.
 
 ### Задачи (по ROADMAP)
 
-**1. `lib/ai/debug-events.ts`:**
-- `DebugStepData` — заменить `inputTokens`, `cachedTokens` на `noCacheInputTokens`, `cacheReadTokens` (`cacheWriteTokens` уже есть, `reasoningTokens` уже есть)
-- `DebugFinishData` — заменить `totalInputTokens`, `totalCachedTokens` на `totalNoCacheInputTokens`, `totalCacheReadTokens`, `totalCacheWriteTokens`
-- Добавить константу `DEBUG_EVENT_SCHEMA_VERSION = 2`
-- Добавить поле `schemaVersion: number` в `DebugStepData` и `DebugFinishData`
+**1. `components/dev-panel/sections/tokens-section.tsx`:**
+- Заменить `st.inputTokens` → `st.noCacheInputTokens`
+- Заменить `st.cachedTokens` → `st.cacheReadTokens`
+- Добавить отображение трёх строк input: "Input (fresh)", "Cache read", "Cache write" + Reasoning
+- `totalTokens` = sum всех четырёх компонентов
 
-**2. `components/dev-panel/dev-panel-provider.tsx`:**
-- При инициализации — если localStorage содержит старую версию схемы → очистить (console.warn)
-- Обновить тип `DevPanelMessageData` если нужно
+**2. `components/dev-panel/sections/cost-breakdown-section.tsx`:**
+- Обновить чтение полей из step (строки 54, 57)
 
-**3. `hooks/use-onboarding-debug.ts`:**
-- Аналогичная миграция localStorage
+**3. `components/dev-panel/sections/timeline-section.tsx`:**
+- Обновить чтение полей (строка 55)
 
-**4. `lib/ai/providers.ts` → `getStepCostRub(step)`:**
-- Обновить чтение: `step.noCacheInputTokens`, `step.cacheReadTokens`, `step.cacheWriteTokens` (убрать bridge-логику `inputTokens - cacheRead - cacheWrite`)
+**4. `components/dev-panel/dev-panel-footer.tsx`:**
+- Обновить чтение суммарных полей (строка 67)
 
-**5. Обновить 3 routes** (где заполняется `DebugStepData` и `DebugFinishData`):
-- `app/(chat)/api/chat/route.ts` — onStepFinish (replace `inputTokens: usage?.inputTokens ?? 0` → `noCacheInputTokens: stepUsage.noCacheInputTokens` и т.д.), onFinish → `emitDebugFinish` (новые totalNoCacheInputTokens и т.д.)
-- `app/(chat)/api/service-chat/route.ts` — аналогично
-- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — аналогично
+**5. `components/dev-panel/pipeline-trace-drawer.tsx`:**
+- `promptTokens`/`completionTokens` → `noCacheInputTokens + cacheReadTokens + cacheWriteTokens` / `outputTokens` (или раздельно)
 
-**6. Валидация:** `npx tsc --noEmit` — ожидаем новые ошибки в DevPanel UI секциях (tokens-section, cost-breakdown-section, footer, timeline). Будут исправлены в Этапе 5.
+**6. Валидация:** `npx tsc --noEmit` → 0 ошибок в компонентах DevPanel. Остаются только 10 ошибок в pipelines (Этап 6).
 
 ### Git commit сообщение
 
 ```
-refactor(tz-tokens1): debug events schema v2 + localStorage migration
+refactor(tz-tokens1): update DevPanel UI to new debug fields
 ```
 
 ---
@@ -140,9 +126,8 @@ npx tsc --noEmit
 # Сборка (пока не работает — ожидается после Этапа 6)
 npm run build
 
-# Найти все callsites
-grep -rn "calcStepCostRub\(" lib/ app/
-grep -rn "DebugStepData\|DebugFinishData" lib/ app/ components/
+# Найти callsites
+grep -rn "inputTokens\|cachedTokens" components/dev-panel/
 ```
 
 ---
@@ -157,4 +142,4 @@ grep -rn "DebugStepData\|DebugFinishData" lib/ app/ components/
 
 ---
 
-**Новая сессия:** начинай с `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` → Этап 4 → `lib/ai/debug-events.ts`.
+**Новая сессия:** начинай с `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` → Этап 5 → `components/dev-panel/sections/tokens-section.tsx`.

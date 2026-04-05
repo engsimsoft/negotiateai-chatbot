@@ -106,37 +106,42 @@
 
 ### Этап 4: DebugStepData + DebugFinishData + localStorage migration
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 **Цель:** Переписать типы debug events + мягкая миграция localStorage.
 
 **Задачи:**
-- [ ] `lib/ai/debug-events.ts`:
-  - [ ] `DebugStepData` — заменить `inputTokens`, `cachedTokens` на `noCacheInputTokens`, `cacheReadTokens` (cacheWriteTokens уже есть)
-  - [ ] `DebugFinishData` — заменить `totalInputTokens`, `totalCachedTokens` на `totalNoCacheInputTokens`, `totalCacheReadTokens`, `totalCacheWriteTokens`
-  - [ ] Добавить константу `DEBUG_EVENT_SCHEMA_VERSION = 2`
-  - [ ] Добавить поле `schemaVersion: number` в DebugStepData и DebugFinishData
+- [x] `lib/ai/debug-events.ts`:
+  - [x] `DebugStepData` — disjoint поля: `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens`
+  - [x] `DebugFinishData` — disjoint поля: `totalNoCacheInputTokens`, `totalCacheReadTokens`, `totalCacheWriteTokens`, `totalOutputTokens`, `totalReasoningTokens`
+  - [x] Добавлена константа `DEBUG_EVENT_SCHEMA_VERSION = 2`
+  - [x] Добавлено поле `schemaVersion: number` в DebugStepData и DebugFinishData
 
-- [ ] `components/dev-panel/dev-panel-provider.tsx`:
-  - [ ] При инициализации — если localStorage содержит старую версию схемы → очистить (кидать warn в console)
-  - [ ] Обновить тип `DevPanelMessageData` если нужно
+- [x] `components/dev-panel/dev-panel-provider.tsx`:
+  - [x] StoredPayload с `schemaVersion` + `entries[]`; при mismatch → wipe + console.warn
+  - [x] Тип `DevPanelMessageData` без изменений (вложенные DebugStepData/DebugFinishData уже типизированы)
 
-- [ ] `hooks/use-onboarding-debug.ts`:
-  - [ ] Аналогичная миграция localStorage
+- [x] `hooks/use-onboarding-debug.ts`:
+  - [x] Аналогичная миграция localStorage
 
-- [ ] `lib/ai/providers.ts` → `getStepCostRub(step)` — обновить чтение: `step.noCacheInputTokens`, `step.cacheReadTokens`, `step.cacheWriteTokens`
+- [x] `lib/ai/providers.ts` → `getStepCostRub(step)` — чтение disjoint полей напрямую, bridge-логика (субтракция) убрана
 
-- [ ] `npx tsc --noEmit` → должны появиться ошибки в DevPanel UI секциях (tokens-section, cost-breakdown-section)
+- [x] 3 routes обновлены (chat, service-chat, task-chat): `DebugStepData`/`DebugFinishData` заполняются новыми именами + `schemaVersion`
+
+- [x] `npx tsc --noEmit` → 0 ошибок в зоне Этапа 4. Новые 17 ошибок в UI секциях / pipelines — ожидаемо (Этапы 5-6)
 
 **Файлы:**
 - `lib/ai/debug-events.ts`
 - `lib/ai/providers.ts` (getStepCostRub)
 - `components/dev-panel/dev-panel-provider.tsx`
 - `hooks/use-onboarding-debug.ts`
+- `app/(chat)/api/chat/route.ts`
+- `app/(chat)/api/service-chat/route.ts`
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` → 0 ошибок в `lib/ai/` и `dev-panel-provider.tsx`
-- [ ] При перезагрузке dev-сервера + открытии чата — старый localStorage очищен (проверить в DevTools)
-- [ ] Git commit: `refactor(tz-tokens1): debug events schema v2 + localStorage migration`
+- [x] `npx tsc --noEmit` → 0 ошибок в `lib/ai/`, `dev-panel-provider.tsx`, 3 routes
+- [ ] При перезагрузке dev-сервера + открытии чата — старый localStorage очищен (проверка после Этапа 5)
+- [x] Git commit: `refactor(tz-tokens1): debug events schema v2 + localStorage migration`
 
 **Критерий готовности:** Схема debug events обновлена, старые localStorage данные очищаются.
 

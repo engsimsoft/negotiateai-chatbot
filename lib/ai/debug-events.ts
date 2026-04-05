@@ -10,16 +10,33 @@
 import { isSimplyDevMode } from "@/lib/constants";
 
 // ---------------------------------------------------------------------------
+// Schema version — bump on breaking changes to DebugStepData/DebugFinishData.
+// Consumers (DevPanelProvider, useOnboardingDebug) compare against this and
+// wipe their localStorage cache when the stored version is older.
+// ---------------------------------------------------------------------------
+
+export const DEBUG_EVENT_SCHEMA_VERSION = 2;
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-step debug event (schema v2 — ТЗ-TOKENS1).
+ *
+ * Input tokens are stored as DISJOINT fields aligned with AI SDK v6 native
+ * `inputTokenDetails.*`. There is no overlap — total input =
+ * noCacheInputTokens + cacheReadTokens + cacheWriteTokens.
+ */
 export interface DebugStepData {
+  schemaVersion: number;
   stepIndex: number;
   stepType: string; // 'initial' | 'continue' | 'tool-result'
   modelId: string;
-  inputTokens: number;
+  noCacheInputTokens: number;  // fresh input (no cache hit/write)
+  cacheReadTokens: number;     // cache_read tokens
+  cacheWriteTokens: number;    // cache_write tokens
   outputTokens: number;
-  cachedTokens: number;
   reasoningTokens: number;
   finishReason: string;
   /** Per-step cost in RUB, calculated server-side via TokenLens (SSOT).
@@ -50,9 +67,11 @@ export interface DebugGuardianData {
 }
 
 export interface DebugFinishData {
-  totalInputTokens: number;
+  schemaVersion: number;
+  totalNoCacheInputTokens: number;
+  totalCacheReadTokens: number;
+  totalCacheWriteTokens: number;
   totalOutputTokens: number;
-  totalCachedTokens: number;
   totalReasoningTokens: number;
   totalSteps: number;
   totalDurationMs: number;

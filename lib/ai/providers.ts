@@ -157,23 +157,13 @@ export function calculateCostRub(
 import type { DebugStepData } from "./debug-events";
 
 /** Get cost for a debug step. Prefers server-calculated value (TokenLens SSOT),
- *  falls back to local hardcoded pricing for legacy data.
- *
- *  NOTE: DebugStepData still uses the legacy shape where `inputTokens` is the total
- *  billable input (fresh + cacheRead + cacheWrite). Derive the fresh portion here.
- *  DebugStepData v2 (Этап 4) will switch to disjoint fields natively. */
+ *  falls back to local hardcoded pricing using disjoint token fields. */
 export function getStepCostRub(step: DebugStepData): number {
   if (step.stepCostRub != null) return step.stepCostRub;
-  const cacheRead = step.cachedTokens;
-  const cacheWrite = step.cacheWriteTokens;
-  const noCacheInputTokens = Math.max(
-    0,
-    step.inputTokens - cacheRead - cacheWrite,
-  );
   return calculateCostRub(step.modelId, {
-    noCacheInputTokens,
-    cacheReadTokens: cacheRead,
-    cacheWriteTokens: cacheWrite,
+    noCacheInputTokens: step.noCacheInputTokens,
+    cacheReadTokens: step.cacheReadTokens,
+    cacheWriteTokens: step.cacheWriteTokens,
     outputTokens: step.outputTokens,
     reasoningTokens: step.reasoningTokens,
   });

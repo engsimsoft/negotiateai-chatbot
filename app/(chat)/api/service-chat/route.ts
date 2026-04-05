@@ -45,6 +45,7 @@ import {
   emitDebugPrompt,
   truncateForDebug,
   truncateToolResultSmart,
+  DEBUG_EVENT_SCHEMA_VERSION,
   type DebugStepData,
 } from "@/lib/ai/debug-events";
 
@@ -799,13 +800,14 @@ export async function POST(request: Request) {
               const stepModelId = response?.modelId || "unknown";
               const stepUsage = extractUsageForPricing(usage);
               const stepData: DebugStepData = {
+                schemaVersion: DEBUG_EVENT_SCHEMA_VERSION,
                 stepIndex: debugStepIndex++,
                 stepType: inferredType,
                 modelId: stepModelId,
-                inputTokens: usage?.inputTokens ?? 0,
-                outputTokens: stepUsage.outputTokens,
-                cachedTokens: stepUsage.cacheReadTokens,
+                noCacheInputTokens: stepUsage.noCacheInputTokens,
+                cacheReadTokens: stepUsage.cacheReadTokens,
                 cacheWriteTokens: stepUsage.cacheWriteTokens,
+                outputTokens: stepUsage.outputTokens,
                 reasoningTokens: stepUsage.reasoningTokens ?? 0,
                 finishReason: finishReason || "unknown",
                 stepCostRub: calcStepCostRub(stepModelId, stepUsage, tlProviders),
@@ -840,15 +842,18 @@ export async function POST(request: Request) {
             });
 
             // ТЗ-DEV1: Emit debug finish summary
+            const finishUsage = extractUsageForPricing(usage);
             emitDebugFinish(dataStream, {
-              totalInputTokens: usage.inputTokens ?? 0,
-              totalOutputTokens: usage.outputTokens ?? 0,
-              totalCachedTokens: usage?.inputTokenDetails?.cacheReadTokens ?? 0,
-              totalReasoningTokens: usage?.outputTokenDetails?.reasoningTokens ?? 0,
+              schemaVersion: DEBUG_EVENT_SCHEMA_VERSION,
+              totalNoCacheInputTokens: finishUsage.noCacheInputTokens,
+              totalCacheReadTokens: finishUsage.cacheReadTokens,
+              totalCacheWriteTokens: finishUsage.cacheWriteTokens,
+              totalOutputTokens: finishUsage.outputTokens,
+              totalReasoningTokens: finishUsage.reasoningTokens ?? 0,
               totalSteps: debugStepDataQueue.length,
               totalDurationMs: totalTime,
               timeToFirstTokenMs: firstTokenTime ?? totalTime,
-              estimatedCostRub: calculateCostRub(modelId, extractUsageForPricing(usage)),
+              estimatedCostRub: calculateCostRub(modelId, finishUsage),
               modelId,
               finishReason: "stop",
             });

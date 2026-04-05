@@ -14,11 +14,12 @@
  */
 
 import { useState, useCallback, useRef } from "react";
-import type {
-  DebugStepData,
-  DebugFinishData,
-  DebugGuardianData,
-  DebugPromptData,
+import {
+  DEBUG_EVENT_SCHEMA_VERSION,
+  type DebugStepData,
+  type DebugFinishData,
+  type DebugGuardianData,
+  type DebugPromptData,
 } from "@/lib/ai/debug-events";
 import type { DevPanelMessageData } from "@/components/dev-panel/dev-panel-provider";
 
@@ -33,10 +34,18 @@ const STORAGE_KEY = "simply-dev-onboarding-debug";
 // localStorage helpers
 // ---------------------------------------------------------------------------
 
+interface StoredPayload {
+  schemaVersion: number;
+  entries: [string, DevPanelMessageData][];
+}
+
 function saveToStorage(map: Map<string, DevPanelMessageData>): void {
   try {
-    const entries = Array.from(map.entries());
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    const payload: StoredPayload = {
+      schemaVersion: DEBUG_EVENT_SCHEMA_VERSION,
+      entries: Array.from(map.entries()),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
     // Silently fail (quota, SSR, etc.)
   }
@@ -46,8 +55,21 @@ function loadFromStorage(): Map<string, DevPanelMessageData> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return new Map();
-    const entries: [string, DevPanelMessageData][] = JSON.parse(raw);
-    return new Map(entries);
+    const parsed = JSON.parse(raw);
+    // Schema migration: wipe legacy (unversioned/older) data
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      parsed.schemaVersion !== DEBUG_EVENT_SCHEMA_VERSION ||
+      !Array.isArray(parsed.entries)
+    ) {
+      console.warn(
+        "[OnboardingDebug] Clearing legacy debug cache (schema mismatch)",
+      );
+      localStorage.removeItem(STORAGE_KEY);
+      return new Map();
+    }
+    return new Map(parsed.entries as [string, DevPanelMessageData][]);
   } catch {
     return new Map();
   }
