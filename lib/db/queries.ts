@@ -2859,7 +2859,9 @@ export async function getUsersForDelivery({
   currentUtcTime: Date;
 }): Promise<Array<{ userId: string; timezone: string; generationTime: string; deliveryFormat: string }>> {
   try {
-    // Get all users with delivery enabled
+    // ТЗ-COSTCTRL Phase 3: INNER JOIN on active TelegramConnection.
+    // Only return users who BOTH have deliveryEnabled=true AND an active Telegram.
+    // This prevents the AI pipeline from running for undeliverable users.
     const rows = await db
       .select({
         userId: briefingSettings.userId,
@@ -2868,10 +2870,17 @@ export async function getUsersForDelivery({
         deliveryFormat: briefingSettings.deliveryFormat,
       })
       .from(briefingSettings)
+      .innerJoin(
+        telegramConnection,
+        and(
+          eq(telegramConnection.userId, briefingSettings.userId),
+          eq(telegramConnection.isActive, true),
+        ),
+      )
       .where(eq(briefingSettings.deliveryEnabled, true));
 
     // ТЗ-TG4b: Hobby plan — cron runs once daily (0 5 * * *).
-    // Return ALL users with deliveryEnabled=true, ignoring generationTime.
+    // Return ALL qualifying users, ignoring generationTime.
     // When upgrading to Pro plan with */15 cron, uncomment the time-window filter below.
     return rows;
 

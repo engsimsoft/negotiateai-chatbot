@@ -121,24 +121,24 @@ WHERE "deliveryEnabled" = true
 
 ## Этап 3 (Phase 3): Fail-fast cron pipeline
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (2026-04-05)
 
 **Цель:** проверять Telegram connection ДО запуска AI-пайплайна. Auto-repair invalid state.
 
 **Задачи:**
-- [ ] Обновить `getUsersForDelivery()` в queries.ts: INNER JOIN на `TelegramConnection.isActive=true` — возвращать только deliverable users
-- [ ] Добавить pre-flight check в `generateAndDeliver()` cron handler: повторная проверка Telegram (defense-in-depth)
-- [ ] При pre-flight violation: auto-repair через `upsertBriefingSettings({userId, deliveryEnabled: false})` + `console.warn`
-- [ ] Pre-flight также для podcast: если `deliveryFormat` включает audio но Telegram нет — skip all
-- [ ] `npx tsc --noEmit` — 0 ошибок
+- [x] Обновить `getUsersForDelivery()` в queries.ts: INNER JOIN на `TelegramConnection.isActive=true` — возвращать только deliverable users
+- [x] Добавить pre-flight check в `generateAndDeliver()` cron handler: повторная проверка Telegram (defense-in-depth)
+- [x] При pre-flight violation: auto-repair через `autoRepairInvalidDeliveryState()` + `console.warn`
+- [x] Pre-flight покрывает все форматы (audio/text/text_audio) единой проверкой до pipeline
+- [x] `npx tsc --noEmit` — 0 ошибок
 
 **Файлы:**
 - `lib/db/queries.ts` — `getUsersForDelivery()` с JOIN
 - `app/api/cron/briefing/route.ts` — pre-flight в `generateAndDeliver()`
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] 🧪 Ручной вызов cron endpoint с CRON_SECRET → видим в логах "skipped: no_telegram", 0 AI-вызовов
 - [ ] 🧪 Мануальный SQL-тест: создать invalid state → вызвать cron → invalid state auto-repaired в БД
 

@@ -7,10 +7,12 @@ import { mergeAndUploadPodcast } from "@/lib/podcast/audio-merger";
 import { CRON_CONCURRENCY_LIMIT } from "@/lib/briefing/briefing-config";
 import {
   getBriefingHistory,
+  getTelegramConnection,
   getUsersForDelivery,
   updateBriefingDeliveryStatus,
   updateBriefingMetadata,
 } from "@/lib/db/queries";
+import { autoRepairInvalidDeliveryState } from "@/lib/briefing/delivery-service";
 import { deliverBriefingToTelegram } from "@/lib/telegram/briefing-delivery";
 import type { BriefingArticle } from "@/lib/briefing/briefing-types";
 import pLimit from "p-limit";
@@ -88,6 +90,18 @@ async function generateAndDeliver(
   error?: string;
 }> {
   try {
+    // ТЗ-COSTCTRL Phase 3: Pre-flight — defense-in-depth Telegram check.
+    // getUsersForDelivery already filters via INNER JOIN, but we re-verify here
+    // to catch any race between the JOIN and now, and to auto-repair invalid state.
+    const tg = await getTelegramConnection({ userId });
+    if (!tg || !tg.isActive) {
+      console.warn(
+        `[cron/briefing] User ${userId}: pre-flight failed — no active Telegram. Auto-repairing.`,
+      );
+      await autoRepairInvalidDeliveryState(userId, "cron_preflight: no active TelegramConnection");
+      return { userId, status: "skipped", deliveryStatus: "no_telegram" };
+    }
+
     // Idempotency check: is there already a ready briefing for today?
     const existing = await getBriefingHistory({
       userId,
