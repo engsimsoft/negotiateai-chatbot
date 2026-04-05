@@ -12,10 +12,14 @@
  * @see ТЗ-DEV2 for full spec
  */
 
+import type { LanguageModelUsage } from "ai";
+import type { ModelCatalog } from "tokenlens/core";
+
 import { isSimplyDevMode } from "@/lib/constants";
+
 import { calculateTtsCostRub } from "./providers";
 import { calcStepCostRub } from "./tokenlens-catalog";
-import type { ModelCatalog } from "tokenlens/core";
+import { extractUsageForPricing } from "./usage-utils";
 
 // ---------------------------------------------------------------------------
 // Types: AI call trace
@@ -24,9 +28,13 @@ import type { ModelCatalog } from "tokenlens/core";
 export interface AiCallTrace {
   modelId: string;
   promptPreview: string; // first 500 chars of system or user prompt
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
+  // Disjoint token fields (AI SDK v6 native)
+  noCacheInputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  totalTokens: number; // derived: sum of all fields above
   costRub: number;
   finishReason: string;
   retryCount: number; // 0 = first attempt succeeded
@@ -239,11 +247,8 @@ export class TraceCollector {
 
 export interface AiResultForTrace {
   modelId: string;
-  usage?: {
-    promptTokens?: number;
-    completionTokens?: number;
-    totalTokens?: number;
-  };
+  /** AI SDK v6 native usage object. Use extractUsageForPricing to map. */
+  usage?: LanguageModelUsage;
   finishReason?: string;
   promptPreview?: string;
   retryCount?: number;
@@ -252,20 +257,25 @@ export interface AiResultForTrace {
 }
 
 export function buildAiCallTrace(result: AiResultForTrace, catalog?: ModelCatalog): AiCallTrace {
-  const promptTokens = result.usage?.promptTokens ?? 0;
-  const completionTokens = result.usage?.completionTokens ?? 0;
-  const totalTokens = result.usage?.totalTokens ?? (promptTokens + completionTokens);
+  const pricingUsage = extractUsageForPricing(result.usage);
+  const reasoningTokens = pricingUsage.reasoningTokens ?? 0;
+  const totalTokens =
+    pricingUsage.noCacheInputTokens +
+    pricingUsage.cacheReadTokens +
+    pricingUsage.cacheWriteTokens +
+    pricingUsage.outputTokens +
+    reasoningTokens;
 
   return {
     modelId: result.modelId,
     promptPreview: result.promptPreview ?? "",
-    promptTokens,
-    completionTokens,
+    noCacheInputTokens: pricingUsage.noCacheInputTokens,
+    cacheReadTokens: pricingUsage.cacheReadTokens,
+    cacheWriteTokens: pricingUsage.cacheWriteTokens,
+    outputTokens: pricingUsage.outputTokens,
+    reasoningTokens,
     totalTokens,
-    costRub: calcStepCostRub(result.modelId, {
-      inputTokens: promptTokens,
-      outputTokens: completionTokens,
-    }, catalog),
+    costRub: calcStepCostRub(result.modelId, pricingUsage, catalog),
     finishReason: result.finishReason ?? "unknown",
     retryCount: result.retryCount ?? 0,
     fallbackUsed: result.fallbackUsed,
@@ -285,8 +295,11 @@ export function buildTtsTrace(input: {
   return {
     modelId: "gemini-2.5-flash-preview-tts",
     promptPreview: "(TTS synthesis)",
-    promptTokens: 0,
-    completionTokens: 0,
+    noCacheInputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
     totalTokens: 0,
     costRub: calculateTtsCostRub(input.audioDurationSeconds),
     finishReason: input.error ? "error" : "stop",

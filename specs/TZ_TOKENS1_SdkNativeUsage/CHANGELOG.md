@@ -49,3 +49,21 @@ lib/ai/tokenlens-catalog.ts:91 — same
 ```
 
 Все ошибки одного типа: "property 'inputTokens' does not exist in type 'TokenUsageForPricing'" — callsites всё ещё передают старый shape. Фикс: в Этапе 2 (tokenlens-catalog) и Этапе 3 (3 routes).
+
+### Этап 2: Обновление ядра ✅
+
+**Files modified:**
+- `lib/ai/tokenlens-catalog.ts`:
+  - `calcCostUsd()` — использует `extractUsageForPricing(usage)` → `calculateCostRub`
+  - `calcStepCostRub()` — signature изменён: принимает `TokenUsageForPricing` напрямую (было custom shape с `inputTokens` как total)
+  - Imports вынесены в топ файла
+- `lib/ai/pipeline-trace.ts`:
+  - `AiCallTrace` — legacy `promptTokens`/`completionTokens` убраны, добавлены disjoint поля: `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens`. `totalTokens` остался как derived-поле.
+  - `AiResultForTrace.usage` — тип изменён на `LanguageModelUsage` (SDK v6 native)
+  - `buildAiCallTrace()` — использует `extractUsageForPricing(result.usage)`
+  - `buildTtsTrace()` — обновлён под новый `AiCallTrace`
+
+**TSC state:** `lib/ai/` — 0 ошибок ✅. Остальных 18 ошибок:
+- 6 в routes (Этап 3): `app/(chat)/api/{chat,service-chat,projects/.../chat}/route.ts`
+- 10 в pipelines (Этап 6): `lib/briefing/*.ts`, `lib/podcast/script-generator.ts`
+- 2 в UI (Этап 5): `components/dev-panel/pipeline-trace-drawer.tsx`

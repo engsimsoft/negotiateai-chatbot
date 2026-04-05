@@ -11,6 +11,11 @@ import type { ModelCatalog } from "tokenlens/core";
 import { fetchModels } from "tokenlens/fetch";
 import { getUsage } from "tokenlens/helpers";
 
+import { RUB_PER_USD } from "@/lib/constants/pricing";
+
+import { calculateCostRub, type TokenUsageForPricing } from "./providers";
+import { extractUsageForPricing } from "./usage-utils";
+
 /**
  * Cached TokenLens model catalog (24h TTL)
  */
@@ -34,31 +39,15 @@ export { getUsage } from "tokenlens/helpers";
 
 /**
  * Calculate cost in USD for a given model and usage.
- * Fallback chain: TokenLens → MODEL_PRICING_RUB → null (only if truly unknown model).
+ * Uses hardcoded MODEL_PRICING_RUB with correct Anthropic cache billing formula.
+ * TokenLens formula is additive (doesn't subtract cached tokens from input) — bypassed.
  */
 export async function calcCostUsd(
   modelId: string,
   usage: LanguageModelUsage
 ): Promise<number | null> {
-  // 1. Try TokenLens (live prices from API)
   try {
-    const providers = await getTokenlensCatalog();
-    if (providers) {
-      const summary = getUsage({ modelId, usage, providers });
-      const cost = summary?.costUSD?.totalUSD;
-      if (cost != null) return cost;
-    }
-  } catch {
-    // Fall through to local fallback
-  }
-
-  // 2. Fallback: hardcoded MODEL_PRICING_RUB → convert to USD
-  try {
-    const costRub = calculateCostRub(modelId, {
-      inputTokens: usage.inputTokens ?? 0,
-      outputTokens: usage.outputTokens ?? 0,
-      cachedInputTokens: (usage.inputTokenDetails as any)?.cacheReadTokens ?? 0,
-    });
+    const costRub = calculateCostRub(modelId, extractUsageForPricing(usage));
     if (costRub > 0) {
       return Math.round((costRub / RUB_PER_USD) * 1_000_000) / 1_000_000;
     }
@@ -74,51 +63,18 @@ export async function calcCostUsd(
 // Used by debug events in onStepFinish to embed pre-calculated cost.
 // ---------------------------------------------------------------------------
 
-import { calculateCostRub } from "./providers";
-import { RUB_PER_USD } from "@/lib/constants/pricing";
-
 /**
- * Calculate per-step cost in RUB using TokenLens catalog (sync, requires pre-fetched catalog).
- * Falls back to hardcoded MODEL_PRICING_RUB if catalog unavailable.
- * Reasoning tokens are billed at output token rate.
+ * Calculate per-step cost in RUB using the disjoint TokenUsageForPricing contract.
+ * Uses hardcoded MODEL_PRICING_RUB with Anthropic cache billing formula.
+ *
+ * Callers should build `usage` via `extractUsageForPricing(sdkUsage)`.
+ * `_providers` kept for backward-compat (TokenLens catalog — currently unused
+ * because we bypass its additive formula).
  */
 export function calcStepCostRub(
   modelId: string,
-  usage: {
-    inputTokens: number;
-    outputTokens: number;
-    cachedInputTokens?: number;
-    reasoningTokens?: number;
-  },
-  providers: ModelCatalog | undefined,
+  usage: TokenUsageForPricing,
+  _providers?: ModelCatalog | undefined,
 ): number {
-  const effectiveOutput = usage.outputTokens + (usage.reasoningTokens ?? 0);
-
-  // Try TokenLens (SSOT — live prices from API)
-  if (providers) {
-    try {
-      const summary = getUsage({
-        modelId,
-        usage: {
-          inputTokens: usage.inputTokens,
-          outputTokens: effectiveOutput,
-          cachedInputTokens: usage.cachedInputTokens ?? 0,
-        } as LanguageModelUsage,
-        providers,
-      });
-      const totalUsd = summary?.costUSD?.totalUSD;
-      if (totalUsd != null && totalUsd > 0) {
-        return Math.round(totalUsd * RUB_PER_USD * 100) / 100;
-      }
-    } catch {
-      // Fall through to hardcoded
-    }
-  }
-
-  // Fallback: hardcoded pricing table
-  return calculateCostRub(modelId, {
-    inputTokens: usage.inputTokens,
-    outputTokens: effectiveOutput,
-    cachedInputTokens: usage.cachedInputTokens ?? 0,
-  });
+  return calculateCostRub(modelId, usage);
 }

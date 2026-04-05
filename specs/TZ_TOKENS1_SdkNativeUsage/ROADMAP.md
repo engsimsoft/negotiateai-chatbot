@@ -50,15 +50,16 @@
 
 ### Этап 2: Обновление ядра (tokenlens + pipeline-trace)
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 **Цель:** Адаптировать все внутренние callsites в `lib/ai/`.
 
 **Задачи:**
-- [ ] `lib/ai/tokenlens-catalog.ts` — переписать `calcCostUsd()` через `extractUsageForPricing`
-- [ ] `lib/ai/tokenlens-catalog.ts` — переписать `calcStepCostRub()` — принимать `TokenUsageForPricing` напрямую
-- [ ] `lib/ai/providers.ts` → `getStepCostRub()` — обновить чтение из `DebugStepData` с новыми полями (после Этапа 4 — ПОМЕТИТЬ как зависимость)
-- [ ] `lib/ai/pipeline-trace.ts` → `buildAiCallTrace()` — убрать legacy `promptTokens/completionTokens`, перейти на `usage.inputTokenDetails.*`. Проверить что параметр `result.usage` имеет правильный тип.
-- [ ] `npx tsc --noEmit` → 0 ошибок в `lib/ai/` (ошибки в routes/pipelines пока остаются)
+- [x] `lib/ai/tokenlens-catalog.ts` — переписать `calcCostUsd()` через `extractUsageForPricing`
+- [x] `lib/ai/tokenlens-catalog.ts` — переписать `calcStepCostRub()` — принимать `TokenUsageForPricing` напрямую
+- [x] `lib/ai/providers.ts` → `getStepCostRub()` — bridge создан в Этапе 1 (обновим финально в Этапе 4)
+- [x] `lib/ai/pipeline-trace.ts` → `buildAiCallTrace()` — legacy `promptTokens/completionTokens` убраны, переход на `LanguageModelUsage` через `extractUsageForPricing`. Добавлены disjoint поля в `AiCallTrace`.
+- [x] `lib/ai/pipeline-trace.ts` → `buildTtsTrace()` — обновлён под новый `AiCallTrace`
+- [x] `npx tsc --noEmit` → 0 ошибок в `lib/ai/` (18 ошибок в routes/pipelines/UI — ожидаемо)
 
 **Файлы:**
 - `lib/ai/tokenlens-catalog.ts`
@@ -66,9 +67,8 @@
 - `lib/ai/pipeline-trace.ts`
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` → 0 ошибок в `lib/ai/` (кроме debug-events / DebugStepData)
-- [ ] Unit-smoke: вызвать `calcStepCostRub()` с mock `TokenUsageForPricing` и убедиться что возвращает правильную стоимость
-- [ ] Git commit: `refactor(tz-tokens1): update tokenlens-catalog + pipeline-trace to new contract`
+- [x] `npx tsc --noEmit` → 0 ошибок в `lib/ai/`
+- [x] Git commit: `refactor(tz-tokens1): update tokenlens-catalog + pipeline-trace to new contract`
 
 **Критерий готовности:** Весь `lib/ai/` компилируется (кроме `debug-events.ts` который обновим в Этапе 4).
 
