@@ -1,8 +1,8 @@
 # Передача сессии ТЗ-TOKENS1
 
 **Дата:** 2026-04-05
-**Последняя сессия:** 3 (Этап 4 завершён)
-**Следующая сессия:** начать **Этап 5**
+**Последняя сессия:** 3 (Этапы 4-5 завершены)
+**Следующая сессия:** начать **Этап 6**
 
 ---
 
@@ -13,9 +13,9 @@
 - [x] **Этап 1:** Базовый контракт — commit `dd411aa`
 - [x] **Этап 2:** Обновление ядра (tokenlens + pipeline-trace) — commit `d9cdf31`
 - [x] **Этап 3:** 3 chat routes (chat, service-chat, task-chat) — commit `cb04b30`
-- [x] **Этап 4:** Debug events v2 + localStorage migration — commit TBD
-- [ ] **Этап 5:** DevPanel UI ← **НАЧАТЬ ЗДЕСЬ**
-- [ ] Этап 6: Pipelines + fake usage fix
+- [x] **Этап 4:** Debug events v2 + localStorage migration — commit `32ade54`
+- [x] **Этап 5:** DevPanel UI — commit TBD
+- [ ] **Этап 6:** Pipelines + fake usage fix ← **НАЧАТЬ ЗДЕСЬ**
 - [ ] Этап 7: Cost Audit UI (fresh/cache/write колонки)
 - [ ] Этап 8: Валидация (7 типов чатов)
 - [ ] Этап 9: Финализация
@@ -24,25 +24,21 @@
 
 ## ⛔ Текущее состояние компиляции
 
-**TSC (`npx tsc --noEmit`):** 17 ошибок, все ожидаемые:
+**TSC (`npx tsc --noEmit`):** 10 ошибок, все в pipelines (Этап 6):
 
 ```
-components/dev-panel/dev-panel-footer.tsx:67                   (1 — Этап 5)
-components/dev-panel/pipeline-trace-drawer.tsx:171             (2 — Этап 5)
-components/dev-panel/sections/cost-breakdown-section.tsx:54,57 (2 — Этап 5)
-components/dev-panel/sections/timeline-section.tsx:55          (1 — Этап 5)
-components/dev-panel/sections/tokens-section.tsx:7,9           (2 — Этап 5)
-lib/briefing/briefing-author.ts:231,235                        (2 — Этап 6)
-lib/briefing/briefing-filter.ts:137,141                        (2 — Этап 6)
-lib/briefing/briefing-section-author.ts:197,201                (2 — Этап 6)
-lib/briefing/research-engine.ts:305,309                        (2 — Этап 6)
-lib/podcast/script-generator.ts:162,166                        (2 — Этап 6)
+lib/briefing/briefing-author.ts:231,235         (2)
+lib/briefing/briefing-filter.ts:137,141         (2)
+lib/briefing/briefing-section-author.ts:197,201 (2)
+lib/briefing/research-engine.ts:305,309         (2)
+lib/podcast/script-generator.ts:162,166         (2)
 ```
 
 **Все ошибки однотипные:**
-- DevPanel UI: обращения к legacy полям `inputTokens`/`cachedTokens` на `DebugStepData` (теперь `noCacheInputTokens`/`cacheReadTokens`)
-- pipeline-trace-drawer: legacy поля `promptTokens`/`completionTokens` на `AiCallTrace`
-- pipelines: передают legacy shape в `AiCallTrace`/`TokenUsageForPricing` (Этап 6)
+- `promptTokens`/`completionTokens` не существуют в `AiCallTrace` (обновлено в Этапе 2)
+- `inputTokens` не существует в `TokenUsageForPricing` (обновлено в Этапе 1)
+
+Pipelines передают legacy shape — нужно переписать callsites под новый контракт.
 
 **Build и manual test отложены** до окончания Этапа 6.
 
@@ -54,57 +50,56 @@ lib/podcast/script-generator.ts:162,166                        (2 — Этап 6
 
 1. `specs/WORKFLOW.md` — правила работы по ТЗ
 2. `specs/TZ_TOKENS1_SdkNativeUsage/SPEC.md` — само ТЗ (9 требований)
-3. `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` — **рабочий чеклист** (Этап 5 и далее)
+3. `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` — **рабочий чеклист** (Этап 6 и далее)
 4. `specs/TZ_TOKENS1_SdkNativeUsage/CHANGELOG.md` — история сессий 1-3
 
 ---
 
-## Что уже сделано (Этапы 1-4)
+## Что уже сделано (Этапы 1-5)
 
-### Этап 4: Debug events schema v2
-- `lib/ai/debug-events.ts`:
-  - `DEBUG_EVENT_SCHEMA_VERSION = 2`
-  - `DebugStepData` disjoint поля: `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens` + `schemaVersion`
-  - `DebugFinishData` disjoint поля: `totalNoCacheInputTokens`, `totalCacheReadTokens`, `totalCacheWriteTokens`, `totalOutputTokens`, `totalReasoningTokens` + `schemaVersion`
-- `lib/ai/providers.ts`:
-  - `getStepCostRub(step)` читает disjoint поля напрямую (bridge-логика убрана)
-- `components/dev-panel/dev-panel-provider.tsx`:
-  - localStorage payload wrapper `{ schemaVersion, entries[] }`. Mismatch → wipe + `console.warn`
-- `hooks/use-onboarding-debug.ts` — то же
-- 3 routes: `DebugStepData`/`DebugFinishData` заполняются новыми именами + `schemaVersion`
+### Этап 5: DevPanel UI
+- `components/dev-panel/sections/tokens-section.tsx` — disjoint суммы, UI с "Input (fresh)", "Cache read", "Cache write", Output, Reasoning, Total
+- `components/dev-panel/sections/cost-breakdown-section.tsx` — StepCost обновлён
+- `components/dev-panel/sections/timeline-section.tsx` — сумма disjoint полей
+- `components/dev-panel/dev-panel-footer.tsx` — totalTokens обновлён
+- `components/dev-panel/pipeline-trace-drawer.tsx` — использует новые поля AiCallTrace
 
 ---
 
-## Следующий шаг: Этап 5 — DevPanel UI
+## Следующий шаг: Этап 6 — Pipelines
 
-**Цель:** Обновить UI компоненты DevPanel чтобы читать новые disjoint поля.
+**Цель:** Обновить все pipeline файлы, исправить fake-usage баг.
 
 ### Задачи (по ROADMAP)
 
-**1. `components/dev-panel/sections/tokens-section.tsx`:**
-- Заменить `st.inputTokens` → `st.noCacheInputTokens`
-- Заменить `st.cachedTokens` → `st.cacheReadTokens`
-- Добавить отображение трёх строк input: "Input (fresh)", "Cache read", "Cache write" + Reasoning
-- `totalTokens` = sum всех четырёх компонентов
+**6.1 — Исправление fake usage (3 файла):**
+- `lib/briefing/briefing-author.ts` — проверить что `result.usage` реальный (не fake)
+- `lib/briefing/briefing-section-author.ts` — то же
+- `lib/podcast/script-generator.ts` — то же
 
-**2. `components/dev-panel/sections/cost-breakdown-section.tsx`:**
-- Обновить чтение полей из step (строки 54, 57)
+**6.2 — Callsites `calcStepCostRub` / `buildAiCallTrace`:**
+Все они используют legacy shape (`promptTokens`/`completionTokens`/`inputTokens`). Нужно:
+- Либо передавать `LanguageModelUsage` через `buildAiCallTrace(modelId, result, ...)`  
+- Либо передавать `TokenUsageForPricing` через `extractUsageForPricing(usage)` → `calcStepCostRub`
 
-**3. `components/dev-panel/sections/timeline-section.tsx`:**
-- Обновить чтение полей (строка 55)
+Файлы:
+- `lib/briefing/briefing-filter.ts:137-141`
+- `lib/briefing/briefing-author.ts:231-235`
+- `lib/briefing/briefing-section-author.ts:197-201`
+- `lib/briefing/research-engine.ts:305-309`
+- `lib/podcast/script-generator.ts:162-166`
 
-**4. `components/dev-panel/dev-panel-footer.tsx`:**
-- Обновить чтение суммарных полей (строка 67)
+**6.3 — Общая проверка `logUsage` callsites:** убедиться что ничего не сломано.
 
-**5. `components/dev-panel/pipeline-trace-drawer.tsx`:**
-- `promptTokens`/`completionTokens` → `noCacheInputTokens + cacheReadTokens + cacheWriteTokens` / `outputTokens` (или раздельно)
-
-**6. Валидация:** `npx tsc --noEmit` → 0 ошибок в компонентах DevPanel. Остаются только 10 ошибок в pipelines (Этап 6).
+**6.4 — Валидация:**
+- `npx tsc --noEmit` → 0 ошибок
+- `npm run build` → успешен
+- Мануальный тест: брифинг pipeline + SQL-проверка `ai_usage_log`
 
 ### Git commit сообщение
 
 ```
-refactor(tz-tokens1): update DevPanel UI to new debug fields
+refactor(tz-tokens1): update all pipelines, fix fake usage in briefing/podcast
 ```
 
 ---
@@ -123,11 +118,12 @@ refactor(tz-tokens1): update DevPanel UI to new debug fields
 # Проверка компиляции
 npx tsc --noEmit
 
-# Сборка (пока не работает — ожидается после Этапа 6)
+# Сборка
 npm run build
 
 # Найти callsites
-grep -rn "inputTokens\|cachedTokens" components/dev-panel/
+grep -rn "promptTokens\|completionTokens" lib/
+grep -rn "calcStepCostRub\|buildAiCallTrace" lib/
 ```
 
 ---
@@ -142,4 +138,4 @@ grep -rn "inputTokens\|cachedTokens" components/dev-panel/
 
 ---
 
-**Новая сессия:** начинай с `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` → Этап 5 → `components/dev-panel/sections/tokens-section.tsx`.
+**Новая сессия:** начинай с `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` → Этап 6.

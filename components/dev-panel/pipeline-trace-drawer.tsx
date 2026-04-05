@@ -168,7 +168,7 @@ function StagesSection({ stages }: { stages: PipelineStageTrace[] }) {
             {stage.ai && (
               <div className="space-y-0.5">
                 <KV label="Model" value={stage.ai.modelId} />
-                <KV label="Tokens" value={`${formatTokens(stage.ai.promptTokens)} in / ${formatTokens(stage.ai.completionTokens)} out`} />
+                <KV label="Tokens" value={`${formatTokens(stage.ai.noCacheInputTokens + stage.ai.cacheReadTokens + stage.ai.cacheWriteTokens)} in / ${formatTokens(stage.ai.outputTokens)} out`} />
                 <KV label="Cost" value={`₽${stage.ai.costRub.toFixed(2)}`} />
                 {stage.ai.retryCount > 0 && (
                   <KV label="Retries" value={stage.ai.retryCount} warn />

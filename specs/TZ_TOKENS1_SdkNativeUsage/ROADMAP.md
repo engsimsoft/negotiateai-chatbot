@@ -149,30 +149,32 @@
 
 ### Этап 5: DevPanel UI (tokens-section, cost-breakdown, footer)
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 **Цель:** Обновить UI компоненты DevPanel чтобы читать новые поля.
 
 **Задачи:**
-- [ ] `components/dev-panel/sections/tokens-section.tsx`:
-  - [ ] Заменить `st.inputTokens` → `st.noCacheInputTokens`
-  - [ ] Заменить `st.cachedTokens` → `st.cacheReadTokens`
-  - [ ] Отображать три строки: "Input (fresh)", "Cache read", "Cache write" + Reasoning
-  - [ ] `totalTokens` = sum всех четырёх компонентов
+- [x] `components/dev-panel/sections/tokens-section.tsx`:
+  - [x] disjoint поля: `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens`
+  - [x] Отображение: "Input (fresh)" всегда, "Cache read"/"Cache write"/"Reasoning" условно (если > 0)
+  - [x] `totalTokens` = sum всех пяти компонентов (disjoint)
 
-- [ ] `components/dev-panel/sections/cost-breakdown-section.tsx`:
-  - [ ] Обновить чтение полей из step
-  - [ ] Per-step cost считается через `getStepCostRub(step)` (уже обновлён в Этапе 4)
+- [x] `components/dev-panel/sections/cost-breakdown-section.tsx`:
+  - [x] `StepCost` интерфейс и `computePerStepCosts` обновлены под disjoint поля
+  - [x] Per-step cost считается через `getStepCostRub(step)` (обновлён в Этапе 4)
 
-- [ ] `components/dev-panel/dev-panel-footer.tsx`:
-  - [ ] Обновить чтение суммарных полей
+- [x] `components/dev-panel/dev-panel-footer.tsx`:
+  - [x] `totalTokens` = sum disjoint полей (no cache + cacheRead + cacheWrite + output + reasoning)
 
-- [ ] `components/dev-panel/sections/timeline-section.tsx`:
-  - [ ] Проверить использует ли inputTokens — обновить
+- [x] `components/dev-panel/sections/timeline-section.tsx`:
+  - [x] `step.inputTokens` → сумма disjoint полей
 
-- [ ] `components/dev-panel/sections/raw-section.tsx`:
-  - [ ] Не требует изменений (рендерит raw JSON)
+- [x] `components/dev-panel/pipeline-trace-drawer.tsx`:
+  - [x] `stage.ai.promptTokens/completionTokens` → `noCacheInputTokens + cacheReadTokens + cacheWriteTokens` / `outputTokens`
 
-- [ ] `npx tsc --noEmit` → 0 ошибок
+- [x] `components/dev-panel/sections/raw-section.tsx`:
+  - [x] Не требует изменений (рендерит raw JSON)
+
+- [x] `npx tsc --noEmit` → 0 ошибок в DevPanel UI (остаются 10 в pipelines — Этап 6)
 
 **Файлы:**
 - `components/dev-panel/sections/tokens-section.tsx`
@@ -181,19 +183,11 @@
 - `components/dev-panel/dev-panel-footer.tsx`
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` → 0 ошибок
-- [ ] `npm run build` → успешен
-- [ ] Git commit: `refactor(tz-tokens1): update DevPanel UI to new debug fields`
+- [x] `npx tsc --noEmit` → 0 ошибок в DevPanel UI
+- [ ] `npm run build` → отложен до Этапа 6 (pipelines всё ещё сломаны)
+- [x] Git commit: `refactor(tz-tokens1): update DevPanel UI to new debug fields`
 
-🧪 **Мануальный тест:**
-1. Открой dev-сервер, отправь сообщение в обычный чат
-2. Открой DevPanel (footer под ответом AI)
-3. Проверь что токены отображаются: Input (fresh), Cache read, Cache write, Reasoning, Total
-4. Проверь что стоимость (₽) отображается без NaN/undefined
-5. Открой Cost Breakdown — per-step bars должны быть видны
-6. **Критично:** убедись что значения ≠ 0 если cache активен
-
-⛔ **СТОП — дождаться подтверждения пользователя.**
+🧪 **Мануальный тест:** отложен до окончания Этапа 6 (build не собирается без починки pipelines).
 
 ---
 

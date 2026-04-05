@@ -4,14 +4,30 @@ import type { DevPanelMessageData } from "../dev-panel-provider";
 export function TokensSection({ data }: { data: DevPanelMessageData }) {
   // Use per-step sums — these represent the actual billed amounts.
   // finish.totalXxxTokens is the last step's cumulative, not the real sum.
-  const inputTokens = data.steps.reduce((s, st) => s + st.inputTokens, 0);
+  // All input fields are DISJOINT (schema v2): no overlap between them.
+  const noCacheInputTokens = data.steps.reduce(
+    (s, st) => s + st.noCacheInputTokens,
+    0,
+  );
+  const cacheReadTokens = data.steps.reduce(
+    (s, st) => s + st.cacheReadTokens,
+    0,
+  );
+  const cacheWriteTokens = data.steps.reduce(
+    (s, st) => s + st.cacheWriteTokens,
+    0,
+  );
   const outputTokens = data.steps.reduce((s, st) => s + st.outputTokens, 0);
-  const cachedTokens = data.steps.reduce((s, st) => s + st.cachedTokens, 0);
   const reasoningTokens = data.steps.reduce(
     (s, st) => s + st.reasoningTokens,
     0,
   );
-  const totalTokens = inputTokens + outputTokens + reasoningTokens;
+  const totalTokens =
+    noCacheInputTokens +
+    cacheReadTokens +
+    cacheWriteTokens +
+    outputTokens +
+    reasoningTokens;
 
   // ТЗ-DEV3: Real cost = sum of per-step costs (each step is a separate API call).
   // Uses server-calculated stepCostRub (TokenLens SSOT) with local fallback.
@@ -27,18 +43,25 @@ export function TokensSection({ data }: { data: DevPanelMessageData }) {
         Tokens &amp; Cost
       </h3>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-        <span className="text-muted-foreground">Input</span>
-        <span>{inputTokens.toLocaleString("ru-RU")}</span>
+        <span className="text-muted-foreground">Input (fresh)</span>
+        <span>{noCacheInputTokens.toLocaleString("ru-RU")}</span>
+
+        {cacheReadTokens > 0 && (
+          <>
+            <span className="text-muted-foreground">Cache read</span>
+            <span>{cacheReadTokens.toLocaleString("ru-RU")}</span>
+          </>
+        )}
+
+        {cacheWriteTokens > 0 && (
+          <>
+            <span className="text-muted-foreground">Cache write</span>
+            <span>{cacheWriteTokens.toLocaleString("ru-RU")}</span>
+          </>
+        )}
 
         <span className="text-muted-foreground">Output</span>
         <span>{outputTokens.toLocaleString("ru-RU")}</span>
-
-        {cachedTokens > 0 && (
-          <>
-            <span className="text-muted-foreground">Cached</span>
-            <span>{cachedTokens.toLocaleString("ru-RU")}</span>
-          </>
-        )}
 
         {reasoningTokens > 0 && (
           <>

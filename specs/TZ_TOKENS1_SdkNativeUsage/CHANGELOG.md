@@ -109,3 +109,21 @@ lib/ai/tokenlens-catalog.ts:91 — same
 - 10 в pipelines (briefing/*, podcast/script-generator) — Этап 6
 
 Все ошибки в зоне Этапа 4 (lib/ai/, dev-panel-provider.tsx, 3 routes) устранены.
+
+### Этап 5: DevPanel UI ✅
+
+**Files modified:**
+- `components/dev-panel/sections/tokens-section.tsx`:
+  - disjoint суммы по steps: `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens`
+  - UI: "Input (fresh)" всегда, остальные строки — условно (> 0)
+  - `totalTokens` = sum пяти компонентов
+- `components/dev-panel/sections/cost-breakdown-section.tsx`:
+  - `StepCost` + `computePerStepCosts` — disjoint поля
+- `components/dev-panel/sections/timeline-section.tsx`:
+  - `step.inputTokens + outputTokens + reasoningTokens` → полная сумма disjoint полей
+- `components/dev-panel/dev-panel-footer.tsx`:
+  - `totalTokens` = sum disjoint полей per step
+- `components/dev-panel/pipeline-trace-drawer.tsx`:
+  - `stage.ai.promptTokens/completionTokens` → `noCacheInputTokens+cacheReadTokens+cacheWriteTokens` / `outputTokens`
+
+**TSC state:** 0 ошибок в DevPanel UI. Остаются 10 ошибок в pipelines (Этап 6).

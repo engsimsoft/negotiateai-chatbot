@@ -64,7 +64,13 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
 
   // ТЗ-DEV3: Sum per-step tokens (real total billed, not last step cumulative)
   const totalTokens = data.steps.reduce(
-    (sum, s) => sum + s.inputTokens + s.outputTokens + s.reasoningTokens,
+    (sum, s) =>
+      sum +
+      s.noCacheInputTokens +
+      s.cacheReadTokens +
+      s.cacheWriteTokens +
+      s.outputTokens +
+      s.reasoningTokens,
     0,
   );
 

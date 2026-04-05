@@ -26,10 +26,11 @@ interface StepCost {
   label: string;
   cost: number;
   modelId: string;
-  inputTokens: number;
+  noCacheInputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
   outputTokens: number;
   reasoningTokens: number;
-  cachedTokens: number;
 }
 
 function computePerStepCosts(data: DevPanelMessageData): StepCost[] {
@@ -51,10 +52,11 @@ function computePerStepCosts(data: DevPanelMessageData): StepCost[] {
       label,
       cost,
       modelId: step.modelId,
-      inputTokens: step.inputTokens,
+      noCacheInputTokens: step.noCacheInputTokens,
+      cacheReadTokens: step.cacheReadTokens,
+      cacheWriteTokens: step.cacheWriteTokens,
       outputTokens: step.outputTokens,
       reasoningTokens: step.reasoningTokens,
-      cachedTokens: step.cachedTokens,
     };
   });
 }
