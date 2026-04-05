@@ -1,0 +1,474 @@
+# Roadmap ТЗ-TOKENS1: SDK Native Usage Tracking
+
+**Создан:** 2026-04-05
+**Версия проекта:** 3.66.0 → 3.67.0
+**Статус:** ⬜ Не начат
+
+---
+
+## Обзор
+
+| Метрика | Значение |
+|---------|----------|
+| Этапов | 9 |
+| Текущий этап | 1 |
+| Сессий (оценка) | 5-6 |
+
+**Критерий успеха:** Dev Panel cost === Cost Audit Dashboard cost === Anthropic Console cost (допуск <1%) во всех 7 типах чатов.
+
+---
+
+## Этапы
+
+### Этап 1: Базовый контракт (ядро типов)
+
+**Статус:** ✅ Завершён
+**Цель:** Переписать интерфейсы `TokenUsageForPricing`, `calculateCostRub`, создать helper `extractUsageForPricing`.
+
+**Задачи:**
+- [x] `lib/ai/providers.ts` — переписать интерфейс `TokenUsageForPricing` с явными полями `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens?`
+- [x] `lib/ai/providers.ts` — переписать `calculateCostRub()` без ручной субтракции
+- [x] `lib/ai/usage-utils.ts` — создать helper `extractUsageForPricing(usage: LanguageModelUsage)` → `TokenUsageForPricing`
+- [x] `lib/ai/usage-utils.ts` — `ExtractedUsage.inputTokens` оставлен как есть (total billable для DB, см. ANALYSIS.md рекомендация #1). `extractUsageFields` рабочий.
+- [x] `npx tsc --noEmit` → 5 ошибок в callsites (фиксим в Этапах 2-3)
+
+**Файлы:**
+- `lib/ai/providers.ts` — интерфейс, функция, не трогаем MODEL_PRICING_RUB
+- `lib/ai/usage-utils.ts` — новый helper
+
+**Валидация этапа:**
+- [x] Интерфейс `TokenUsageForPricing` скомпилирован корректно
+- [x] Функция `extractUsageForPricing` работает для mock-usage объектов
+- [x] Ожидаемые ошибки компиляции в callsites зафиксированы (5 ошибок — см. CHANGELOG)
+- [x] Git commit: `refactor(tz-tokens1): new TokenUsageForPricing contract + extractUsageForPricing helper`
+
+**Критерий готовности:** Ядро типов готово, компилятор показывает точный список callsites для обновления.
+
+⛔ **НЕ переходить к этапу 2 без фиксации списка ошибок компиляции!**
+
+---
+
+### Этап 2: Обновление ядра (tokenlens + pipeline-trace)
+
+**Статус:** ⬜ Не начат
+**Цель:** Адаптировать все внутренние callsites в `lib/ai/`.
+
+**Задачи:**
+- [ ] `lib/ai/tokenlens-catalog.ts` — переписать `calcCostUsd()` через `extractUsageForPricing`
+- [ ] `lib/ai/tokenlens-catalog.ts` — переписать `calcStepCostRub()` — принимать `TokenUsageForPricing` напрямую
+- [ ] `lib/ai/providers.ts` → `getStepCostRub()` — обновить чтение из `DebugStepData` с новыми полями (после Этапа 4 — ПОМЕТИТЬ как зависимость)
+- [ ] `lib/ai/pipeline-trace.ts` → `buildAiCallTrace()` — убрать legacy `promptTokens/completionTokens`, перейти на `usage.inputTokenDetails.*`. Проверить что параметр `result.usage` имеет правильный тип.
+- [ ] `npx tsc --noEmit` → 0 ошибок в `lib/ai/` (ошибки в routes/pipelines пока остаются)
+
+**Файлы:**
+- `lib/ai/tokenlens-catalog.ts`
+- `lib/ai/providers.ts` (getStepCostRub)
+- `lib/ai/pipeline-trace.ts`
+
+**Валидация этапа:**
+- [ ] `npx tsc --noEmit` → 0 ошибок в `lib/ai/` (кроме debug-events / DebugStepData)
+- [ ] Unit-smoke: вызвать `calcStepCostRub()` с mock `TokenUsageForPricing` и убедиться что возвращает правильную стоимость
+- [ ] Git commit: `refactor(tz-tokens1): update tokenlens-catalog + pipeline-trace to new contract`
+
+**Критерий готовности:** Весь `lib/ai/` компилируется (кроме `debug-events.ts` который обновим в Этапе 4).
+
+---
+
+### Этап 3: Обновление 3 routes (chat, service-chat, task-chat)
+
+**Статус:** ⬜ Не начат
+**Цель:** Переписать `onStepFinish` и `onFinish` во всех 3 основных чат-роутах.
+
+**Задачи:**
+- [ ] `app/(chat)/api/chat/route.ts`:
+  - [ ] `onStepFinish` — использовать `extractUsageForPricing(usage)` вместо ручного сбора полей
+  - [ ] `onStepFinish` → `DebugStepData` — заполнить новые поля `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `reasoningTokens`
+  - [ ] `onFinish` → `emitDebugFinish` — передать total per-field (сумма по всем шагам)
+  - [ ] `onFinish` → вызов `calculateCostRub` для `estimatedCostRub` — передать новые поля
+
+- [ ] `app/(chat)/api/service-chat/route.ts`:
+  - [ ] Аналогично (onStepFinish + onFinish)
+  - [ ] Убедиться что `logUsage` вызов остаётся с `usage: LanguageModelUsage` (он использует `extractUsageFields` внутри для DB)
+
+- [ ] `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`:
+  - [ ] Аналогично (onStepFinish + onFinish)
+  - [ ] Проверить `saveAiUsageLog` прямой вызов (line 384) — должен остаться рабочим через `extractUsageFields`
+
+- [ ] `npx tsc --noEmit` → 0 ошибок во всех 3 routes
+
+**Файлы:**
+- `app/(chat)/api/chat/route.ts`
+- `app/(chat)/api/service-chat/route.ts`
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`
+
+**Валидация этапа:**
+- [ ] `npx tsc --noEmit` → 0 ошибок в routes (кроме DevPanel UI)
+- [ ] `npm run build` → успешен (UI пока может отображать мусор, это ок)
+- [ ] Git commit: `refactor(tz-tokens1): update 3 chat routes to new usage contract`
+
+**Критерий готовности:** Routes компилируются, сервер стартует, отправить тестовое сообщение → в логах сервера не видно ошибок.
+
+🧪 **Мануальный тест:** отправить 1 сообщение в обычный чат, убедиться что сервер НЕ падает. DevPanel может показывать мусор — это нормально, UI обновим в следующих этапах.
+
+⛔ **СТОП — дождаться подтверждения пользователя.**
+
+---
+
+### Этап 4: DebugStepData + DebugFinishData + localStorage migration
+
+**Статус:** ⬜ Не начат
+**Цель:** Переписать типы debug events + мягкая миграция localStorage.
+
+**Задачи:**
+- [ ] `lib/ai/debug-events.ts`:
+  - [ ] `DebugStepData` — заменить `inputTokens`, `cachedTokens` на `noCacheInputTokens`, `cacheReadTokens` (cacheWriteTokens уже есть)
+  - [ ] `DebugFinishData` — заменить `totalInputTokens`, `totalCachedTokens` на `totalNoCacheInputTokens`, `totalCacheReadTokens`, `totalCacheWriteTokens`
+  - [ ] Добавить константу `DEBUG_EVENT_SCHEMA_VERSION = 2`
+  - [ ] Добавить поле `schemaVersion: number` в DebugStepData и DebugFinishData
+
+- [ ] `components/dev-panel/dev-panel-provider.tsx`:
+  - [ ] При инициализации — если localStorage содержит старую версию схемы → очистить (кидать warn в console)
+  - [ ] Обновить тип `DevPanelMessageData` если нужно
+
+- [ ] `hooks/use-onboarding-debug.ts`:
+  - [ ] Аналогичная миграция localStorage
+
+- [ ] `lib/ai/providers.ts` → `getStepCostRub(step)` — обновить чтение: `step.noCacheInputTokens`, `step.cacheReadTokens`, `step.cacheWriteTokens`
+
+- [ ] `npx tsc --noEmit` → должны появиться ошибки в DevPanel UI секциях (tokens-section, cost-breakdown-section)
+
+**Файлы:**
+- `lib/ai/debug-events.ts`
+- `lib/ai/providers.ts` (getStepCostRub)
+- `components/dev-panel/dev-panel-provider.tsx`
+- `hooks/use-onboarding-debug.ts`
+
+**Валидация этапа:**
+- [ ] `npx tsc --noEmit` → 0 ошибок в `lib/ai/` и `dev-panel-provider.tsx`
+- [ ] При перезагрузке dev-сервера + открытии чата — старый localStorage очищен (проверить в DevTools)
+- [ ] Git commit: `refactor(tz-tokens1): debug events schema v2 + localStorage migration`
+
+**Критерий готовности:** Схема debug events обновлена, старые localStorage данные очищаются.
+
+---
+
+### Этап 5: DevPanel UI (tokens-section, cost-breakdown, footer)
+
+**Статус:** ⬜ Не начат
+**Цель:** Обновить UI компоненты DevPanel чтобы читать новые поля.
+
+**Задачи:**
+- [ ] `components/dev-panel/sections/tokens-section.tsx`:
+  - [ ] Заменить `st.inputTokens` → `st.noCacheInputTokens`
+  - [ ] Заменить `st.cachedTokens` → `st.cacheReadTokens`
+  - [ ] Отображать три строки: "Input (fresh)", "Cache read", "Cache write" + Reasoning
+  - [ ] `totalTokens` = sum всех четырёх компонентов
+
+- [ ] `components/dev-panel/sections/cost-breakdown-section.tsx`:
+  - [ ] Обновить чтение полей из step
+  - [ ] Per-step cost считается через `getStepCostRub(step)` (уже обновлён в Этапе 4)
+
+- [ ] `components/dev-panel/dev-panel-footer.tsx`:
+  - [ ] Обновить чтение суммарных полей
+
+- [ ] `components/dev-panel/sections/timeline-section.tsx`:
+  - [ ] Проверить использует ли inputTokens — обновить
+
+- [ ] `components/dev-panel/sections/raw-section.tsx`:
+  - [ ] Не требует изменений (рендерит raw JSON)
+
+- [ ] `npx tsc --noEmit` → 0 ошибок
+
+**Файлы:**
+- `components/dev-panel/sections/tokens-section.tsx`
+- `components/dev-panel/sections/cost-breakdown-section.tsx`
+- `components/dev-panel/sections/timeline-section.tsx`
+- `components/dev-panel/dev-panel-footer.tsx`
+
+**Валидация этапа:**
+- [ ] `npx tsc --noEmit` → 0 ошибок
+- [ ] `npm run build` → успешен
+- [ ] Git commit: `refactor(tz-tokens1): update DevPanel UI to new debug fields`
+
+🧪 **Мануальный тест:**
+1. Открой dev-сервер, отправь сообщение в обычный чат
+2. Открой DevPanel (footer под ответом AI)
+3. Проверь что токены отображаются: Input (fresh), Cache read, Cache write, Reasoning, Total
+4. Проверь что стоимость (₽) отображается без NaN/undefined
+5. Открой Cost Breakdown — per-step bars должны быть видны
+6. **Критично:** убедись что значения ≠ 0 если cache активен
+
+⛔ **СТОП — дождаться подтверждения пользователя.**
+
+---
+
+### Этап 6: Pipelines (briefing + podcast + meeting + остальные)
+
+**Статус:** ⬜ Не начат
+**Цель:** Обновить все pipeline файлы, исправить fake-usage баг.
+
+**Задачи:**
+
+**6.1 — Исправление fake usage (3 файла):**
+- [ ] `lib/briefing/briefing-author.ts` — получать real usage из `result.usage` (AI SDK), передавать объект целиком в `logUsage`
+- [ ] `lib/briefing/briefing-section-author.ts` — то же
+- [ ] `lib/podcast/script-generator.ts` — то же
+
+**6.2 — Остальные pipeline с logUsage (остаются как есть — используют `extractUsageFields` внутри):**
+- [ ] `lib/briefing/briefing-filter.ts` — проверить что `usage` передаётся реальный (не fake)
+- [ ] `lib/briefing/research-engine.ts` — проверить
+- [ ] `lib/meeting/meeting-pipeline.ts` — проверить
+
+**6.3 — Callsites `calcStepCostRub` в pipelines:**
+- [ ] `lib/briefing/briefing-filter.ts:140` — обновить параметры
+- [ ] `lib/briefing/briefing-author.ts:234` — обновить
+- [ ] `lib/briefing/briefing-section-author.ts:200` — обновить
+- [ ] `lib/briefing/research-engine.ts:308` — обновить
+- [ ] `lib/podcast/script-generator.ts:165` — обновить
+
+**6.4 — Routes/utils с logUsage (поверка что ничего не сломано):**
+- [ ] Grep `logUsage\(` → пройтись по всем ~20 callsites, убедиться что параметры совместимы
+- [ ] Особенно: `lib/ai/professor-pipeline.ts` (3 callsites с `extractUsageFields`)
+
+- [ ] `npx tsc --noEmit` → 0 ошибок
+- [ ] `npm run build` → успешен
+
+**Файлы:**
+- `lib/briefing/*.ts` (4 файла)
+- `lib/podcast/*.ts` (2 файла)
+- `lib/meeting/*.ts` (2 файла)
+- `lib/ai/professor-pipeline.ts`
+- Остальные pipeline файлы по списку в ANALYSIS.md
+
+**Валидация этапа:**
+- [ ] `npx tsc --noEmit` → 0 ошибок
+- [ ] `npm run build` → успешен
+- [ ] Git commit: `refactor(tz-tokens1): update all pipelines, fix fake usage in briefing/podcast`
+
+🧪 **Мануальный тест:**
+1. Запусти генерацию брифинга (полный pipeline: filter → author → section-author)
+2. В БД проверь записи `ai_usage_log` WHERE chatMode LIKE 'briefing:%' — должны быть реальные токены (не нули)
+3. Проверь costUsd ≠ NULL для всех записей
+
+⛔ **СТОП — дождаться подтверждения пользователя.**
+
+---
+
+### Этап 7: Cost Audit UI — разделение fresh/cache/write
+
+**Статус:** ⬜ Не начат
+**Цель:** Обновить страницу `/admin/cost-audit` — показать разделение токенов на fresh / cache_read / cache_write, чтобы можно было сверять с Anthropic Console.
+
+**Задачи:**
+
+**7.1 — DB query обновления:**
+- [ ] `lib/db/queries.ts` → `getCostByModel(days)` — добавить в SELECT раздельные поля:
+  - `SUM(inputTokens) as totalInputTokens` (уже есть как `inputTokens`)
+  - `SUM(cacheReadTokens) as totalCacheReadTokens`
+  - `SUM(cacheWriteTokens) as totalCacheWriteTokens`
+  - `SUM(thinkingTokens) as totalReasoningTokens`
+  - Вычисляемое: `freshInputTokens = inputTokens - cacheReadTokens - cacheWriteTokens`
+
+- [ ] `lib/db/queries.ts` → добавить `getUsageBreakdownByChatMode(days)` — раздельные токены по chatMode (опционально)
+
+**7.2 — UI страница:**
+- [ ] `app/(dashboard)/admin/cost-audit/page.tsx`:
+  - [ ] В таблицу "Расходы по моделям" добавить колонки:
+    - "Fresh in" (свежий input)
+    - "Cache read"
+    - "Cache write"
+    - "Reasoning" (если есть)
+  - [ ] Оставить "Токены in (total)" как итоговую, но добавить tooltip "= fresh + cache_read + cache_write"
+  - [ ] Цветовая индикация: cache_read — зелёным (скидка), cache_write — жёлтым (надбавка)
+
+**7.3 — Legacy data warning:**
+- [ ] Добавить alert в header страницы: "Записи до [дата рефакторинга] могут иметь неточный costUsd — исправлено в TZ_TOKENS1"
+- [ ] Дата захардкодится после деплоя (или читается из env переменной `TOKENS1_DEPLOY_DATE`)
+
+**7.4 — Summary карточки:**
+- [ ] В верхнем ряду добавить 4-ю карточку "Cache hit rate" = `cacheReadTokens / (cacheReadTokens + freshInputTokens) × 100%`
+  - Показывает насколько эффективно работает prompt caching
+  - Ожидаемое значение после прогрева: 60-90%
+
+- [ ] `npx tsc --noEmit` → 0 ошибок
+- [ ] `npm run build` → успешен
+
+**Файлы:**
+- `lib/db/queries.ts` — `getCostByModel`, возможно новый `getUsageBreakdownByChatMode`
+- `app/(dashboard)/admin/cost-audit/page.tsx` — таблицы + карточки
+
+**Валидация этапа:**
+- [ ] `npx tsc --noEmit` → 0 ошибок
+- [ ] `npm run build` → успешен
+- [ ] Git commit: `feat(tz-tokens1): cost audit UI — fresh/cache/write columns + hit rate card`
+
+🧪 **Мануальный тест:**
+1. Открой `/admin/cost-audit`
+2. Проверь новые колонки в таблице "Расходы по моделям"
+3. Проверь карточку "Cache hit rate"
+4. Убедись что `fresh + cacheRead + cacheWrite ≈ inputTokens (total)` для каждой строки
+5. Проверь legacy warning баннер
+
+⛔ **СТОП — дождаться подтверждения пользователя.**
+
+**Критерий готовности:** Dashboard показывает прозрачную разбивку токенов, готов к использованию для сверки с Anthropic Console в Этапе 8.
+
+---
+
+### Этап 8: Валидация (7 типов чатов × 3 запроса)
+
+**Статус:** ⬜ Не начат
+**Цель:** Прогнать полный аудит, сверить с Anthropic Console, допуск <1%.
+
+**Задачи:**
+
+**7.1 — Подготовка:**
+- [ ] `SIMPLY_DEV_MODE=true` подтверждён
+- [ ] DevPanel открыт в браузере
+- [ ] Anthropic Console → Usage доступен (URL: console.anthropic.com/settings/usage)
+- [ ] mcp__postgres__query работает
+
+**7.2 — Таблица расхождений (заполняется в процессе):**
+
+| # | Тип | chatMode | Модель | Запросов | DevPanel ₽ | DB costUsd×100 | Anthropic $ | Δ% | Статус |
+|---|-----|----------|--------|----------|------------|-----------------|-------------|----|----|
+| 1 | Обычный чат | chat | Haiku | 3 | — | — | — | — | ⬜ |
+| 2 | Экспертиза | expertise | Sonnet | 3 | — | — | — | — | ⬜ |
+| 3 | Создание | create | Sonnet | 3 | — | — | — | — | ⬜ |
+| 4 | Бен | service:ben | Haiku | 3 | — | — | — | — | ⬜ |
+| 5 | Менеджер | service:project-manager | Haiku | 3 | — | — | — | — | ⬜ |
+| 6 | Брифинг | briefing:* | Sonnet | 1 pipeline | — | — | — | — | ⬜ |
+| 7 | Meeting | meeting:* | Sonnet | 1 запись | — | — | — | — | ⬜ |
+
+**7.3 — Прогон по типам:**
+- [ ] Тип 1: 3 сообщения в обычный чат Haiku → зафиксировать
+- [ ] Тип 2-3: Экспертиза + Создание (Sonnet) → зафиксировать
+- [ ] Тип 4: Бен → зафиксировать
+- [ ] Тип 5: Менеджер проекта → зафиксировать
+- [ ] Тип 6: полный брифинг pipeline → зафиксировать по каждой стадии
+- [ ] Тип 7: короткая meeting запись → зафиксировать
+
+**7.4 — Анализ:**
+- [ ] Все строки таблицы заполнены
+- [ ] Δ% < 1% во всех случаях
+- [ ] Если расхождение >1% — root cause + fix
+
+**Валидация этапа:**
+- [ ] Таблица расхождений полностью заполнена
+- [ ] Все Δ% < 1%
+- [ ] `npm run build` → успешен
+- [ ] Git commit: `test(tz-tokens1): validation complete, all chat types verified`
+
+**Критерий готовности:** 7/7 типов прошли валидацию, расхождений нет.
+
+⛔ **СТОП — если есть расхождения, возврат к Этапам 2-7 для fix.**
+
+---
+
+### Этап 9: Финализация
+
+**Статус:** ⬜ Не начат
+**Цель:** Документация, ADR, архив.
+
+⛔ **ПЕРВЫМ ДЕЛОМ:** Прочитать `/Users/mactm/Projects/NegotiateAI Chatbot/DOCUMENTATION_GUIDE.md` — пройти чеклист.
+
+**Задачи:**
+
+**Документация (обязательная):**
+- [ ] ⛔ Прочитать `DOCUMENTATION_GUIDE.md` → пройти "✅ Чек-лист при изменениях"
+- [ ] Обновить главный `CHANGELOG.md` (секция 3.67.0)
+- [ ] Обновить `SIMPLY_STATUS.md` (завершённые ТЗ)
+- [ ] Обновить `CLAUDE.md` (секция "Структура кода" если нужно)
+- [ ] Обновить `package.json` → 3.67.0
+
+**Документация (по чеклисту):**
+- [ ] **ADR обязателен:** создать `docs/decisions/030-sdk-native-usage-tracking.md`
+  - Контекст: 2 месяца борьбы с расхождением, самопальная формула vs SDK v6 native
+  - Решение: breaking refactor на `inputTokenDetails.*`
+  - Альтернативы: (1) точечная правка, (2) продолжать субтракцию + тесты
+  - Trade-offs: breaking internal API vs надёжность и стандарт
+  - Consequences: единый SSOT, устойчивость к будущим провайдерам
+- [ ] Обновить `docs/ai-providers.md` → Реестр конфигураций (TokenUsageForPricing, calculateCostRub signature)
+- [ ] Обновить `docs/ai-chats-map.md` — не затрагивает модели, но проверить
+- [ ] Обновить `docs/architecture.md` — новый контракт typing
+
+**⛔ Верификация docs против кода (Правило 5):**
+- [ ] `ai-providers.md` → Реестр конфигураций сверен с `lib/ai/providers.ts`
+- [ ] `ai-chats-map.md` → код-блок myProvider совпадает с `providers.ts`
+- [ ] `CLAUDE.md` → пути файлов актуальны
+
+**Завершение:**
+- [ ] БД-проверка через mcp__postgres__query:
+  - [ ] SELECT COUNT(*) FROM ai_usage_log WHERE createdAt > NOW() - INTERVAL '1 day' GROUP BY chatMode
+  - [ ] SELECT * FROM ai_usage_log WHERE costUsd IS NULL AND createdAt > NOW() - INTERVAL '1 day'
+- [ ] Финальный мануальный тест: 1 сообщение в каждый из 7 типов чатов
+- [ ] Перенести `specs/TZ_TOKENS1_SdkNativeUsage/` → `_archive/`
+
+**Валидация:**
+- [ ] `npm run build` → успешен
+- [ ] Production URL работает (если деплой)
+- [ ] Документация актуальна (проверено)
+- [ ] Git commit: `chore(tz-tokens1): finalization — docs + ADR + archive`
+
+**Критерий готовности:** Всё задокументировано, ADR создан, папка в архиве.
+
+---
+
+## Файлы затронутые рефакторингом
+
+**Ядро (8 файлов):**
+- `lib/ai/providers.ts`
+- `lib/ai/tokenlens-catalog.ts`
+- `lib/ai/usage-utils.ts`
+- `lib/ai/debug-events.ts`
+- `lib/ai/pipeline-trace.ts`
+- `app/(chat)/api/chat/route.ts`
+- `app/(chat)/api/service-chat/route.ts`
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`
+
+**DevPanel UI (5 файлов):**
+- `components/dev-panel/dev-panel-provider.tsx`
+- `components/dev-panel/sections/tokens-section.tsx`
+- `components/dev-panel/sections/cost-breakdown-section.tsx`
+- `components/dev-panel/sections/timeline-section.tsx`
+- `components/dev-panel/dev-panel-footer.tsx`
+- `hooks/use-onboarding-debug.ts`
+
+**Pipelines (11+ файлов):**
+- `lib/briefing/briefing-filter.ts`
+- `lib/briefing/briefing-author.ts`
+- `lib/briefing/briefing-section-author.ts`
+- `lib/briefing/research-engine.ts`
+- `lib/podcast/script-generator.ts`
+- `lib/podcast/tts-gemini.ts`
+- `lib/meeting/meeting-pipeline.ts`
+- `lib/meeting/deepgram-transcribe.ts`
+- `lib/ai/professor-pipeline.ts`
+- `lib/ai/clerks/*.ts`
+- `lib/ai/professors/*.ts`
+- `lib/ai/tools/deep-research.ts`
+- `lib/ai/vision-ocr.ts`
+- `app/(chat)/actions.ts`
+- `app/(chat)/api/assistant/ben/route.ts`
+- `app/(chat)/api/projects/[id]/analyze-file/route.ts`
+- `app/(chat)/api/projects/[id]/generate-summary/route.ts`
+
+**Cost Audit Dashboard (Этап 7):**
+- `app/(dashboard)/admin/cost-audit/page.tsx`
+- `lib/db/queries.ts` (getCostByModel, возможно новые breakdown queries)
+
+**Документация:**
+- `docs/decisions/030-sdk-native-usage-tracking.md` — новый
+- `docs/ai-providers.md`
+- `CHANGELOG.md`
+- `SIMPLY_STATUS.md`
+- `CLAUDE.md`
+- `package.json`
+
+---
+
+## Мантра
+
+**"Непроверенный код = несуществующий код. Непровалидированная стоимость = биллинговый риск."**
+
+Каждая цифра в Dev Panel должна совпадать с Anthropic Console с точностью <1%.

@@ -1,0 +1,51 @@
+# Changelog ТЗ-TOKENS1
+
+## Сессия 1 — 2026-04-05
+
+### Планирование
+- Создана папка `specs/TZ_TOKENS1_SdkNativeUsage/`
+- Написан `SPEC.md` (senior-dev spec, 9 требований R1-R9)
+- Разведана кодовая база: 8 ядерных файлов + 28 callsites `logUsage` + 4 файла DevPanel UI + pipelines
+- Написан `ANALYSIS.md` (код-ревью, риски, рекомендации)
+- Написан `ROADMAP.md` (8 этапов, валидация на каждом)
+- Архивирован TZ_AUDIT1 (заменён на TZ_TOKENS1)
+
+### Files created
+- `specs/TZ_TOKENS1_SdkNativeUsage/SPEC.md`
+- `specs/TZ_TOKENS1_SdkNativeUsage/ANALYSIS.md`
+- `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md`
+- `specs/TZ_TOKENS1_SdkNativeUsage/CHANGELOG.md`
+- `specs/TZ_TOKENS1_SdkNativeUsage/HANDOFF.md`
+
+### Files moved
+- `specs/TZ_AUDIT1_TokenCostValidation/` → `_archive/TZ_AUDIT1_TokenCostValidation/`
+
+### Scope updates
+- Добавлен **Этап 7: Cost Audit UI** — разделение токенов на fresh/cache_read/cache_write + Cache hit rate card + legacy data warning. Роадмап расширен с 8 до 9 этапов.
+
+---
+
+## Сессия 2 — 2026-04-05
+
+### Этап 1: Базовый контракт ✅
+
+**Files modified:**
+- `lib/ai/providers.ts`:
+  - `TokenUsageForPricing` переписан с disjoint-полями: `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens?`
+  - `calculateCostRub()` — убрана ручная субтракция, reasoning билится по output rate
+  - `getStepCostRub()` — bridge: derives `noCacheInputTokens = inputTokens - cacheRead - cacheWrite` (до DebugStepData v2 в Этапе 4)
+- `lib/ai/usage-utils.ts`:
+  - Новый helper `extractUsageForPricing(usage)` → `TokenUsageForPricing`
+  - Читает `inputTokenDetails.{noCacheTokens,cacheReadTokens,cacheWriteTokens}` + `outputTokenDetails.reasoningTokens`
+  - Fallback для `noCacheInputTokens`: `inputTokens - cacheRead - cacheWrite` если SDK не прислал
+
+**TSC errors (5, ожидаемо, фиксятся в Этапах 2-3):**
+```
+app/(chat)/api/chat/route.ts:775 — { inputTokens } → TokenUsageForPricing
+app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts:405 — same
+app/(chat)/api/service-chat/route.ts:858 — same
+lib/ai/tokenlens-catalog.ts:46 — same
+lib/ai/tokenlens-catalog.ts:91 — same
+```
+
+Все ошибки одного типа: "property 'inputTokens' does not exist in type 'TokenUsageForPricing'" — callsites всё ещё передают старый shape. Фикс: в Этапе 2 (tokenlens-catalog) и Этапе 3 (3 routes).

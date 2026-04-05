@@ -10,6 +10,7 @@ import type { LanguageModelUsage } from "ai";
 
 import { saveAiUsageLog } from "@/lib/db/queries";
 
+import type { TokenUsageForPricing } from "./providers";
 import { calcCostUsd } from "./tokenlens-catalog";
 
 // ---------------------------------------------------------------------------
@@ -65,6 +66,51 @@ export function extractUsageFields(
     cacheReadTokens: usage.inputTokenDetails?.cacheReadTokens ?? 0,
     cacheWriteTokens: usage.inputTokenDetails?.cacheWriteTokens ?? 0,
     thinkingTokens: usage.outputTokenDetails?.reasoningTokens ?? 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// extractUsageForPricing — map AI SDK usage → TokenUsageForPricing (disjoint)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a disjoint TokenUsageForPricing from an AI SDK v6 usage object.
+ *
+ * Reads native `inputTokenDetails.{noCacheTokens,cacheReadTokens,cacheWriteTokens}`
+ * and `outputTokenDetails.reasoningTokens`. All fields are disjoint — pass the
+ * result directly to `calculateCostRub`.
+ *
+ * Fallback for `noCacheInputTokens` when `noCacheTokens` is missing:
+ * derive from `inputTokens - cacheReadTokens - cacheWriteTokens`.
+ */
+export function extractUsageForPricing(
+  usage: LanguageModelUsage | undefined | null,
+): TokenUsageForPricing {
+  if (!usage) {
+    return {
+      noCacheInputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      outputTokens: 0,
+      reasoningTokens: 0,
+    };
+  }
+
+  const details = usage.inputTokenDetails;
+  const cacheReadTokens = details?.cacheReadTokens ?? 0;
+  const cacheWriteTokens = details?.cacheWriteTokens ?? 0;
+  const noCacheFromSdk = details?.noCacheTokens;
+  const noCacheInputTokens =
+    noCacheFromSdk != null
+      ? noCacheFromSdk
+      : Math.max(0, (usage.inputTokens ?? 0) - cacheReadTokens - cacheWriteTokens);
+
+  return {
+    noCacheInputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    outputTokens: usage.outputTokens ?? 0,
+    reasoningTokens: usage.outputTokenDetails?.reasoningTokens ?? 0,
   };
 }
 
