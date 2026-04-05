@@ -4540,3 +4540,110 @@ export async function saveCronRunLog({
     console.warn("[saveCronRunLog] Failed to save cron run log:", error);
   }
 }
+
+// ============================================================================
+// Admin Cost Audit Queries (ТЗ-COSTCTRL Phase 6)
+// ============================================================================
+
+export interface InvalidDeliveryUser {
+  userId: string;
+  email: string;
+  deliveryEnabled: boolean;
+}
+
+/** Users with deliveryEnabled=true but no active Telegram connection */
+export async function getInvalidDeliveryStateUsers(): Promise<InvalidDeliveryUser[]> {
+  const rows = await db.execute(sql`
+    SELECT bs."userId", u."email", bs."deliveryEnabled"
+    FROM "BriefingSettings" bs
+    JOIN "User" u ON u."id" = bs."userId"
+    LEFT JOIN "TelegramConnection" tc ON tc."userId" = bs."userId" AND tc."isActive" = true
+    WHERE bs."deliveryEnabled" = true AND tc."userId" IS NULL
+  `);
+  return rows.rows as unknown as InvalidDeliveryUser[];
+}
+
+/** Last N cron runs, most recent first */
+export async function getLastCronRuns(limit = 10): Promise<CronRunLog[]> {
+  return db
+    .select()
+    .from(cronRunLog)
+    .orderBy(desc(cronRunLog.startedAt))
+    .limit(limit);
+}
+
+export interface CostByDay {
+  day: string;
+  totalUsd: number | null;
+  count: number;
+}
+
+/** Total cost grouped by calendar day for last N days */
+export async function getCostByDay(days = 30): Promise<CostByDay[]> {
+  const rows = await db.execute(sql`
+    SELECT
+      DATE("createdAt") AS day,
+      SUM(CAST("costUsd" AS numeric)) AS "totalUsd",
+      COUNT(*) AS count
+    FROM "ai_usage_log"
+    WHERE "createdAt" > NOW() - INTERVAL '${sql.raw(String(days))} days'
+    GROUP BY DATE("createdAt")
+    ORDER BY day DESC
+  `);
+  return rows.rows.map((r: any) => ({
+    day: String(r.day),
+    totalUsd: r.totalUsd != null ? Number(r.totalUsd) : null,
+    count: Number(r.count),
+  }));
+}
+
+export interface CostByChatMode {
+  chatMode: string;
+  totalUsd: number | null;
+  count: number;
+}
+
+/** Total cost grouped by chatMode for last N days */
+export async function getCostByChatMode(days = 30): Promise<CostByChatMode[]> {
+  const rows = await db.execute(sql`
+    SELECT
+      "chatMode",
+      SUM(CAST("costUsd" AS numeric)) AS "totalUsd",
+      COUNT(*) AS count
+    FROM "ai_usage_log"
+    WHERE "createdAt" > NOW() - INTERVAL '${sql.raw(String(days))} days'
+    GROUP BY "chatMode"
+    ORDER BY "totalUsd" DESC NULLS LAST
+  `);
+  return rows.rows.map((r: any) => ({
+    chatMode: String(r.chatMode),
+    totalUsd: r.totalUsd != null ? Number(r.totalUsd) : null,
+    count: Number(r.count),
+  }));
+}
+
+export interface NullCostRecord {
+  chatMode: string;
+  modelId: string;
+  count: number;
+}
+
+/** Records with costUsd IS NULL for last N days, grouped by chatMode + modelId */
+export async function getNullCostRecords(days = 30): Promise<NullCostRecord[]> {
+  const rows = await db.execute(sql`
+    SELECT
+      "chatMode",
+      "modelId",
+      COUNT(*) AS count
+    FROM "ai_usage_log"
+    WHERE "costUsd" IS NULL
+      AND "createdAt" > NOW() - INTERVAL '${sql.raw(String(days))} days'
+    GROUP BY "chatMode", "modelId"
+    ORDER BY count DESC
+  `);
+  return rows.rows.map((r: any) => ({
+    chatMode: String(r.chatMode),
+    modelId: String(r.modelId),
+    count: Number(r.count),
+  }));
+}

@@ -230,20 +230,20 @@ WHERE "deliveryEnabled" = true
 
 ## Этап 6 (Phase 6): Admin cost-audit endpoint
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (2026-04-05)
 
 **Цель:** self-service endpoint для мониторинга cost health.
 
 **Задачи:**
-- [ ] Создать `app/api/admin/cost-audit/route.ts` (GET) с gate `isSimplyDevMode`
-- [ ] Реализовать queries:
+- [x] Создать `app/api/admin/cost-audit/route.ts` (GET) с gate `isSimplyDevMode`
+- [x] Реализовать queries:
   - invalid state users (deliveryEnabled + no Telegram)
   - lastCronRuns (последние 10 записей cron_run_log)
   - costByDay за 30 дней
   - costByChatMode за 30 дней
   - nullCostRecords за 30 дней
-- [ ] Возвращать JSON с этими метриками
-- [ ] `npx tsc --noEmit` — 0 ошибок
+- [x] Возвращать JSON с этими метриками
+- [x] `npx tsc --noEmit` — 0 ошибок
 
 **Файлы:**
 - `app/api/admin/cost-audit/route.ts` — новый
