@@ -109,6 +109,7 @@
     "recharts": "^3.7.0",
     "redis": "^5.0.0",
     "remark-gfm": "^4.0.1",
+    "remark-parse": "11.0.0",
     "rss-parser": "^3.13.0",
     "server-only": "^0.0.1",
     "shiki": "^3.12.2",
