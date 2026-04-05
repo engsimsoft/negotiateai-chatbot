@@ -10,10 +10,10 @@
 
 | Метрика | Значение |
 |---------|----------|
-| Этапов | 9 |
-| Завершено | 6 / 9 |
-| Текущий этап | 7 (после мануального теста Этапа 6) |
-| Сессий пройдено | 3 |
+| Этапов | 10 |
+| Завершено | 7 / 10 |
+| Текущий этап | Этап 7 (Cost Audit UI) после мануального теста 7.5 |
+| Сессий пройдено | 4 |
 
 **Критерий успеха:** Dev Panel cost === Cost Audit Dashboard cost === Anthropic Console cost (допуск <1%) во всех 7 типах чатов.
 
@@ -297,6 +297,176 @@
 
 ---
 
+### Этап 7.5: User-facing Context popover (input-level usage UI)
+
+**Статус:** ✅ Завершён (ожидает мануальный тест)
+**Цель:** Починить legacy popover над полем ввода чата (`components/elements/context.tsx`) — он показывает **стоимость в 5.6× выше реальной** из-за additive-формулы внешней библиотеки `tokenlens/helpers.getUsage`. Убрать last-message-only behaviour → показывать **кумулятивный расход за сессию**.
+
+**Root cause:**
+- [chat/route.ts:737](app/(chat)/api/chat/route.ts#L737) вызывает `getUsage({ modelId, usage, providers })` из `tokenlens/helpers`.
+- `getUsage` использует additive-формулу: `inputUSD = usage.inputTokens × input_rate`, не вычитая cache-токены из fresh input.
+- AI SDK v5 кладёт в `usage.inputTokens` суммарный input (fresh + cache_read + cache_write).
+- Результат: cache-токены считаются **дважды** — один раз как "Cache Hits" по cache-rate, второй раз внутри "Input" по fresh-rate → overcount **5-10×**.
+- TOKENS1 уже обходит tokenlens везде (см. `lib/ai/tokenlens-catalog.ts:44` — "bypassed"), но UI popover остался на сыром `getUsage`.
+
+**Доказанный баг (скрин пользователя, Haiku 4.5, 2026-04-06):**
+- Реальная стоимость сообщения: ₽0.29 (1468 fresh + 13420 cache_read + 23 output)
+- Popover показывает: ₽1.63 (14888 "Input" × fresh_rate + 13420 Cache Hits + 23 output)
+- Overcount: **5.6×**
+
+**Задачи:**
+
+**7.5.0 — Добавить `MODEL_CONTEXT_WINDOW` константу (SSOT для circle-индикатора):**
+- [x] `lib/ai/providers.ts`:
+  ```ts
+  /** Context window size per model (tokens). Source: Anthropic official docs (claude.com/docs/about-claude/pricing). */
+  export const MODEL_CONTEXT_WINDOW: Record<string, number> = {
+    // Claude 4.6 family — 1M native (no beta flag, flat pricing across full window)
+    "claude-sonnet-4-6":          1_000_000,
+    "claude-sonnet":              1_000_000,
+    "claude-opus-4-6":            1_000_000,
+    "claude-opus":                1_000_000,
+    // Haiku 4.5 — 200K
+    "claude-haiku-4-5-20251001":  200_000,
+    "claude-haiku":               200_000,
+    // Legacy (fallback)
+    "claude-sonnet-4-5-20250929": 200_000,
+  };
+
+  export function getContextWindow(modelId: string): number {
+    return MODEL_CONTEXT_WINDOW[modelId] ?? 200_000; // Safe default
+  }
+  ```
+- [x] Убрать зависимость от tokenlens `usage.context.totalMax` — использовать `getContextWindow(modelId)`
+
+**7.5.1 — Расширить контракт `AppUsage`:**
+- [x] `lib/usage.ts` — убрать зависимость от `UsageData` из tokenlens, определить собственный тип:
+  ```ts
+  export type AppUsage = LanguageModelUsage & {
+    modelId?: string;
+    // Disjoint token breakdown (TOKENS1 contract):
+    noCacheInputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    outputTokens: number;
+    reasoningTokens: number;
+    // Cost in RUB (SSOT from calculateCostRub):
+    costRub: {
+      freshInputRub: number;
+      cacheReadRub: number;
+      cacheWriteRub: number;
+      outputRub: number;
+      reasoningRub: number;
+      totalRub: number;
+    };
+    // Context window (для circle-индикатора):
+    contextWindow?: {
+      used: number;
+      max: number;
+    };
+  };
+  ```
+
+**7.5.2 — Обновить `chat/route.ts` (и если нужно — service-chat, task-chat):**
+- [x] `app/(chat)/api/chat/route.ts:737-744` — убрать вызов `getUsage(tokenlens)`, собирать `AppUsage` через:
+  - `extractUsageForPricing(usage)` → disjoint tokens
+  - `calculateCostRub(modelId, pricingUsage)` → totalRub
+  - Отдельный helper `calculateCostBreakdownRub(modelId, pricingUsage)` → per-component breakdown (нужно добавить в `providers.ts`)
+  - Context window max → из `MODEL_CONTEXT_WINDOW` константы (проверить/создать в providers.ts)
+- [x] Убедиться что `finalMergedUsage` отправляется через `data-usage` с новым типом
+- [ ] Проверить все `dataStream.write({ type: "data-usage", ... })` в route.ts (5 мест) — унифицировать
+
+**7.5.3 — Добавить breakdown helper в `providers.ts`:**
+- [ ] `lib/ai/providers.ts` → `calculateCostBreakdownRub(modelId, usage: TokenUsageForPricing)`:
+  ```ts
+  export type CostBreakdownRub = {
+    freshInputRub: number;
+    cacheReadRub: number;
+    cacheWriteRub: number;
+    outputRub: number;
+    reasoningRub: number;
+    totalRub: number;
+  };
+  ```
+  Использует тот же `MODEL_PRICING_RUB`, что и `calculateCostRub` — просто возвращает компоненты вместо суммы.
+
+**7.5.4 — Переписать `Context` popover:**
+- [x] `components/elements/context.tsx`:
+  - [ ] Убрать импорт `UsageData` из tokenlens
+  - [ ] Убрать inline расчёт `parseFloat(costText) × RUB_PER_USD` — читать `costRub.*Rub` напрямую
+  - [ ] Строки breakdown (условные, если >0):
+    - "Fresh input" — `noCacheInputTokens` + `freshInputRub`
+    - "Cache read" — `cacheReadTokens` + `cacheReadRub` (зелёная иконка/текст — скидка)
+    - "Cache write" — `cacheWriteTokens` + `cacheWriteRub` (жёлтая — надбавка)
+    - "Output" — `outputTokens` + `outputRub`
+    - "Reasoning" — `reasoningTokens` + `reasoningRub` (если >0)
+  - [ ] "Total cost" — `costRub.totalRub` (прямо из SSOT)
+  - [ ] Circle-индикатор: `contextWindow.used / contextWindow.max` — **per-message** (последний запрос, показывает заполнение окна)
+  - [ ] Заголовок popover: "За эту сессию" (для breakdown'а) и "Контекст след. запроса: X / Y" (для circle)
+
+**7.5.5 — Кумулятивный аккумулятор в `chat.tsx`:**
+- [x] `components/chat.tsx:228-229` — вместо `setUsage(dataPart.data)` реализовать аккумуляцию:
+  ```ts
+  if (dataPart.type === "data-usage") {
+    const incoming = dataPart.data as AppUsage;
+    setUsage(prev => mergeAppUsage(prev, incoming));
+  }
+  ```
+- [ ] `lib/usage.ts` → helper `mergeAppUsage(prev, incoming): AppUsage`:
+  - Суммирует все disjoint tokens
+  - Суммирует все costRub компоненты
+  - `contextWindow` берёт из **incoming** (последнее сообщение — актуальное заполнение)
+  - `modelId` берёт из incoming (последняя использованная модель)
+- [x] `initialLastContext` (из server render) — оставить семантику: это начальная точка для аккумулятора (при открытии существующего чата из БД). Проверить что бэкенд может отдать накопленный usage для сохранённого чата (опционально — отдельная задача, может быть deferred).
+
+**7.5.6 — Проверить остальные callsites:**
+- [x] `grep -rn "getUsage\b" lib/ app/` — `tokenlens/helpers.getUsage` больше не импортируется
+- [x] `lib/ai/tokenlens-catalog.ts` — удалён `export { getUsage } from "tokenlens/helpers"` и сам import
+- [x] `UsageData` из tokenlens больше не используется в `lib/usage.ts` (новый self-contained `AppUsage`)
+- [x] **Бонус:** `extractUsageForPricing` перенесён из `usage-utils.ts` (server-only) в `providers.ts` (client-safe) — теперь один SSOT, доступен и клиенту, и серверу
+
+**7.5.7 — Валидация:**
+- [x] `npx tsc --noEmit` → 0 ошибок
+- [x] `npm run build` → успешен (clean build 12.2s)
+- [ ] Ручной тест: отправить 3 сообщения в чат Haiku
+  - Circle показывает заполнение окна (% от 200k)
+  - Popover → "Fresh input", "Cache read" (>0 после msg #2), "Cache write" (>0 после msg #1), "Output", "Total cost"
+  - **Total cost == сумма ₽ из footer'ов всех 3 ответов** (критерий корректности аккумулятора)
+  - **Per-component ₽ совпадают с DevPanel breakdown** (критерий корректности pricing)
+- [ ] Ручной тест: открыть сохранённый чат (reload страницы) → проверить что аккумулятор стартует с initialLastContext (либо с нуля — если initialLastContext = last-message)
+
+**Файлы:**
+- `lib/usage.ts` — новый контракт `AppUsage`, helper `mergeAppUsage`
+- `lib/ai/providers.ts` — новый `calculateCostBreakdownRub` + `CostBreakdownRub` тип
+- `lib/ai/tokenlens-catalog.ts` — удалить `export { getUsage }`
+- `app/(chat)/api/chat/route.ts` — собирать `AppUsage` через TOKENS1 helpers, не tokenlens
+- `app/(chat)/api/service-chat/route.ts` — проверить, аналогично
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — проверить, аналогично
+- `components/elements/context.tsx` — переписать popover
+- `components/chat.tsx` — аккумулятор usage
+- `components/multimodal-input.tsx` — проверить пробрасывание usage (без изменений контракта, но типизация)
+
+**Валидация этапа:**
+- [x] `npx tsc --noEmit` → 0 ошибок
+- [x] `npm run build` → успешен
+- [ ] Ручной тест пройден (Total в popover === сумма footer'ов)
+- [ ] Git commit: `fix(tz-tokens1): rewrite Context popover — disjoint breakdown + session cumulative`
+
+🧪 **Мануальный тест (обязательный):**
+1. Открой пустой чат Haiku
+2. Отправь "Привет" → запомни ₽ из footer'а
+3. Отправь ещё 2 сообщения → запомни ₽ каждого
+4. Открой popover (клик на круг у input)
+5. **Проверь: Total cost == сумма трёх ₽ из footer'ов** (±₽0.01 из-за округлений)
+6. **Проверь: Cache read ≠ Cache read × 10** (что не путается с Input)
+7. Перезагрузи страницу → открой popover → проверь состояние аккумулятора
+
+⛔ **СТОП — дождаться подтверждения пользователя.**
+
+**Критерий готовности:** User-facing popover показывает **реальную, правильную, кумулятивную** стоимость. Никаких legacy путей расчёта в проде. Tokens1-контракт применяется **везде**.
+
+---
+
 ### Этап 8: Валидация (7 типов чатов × 3 запроса)
 
 **Статус:** ⬜ Не начат
@@ -438,6 +608,13 @@
 **Cost Audit Dashboard (Этап 7):**
 - `app/(dashboard)/admin/cost-audit/page.tsx`
 - `lib/db/queries.ts` (getCostByModel, возможно новые breakdown queries)
+
+**Context popover (Этап 7.5):**
+- `lib/usage.ts` — новый AppUsage контракт + mergeAppUsage
+- `lib/ai/providers.ts` — calculateCostBreakdownRub
+- `lib/ai/tokenlens-catalog.ts` — удалить export { getUsage }
+- `components/elements/context.tsx` — переписать popover
+- `components/chat.tsx` — кумулятивный аккумулятор usage
 
 **Документация:**
 - `docs/decisions/030-sdk-native-usage-tracking.md` — новый

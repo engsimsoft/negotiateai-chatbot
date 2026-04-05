@@ -9,7 +9,7 @@ import {
   streamText,
 } from "ai";
 import { z } from "zod";
-import { getTokenlensCatalog, getUsage, calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
+import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
 import { extractUsageFields, extractUsageForPricing, logUsage } from "@/lib/ai/usage-utils";
 import { auth } from "@/app/(auth)/auth";
 import { userEntitlements } from "@/lib/ai/entitlements";
@@ -34,7 +34,7 @@ import { executeProfessorPipeline } from "@/lib/ai/professor-pipeline";
 import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment, isSimplyDevMode } from "@/lib/constants";
 import { createStepTracker, type GuardianFlags } from "@/lib/ai/tool-call-guardian";
-import { calculateCostRub } from "@/lib/ai/providers";
+import { calculateCostRub, RUB_PER_USD } from "@/lib/ai/providers";
 import {
   emitDebugStep,
   emitDebugGuardian,
@@ -66,7 +66,7 @@ import {
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
-import type { AppUsage } from "@/lib/usage";
+import { buildAppUsage, type AppUsage } from "@/lib/usage";
 import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages } from "@/lib/utils";
 // ТЗ-07A: generateTitleFromUserMessage больше не используется здесь
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
@@ -588,8 +588,7 @@ export async function POST(request: Request) {
         // ТЗ-DEV1: Debug step tracking state
         let debugStepIndex = 0;
         const debugStepDataQueue: DebugStepData[] = [];
-        // SSOT: prefetch TokenLens catalog for per-step cost calculation
-        const tlProviders = isSimplyDevMode ? await getTokenlensCatalog() : undefined;
+        // TOKENS1 Этап 7.5: cost uses hardcoded MODEL_PRICING_RUB (SSOT), no TokenLens catalog needed.
 
         // ТЗ-03 Фаза 7: Professor Pipeline Mode
         if (isProfessorMode) {
@@ -687,7 +686,7 @@ export async function POST(request: Request) {
                 outputTokens: stepUsage.outputTokens,
                 reasoningTokens: stepUsage.reasoningTokens ?? 0,
                 finishReason: finishReason || "unknown",
-                stepCostRub: calcStepCostRub(stepModelId, stepUsage, tlProviders),
+                stepCostRub: calcStepCostRub(stepModelId, stepUsage),
                 toolCalls: (toolCalls ?? []).map((tc: any) => ({
                   toolName: tc.toolName,
                   args: (tc.input ?? tc.args) as Record<string, unknown>,
@@ -709,38 +708,32 @@ export async function POST(request: Request) {
             console.log(
               `[Performance] Chat ${id}: TTFT = ${firstTokenTime}ms, Total = ${totalTime}ms`
             );
+            // ТЗ-TOKENS1 Этап 7.5: build AppUsage via SSOT (calculateCostBreakdownRub),
+            // no more tokenlens additive-formula cost (was overcounting cache tokens 5×).
             let resolvedModelId: string | undefined;
             let costUsd: number | null = null;
             try {
-              const providers = await getTokenlensCatalog();
               const chatModelId = getModelForChatMode(chatMode);
-              resolvedModelId =
-                myProvider.languageModel(chatModelId).modelId;
-              if (!resolvedModelId) {
-                finalMergedUsage = usage;
-                dataStream.write({
-                  type: "data-usage",
-                  data: finalMergedUsage,
-                });
-                return;
-              }
+              resolvedModelId = myProvider.languageModel(chatModelId).modelId;
+              const effectiveModelId =
+                resolvedModelId ?? (isProjectChat ? `project:${tier}` : chatMode);
 
-              if (!providers) {
-                finalMergedUsage = usage;
-                dataStream.write({
-                  type: "data-usage",
-                  data: finalMergedUsage,
-                });
-                return;
-              }
-
-              const summary = getUsage({ modelId: resolvedModelId, usage, providers });
-              costUsd = summary?.costUSD?.totalUSD ?? null;
-              finalMergedUsage = { ...usage, ...summary, modelId: resolvedModelId } as AppUsage;
+              finalMergedUsage = buildAppUsage(effectiveModelId, usage);
+              // costUsd for DB audit (AiUsageLog) — derived from costRub / RUB_PER_USD
+              costUsd =
+                finalMergedUsage.costRub.totalRub > 0
+                  ? Math.round(
+                      (finalMergedUsage.costRub.totalRub / RUB_PER_USD) * 1_000_000,
+                    ) / 1_000_000
+                  : null;
               dataStream.write({ type: "data-usage", data: finalMergedUsage });
             } catch (err) {
-              console.warn("TokenLens enrichment failed", err);
-              finalMergedUsage = usage;
+              console.warn("AppUsage build failed", err);
+              // Never break the stream — emit a minimal placeholder so client
+              // state doesn't get stuck waiting.
+              const fallbackModelId =
+                resolvedModelId ?? (isProjectChat ? `project:${tier}` : chatMode);
+              finalMergedUsage = buildAppUsage(fallbackModelId, usage);
               dataStream.write({ type: "data-usage", data: finalMergedUsage });
             }
 

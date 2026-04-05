@@ -1,4 +1,5 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
+import type { LanguageModelUsage } from "ai";
 import { customProvider } from "ai";
 import { isTestEnvironment } from "../constants";
 
@@ -66,6 +67,42 @@ export function getClaudeModel(name: "haiku" | "sonnet" | "opus") {
 export { RUB_PER_USD } from "@/lib/constants/pricing";
 
 // ---------------------------------------------------------------------------
+// Model context windows (tokens)
+// Source: Anthropic official docs — claude.com/docs/en/about-claude/models/overview
+// (verified April 2026). SSOT for context-usage UI indicators.
+// ---------------------------------------------------------------------------
+
+/**
+ * Context window size per model, in tokens.
+ *
+ * Claude 4.6 family (Sonnet/Opus): 1M native — no beta flag, flat pricing
+ * across the full window (a 900k-token request is billed at the same
+ * per-token rate as a 9k-token request).
+ *
+ * Haiku 4.5: 200K.
+ */
+export const MODEL_CONTEXT_WINDOW: Record<string, number> = {
+  // Claude 4.6 — 1M native
+  "claude-sonnet-4-6":           1_000_000,
+  "claude-sonnet":               1_000_000,
+  "claude-opus-4-6":             1_000_000,
+  "claude-opus":                 1_000_000,
+  // Haiku 4.5 — 200K
+  "claude-haiku-4-5-20251001":   200_000,
+  "claude-haiku":                200_000,
+  // Legacy (fallback)
+  "claude-sonnet-4-5-20250929":  200_000,
+  // Gemini (for completeness — used in vision-ocr, briefing)
+  "gemini-2.0-flash":            1_000_000,
+  "gemini-2.5-flash":            1_000_000,
+};
+
+/** Returns context window size for a model. Defaults to 200K if unknown. */
+export function getContextWindow(modelId: string): number {
+  return MODEL_CONTEXT_WINDOW[modelId] ?? 200_000;
+}
+
+// ---------------------------------------------------------------------------
 // Model Pricing (RUB per 1K tokens — fallback when TokenLens unavailable)
 // Primary source of truth: TokenLens (fetches live prices from API).
 // This hardcoded table is used as fallback and for pipeline traces.
@@ -124,6 +161,53 @@ export interface TokenUsageForPricing {
 }
 
 /**
+ * Extract a disjoint TokenUsageForPricing from an AI SDK v6 usage object.
+ *
+ * Reads native `inputTokenDetails.{noCacheTokens,cacheReadTokens,cacheWriteTokens}`
+ * and `outputTokenDetails.reasoningTokens`. All fields are disjoint — pass the
+ * result directly to `calculateCostRub` / `calculateCostBreakdownRub`.
+ *
+ * Fallback for `noCacheInputTokens` when `noCacheTokens` is missing:
+ * derive from `inputTokens - cacheReadTokens - cacheWriteTokens`.
+ *
+ * Client-safe (pure function) — usable in both server routes and client
+ * components.
+ */
+export function extractUsageForPricing(
+  usage: LanguageModelUsage | undefined | null,
+): TokenUsageForPricing {
+  if (!usage) {
+    return {
+      noCacheInputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      outputTokens: 0,
+      reasoningTokens: 0,
+    };
+  }
+
+  const details = usage.inputTokenDetails;
+  const cacheReadTokens = details?.cacheReadTokens ?? 0;
+  const cacheWriteTokens = details?.cacheWriteTokens ?? 0;
+  const noCacheFromSdk = details?.noCacheTokens;
+  const noCacheInputTokens =
+    noCacheFromSdk != null
+      ? noCacheFromSdk
+      : Math.max(
+          0,
+          (usage.inputTokens ?? 0) - cacheReadTokens - cacheWriteTokens,
+        );
+
+  return {
+    noCacheInputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    outputTokens: usage.outputTokens ?? 0,
+    reasoningTokens: usage.outputTokenDetails?.reasoningTokens ?? 0,
+  };
+}
+
+/**
  * Calculate cost in RUB using Anthropic billing model:
  * - fresh input tokens:   billed at input rate (1×)
  * - cache_read tokens:    billed at cached rate (0.1× input)
@@ -148,6 +232,66 @@ export function calculateCostRub(
   const outputCost     = (effectiveOutput          / 1000) * pricing.output;
 
   return Math.round((inputCost + cacheReadCost + cacheWriteCost + outputCost) * 100) / 100;
+}
+
+/**
+ * Per-component cost breakdown in RUB. Same formula as `calculateCostRub`,
+ * but returns each component separately instead of the sum — used by the
+ * user-facing Context popover to show where cost comes from.
+ *
+ * All values are RUB (rounded to 2 decimals).
+ * `totalRub` === `calculateCostRub(modelId, usage)`.
+ */
+export interface CostBreakdownRub {
+  freshInputRub: number;
+  cacheReadRub: number;
+  cacheWriteRub: number;
+  outputRub: number;
+  reasoningRub: number;
+  totalRub: number;
+}
+
+export function calculateCostBreakdownRub(
+  modelId: string,
+  usage: TokenUsageForPricing,
+): CostBreakdownRub {
+  const pricing = MODEL_PRICING_RUB[modelId];
+  if (!pricing) {
+    return {
+      freshInputRub: 0,
+      cacheReadRub: 0,
+      cacheWriteRub: 0,
+      outputRub: 0,
+      reasoningRub: 0,
+      totalRub: 0,
+    };
+  }
+
+  const reasoningTokens = usage.reasoningTokens ?? 0;
+
+  const freshInputRub  = round2((usage.noCacheInputTokens / 1000) * pricing.input);
+  const cacheReadRub   = round2((usage.cacheReadTokens    / 1000) * pricing.cached);
+  const cacheWriteRub  = round2((usage.cacheWriteTokens   / 1000) * pricing.cacheWrite);
+  const outputRub      = round2((usage.outputTokens       / 1000) * pricing.output);
+  // Anthropic treats extended thinking tokens as output (same rate)
+  const reasoningRub   = round2((reasoningTokens          / 1000) * pricing.output);
+
+  const totalRub = round2(
+    freshInputRub + cacheReadRub + cacheWriteRub + outputRub + reasoningRub,
+  );
+
+  return {
+    freshInputRub,
+    cacheReadRub,
+    cacheWriteRub,
+    outputRub,
+    reasoningRub,
+    totalRub,
+  };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 // ---------------------------------------------------------------------------

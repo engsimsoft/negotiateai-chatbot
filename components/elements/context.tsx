@@ -10,16 +10,12 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
-import { RUB_PER_USD } from "@/lib/constants/pricing";
 
 export type ContextProps = ComponentProps<"button"> & {
-  /** Optional full usage payload to enable breakdown view */
+  /** Cumulative session usage — summed across all messages in this chat. */
   usage?: AppUsage;
 };
 
-const _THOUSAND = 1000;
-const _MILLION = 1_000_000;
-const _BILLION = 1_000_000_000;
 const PERCENT_MAX = 100;
 
 // Lucide CircleIcon geometry
@@ -72,45 +68,56 @@ export const ContextIcon = ({ percent }: ContextIconProps) => {
   );
 };
 
+function formatRub(rub: number): string {
+  if (rub <= 0) return "—";
+  if (rub < 0.01) return "< ₽0.01";
+  return `₽${rub.toFixed(2)}`;
+}
+
 function InfoRow({
   label,
   tokens,
-  costText,
+  rub,
+  accent,
 }: {
   label: string;
-  tokens?: number;
-  costText?: string;
+  tokens: number;
+  rub: number;
+  /** Optional color accent: "discount" (green) for cache_read, "premium" (amber) for cache_write. */
+  accent?: "discount" | "premium";
 }) {
   return (
     <div className="flex items-center justify-between text-xs">
-      <span className="text-muted-foreground">{label}</span>
+      <span
+        className={cn(
+          "text-muted-foreground",
+          accent === "discount" && "text-emerald-600 dark:text-emerald-400",
+          accent === "premium" && "text-amber-600 dark:text-amber-400",
+        )}
+      >
+        {label}
+      </span>
       <div className="flex items-center gap-2 font-mono">
-        <span className="min-w-[4ch] text-right">
-          {tokens === undefined ? "—" : tokens.toLocaleString()}
+        <span className="min-w-[4ch] text-right">{tokens.toLocaleString()}</span>
+        <span className="text-muted-foreground min-w-[5ch] text-right">
+          {formatRub(rub)}
         </span>
-        {costText !== undefined &&
-          costText !== null &&
-          !Number.isNaN(Number.parseFloat(costText)) && (
-            <span className="text-muted-foreground">
-              {(() => {
-                const rub = Number.parseFloat(costText) * RUB_PER_USD;
-                return rub < 0.01 ? "< ₽0.01" : `₽${rub.toFixed(2)}`;
-              })()}
-            </span>
-          )}
       </div>
     </div>
   );
 }
 
 export const Context = ({ className, usage, ...props }: ContextProps) => {
-  const used = usage?.totalTokens ?? 0;
-  const max =
-    usage?.context?.totalMax ??
-    usage?.context?.combinedMax ??
-    usage?.context?.inputMax;
-  const hasMax = typeof max === "number" && Number.isFinite(max) && max > 0;
-  const usedPercent = hasMax ? Math.min(100, (used / max) * 100) : 0;
+  const contextUsed = usage?.contextWindow.used ?? 0;
+  const contextMax = usage?.contextWindow.max ?? 0;
+  const hasMax = contextMax > 0;
+  const usedPercent = hasMax
+    ? Math.min(100, (contextUsed / contextMax) * 100)
+    : 0;
+
+  const cost = usage?.costRub;
+  const totalRub = cost?.totalRub ?? 0;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -118,75 +125,85 @@ export const Context = ({ className, usage, ...props }: ContextProps) => {
           className={cn(
             "inline-flex select-none items-center gap-1 rounded-md text-sm",
             "cursor-pointer bg-background text-foreground",
-            className
+            className,
           )}
           type="button"
           {...props}
         >
-          <span className="hidden font-medium text-muted-foreground">
-            {usedPercent.toFixed(1)}%
-          </span>
           <ContextIcon percent={usedPercent} />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-fit p-3" side="top">
-        <div className="min-w-[240px] space-y-2">
-          <div className="flex items-start justify-between text-sm">
-            <span>{usedPercent.toFixed(1)}%</span>
-            <span className="text-muted-foreground">
-              {hasMax ? `${used} / ${max} tokens` : `${used} tokens`}
-            </span>
-          </div>
-          <div className="space-y-2">
+        <div className="min-w-[260px] space-y-2">
+          {/* Context window (last message fill) */}
+          <div className="space-y-1">
+            <div className="flex items-start justify-between text-sm">
+              <span className="font-medium">Контекст</span>
+              <span className="text-muted-foreground tabular-nums">
+                {hasMax
+                  ? `${contextUsed.toLocaleString()} / ${contextMax.toLocaleString()}`
+                  : `${contextUsed.toLocaleString()} tokens`}
+              </span>
+            </div>
             <Progress className="h-2 bg-muted" value={usedPercent} />
+            <div className="text-[10px] text-muted-foreground text-right">
+              {usedPercent.toFixed(1)}% окна модели ({usage?.modelId ?? "—"})
+            </div>
           </div>
-          <div className="mt-1 space-y-1">
-            {usage?.cachedInputTokens && usage.cachedInputTokens > 0 && (
-              <InfoRow
-                costText={usage?.costUSD?.cacheReadUSD?.toString()}
-                label="Cache Hits"
-                tokens={usage?.cachedInputTokens}
-              />
-            )}
-            <InfoRow
-              costText={usage?.costUSD?.inputUSD?.toString()}
-              label="Input"
-              tokens={usage?.inputTokens}
-            />
-            <InfoRow
-              costText={usage?.costUSD?.outputUSD?.toString()}
-              label="Output"
-              tokens={usage?.outputTokens}
-            />
-            <InfoRow
-              costText={usage?.costUSD?.reasoningUSD?.toString()}
-              label="Reasoning"
-              tokens={
-                usage?.reasoningTokens && usage.reasoningTokens > 0
-                  ? usage.reasoningTokens
-                  : undefined
-              }
-            />
-            {usage?.costUSD?.totalUSD !== undefined && (
-              <>
+
+          {usage && (
+            <>
+              <Separator />
+              {/* Cumulative session cost */}
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-muted-foreground">
+                  Расход за сессию
+                </div>
+                {usage.noCacheInputTokens > 0 && (
+                  <InfoRow
+                    label="Fresh input"
+                    tokens={usage.noCacheInputTokens}
+                    rub={cost?.freshInputRub ?? 0}
+                  />
+                )}
+                {usage.cacheReadTokens > 0 && (
+                  <InfoRow
+                    accent="discount"
+                    label="Cache read"
+                    tokens={usage.cacheReadTokens}
+                    rub={cost?.cacheReadRub ?? 0}
+                  />
+                )}
+                {usage.cacheWriteTokens > 0 && (
+                  <InfoRow
+                    accent="premium"
+                    label="Cache write"
+                    tokens={usage.cacheWriteTokens}
+                    rub={cost?.cacheWriteRub ?? 0}
+                  />
+                )}
+                <InfoRow
+                  label="Output"
+                  tokens={usage.outputTokens}
+                  rub={cost?.outputRub ?? 0}
+                />
+                {usage.reasoningTokens > 0 && (
+                  <InfoRow
+                    label="Reasoning"
+                    tokens={usage.reasoningTokens}
+                    rub={cost?.reasoningRub ?? 0}
+                  />
+                )}
                 <Separator className="mt-1" />
                 <div className="flex items-center justify-between pt-1 text-xs">
-                  <span className="text-muted-foreground">Total cost</span>
-                  <div className="flex items-center gap-2 font-mono">
-                    <span className="min-w-[4ch] text-right" />
-                    <span>
-                      {(() => {
-                        const parsed = Number.parseFloat(usage.costUSD.totalUSD.toString());
-                        if (Number.isNaN(parsed)) return "—";
-                        const rub = parsed * RUB_PER_USD;
-                        return rub < 0.01 ? "< ₽0.01" : `₽${rub.toFixed(2)}`;
-                      })()}
-                    </span>
-                  </div>
+                  <span className="font-medium">Итого</span>
+                  <span className="font-mono font-medium">
+                    {formatRub(totalRub)}
+                  </span>
                 </div>
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

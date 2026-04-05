@@ -9,7 +9,6 @@ import type { LanguageModelUsage } from "ai";
 import { unstable_cache as cache } from "next/cache";
 import type { ModelCatalog } from "tokenlens/core";
 import { fetchModels } from "tokenlens/fetch";
-import { getUsage } from "tokenlens/helpers";
 
 import { RUB_PER_USD } from "@/lib/constants/pricing";
 
@@ -31,11 +30,6 @@ export const getTokenlensCatalog = cache(
   ["tokenlens-catalog"],
   { revalidate: 24 * 60 * 60 }
 );
-
-/**
- * Re-export getUsage for endpoints that need full UsageData (e.g. chat/route.ts)
- */
-export { getUsage } from "tokenlens/helpers";
 
 /**
  * Calculate cost in USD for a given model and usage.

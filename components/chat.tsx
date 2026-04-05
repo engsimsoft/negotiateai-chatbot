@@ -28,7 +28,7 @@ import {
   clientErrorMessages,
 } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
-import type { AppUsage } from "@/lib/usage";
+import { mergeAppUsage, normalizeStoredAppUsage, type AppUsage } from "@/lib/usage";
 import { cn, fetcher, fetchWithErrorHandlers, generateUUID, getChatUrl } from "@/lib/utils";
 import { Artifact } from "./artifact";
 import { DevPanelProvider } from "./dev-panel/dev-panel-provider";
@@ -78,7 +78,12 @@ export function Chat({
   const { setDataStream } = useDataStream();
 
   const [input, setInput] = useState<string>("");
-  const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
+  // ТЗ-TOKENS1 Этап 7.5: cumulative session usage (summed across all messages).
+  // initialLastContext is a snapshot from DB (chat.lastContext); we normalize it
+  // to drop legacy (pre-7.5) shapes that don't have costRub/contextWindow fields.
+  const [usage, setUsage] = useState<AppUsage | undefined>(() =>
+    normalizeStoredAppUsage(initialLastContext),
+  );
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   const currentModelIdRef = useRef(currentModelId);
@@ -226,7 +231,11 @@ export function Chat({
       // Cast dataPart to match expected type
       setDataStream((ds) => (ds ? [...ds, dataPart as typeof ds[number]] : []));
       if (dataPart.type === "data-usage") {
-        setUsage(dataPart.data as AppUsage);
+        // ТЗ-TOKENS1 Этап 7.5: accumulate session usage (sum of all messages),
+        // Context popover shows cumulative cost while circle indicator shows
+        // the last message's context-window fill (contextWindow from incoming).
+        const incoming = dataPart.data as AppUsage;
+        setUsage((prev) => mergeAppUsage(prev, incoming));
       }
 
       // ТЗ-C3: Handle context usage indicator
@@ -417,7 +426,7 @@ export function Chat({
   });
 
   return (
-    <DevPanelProvider chatId={id} messages={messages}>
+    <DevPanelProvider chatId={id} messages={messages} status={status}>
       <div className={cn(
         "overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-background",
         "transition-[margin] duration-200 ease-linear",
