@@ -12,6 +12,51 @@
 
 ---
 
+## [3.65.0] - 2026-04-05 - AiSdkV6Migration
+
+**ТЗ-SDK6**: Миграция AI SDK v5 → v6. Получен нативный `cacheWriteTokens` (ранее был 0). Убраны все `(usage as any)` касты — полностью типизированный usage через `inputTokenDetails`/`outputTokenDetails`.
+
+### Changed
+- `ai` 5.0.123 → 6.0.116
+- `@ai-sdk/anthropic` 2.0.63 → 3.0.58
+- `@ai-sdk/google` 2.0.44 → 3.0.43
+- `@ai-sdk/react` 2.0.105 → 3.0.118
+- `convertToCoreMessages` → `await convertToModelMessages` (3 route-файла, 4 вызова)
+- `CoreMessage` → `ModelMessage` (professor-pipeline.ts)
+- `CoreAssistantMessage` → `AssistantModelMessage`, `CoreToolMessage` → `ToolModelMessage` (lib/utils.ts)
+- `extractUsageFields()` использует нативные v6 поля (`usage.inputTokenDetails.cacheReadTokens`, `cacheWriteTokens`, `usage.outputTokenDetails.reasoningTokens`)
+- 15 inline `(usage as any)` кастов убраны в 3 route-файлах (DevPanel debug events)
+
+### Removed
+- `@openrouter/ai-sdk-provider` (мёртвая зависимость, 0 импортов)
+- `@ai-sdk/gateway` (мёртвая зависимость)
+- `@ai-sdk/openai` (мёртвая зависимость)
+- `@ai-sdk/provider` (мёртвая зависимость)
+- `@ai-sdk/xai` (мёртвая зависимость)
+
+### Added
+- `context-usage` data type в `CustomUIDataTypes` (lib/types.ts) — для строгой типизации v6
+- 3 новых состояния `ToolUIPart`: `approval-requested`, `approval-responded`, `output-denied` (tool.tsx)
+
+### Files
+- package.json
+- lib/ai/usage-utils.ts
+- lib/utils.ts
+- lib/types.ts
+- lib/ai/professor-pipeline.ts
+- app/(chat)/api/chat/route.ts
+- app/(chat)/api/service-chat/route.ts
+- app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts
+- app/(chat)/api/assistant/ben/route.ts
+- components/elements/tool.tsx
+
+### Impact
+- `cacheWriteTokens` теперь заполняется нативно при Anthropic cache write (~25% gap в расчёте стоимости закрыт)
+- Удалено 5 мёртвых зависимостей — чище `package.json`, меньше peer-dependency рисков
+- Ноль `(usage as any)` кастов — полностью типизированный usage
+
+---
+
 ## [3.64.0] - 2026-03-09 - UnifiedCostUI
 
 **ТЗ-CACHE3**: Единый SSOT отображения стоимости. Все UI-компоненты показывают стоимость в рублях через единую цепочку (TokenLens → hardcoded fallback). Исправлен баг DevPanel (не отображался для первого сообщения).

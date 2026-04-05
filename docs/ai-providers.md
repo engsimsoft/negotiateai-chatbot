@@ -34,11 +34,11 @@
 
 | Параметр | Значение |
 |----------|----------|
-| SDK | `@ai-sdk/anthropic@2.0.63` |
+| SDK | `@ai-sdk/anthropic@3.0.58` (обёртка над `ai@6.0.116`) |
 | API Key | `ANTHROPIC_API_KEY` |
 | Документация | https://docs.anthropic.com/ |
 
-> **Важно:** Используем `@ai-sdk/anthropic@2.0.63` (не v3.x), т.к. v3 возвращает `LanguageModelV3`, несовместимый с текущим `ai@5.0.123` (ожидает `LanguageModelV2`).
+> **SDK версии (v3.65.0+):** `ai@6.x` + `@ai-sdk/anthropic@3.x` + `@ai-sdk/google@3.x` + `@ai-sdk/react@3.x`. v6 предоставляет нативные `inputTokenDetails`/`outputTokenDetails` (включая `cacheWriteTokens`).
 
 ### Google AI (vision-ocr + Briefing фильтр + Podcast)
 
