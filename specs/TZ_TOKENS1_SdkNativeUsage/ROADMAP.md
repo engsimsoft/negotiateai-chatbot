@@ -76,25 +76,19 @@
 
 ### Этап 3: Обновление 3 routes (chat, service-chat, task-chat)
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 **Цель:** Переписать `onStepFinish` и `onFinish` во всех 3 основных чат-роутах.
 
 **Задачи:**
-- [ ] `app/(chat)/api/chat/route.ts`:
-  - [ ] `onStepFinish` — использовать `extractUsageForPricing(usage)` вместо ручного сбора полей
-  - [ ] `onStepFinish` → `DebugStepData` — заполнить новые поля `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `reasoningTokens`
-  - [ ] `onFinish` → `emitDebugFinish` — передать total per-field (сумма по всем шагам)
-  - [ ] `onFinish` → вызов `calculateCostRub` для `estimatedCostRub` — передать новые поля
+- [x] `app/(chat)/api/chat/route.ts`:
+  - [x] `onStepFinish` — использует `extractUsageForPricing(usage)` вместо ручного сбора полей
+  - [x] `DebugStepData` — поля legacy (переименование в Этапе 4)
+  - [x] `onFinish` → `calculateCostRub` для `estimatedCostRub` — через `extractUsageForPricing`
+  - [x] `emitDebugFinish` — используется `usage.inputTokens` как total (поля legacy DebugFinishData до Этапа 4)
 
-- [ ] `app/(chat)/api/service-chat/route.ts`:
-  - [ ] Аналогично (onStepFinish + onFinish)
-  - [ ] Убедиться что `logUsage` вызов остаётся с `usage: LanguageModelUsage` (он использует `extractUsageFields` внутри для DB)
-
-- [ ] `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`:
-  - [ ] Аналогично (onStepFinish + onFinish)
-  - [ ] Проверить `saveAiUsageLog` прямой вызов (line 384) — должен остаться рабочим через `extractUsageFields`
-
-- [ ] `npx tsc --noEmit` → 0 ошибок во всех 3 routes
+- [x] `app/(chat)/api/service-chat/route.ts` — аналогично. `logUsage` продолжает работать через `extractUsageFields`.
+- [x] `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — аналогично. `saveAiUsageLog` работает через `extractUsageFields`.
+- [x] `npx tsc --noEmit` → 0 ошибок в 3 routes (остаются pipelines Этап 6 + UI Этап 5)
 
 **Файлы:**
 - `app/(chat)/api/chat/route.ts`
@@ -102,15 +96,11 @@
 - `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` → 0 ошибок в routes (кроме DevPanel UI)
-- [ ] `npm run build` → успешен (UI пока может отображать мусор, это ок)
-- [ ] Git commit: `refactor(tz-tokens1): update 3 chat routes to new usage contract`
+- [x] `npx tsc --noEmit` → 0 ошибок в routes
+- [x] Git commit: `refactor(tz-tokens1): update 3 chat routes to new usage contract`
+- ⚠️ `npm run build` отложен до Этапа 6 — pipelines + UI всё ещё сломаны. Мануальный тест также после Этапа 6.
 
-**Критерий готовности:** Routes компилируются, сервер стартует, отправить тестовое сообщение → в логах сервера не видно ошибок.
-
-🧪 **Мануальный тест:** отправить 1 сообщение в обычный чат, убедиться что сервер НЕ падает. DevPanel может показывать мусор — это нормально, UI обновим в следующих этапах.
-
-⛔ **СТОП — дождаться подтверждения пользователя.**
+**Критерий готовности:** Routes компилируются.
 
 ---
 

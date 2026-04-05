@@ -38,7 +38,7 @@ import {
 import { calcUsagePercent, SNAPSHOT_THRESHOLD, FALLBACK_MESSAGE_PAIRS } from "@/lib/ai/context-limits";
 import { createFallbackSnapshot } from "@/lib/ai/clerks/snapshot-creator";
 import { calcCostUsd, getTokenlensCatalog, calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
-import { extractUsageFields } from "@/lib/ai/usage-utils";
+import { extractUsageFields, extractUsageForPricing } from "@/lib/ai/usage-utils";
 import { createStepTracker } from "@/lib/ai/tool-call-guardian";
 import { ChatSDKError } from "@/lib/errors";
 import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages } from "@/lib/utils";
@@ -337,20 +337,16 @@ export async function POST(
                   ? "tool-result"
                   : "initial";
               const stepModelId = response?.modelId || "unknown";
-              const stepUsage = {
-                inputTokens: usage?.inputTokens ?? 0,
-                outputTokens: usage?.outputTokens ?? 0,
-                cachedInputTokens: usage?.inputTokenDetails?.cacheReadTokens ?? 0,
-                reasoningTokens: usage?.outputTokenDetails?.reasoningTokens ?? 0,
-              };
+              const stepUsage = extractUsageForPricing(usage);
               const stepData: DebugStepData = {
                 stepIndex: debugStepIndex++,
                 stepType: inferredType,
                 modelId: stepModelId,
-                inputTokens: stepUsage.inputTokens,
+                inputTokens: usage?.inputTokens ?? 0,
                 outputTokens: stepUsage.outputTokens,
-                cachedTokens: stepUsage.cachedInputTokens,
-                reasoningTokens: stepUsage.reasoningTokens,
+                cachedTokens: stepUsage.cacheReadTokens,
+                cacheWriteTokens: stepUsage.cacheWriteTokens,
+                reasoningTokens: stepUsage.reasoningTokens ?? 0,
                 finishReason: finishReason || "unknown",
                 stepCostRub: calcStepCostRub(stepModelId, stepUsage, tlProviders),
                 toolCalls: (toolCalls ?? []).map((tc: any) => ({
@@ -399,11 +395,7 @@ export async function POST(
               totalSteps: debugStepDataQueue.length,
               totalDurationMs: totalTime,
               timeToFirstTokenMs: firstTokenTime ?? totalTime,
-              estimatedCostRub: calculateCostRub(resolvedModelId, {
-                inputTokens: usage.inputTokens ?? 0,
-                outputTokens: usage.outputTokens ?? 0,
-                cachedInputTokens: usage?.inputTokenDetails?.cacheReadTokens ?? 0,
-              }),
+              estimatedCostRub: calculateCostRub(resolvedModelId, extractUsageForPricing(usage)),
               modelId: resolvedModelId,
               finishReason: "stop",
             });

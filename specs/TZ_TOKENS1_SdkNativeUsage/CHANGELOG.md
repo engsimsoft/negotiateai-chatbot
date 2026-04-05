@@ -67,3 +67,17 @@ lib/ai/tokenlens-catalog.ts:91 — same
 - 6 в routes (Этап 3): `app/(chat)/api/{chat,service-chat,projects/.../chat}/route.ts`
 - 10 в pipelines (Этап 6): `lib/briefing/*.ts`, `lib/podcast/script-generator.ts`
 - 2 в UI (Этап 5): `components/dev-panel/pipeline-trace-drawer.tsx`
+
+### Этап 3: Обновление 3 routes ✅
+
+**Files modified:**
+- `app/(chat)/api/chat/route.ts`:
+  - `onStepFinish` — `stepUsage` построен через `extractUsageForPricing(usage)`, передан в `calcStepCostRub`
+  - DebugStepData заполняется legacy-полями (`inputTokens` = total, `cachedTokens` = cacheRead) — переименование в Этапе 4
+  - `onFinish` → `calculateCostRub(..., extractUsageForPricing(usage))`
+- `app/(chat)/api/service-chat/route.ts` — аналогично
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — аналогично
+
+**TSC state:** 3 routes — 0 ошибок ✅. Остаётся 12 ошибок (pipelines Этап 6, UI Этап 5).
+
+**Решение:** `npm run build` + мануальный тест перенесены на конец Этапа 6 (нельзя собрать с битыми pipelines).

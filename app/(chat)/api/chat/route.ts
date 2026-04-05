@@ -10,7 +10,7 @@ import {
 } from "ai";
 import { z } from "zod";
 import { getTokenlensCatalog, getUsage, calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
-import { extractUsageFields, logUsage } from "@/lib/ai/usage-utils";
+import { extractUsageFields, extractUsageForPricing, logUsage } from "@/lib/ai/usage-utils";
 import { auth } from "@/app/(auth)/auth";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import { getModelForChatMode } from "@/lib/ai/chat-mode-config";
@@ -674,20 +674,16 @@ export async function POST(request: Request) {
                   ? "tool-result"
                   : "initial";
               const stepModelId = response?.modelId || "unknown";
-              const stepUsage = {
-                inputTokens: usage?.inputTokens ?? 0,
-                outputTokens: usage?.outputTokens ?? 0,
-                cachedInputTokens: usage?.inputTokenDetails?.cacheReadTokens ?? 0,
-                reasoningTokens: usage?.outputTokenDetails?.reasoningTokens ?? 0,
-              };
+              const stepUsage = extractUsageForPricing(usage);
               const stepData: DebugStepData = {
                 stepIndex: debugStepIndex++,
                 stepType: inferredType,
                 modelId: stepModelId,
-                inputTokens: stepUsage.inputTokens,
+                inputTokens: usage?.inputTokens ?? 0,
                 outputTokens: stepUsage.outputTokens,
-                cachedTokens: stepUsage.cachedInputTokens,
-                reasoningTokens: stepUsage.reasoningTokens,
+                cachedTokens: stepUsage.cacheReadTokens,
+                cacheWriteTokens: stepUsage.cacheWriteTokens,
+                reasoningTokens: stepUsage.reasoningTokens ?? 0,
                 finishReason: finishReason || "unknown",
                 stepCostRub: calcStepCostRub(stepModelId, stepUsage, tlProviders),
                 toolCalls: (toolCalls ?? []).map((tc: any) => ({
@@ -769,11 +765,7 @@ export async function POST(request: Request) {
               timeToFirstTokenMs: firstTokenTime ?? totalTime,
               estimatedCostRub: calculateCostRub(
                 resolvedModelId || logModelId,
-                {
-                  inputTokens: usage.inputTokens ?? 0,
-                  outputTokens: usage.outputTokens ?? 0,
-                  cachedInputTokens: usage?.inputTokenDetails?.cacheReadTokens ?? 0,
-                },
+                extractUsageForPricing(usage),
               ),
               modelId: resolvedModelId || logModelId,
               finishReason: "stop",
