@@ -2,8 +2,8 @@
  * Usage Logging Utilities — ТЗ-CACHE2
  *
  * Centralized extraction of AI SDK usage fields and preparation
- * of saveAiUsageLog parameters. Replaces scattered (usage as any)
- * casts across the codebase.
+ * of saveAiUsageLog parameters. Uses AI SDK v6 native
+ * inputTokenDetails/outputTokenDetails types.
  */
 
 import type { LanguageModelUsage } from "ai";
@@ -39,15 +39,10 @@ export interface LogUsageInput {
 // ---------------------------------------------------------------------------
 
 /**
- * Extract all available token fields from an AI SDK usage object.
+ * Extract all available token fields from an AI SDK v6 usage object.
  *
- * AI SDK v5 exposes `cachedInputTokens` and `reasoningTokens` on the usage
- * object at runtime, but they are not part of the LanguageModelUsage
- * TypeScript type — hence the `as any` casts.
- *
- * `cacheWriteTokens` (Anthropic `cache_creation_input_tokens`) is NOT
- * available in AI SDK v5's flat usage structure.
- * TODO: Check availability after AI SDK v6 migration.
+ * AI SDK v6 provides structured `inputTokenDetails` and `outputTokenDetails`
+ * with native types for cached, cacheWrite, and reasoning tokens.
  */
 export function extractUsageFields(
   usage: LanguageModelUsage | undefined | null,
@@ -62,18 +57,12 @@ export function extractUsageFields(
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const u = usage as any;
-
   return {
     inputTokens: usage.inputTokens ?? 0,
     outputTokens: usage.outputTokens ?? 0,
-    cacheReadTokens: u?.cachedInputTokens ?? 0,
-    // AI SDK v5 does not expose cache_creation_input_tokens.
-    // Try known possible field names, default to 0.
-    cacheWriteTokens:
-      u?.cacheCreationInputTokens ?? u?.cacheWriteInputTokens ?? 0,
-    thinkingTokens: u?.reasoningTokens ?? 0,
+    cacheReadTokens: usage.inputTokenDetails?.cacheReadTokens ?? 0,
+    cacheWriteTokens: usage.inputTokenDetails?.cacheWriteTokens ?? 0,
+    thinkingTokens: usage.outputTokenDetails?.reasoningTokens ?? 0,
   };
 }
 

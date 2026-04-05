@@ -677,8 +677,8 @@ export async function POST(request: Request) {
               const stepUsage = {
                 inputTokens: usage?.inputTokens ?? 0,
                 outputTokens: usage?.outputTokens ?? 0,
-                cachedInputTokens: (usage as any)?.cachedInputTokens ?? 0,
-                reasoningTokens: (usage as any)?.reasoningTokens ?? 0,
+                cachedInputTokens: usage?.inputTokenDetails?.cacheReadTokens ?? 0,
+                reasoningTokens: usage?.outputTokenDetails?.reasoningTokens ?? 0,
               };
               const stepData: DebugStepData = {
                 stepIndex: debugStepIndex++,
@@ -762,8 +762,8 @@ export async function POST(request: Request) {
             emitDebugFinish(dataStream, {
               totalInputTokens: usage.inputTokens ?? 0,
               totalOutputTokens: usage.outputTokens ?? 0,
-              totalCachedTokens: (usage as any).cachedInputTokens ?? 0,
-              totalReasoningTokens: (usage as any).reasoningTokens ?? 0,
+              totalCachedTokens: usage?.inputTokenDetails?.cacheReadTokens ?? 0,
+              totalReasoningTokens: usage?.outputTokenDetails?.reasoningTokens ?? 0,
               totalSteps: debugStepDataQueue.length,
               totalDurationMs: totalTime,
               timeToFirstTokenMs: firstTokenTime ?? totalTime,
@@ -772,7 +772,7 @@ export async function POST(request: Request) {
                 {
                   inputTokens: usage.inputTokens ?? 0,
                   outputTokens: usage.outputTokens ?? 0,
-                  cachedInputTokens: (usage as any).cachedInputTokens ?? 0,
+                  cachedInputTokens: usage?.inputTokenDetails?.cacheReadTokens ?? 0,
                 },
               ),
               modelId: resolvedModelId || logModelId,
