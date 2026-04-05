@@ -12,6 +12,39 @@
 
 ---
 
+## [3.66.0] - 2026-04-05 - BriefingCostControl
+
+**ТЗ-COSTCTRL**: Устранение 4 дефектов briefing/podcast cron подсистемы — delivery invariants, fail-fast pipeline, guaranteed cost logging, 100% cost coverage.
+
+### Added
+- `lib/briefing/delivery-service.ts` — единая точка изменения `deliveryEnabled`, enforced invariant (требует активный Telegram)
+- `lib/db/schema.ts` — новая таблица `CronRunLog` (forensics каждого cron run)
+- `lib/db/queries.ts` — `saveCronRunLog()`, `getInvalidDeliveryStateUsers()`, `getLastCronRuns()`, `getCostByPeriod()`, `getCostByModel()`, `getCostByChatMode()`, `getNullCostRecords()`
+- `app/api/admin/cost-audit/route.ts` — JSON API endpoint для программного доступа (gated by dev mode)
+- `app/(dashboard)/admin/cost-audit/page.tsx` — Admin cost dashboard: period selector (24ч/7д/30д/3м/12м), cost by model/chatMode/period, null cost breakdown, cron history
+- `scripts/phase0-disable-invalid-delivery.ts` — emergency repair script (использован однократно)
+- `lib/ai/providers.ts` — `calculateDeepgramCostUsd()`, `calculateGeminiTtsCostUsd()`, `sonar-deep-research` pricing
+- `lib/ai/usage-utils.ts` — `costUsdOverride` в `LogUsageInput` для non-token провайдеров
+
+### Changed
+- `app/(chat)/api/briefing/delivery/route.ts` — PATCH использует delivery-service, возвращает 409 при invariant violation
+- `app/(chat)/api/telegram/link/route.ts` — DELETE cascade: `disableDeliveryOnTelegramDisconnect()`
+- `components/briefing/briefing-delivery-settings.tsx` — escape hatch (выключить можно всегда), tooltip при попытке включить без Telegram, 409 handling
+- `lib/db/queries.ts` — `getUsersForDelivery()` INNER JOIN на активный TelegramConnection
+- `app/api/cron/briefing/route.ts` — pre-flight check перед AI pipeline + auto-repair + `await saveCronRunLog()`
+- `lib/briefing/briefing-author.ts`, `briefing-filter.ts`, `briefing-section-author.ts` — `waitUntil(logUsage(...))`
+- `lib/podcast/script-generator.ts`, `tts-gemini.ts` — `waitUntil(logUsage(...))` + `costUsdOverride`
+- `lib/meeting/deepgram-transcribe.ts` — `costUsdOverride: calculateDeepgramCostUsd(duration)`
+- `lib/ai/tokenlens-catalog.ts` — `calcCostUsd()` fallback chain: TokenLens → MODEL_PRICING_RUB → null
+
+### Fixed
+- Money leak: cron запускал AI-pipeline для юзеров без активного Telegram
+- `logUsage` был fire-and-forget без `waitUntil` → записи терялись на Vercel serverless
+- `costUsd` был NULL для Deepgram и Gemini TTS (non-token pricing)
+- Mouse-trap: switch доставки нельзя было выключить если Telegram отключился
+
+---
+
 ## [3.65.0] - 2026-04-05 - AiSdkV6Migration
 
 **ТЗ-SDK6**: Миграция AI SDK v5 → v6. Получен нативный `cacheWriteTokens` (ранее был 0). Убраны все `(usage as any)` касты — полностью типизированный usage через `inputTokenDetails`/`outputTokenDetails`.

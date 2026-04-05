@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.65.0
+**Версия:** 3.66.0
 **Дата:** 2026-04-05
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -1545,6 +1545,7 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [specs/TZ_COSTCTRL_BriefingCostControl/](specs/TZ_COSTCTRL_BriefingCostControl/) — ТЗ-COSTCTRL Briefing Cost Control (v3.66.0)
 - [_archive/TZ_BF4_PerSectionRefresh/](_archive/TZ_BF4_PerSectionRefresh/) — ТЗ-BF4 PerSectionRefresh
 - [_archive/TZ_BF2_SimplyNews/](_archive/TZ_BF2_SimplyNews/) — ТЗ-BF2 SimplyNews
 - [_archive/TZ_HF1_BriefingSetupUpdate/](_archive/TZ_HF1_BriefingSetupUpdate/) — ТЗ-HF1 Briefing PE Update
@@ -1589,4 +1590,4 @@ components/projects/
 
 ---
 
-**Обновлено:** 2026-02-19
+**Обновлено:** 2026-04-05
