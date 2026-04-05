@@ -193,20 +193,20 @@ WHERE "deliveryEnabled" = true
 
 ## Этап 5 (Phase 5): Complete cost coverage
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (2026-04-05)
 
 **Цель:** 100% cost coverage, `costUsd` никогда не NULL для успешных AI-вызовов.
 
 **Задачи:**
-- [ ] Расширить `MODEL_PRICING_RUB` в `lib/ai/providers.ts`:
+- [x] Расширить `MODEL_PRICING_RUB` в `lib/ai/providers.ts`:
   - `sonar-deep-research`: $2/1M in, $8/1M out
   - `gemini-2.5-flash-preview-tts`: per-character pricing (handled separately)
   - `deepgram-nova-3`: per-minute pricing (handled separately)
-- [ ] Добавить helpers: `calculateDeepgramCostUsd(audioSeconds)`, `calculateGeminiTtsCostUsd(charCount)` в providers.ts
-- [ ] Обновить `calcCostUsd()` в `tokenlens-catalog.ts`: fallback chain TokenLens → MODEL_PRICING_RUB → null (only if truly unknown)
-- [ ] Обновить `logUsage` interface: добавить `costUsdOverride?: number` для провайдеров с non-token pricing (Deepgram, TTS)
-- [ ] Применить `costUsdOverride` в `deepgram-transcribe.ts` и `tts-gemini.ts`
-- [ ] `npx tsc --noEmit` — 0 ошибок
+- [x] Добавить helpers: `calculateDeepgramCostUsd(audioSeconds)`, `calculateGeminiTtsCostUsd(charCount)` в providers.ts
+- [x] Обновить `calcCostUsd()` в `tokenlens-catalog.ts`: fallback chain TokenLens → MODEL_PRICING_RUB → null (only if truly unknown)
+- [x] Обновить `logUsage` interface: добавить `costUsdOverride?: number` для провайдеров с non-token pricing (Deepgram, TTS)
+- [x] Применить `costUsdOverride` в `deepgram-transcribe.ts` и `tts-gemini.ts`
+- [x] `npx tsc --noEmit` — 0 ошибок
 
 **Файлы:**
 - `lib/ai/providers.ts` — MODEL_PRICING_RUB + helpers

@@ -34,20 +34,39 @@ export { getUsage } from "tokenlens/helpers";
 
 /**
  * Calculate cost in USD for a given model and usage.
- * Returns null if catalog unavailable.
+ * Fallback chain: TokenLens → MODEL_PRICING_RUB → null (only if truly unknown model).
  */
 export async function calcCostUsd(
   modelId: string,
   usage: LanguageModelUsage
 ): Promise<number | null> {
+  // 1. Try TokenLens (live prices from API)
   try {
     const providers = await getTokenlensCatalog();
-    if (!providers) return null;
-    const summary = getUsage({ modelId, usage, providers });
-    return summary?.costUSD?.totalUSD ?? null;
+    if (providers) {
+      const summary = getUsage({ modelId, usage, providers });
+      const cost = summary?.costUSD?.totalUSD;
+      if (cost != null) return cost;
+    }
   } catch {
-    return null;
+    // Fall through to local fallback
   }
+
+  // 2. Fallback: hardcoded MODEL_PRICING_RUB → convert to USD
+  try {
+    const costRub = calculateCostRub(modelId, {
+      inputTokens: usage.inputTokens ?? 0,
+      outputTokens: usage.outputTokens ?? 0,
+      cachedInputTokens: (usage.inputTokenDetails as any)?.cacheReadTokens ?? 0,
+    });
+    if (costRub > 0) {
+      return Math.round((costRub / RUB_PER_USD) * 1_000_000) / 1_000_000;
+    }
+  } catch {
+    // Truly unknown model
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------

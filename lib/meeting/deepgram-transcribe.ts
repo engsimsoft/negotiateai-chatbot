@@ -3,6 +3,7 @@
 import "server-only";
 
 import { logUsage } from "@/lib/ai/usage-utils";
+import { calculateDeepgramCostUsd } from "@/lib/ai/providers";
 
 const DEEPGRAM_API_URL = "https://api.deepgram.com/v1/listen";
 
@@ -149,7 +150,7 @@ export async function transcribeAudio(
     }
   }
 
-  // ТЗ-CACHE2: Usage logging (Deepgram has no token usage, log for cost tracking)
+  // ТЗ-CACHE2+P5: Usage logging — costUsdOverride bypasses calcCostUsd for non-token pricing
   if (userId) {
     logUsage({
       userId,
@@ -157,6 +158,7 @@ export async function transcribeAudio(
       modelId: "deepgram-nova-3",
       chatMode: "meeting:transcribe",
       durationMs,
+      costUsdOverride: calculateDeepgramCostUsd(data.metadata.duration),
     });
   }
 

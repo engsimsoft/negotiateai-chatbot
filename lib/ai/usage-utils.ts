@@ -32,6 +32,8 @@ export interface LogUsageInput {
   chatId?: string | null;
   durationMs?: number | null;
   guardianFlags?: Record<string, unknown> | null;
+  /** Override cost in USD for non-token providers (Deepgram, Gemini TTS). Skips calcCostUsd. */
+  costUsdOverride?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,10 +84,14 @@ export async function logUsage({
   chatId,
   durationMs,
   guardianFlags,
+  costUsdOverride,
 }: LogUsageInput): Promise<void> {
   try {
     const fields = extractUsageFields(usage);
-    const costUsd = await calcCostUsd(modelId, usage);
+    const costUsd =
+      costUsdOverride !== undefined && costUsdOverride !== null
+        ? costUsdOverride
+        : await calcCostUsd(modelId, usage);
 
     saveAiUsageLog({
       chatId: chatId ?? null,

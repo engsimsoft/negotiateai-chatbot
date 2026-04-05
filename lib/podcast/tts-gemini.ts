@@ -4,6 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import { buildTtsTrace } from "@/lib/ai/pipeline-trace";
 import { waitUntil } from "@vercel/functions";
 import { logUsage } from "@/lib/ai/usage-utils";
+import { calculateGeminiTtsCostUsd } from "@/lib/ai/providers";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import type { TTSProvider, VoiceConfig } from "./types";
 
@@ -78,7 +79,7 @@ export async function generateSpeechWithRetry(
     // PCM: 24kHz, 16-bit mono → 48000 bytes/sec
     const audioDurationSeconds = Math.round(buffer.length / 48000);
 
-    // ТЗ-CACHE2: Usage logging — waitUntil ensures completion on Vercel serverless
+    // ТЗ-CACHE2+P5: Usage logging — costUsdOverride bypasses calcCostUsd for char-based pricing
     if (userId) {
       waitUntil(logUsage({
         userId,
@@ -86,6 +87,7 @@ export async function generateSpeechWithRetry(
         modelId: TTS_MODEL,
         chatMode: "podcast:tts",
         durationMs,
+        costUsdOverride: calculateGeminiTtsCostUsd(script.length),
       }));
     }
 
@@ -112,7 +114,7 @@ export async function generateSpeechWithRetry(
     const durationMs = Date.now() - startTime;
     const audioDurationSeconds = Math.round(buffer.length / 48000);
 
-    // ТЗ-CACHE2: Usage logging (retry path) — waitUntil ensures completion on Vercel serverless
+    // ТЗ-CACHE2+P5: Usage logging (retry path) — costUsdOverride for char-based pricing
     if (userId) {
       waitUntil(logUsage({
         userId,
@@ -120,6 +122,7 @@ export async function generateSpeechWithRetry(
         modelId: TTS_MODEL,
         chatMode: "podcast:tts",
         durationMs,
+        costUsdOverride: calculateGeminiTtsCostUsd(script.length),
       }));
     }
 

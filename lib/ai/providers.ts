@@ -99,6 +99,8 @@ const MODEL_PRICING_RUB: Record<string, ModelPricing> = {
 
   // Perplexity Sonar Pro ($3/1M in, $15/1M out)
   "sonar-pro":                   { input: 0.30,  output: 1.50,  cached: 0 },
+  // Perplexity Sonar Deep Research ($2/1M in, $8/1M out)
+  "sonar-deep-research":         { input: 0.20,  output: 0.80,  cached: 0 },
 };
 
 export interface TokenUsageForPricing {
@@ -141,9 +143,24 @@ export function getStepCostRub(step: DebugStepData): number {
 }
 
 // ---------------------------------------------------------------------------
-// TTS Pricing (Google Gemini TTS — priced per audio second)
-// Google charges per character (~$4/1M chars). Average: ~15 chars/sec of speech.
-// Rough estimate: $0.06/1K seconds → ₽0.006/second at RUB_PER_USD
+// Non-token provider cost helpers (Deepgram, Gemini TTS)
+// These providers use per-minute / per-character pricing, not tokens.
+// ---------------------------------------------------------------------------
+
+/** Deepgram Nova-3: $0.0043/min batch pricing */
+export function calculateDeepgramCostUsd(audioSeconds: number): number {
+  const USD_PER_SECOND = 0.0043 / 60;
+  return Math.round(audioSeconds * USD_PER_SECOND * 1_000_000) / 1_000_000;
+}
+
+/** Gemini TTS (gemini-2.5-flash-preview-tts): $4/1M characters */
+export function calculateGeminiTtsCostUsd(charCount: number): number {
+  const USD_PER_CHAR = 4 / 1_000_000;
+  return Math.round(charCount * USD_PER_CHAR * 1_000_000) / 1_000_000;
+}
+
+// ---------------------------------------------------------------------------
+// TTS Pricing (Google Gemini TTS — legacy RUB helper for pipeline traces)
 // ---------------------------------------------------------------------------
 
 const TTS_COST_RUB_PER_SECOND = 0.006;
