@@ -289,11 +289,13 @@ async function researchSingleTopic(
       verified: sources.length,
     });
 
-    // ТЗ-DEV2: Build per-topic trace
+    // ТЗ-DEV2+TOKENS1: Build per-topic trace
+    // Perplexity has no prompt caching → all input is fresh, cache fields are 0.
     const durationMs = Date.now() - startTime;
-    const promptTokens = perplexityResult.usage?.promptTokens ?? 0;
-    const completionTokens = perplexityResult.usage?.completionTokens ?? 0;
-    const totalTokens = perplexityResult.usage?.totalTokens ?? (promptTokens + completionTokens);
+    const noCacheInputTokens = perplexityResult.usage?.promptTokens ?? 0;
+    const outputTokens = perplexityResult.usage?.completionTokens ?? 0;
+    const totalTokens =
+      perplexityResult.usage?.totalTokens ?? (noCacheInputTokens + outputTokens);
 
     const trace: PipelineStageTrace = {
       stage: "research",
@@ -302,12 +304,17 @@ async function researchSingleTopic(
       ai: {
         modelId: "sonar-pro",
         promptPreview: query.slice(0, 500),
-        promptTokens,
-        completionTokens,
+        noCacheInputTokens,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        outputTokens,
+        reasoningTokens: 0,
         totalTokens,
         costRub: calcStepCostRub("sonar-pro", {
-          inputTokens: promptTokens,
-          outputTokens: completionTokens,
+          noCacheInputTokens,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+          outputTokens,
         }, catalog),
         finishReason: "stop",
         retryCount: 0,

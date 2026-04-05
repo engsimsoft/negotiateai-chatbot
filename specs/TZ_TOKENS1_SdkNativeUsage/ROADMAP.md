@@ -193,34 +193,25 @@
 
 ### Этап 6: Pipelines (briefing + podcast + meeting + остальные)
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (ожидает мануальный тест)
 **Цель:** Обновить все pipeline файлы, исправить fake-usage баг.
 
 **Задачи:**
 
 **6.1 — Исправление fake usage (3 файла):**
-- [ ] `lib/briefing/briefing-author.ts` — получать real usage из `result.usage` (AI SDK), передавать объект целиком в `logUsage`
-- [ ] `lib/briefing/briefing-section-author.ts` — то же
-- [ ] `lib/podcast/script-generator.ts` — то же
+- [x] `lib/briefing/briefing-author.ts` — `result.usage: LanguageModelUsage` сохраняется и передаётся в logUsage напрямую
+- [x] `lib/briefing/briefing-section-author.ts` — то же
+- [x] `lib/podcast/script-generator.ts` — Gemini без кэша: `inputTokenDetails: { noCacheTokens: totalPromptTokens, cacheReadTokens: 0, cacheWriteTokens: 0 }` в synthetic usage
 
-**6.2 — Остальные pipeline с logUsage (остаются как есть — используют `extractUsageFields` внутри):**
-- [ ] `lib/briefing/briefing-filter.ts` — проверить что `usage` передаётся реальный (не fake)
-- [ ] `lib/briefing/research-engine.ts` — проверить
-- [ ] `lib/meeting/meeting-pipeline.ts` — проверить
+**6.2 — Callsites обновлены:**
+- [x] `lib/briefing/briefing-filter.ts` — `buildAiCallTrace()` c real `LanguageModelUsage`
+- [x] `lib/briefing/briefing-author.ts` — `buildAiCallTrace()` + `error` post-set
+- [x] `lib/briefing/briefing-section-author.ts` — `buildAiCallTrace()` + `error` post-set
+- [x] `lib/briefing/research-engine.ts` — manual AiCallTrace с disjoint-полями (Perplexity = no cache)
+- [x] `lib/podcast/script-generator.ts` — manual AiCallTrace с disjoint-полями (Gemini = no cache, retry accumulator)
 
-**6.3 — Callsites `calcStepCostRub` в pipelines:**
-- [ ] `lib/briefing/briefing-filter.ts:140` — обновить параметры
-- [ ] `lib/briefing/briefing-author.ts:234` — обновить
-- [ ] `lib/briefing/briefing-section-author.ts:200` — обновить
-- [ ] `lib/briefing/research-engine.ts:308` — обновить
-- [ ] `lib/podcast/script-generator.ts:165` — обновить
-
-**6.4 — Routes/utils с logUsage (поверка что ничего не сломано):**
-- [ ] Grep `logUsage\(` → пройтись по всем ~20 callsites, убедиться что параметры совместимы
-- [ ] Особенно: `lib/ai/professor-pipeline.ts` (3 callsites с `extractUsageFields`)
-
-- [ ] `npx tsc --noEmit` → 0 ошибок
-- [ ] `npm run build` → успешен
+- [x] `npx tsc --noEmit` → 0 ошибок
+- [x] `npm run build` → успешен
 
 **Файлы:**
 - `lib/briefing/*.ts` (4 файла)
@@ -230,14 +221,15 @@
 - Остальные pipeline файлы по списку в ANALYSIS.md
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` → 0 ошибок
-- [ ] `npm run build` → успешен
-- [ ] Git commit: `refactor(tz-tokens1): update all pipelines, fix fake usage in briefing/podcast`
+- [x] `npx tsc --noEmit` → 0 ошибок
+- [x] `npm run build` → успешен
+- [x] Git commit: `refactor(tz-tokens1): update all pipelines, fix fake usage in briefing/podcast`
 
-🧪 **Мануальный тест:**
+🧪 **Мануальный тест (ожидается):**
 1. Запусти генерацию брифинга (полный pipeline: filter → author → section-author)
 2. В БД проверь записи `ai_usage_log` WHERE chatMode LIKE 'briefing:%' — должны быть реальные токены (не нули)
 3. Проверь costUsd ≠ NULL для всех записей
+4. Обычный чат с Claude (cached context) → проверить что `inputTokens/cacheReadTokens/cacheWriteTokens` в DB соответствуют Anthropic Console
 
 ⛔ **СТОП — дождаться подтверждения пользователя.**
 

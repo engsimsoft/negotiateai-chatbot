@@ -1,8 +1,8 @@
 # Передача сессии ТЗ-TOKENS1
 
 **Дата:** 2026-04-05
-**Последняя сессия:** 3 (Этапы 4-5 завершены)
-**Следующая сессия:** начать **Этап 6**
+**Последняя сессия:** 3 (Этапы 4-6 завершены)
+**Следующая сессия:** мануальный тест → затем **Этап 7**
 
 ---
 
@@ -11,131 +11,94 @@
 - [x] **Фаза 1:** Анализ + Код-ревью завершены
 - [x] **Фаза 2:** Планирование завершено (ROADMAP 9 этапов)
 - [x] **Этап 1:** Базовый контракт — commit `dd411aa`
-- [x] **Этап 2:** Обновление ядра (tokenlens + pipeline-trace) — commit `d9cdf31`
-- [x] **Этап 3:** 3 chat routes (chat, service-chat, task-chat) — commit `cb04b30`
-- [x] **Этап 4:** Debug events v2 + localStorage migration — commit `32ade54`
-- [x] **Этап 5:** DevPanel UI — commit TBD
-- [ ] **Этап 6:** Pipelines + fake usage fix ← **НАЧАТЬ ЗДЕСЬ**
-- [ ] Этап 7: Cost Audit UI (fresh/cache/write колонки)
+- [x] **Этап 2:** Обновление ядра — commit `d9cdf31`
+- [x] **Этап 3:** 3 chat routes — commit `cb04b30`
+- [x] **Этап 4:** Debug events v2 + localStorage — commit `32ade54`
+- [x] **Этап 5:** DevPanel UI — commit `11df1b3`
+- [x] **Этап 6:** Pipelines + fake usage fix — commit TBD ⏸️ ожидает мануальный тест
+- [ ] **Этап 7:** Cost Audit UI (fresh/cache/write колонки) ← **после теста**
 - [ ] Этап 8: Валидация (7 типов чатов)
 - [ ] Этап 9: Финализация
 
 ---
 
-## ⛔ Текущее состояние компиляции
+## ✅ Состояние компиляции
 
-**TSC (`npx tsc --noEmit`):** 10 ошибок, все в pipelines (Этап 6):
+**TSC (`npx tsc --noEmit`):** 0 ошибок ✅
+**Build (`npm run build`):** успешен ✅
 
-```
-lib/briefing/briefing-author.ts:231,235         (2)
-lib/briefing/briefing-filter.ts:137,141         (2)
-lib/briefing/briefing-section-author.ts:197,201 (2)
-lib/briefing/research-engine.ts:305,309         (2)
-lib/podcast/script-generator.ts:162,166         (2)
-```
-
-**Все ошибки однотипные:**
-- `promptTokens`/`completionTokens` не существуют в `AiCallTrace` (обновлено в Этапе 2)
-- `inputTokens` не существует в `TokenUsageForPricing` (обновлено в Этапе 1)
-
-Pipelines передают legacy shape — нужно переписать callsites под новый контракт.
-
-**Build и manual test отложены** до окончания Этапа 6.
+Весь рефакторинг (Этапы 1-6) скомпилирован и собран.
 
 ---
 
-## ⛔ КРИТИЧНО: читать СНАЧАЛА
+## 🧪 Мануальный тест (ПРИОРИТЕТ)
 
-**Порядок чтения в новой сессии:**
+**Перед Этапом 7 пользователь должен протестировать:**
 
-1. `specs/WORKFLOW.md` — правила работы по ТЗ
-2. `specs/TZ_TOKENS1_SdkNativeUsage/SPEC.md` — само ТЗ (9 требований)
-3. `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` — **рабочий чеклист** (Этап 6 и далее)
-4. `specs/TZ_TOKENS1_SdkNativeUsage/CHANGELOG.md` — история сессий 1-3
+### Тест 1: обычный чат (проверка кэша Anthropic)
+1. Открой dev-сервер, отправь 2-3 сообщения в обычный чат (Haiku/Sonnet)
+2. Открой DevPanel (footer под ответом AI)
+3. Проверь что токены отображаются: Input (fresh), Cache read, Cache write, Output, Reasoning, Total
+4. Проверь что стоимость (₽) отображается без NaN/undefined
+5. **Критично:** после 2-го сообщения Cache read должен быть > 0 (prompt caching работает)
+
+### Тест 2: брифинг pipeline (fake usage fix)
+1. Запусти генерацию брифинга
+2. SQL-проверка:
+```sql
+SELECT chatMode, inputTokens, cacheReadTokens, cacheWriteTokens, outputTokens, costUsd, createdAt
+FROM ai_usage_log
+WHERE chatMode LIKE 'briefing:%'
+ORDER BY createdAt DESC
+LIMIT 10;
+```
+3. Убедиться: `inputTokens`, `costUsd` ≠ 0/NULL во всех записях briefing:author и briefing:section-author
+
+### Тест 3: localStorage migration
+1. В DevTools → Application → Local Storage: удали `simply-dev-chat-debug:*` ключи (или очисти полностью)
+2. Проверь что при новом чате появляется новый ключ с `schemaVersion: 2`
+3. Вручную вставь legacy-entry без `schemaVersion` → перезагрузи → должен быть `console.warn` + ключ удалён
 
 ---
 
-## Что уже сделано (Этапы 1-5)
+## Что сделано в этой сессии (Этапы 4-6)
+
+### Этап 4: Debug events schema v2
+- `DebugStepData`/`DebugFinishData` — disjoint поля + `schemaVersion: 2`
+- localStorage wrapper с миграцией (2 файла)
+- 3 chat routes обновлены
 
 ### Этап 5: DevPanel UI
-- `components/dev-panel/sections/tokens-section.tsx` — disjoint суммы, UI с "Input (fresh)", "Cache read", "Cache write", Output, Reasoning, Total
-- `components/dev-panel/sections/cost-breakdown-section.tsx` — StepCost обновлён
-- `components/dev-panel/sections/timeline-section.tsx` — сумма disjoint полей
-- `components/dev-panel/dev-panel-footer.tsx` — totalTokens обновлён
-- `components/dev-panel/pipeline-trace-drawer.tsx` — использует новые поля AiCallTrace
+- 5 UI файлов переписаны под disjoint-поля
+- `tokens-section` показывает "Input (fresh)" + условно Cache read/write/Reasoning
+
+### Этап 6: Pipelines
+- `briefing-filter.ts` — `buildAiCallTrace()` вместо ручного конструирования, real usage в logUsage
+- `briefing-author.ts` / `briefing-section-author.ts` — хранят `LanguageModelUsage` целиком (был fake shape!), передают real usage в logUsage, используют `buildAiCallTrace`
+- `research-engine.ts` — manual AiCallTrace с disjoint-полями (Perplexity без кэша)
+- `script-generator.ts` — synthetic usage с `inputTokenDetails`, manual AiCallTrace (Gemini без кэша, retry accumulator)
 
 ---
 
-## Следующий шаг: Этап 6 — Pipelines
+## Следующий шаг: Этап 7 — Cost Audit UI
 
-**Цель:** Обновить все pipeline файлы, исправить fake-usage баг.
+**После мануального теста.** Цель: обновить `/admin/cost-audit` — раздельные колонки fresh/cache_read/cache_write, Cache hit rate card, legacy data warning.
 
-### Задачи (по ROADMAP)
-
-**6.1 — Исправление fake usage (3 файла):**
-- `lib/briefing/briefing-author.ts` — проверить что `result.usage` реальный (не fake)
-- `lib/briefing/briefing-section-author.ts` — то же
-- `lib/podcast/script-generator.ts` — то же
-
-**6.2 — Callsites `calcStepCostRub` / `buildAiCallTrace`:**
-Все они используют legacy shape (`promptTokens`/`completionTokens`/`inputTokens`). Нужно:
-- Либо передавать `LanguageModelUsage` через `buildAiCallTrace(modelId, result, ...)`  
-- Либо передавать `TokenUsageForPricing` через `extractUsageForPricing(usage)` → `calcStepCostRub`
-
-Файлы:
-- `lib/briefing/briefing-filter.ts:137-141`
-- `lib/briefing/briefing-author.ts:231-235`
-- `lib/briefing/briefing-section-author.ts:197-201`
-- `lib/briefing/research-engine.ts:305-309`
-- `lib/podcast/script-generator.ts:162-166`
-
-**6.3 — Общая проверка `logUsage` callsites:** убедиться что ничего не сломано.
-
-**6.4 — Валидация:**
-- `npx tsc --noEmit` → 0 ошибок
-- `npm run build` → успешен
-- Мануальный тест: брифинг pipeline + SQL-проверка `ai_usage_log`
-
-### Git commit сообщение
-
-```
-refactor(tz-tokens1): update all pipelines, fix fake usage in briefing/podcast
-```
-
----
-
-## Пользователь подтвердил
-
-- ✅ План 9 этапов
-- ✅ localStorage migration — dev-режим, старые данные не важны, очищаются автоматически
-- ✅ Build + manual test перенесены до окончания Этапа 6
-
----
-
-## Полезные команды
-
-```bash
-# Проверка компиляции
-npx tsc --noEmit
-
-# Сборка
-npm run build
-
-# Найти callsites
-grep -rn "promptTokens\|completionTokens" lib/
-grep -rn "calcStepCostRub\|buildAiCallTrace" lib/
-```
+**Задачи (ROADMAP):**
+- `lib/db/queries.ts` → `getCostByModel()` — добавить SUM разных полей
+- `app/(dashboard)/admin/cost-audit/page.tsx` — новые колонки + "Cache hit rate" card + legacy warning baner
+- Git commit: `feat(tz-tokens1): cost audit UI — fresh/cache/write columns + hit rate card`
 
 ---
 
 ## Правила работы (НИКОГДА НЕ НАРУШАТЬ)
 
-- ⛔ **НЕ** отмечать `[x]` без `npx tsc --noEmit` = 0 ошибок (в зоне этапа)
+- ⛔ **НЕ** отмечать `[x]` без `npx tsc --noEmit` = 0 ошибок
 - ⛔ **НЕ** использовать TodoWrite — основной чеклист это ROADMAP.md
-- ✅ Git commit после КАЖДОГО этапа: `refactor(tz-tokens1): описание`
+- ✅ Git commit после КАЖДОГО этапа
 - ✅ ROADMAP.md — обновляй статусы сразу после задачи
 - ✅ CHANGELOG.md — добавляй секцию после каждого этапа
 
 ---
 
-**Новая сессия:** начинай с `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` → Этап 6.
+**Новая сессия:** сначала проведи мануальный тест (3 сценария выше) → доложи результат пользователю → затем Этап 7.

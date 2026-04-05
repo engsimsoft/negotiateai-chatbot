@@ -3,11 +3,10 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
 import type { ModelCatalog } from "tokenlens/core";
 import { waitUntil } from "@vercel/functions";
 import { logUsage } from "@/lib/ai/usage-utils";
-import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
+import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { FILTER_MODEL, MAX_FILTER_CANDIDATES } from "./briefing-config";
 import type { RawContent } from "./source-fetchers/types";
 
@@ -112,38 +111,35 @@ Output JSON with "candidates" array.`,
   }
 
   const durationMs = Date.now() - startTime;
-  const promptTokens = usage?.inputTokens ?? 0;
-  const completionTokens = usage?.outputTokens ?? 0;
-  const totalTokens = promptTokens + completionTokens;
 
   // ТЗ-CACHE2: Usage logging — waitUntil ensures completion on Vercel serverless
-  if (userId) {
+  if (userId && usage) {
     waitUntil(logUsage({
       userId,
-      usage: usage ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 } as any,
+      usage,
       modelId: FILTER_MODEL,
       chatMode: "briefing:filter",
       durationMs,
     }));
   }
 
+  const ai = buildAiCallTrace(
+    {
+      modelId: FILTER_MODEL,
+      usage,
+      finishReason: "stop",
+      promptPreview: userPrompt.slice(0, 500),
+      retryCount: 0,
+      durationMs,
+    },
+    catalog,
+  );
+
   const trace: PipelineStageTrace = {
     stage: "filter",
     startedAt: new Date(startTime).toISOString(),
     durationMs,
-    ai: {
-      modelId: FILTER_MODEL,
-      promptPreview: userPrompt.slice(0, 500),
-      promptTokens,
-      completionTokens,
-      totalTokens,
-      costRub: calcStepCostRub(FILTER_MODEL, {
-        inputTokens: promptTokens,
-        outputTokens: completionTokens,
-      }, catalog),
-      finishReason: "stop",
-      retryCount: 0,
-    },
+    ai,
     dataFlow: {
       inputCount: items.length,
       outputCount: candidates.length,
@@ -155,7 +151,7 @@ Output JSON with "candidates" array.`,
 
   return {
     candidates,
-    tokensUsed: totalTokens,
+    tokensUsed: ai.totalTokens,
     trace,
   };
 }

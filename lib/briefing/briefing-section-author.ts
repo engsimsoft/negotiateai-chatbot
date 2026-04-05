@@ -5,11 +5,11 @@ import path from "path";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
+import type { LanguageModelUsage } from "ai";
 import type { ModelCatalog } from "tokenlens/core";
 import { waitUntil } from "@vercel/functions";
 import { logUsage } from "@/lib/ai/usage-utils";
-import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
+import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { AUTHOR_MODEL, AUTHOR_MODEL_FALLBACK } from "./briefing-config";
 import type { FilteredItem } from "./briefing-filter";
 import type { RawContent } from "./source-fetchers/types";
@@ -128,8 +128,7 @@ export async function generateSection(
   const warnings: string[] = [];
 
   let object: BriefingArticleSection;
-  let promptTokens = 0;
-  let completionTokens = 0;
+  let usage: LanguageModelUsage | undefined;
   let finishReason = "stop";
   let usedModel = AUTHOR_MODEL;
   let retryCount = 0;
@@ -145,8 +144,7 @@ export async function generateSection(
       maxOutputTokens: 8192,
     });
     object = result.object;
-    promptTokens = result.usage?.inputTokens ?? 0;
-    completionTokens = result.usage?.outputTokens ?? 0;
+    usage = result.usage;
     finishReason = result.finishReason ?? "stop";
     console.log(`[Section Author] model=${AUTHOR_MODEL} usage:`, JSON.stringify(result.usage));
   } catch (err) {
@@ -168,49 +166,47 @@ export async function generateSection(
       maxOutputTokens: 8192,
     });
     object = result.object;
-    promptTokens = result.usage?.inputTokens ?? 0;
-    completionTokens = result.usage?.outputTokens ?? 0;
+    usage = result.usage;
     finishReason = result.finishReason ?? "stop";
   }
 
-  const totalTokens = promptTokens + completionTokens;
   const durationMs = Date.now() - startTime;
 
-  // ТЗ-CACHE2: Usage logging — waitUntil ensures completion on Vercel serverless
-  if (userId) {
+  // ТЗ-CACHE2+TOKENS1: Usage logging — real usage from AI SDK (not fake shape)
+  if (userId && usage) {
     waitUntil(logUsage({
       userId,
-      usage: { inputTokens: promptTokens, outputTokens: completionTokens, totalTokens } as any,
+      usage,
       modelId: usedModel,
       chatMode: "briefing:section-author",
       durationMs,
     }));
   }
 
+  const ai = buildAiCallTrace(
+    {
+      modelId: usedModel,
+      usage,
+      finishReason,
+      promptPreview: userMessage.slice(0, 500),
+      retryCount,
+      fallbackUsed,
+      durationMs,
+    },
+    catalog,
+  );
+  ai.error = primaryError;
+
   const trace: PipelineStageTrace = {
     stage: "section-refresh",
     startedAt: new Date(startTime).toISOString(),
     durationMs,
-    ai: {
-      modelId: usedModel,
-      promptPreview: userMessage.slice(0, 500),
-      promptTokens,
-      completionTokens,
-      totalTokens,
-      costRub: calcStepCostRub(usedModel, {
-        inputTokens: promptTokens,
-        outputTokens: completionTokens,
-      }, catalog),
-      finishReason,
-      retryCount,
-      fallbackUsed,
-      error: primaryError,
-    },
+    ai,
     errors: [],
     warnings,
   };
 
-  return { section: object, tokensUsed: totalTokens, trace };
+  return { section: object, tokensUsed: ai.totalTokens, trace };
 }
 
 // --- Volume instruction for single section ---

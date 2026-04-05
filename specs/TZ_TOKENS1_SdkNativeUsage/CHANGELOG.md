@@ -127,3 +127,27 @@ lib/ai/tokenlens-catalog.ts:91 — same
   - `stage.ai.promptTokens/completionTokens` → `noCacheInputTokens+cacheReadTokens+cacheWriteTokens` / `outputTokens`
 
 **TSC state:** 0 ошибок в DevPanel UI. Остаются 10 ошибок в pipelines (Этап 6).
+
+### Этап 6: Pipelines + fake usage fix ✅
+
+**Files modified:**
+- `lib/briefing/briefing-filter.ts`:
+  - `buildAiCallTrace({ modelId, usage, ... }, catalog)` вместо ручного конструирования
+  - `logUsage({ usage })` — передаётся real `LanguageModelUsage` (было `usage ?? fakeShape`)
+- `lib/briefing/briefing-author.ts`:
+  - `usage: LanguageModelUsage | undefined` сохраняется из `result.usage` (было ручное извлечение promptTokens/completionTokens)
+  - `logUsage` получает real usage (не fake `{inputTokens, outputTokens, totalTokens} as any`)
+  - `buildAiCallTrace(...)` + post-set `ai.error = primaryError`
+- `lib/briefing/briefing-section-author.ts` — аналогично briefing-author
+- `lib/briefing/research-engine.ts`:
+  - AiCallTrace конструируется вручную с disjoint-полями: `noCacheInputTokens = promptTokens`, `cacheRead/Write = 0` (Perplexity без prompt caching)
+- `lib/podcast/script-generator.ts`:
+  - Synthetic `LanguageModelUsage` для logUsage с `inputTokenDetails.{noCacheTokens, cacheReadTokens, cacheWriteTokens}` (Gemini без prompt caching, retry accumulator)
+  - AiCallTrace с disjoint-полями вручную
+
+**TSC state:** 0 ошибок ✅
+**Build state:** `npm run build` успешен ✅
+
+**Key fix:** briefing-author и briefing-section-author передавали в `logUsage` вручную собранный shape `{inputTokens, outputTokens, totalTokens} as any`, теряя `inputTokenDetails.*`. Теперь передаётся оригинальный `LanguageModelUsage` от AI SDK — `extractUsageFields` внутри `logUsage` корректно извлекает cache_read/cache_write.
+
+**Ожидается мануальный тест** перед переходом к Этапу 7 (Cost Audit UI).

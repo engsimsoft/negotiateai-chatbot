@@ -141,11 +141,21 @@ export async function generateScript(
     const durationMs = Date.now() - startTime;
     const totalTokens = totalPromptTokens + totalCompletionTokens;
 
-    // ТЗ-CACHE2: Usage logging — waitUntil ensures completion on Vercel serverless
+    // ТЗ-CACHE2+TOKENS1: Usage logging — Gemini has no prompt caching,
+    // so all input tokens are fresh (no cache read/write).
     if (userId) {
       waitUntil(logUsage({
         userId,
-        usage: { inputTokens: totalPromptTokens, outputTokens: totalCompletionTokens, totalTokens } as any,
+        usage: {
+          inputTokens: totalPromptTokens,
+          outputTokens: totalCompletionTokens,
+          totalTokens,
+          inputTokenDetails: {
+            noCacheTokens: totalPromptTokens,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+          },
+        } as any,
         modelId: SCRIPT_MODEL,
         chatMode: "podcast:script",
         durationMs,
@@ -159,11 +169,16 @@ export async function generateScript(
       ai: {
         modelId: SCRIPT_MODEL,
         promptPreview: baseMessage.slice(0, 500),
-        promptTokens: totalPromptTokens,
-        completionTokens: totalCompletionTokens,
+        noCacheInputTokens: totalPromptTokens,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        outputTokens: totalCompletionTokens,
+        reasoningTokens: 0,
         totalTokens,
         costRub: calcStepCostRub(SCRIPT_MODEL, {
-          inputTokens: totalPromptTokens,
+          noCacheInputTokens: totalPromptTokens,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
           outputTokens: totalCompletionTokens,
         }, catalog),
         finishReason: lastFinishReason,
