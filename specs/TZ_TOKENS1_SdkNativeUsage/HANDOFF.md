@@ -1,8 +1,8 @@
 # Передача сессии ТЗ-TOKENS1
 
 **Дата:** 2026-04-05
-**Сессия:** 1 (планирование — завершена)
-**Следующая сессия:** начать реализацию с Этапа 1
+**Последняя сессия:** 2 (Этапы 1-3 завершены)
+**Следующая сессия:** начать **Этап 4**
 
 ---
 
@@ -10,10 +10,10 @@
 
 - [x] **Фаза 1:** Анализ + Код-ревью завершены
 - [x] **Фаза 2:** Планирование завершено (ROADMAP 9 этапов)
-- [ ] Этап 1: Базовый контракт ← **НАЧАТЬ ЗДЕСЬ**
-- [ ] Этап 2: Обновление ядра (tokenlens + pipeline-trace)
-- [ ] Этап 3: 3 chat routes (chat, service-chat, task-chat)
-- [ ] Этап 4: Debug events v2 + localStorage migration
+- [x] **Этап 1:** Базовый контракт — commit `dd411aa`
+- [x] **Этап 2:** Обновление ядра (tokenlens + pipeline-trace) — commit `d9cdf31`
+- [x] **Этап 3:** 3 chat routes (chat, service-chat, task-chat) — commit `cb04b30`
+- [ ] **Этап 4:** Debug events v2 + localStorage migration ← **НАЧАТЬ ЗДЕСЬ**
 - [ ] Этап 5: DevPanel UI
 - [ ] Этап 6: Pipelines + fake usage fix
 - [ ] Этап 7: Cost Audit UI (fresh/cache/write колонки)
@@ -22,165 +22,112 @@
 
 ---
 
-## ⛔ КРИТИЧНО: читать СНАЧАЛА перед работой
+## ⛔ Текущее состояние компиляции
 
-**Новая сессия должна прочитать в таком порядке:**
+**TSC (`npx tsc --noEmit`):** 12 ошибок, все ожидаемые:
 
-1. `specs/WORKFLOW.md` — правила работы по ТЗ (валидация, git-commits)
-2. `specs/ROADMAP_GUIDE.md` — правила чеклиста
-3. `specs/TZ_TOKENS1_SdkNativeUsage/SPEC.md` — само ТЗ (9 требований R1-R9)
-4. `specs/TZ_TOKENS1_SdkNativeUsage/ANALYSIS.md` — код-ревью, риски, решения
-5. `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` — **рабочий чеклист** (9 этапов)
+```
+components/dev-panel/pipeline-trace-drawer.tsx:171  (2 ошибки — Этап 5)
+lib/briefing/briefing-author.ts:231,235             (2 — Этап 6)
+lib/briefing/briefing-filter.ts:137,141             (2 — Этап 6)
+lib/briefing/briefing-section-author.ts:197,201     (2 — Этап 6)
+lib/briefing/research-engine.ts:305,309             (2 — Этап 6)
+lib/podcast/script-generator.ts:162,166             (2 — Этап 6)
+```
 
-**Главный документ для работы:** `ROADMAP.md` — перечитывай перед каждой задачей, отмечай `[x]` после.
+**Все ошибки однотипные:**
+- `'promptTokens'/'completionTokens' does not exist in type 'AiCallTrace'` (AiCallTrace был обновлён в Этапе 2)
+- `'inputTokens' does not exist in type 'TokenUsageForPricing'` (контракт обновлён в Этапе 1)
+
+**Build и manual test отложены** до окончания Этапа 6 (нельзя собрать с битыми pipelines).
 
 ---
 
-## Суть ТЗ
+## ⛔ КРИТИЧНО: читать СНАЧАЛА
 
-**Breaking refactor** системы расчёта токенов и стоимости. Переход с самопальной формулы `inputTokens - cacheRead - cacheWrite` на стандартный AI SDK v6 API (`usage.inputTokenDetails.{noCacheTokens, cacheReadTokens, cacheWriteTokens}`).
+**Порядок чтения в новой сессии:**
 
-**Почему:** 2 месяца борьбы с расхождением Dev Panel vs Anthropic Console. Исходники `node_modules/@ai-sdk/anthropic/dist/internal/index.js` подтверждают — SDK уже предоставляет готовые разделённые поля.
-
-**Масштаб:** 35+ файлов (8 ядерных + 28 callsites `logUsage` + DevPanel UI + Cost Audit).
-
----
-
-## Ключевые решения (из ANALYSIS.md)
-
-1. **DB schema НЕ трогаем** — `ai_usage_log.inputTokens` остаётся как total billable. Миграция данных не нужна.
-2. **localStorage migration через version-key** — `DEBUG_EVENT_SCHEMA_VERSION = 2`, старые записи очищаются при несовпадении.
-3. **Fake-usage в 3 pipeline файлах** (`briefing-author.ts`, `briefing-section-author.ts`, `podcast/script-generator.ts`) — включено в Этап 6 (получать real usage из `result.usage`).
-4. **Legacy `promptTokens`/`completionTokens`** в `pipeline-trace.ts` — убираем в Этапе 2.
-5. **Cost Audit Dashboard** — добавляем разделение fresh/cache/write колонок в Этапе 7.
+1. `specs/WORKFLOW.md` — правила работы по ТЗ
+2. `specs/TZ_TOKENS1_SdkNativeUsage/SPEC.md` — само ТЗ (9 требований)
+3. `specs/TZ_TOKENS1_SdkNativeUsage/ANALYSIS.md` — код-ревью, риски
+4. `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` — **рабочий чеклист** (Этап 4 и далее)
+5. `specs/TZ_TOKENS1_SdkNativeUsage/CHANGELOG.md` — история сессий 1-2
 
 ---
 
-## Первые шаги новой сессии
+## Что уже сделано (Этапы 1-3)
 
-### Шаг 1 — прочитать контекст (3 мин)
-```
-Read: specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md (весь)
-Read: specs/TZ_TOKENS1_SdkNativeUsage/ANALYSIS.md (секция "Текущая архитектура")
-Read: lib/ai/providers.ts (файл который сейчас правим)
-```
+### Этап 1: Базовый контракт
+- `lib/ai/providers.ts`:
+  - `TokenUsageForPricing` — disjoint поля: `noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens?`
+  - `calculateCostRub()` — без ручной субтракции, reasoning билится по output rate
+  - `getStepCostRub()` — временный bridge до Этапа 4
+- `lib/ai/usage-utils.ts`:
+  - Новый helper `extractUsageForPricing(usage)` → `TokenUsageForPricing`
+  - Читает `inputTokenDetails.{noCacheTokens, cacheReadTokens, cacheWriteTokens}` + `outputTokenDetails.reasoningTokens`
 
-### Шаг 2 — Этап 1: Базовый контракт
-Переписать `lib/ai/providers.ts`:
+### Этап 2: Ядро (lib/ai/)
+- `lib/ai/tokenlens-catalog.ts`:
+  - `calcCostUsd()` — использует `extractUsageForPricing`
+  - `calcStepCostRub()` — signature: `(modelId, usage: TokenUsageForPricing, providers?)`
+- `lib/ai/pipeline-trace.ts`:
+  - `AiCallTrace` — legacy `promptTokens/completionTokens` убраны, добавлены disjoint поля (`noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens`), `totalTokens` — derived
+  - `AiResultForTrace.usage` — тип `LanguageModelUsage` (SDK v6 native)
+  - `buildAiCallTrace`, `buildTtsTrace` обновлены
 
-**Было (строки 106-137):**
-```typescript
-export interface TokenUsageForPricing {
-  inputTokens: number;          // непрозрачно: total? fresh?
-  outputTokens: number;
-  cachedInputTokens?: number;
-  cacheWriteTokens?: number;
-}
+### Этап 3: 3 chat routes
+- `app/(chat)/api/chat/route.ts`
+- `app/(chat)/api/service-chat/route.ts`
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`
 
-export function calculateCostRub(modelId, usage) {
-  // ...
-  const freshInput = usage.inputTokens - cacheRead - cacheWrite;  // ← ручная субтракция
-  // ...
-}
-```
+Во всех: `onStepFinish` и `onFinish` используют `extractUsageForPricing(usage)` для построения `TokenUsageForPricing` перед вызовом `calcStepCostRub`/`calculateCostRub`.
 
-**Стало:**
-```typescript
-export interface TokenUsageForPricing {
-  noCacheInputTokens: number;     // явно свежие
-  cacheReadTokens: number;        // явно read
-  cacheWriteTokens: number;       // явно write
-  outputTokens: number;
-  reasoningTokens?: number;       // опционально (Opus extended thinking)
-}
-
-export function calculateCostRub(modelId, usage): number {
-  const p = MODEL_PRICING_RUB[modelId];
-  if (!p) return 0;
-  const effectiveOutput = usage.outputTokens + (usage.reasoningTokens ?? 0);
-  const cost =
-    (usage.noCacheInputTokens / 1000) * p.input +
-    (usage.cacheReadTokens    / 1000) * p.cached +
-    (usage.cacheWriteTokens   / 1000) * p.cacheWrite +
-    (effectiveOutput          / 1000) * p.output;
-  return Math.round(cost * 100) / 100;
-}
-```
-
-**Затем создать helper в `lib/ai/usage-utils.ts`:**
-```typescript
-export function extractUsageForPricing(
-  usage: LanguageModelUsage | undefined | null,
-): TokenUsageForPricing {
-  const details = usage?.inputTokenDetails;
-  return {
-    noCacheInputTokens: details?.noCacheTokens ?? usage?.inputTokens ?? 0,
-    cacheReadTokens:    details?.cacheReadTokens ?? 0,
-    cacheWriteTokens:   details?.cacheWriteTokens ?? 0,
-    outputTokens:       usage?.outputTokens ?? 0,
-    reasoningTokens:    usage?.outputTokenDetails?.reasoningTokens ?? 0,
-  };
-}
-```
-
-### Шаг 3 — валидация
-```bash
-npx tsc --noEmit
-```
-**Ожидаем ~20+ ошибок** в callsites — это нормально. Зафиксировать список (копировать вывод) в `CHANGELOG.md` сессии 2. Это будет roadmap для Этапов 2-3-4.
-
-### Шаг 4 — git commit
-```bash
-git add lib/ai/providers.ts lib/ai/usage-utils.ts
-git commit -m "refactor(tz-tokens1): new TokenUsageForPricing contract + extractUsageForPricing helper"
-```
-
-### Шаг 5 — отметить `[x]` в ROADMAP для Этапа 1, обновить HANDOFF
+⚠️ **Важно:** `DebugStepData` в этих routes пока заполняется **legacy-именами** (`inputTokens` = total, `cachedTokens` = cacheRead). Это намеренно — переименование схемы в Этапе 4.
 
 ---
 
-## Открытые вопросы (нужно подтверждение пользователя)
+## Следующий шаг: Этап 4
 
-**ПЕРВЫМ ДЕЛОМ в новой сессии — спросить пользователя:**
+**Цель:** Переписать типы debug events + мягкая миграция localStorage.
 
-1. **Согласен с планом 9 этапов?** (см. ROADMAP.md → Обзор)
-2. **localStorage migration** — ок что старые dev-записи DevPanel очистятся при первом открытии? (self-healing, одноразово, только dev-режим)
+### Задачи (по ROADMAP)
 
-Если ДА на оба — начинать Этап 1.
-Если НЕТ — обсуждать корректировки.
+**1. `lib/ai/debug-events.ts`:**
+- `DebugStepData` — заменить `inputTokens`, `cachedTokens` на `noCacheInputTokens`, `cacheReadTokens` (`cacheWriteTokens` уже есть, `reasoningTokens` уже есть)
+- `DebugFinishData` — заменить `totalInputTokens`, `totalCachedTokens` на `totalNoCacheInputTokens`, `totalCacheReadTokens`, `totalCacheWriteTokens`
+- Добавить константу `DEBUG_EVENT_SCHEMA_VERSION = 2`
+- Добавить поле `schemaVersion: number` в `DebugStepData` и `DebugFinishData`
+
+**2. `components/dev-panel/dev-panel-provider.tsx`:**
+- При инициализации — если localStorage содержит старую версию схемы → очистить (console.warn)
+- Обновить тип `DevPanelMessageData` если нужно
+
+**3. `hooks/use-onboarding-debug.ts`:**
+- Аналогичная миграция localStorage
+
+**4. `lib/ai/providers.ts` → `getStepCostRub(step)`:**
+- Обновить чтение: `step.noCacheInputTokens`, `step.cacheReadTokens`, `step.cacheWriteTokens` (убрать bridge-логику `inputTokens - cacheRead - cacheWrite`)
+
+**5. Обновить 3 routes** (где заполняется `DebugStepData` и `DebugFinishData`):
+- `app/(chat)/api/chat/route.ts` — onStepFinish (replace `inputTokens: usage?.inputTokens ?? 0` → `noCacheInputTokens: stepUsage.noCacheInputTokens` и т.д.), onFinish → `emitDebugFinish` (новые totalNoCacheInputTokens и т.д.)
+- `app/(chat)/api/service-chat/route.ts` — аналогично
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — аналогично
+
+**6. Валидация:** `npx tsc --noEmit` — ожидаем новые ошибки в DevPanel UI секциях (tokens-section, cost-breakdown-section, footer, timeline). Будут исправлены в Этапе 5.
+
+### Git commit сообщение
+
+```
+refactor(tz-tokens1): debug events schema v2 + localStorage migration
+```
 
 ---
 
-## Что уже сделано в сессии 1
+## Пользователь подтвердил
 
-### Созданные документы
-- `specs/TZ_TOKENS1_SdkNativeUsage/SPEC.md` — 9 требований
-- `specs/TZ_TOKENS1_SdkNativeUsage/ANALYSIS.md` — код-ревью + 6 рисков
-- `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` — 9 этапов с валидацией
-- `specs/TZ_TOKENS1_SdkNativeUsage/CHANGELOG.md`
-- `specs/TZ_TOKENS1_SdkNativeUsage/HANDOFF.md` (этот файл)
-
-### Архивирование
-- `specs/TZ_AUDIT1_TokenCostValidation/` → `_archive/` (заменён этим TZ)
-
-### Разведка кодовой базы
-Полная карта зависимостей в ANALYSIS.md. Все callsites найдены:
-- `calculateCostRub`: 6 мест
-- `calcStepCostRub`: 4 места (route.ts × 3 + pipeline-trace)
-- `logUsage`: 28 мест
-- `extractUsageFields`: 6 мест
-- `emitDebugStep/Finish/Guardian/Prompt`: 12 мест в 3 routes
-- DevPanel UI: 5 компонентов
-
----
-
-## Валидация (критерий успеха всего TZ)
-
-```
-DevPanel cost === Cost Audit Dashboard cost === Anthropic Console cost (Δ<1%)
-```
-
-Для 7 типов чатов × 3 запроса каждый (см. Этап 8 в ROADMAP).
+- ✅ План 9 этапов
+- ✅ localStorage migration — dev-режим, старые данные не важны, очищаются автоматически
+- ✅ Build + manual test перенесены до окончания Этапа 6
 
 ---
 
@@ -190,33 +137,24 @@ DevPanel cost === Cost Audit Dashboard cost === Anthropic Console cost (Δ<1%)
 # Проверка компиляции
 npx tsc --noEmit
 
-# Сборка
+# Сборка (пока не работает — ожидается после Этапа 6)
 npm run build
 
-# Dev сервер
-npm run dev
-
-# Найти все callsites типа
-grep -rn "calculateCostRub\(" lib/ app/
+# Найти все callsites
 grep -rn "calcStepCostRub\(" lib/ app/
-grep -rn "logUsage\(" lib/ app/
-
-# Проверка БД (через mcp__postgres__query)
-SELECT chatMode, COUNT(*), SUM("costUsd") FROM ai_usage_log
-WHERE "createdAt" > NOW() - INTERVAL '1 day'
-GROUP BY chatMode;
+grep -rn "DebugStepData\|DebugFinishData" lib/ app/ components/
 ```
 
 ---
 
-## Правила работы (из WORKFLOW.md)
+## Правила работы (НИКОГДА НЕ НАРУШАТЬ)
 
-- ⛔ **НЕ** отмечать `[x]` без `npx tsc --noEmit` = 0 ошибок
-- ⛔ **НЕ** переходить к следующему этапу без мануального теста пользователя
-- ⛔ **НЕ** делать "скопом" — Этап → tsc → build → git commit → ТЕСТ → следующий
+- ⛔ **НЕ** отмечать `[x]` без `npx tsc --noEmit` = 0 ошибок (в зоне этапа)
+- ⛔ **НЕ** использовать TodoWrite — основной чеклист это ROADMAP.md
 - ✅ Git commit после КАЖДОГО этапа: `refactor(tz-tokens1): описание`
-- ✅ ROADMAP.md — это чеклист, а не архив. Отмечай `[x]` сразу после задачи.
+- ✅ ROADMAP.md — обновляй статусы сразу после задачи
+- ✅ CHANGELOG.md — добавляй секцию после каждого этапа
 
 ---
 
-**Следующая сессия:** открой `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md`, прочитай Этап 1, спроси у пользователя подтверждение, начинай.
+**Новая сессия:** начинай с `specs/TZ_TOKENS1_SdkNativeUsage/ROADMAP.md` → Этап 4 → `lib/ai/debug-events.ts`.
