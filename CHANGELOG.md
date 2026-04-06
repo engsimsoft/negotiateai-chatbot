@@ -8,9 +8,31 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- RAG-2: MIND Consolidation + Profile + UI
 - RAG-3: Compaction (бесконечный чат)
 - RAG-4: Библиотека MVP (загрузка документов + search)
+
+---
+
+## [3.72.0] - 2026-04-07 - MIND Consolidation + Profile + UI
+
+**ТЗ-RAG2**: Ревизия фактов (Sonnet), ночной Opus-профиль, UI управления памятью. Гибридная консолидация: batch + event-triggered.
+
+### Added
+- **Sonnet консолидация** (`lib/ai/memory/consolidate.ts`) — два режима: полная ревизия (cron) и мини-ревизия (event-triggered каждые 20 фактов). Actions: supersede/merge/remove
+- **Промпт консолидации** (`lib/prompts/memory/consolidate.md`) — Sonnet ревизует факты: противоречия, дубли, устаревшее
+- **Opus-профиль** (`lib/ai/memory/profile.ts`) — `generateUserProfile()` нарративный профиль (800-1200 слов), `getProfileBlock()` → XML `<user-profile>` для system prompt
+- **Промпт профиля** (`lib/prompts/memory/profile.md`) — Opus генерирует связный профиль из фактов
+- **Ночной cron** (`app/api/cron/memory-profile/route.ts`) — 0:00 UTC (3:00 MSK): консолидация → профиль. CRON_SECRET, p-limit(3), saveCronRunLog
+- **Memory API** — `/api/user/memory` (GET facts, DELETE one/all), `/api/user/memory/settings` (GET/PATCH memoryEnabled)
+- **UI «Память»** (`components/settings/memory-section.tsx`) — секция на /settings: toggle, профиль (read-only), список фактов с category badges, удаление, «Удалить всё»
+- **DB таблицы** — `memory_settings` (memoryEnabled, factsSinceConsolidation, factsUpdatedSince), `user_profile_summary` (content, factCount, tokenCount, costUsd)
+
+### Changed
+- **chat/route.ts** — два слоя контекста: `<user-profile>` (Opus) + `<memory>` (retrieval). memoryEnabled gate (retrieve + extract)
+- **project task chat** — memoryEnabled gate
+- **extract.ts** — мини-консолидация триггер при пороге 20 фактов (fire-and-forget)
+- **vercel.json** — +cron `0 0 * * *` (memory-profile)
+- **settings-page.tsx** — +секция «Память» (Brain icon)
 
 ---
 
