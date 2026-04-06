@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import useSWR from "swr";
-import { ArrowLeft, User, Monitor, Palette, Link, Loader2, Users, ChevronRight } from "lucide-react";
+import { ArrowLeft, User, Monitor, Palette, Link, Loader2, Users, ChevronRight, Brain } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/toast";
 import { UserMenu } from "@/components/user-menu";
+import { MemorySection } from "@/components/settings/memory-section";
 import { fetcher } from "@/lib/utils";
 
 interface UserProfile {
@@ -48,7 +49,7 @@ const OCCUPATION_OPTIONS = [
   "Другое",
 ];
 
-type Section = "profile" | "account" | "connections" | "appearance";
+type Section = "profile" | "account" | "connections" | "memory" | "appearance";
 
 const SECTIONS: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: "profile", label: "Профиль", icon: <User className="size-4" /> },
@@ -57,6 +58,11 @@ const SECTIONS: { id: Section; label: string; icon: React.ReactNode }[] = [
     id: "connections",
     label: "Подключения",
     icon: <Link className="size-4" />,
+  },
+  {
+    id: "memory",
+    label: "Память",
+    icon: <Brain className="size-4" />,
   },
   {
     id: "appearance",
@@ -198,6 +204,8 @@ export function SettingsPage() {
               )}
 
               {activeSection === "connections" && <ConnectionsSection />}
+
+              {activeSection === "memory" && <MemorySection />}
 
               {activeSection === "appearance" && (
                 <AppearanceSection
