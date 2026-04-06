@@ -68,6 +68,11 @@ import {
   meetingRecord,
   type CronRunLog,
   cronRunLog,
+  type MemorySettings,
+  memorySettings,
+  type UserProfileSummary,
+  userProfileSummary,
+  memoryEntry,
   type User,
   user,
   vote,
@@ -4743,4 +4748,199 @@ export async function getCostByModel(days: number): Promise<CostByModel[]> {
       reasoningTokens: Number(r.reasoningTokens ?? 0),
     };
   });
+}
+
+// ============================================================================
+// Memory Settings (ТЗ-RAG2)
+// ============================================================================
+
+/**
+ * Get memory settings for a user. Creates default settings if none exist.
+ */
+export async function getMemorySettings({
+  userId,
+}: {
+  userId: string;
+}): Promise<MemorySettings> {
+  const [existing] = await db
+    .select()
+    .from(memorySettings)
+    .where(eq(memorySettings.userId, userId));
+
+  if (existing) return existing;
+
+  // Create default settings
+  const now = new Date();
+  const [created] = await db
+    .insert(memorySettings)
+    .values({
+      userId,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing()
+    .returning();
+
+  // Handle race condition: another request may have created it
+  if (!created) {
+    const [refetched] = await db
+      .select()
+      .from(memorySettings)
+      .where(eq(memorySettings.userId, userId));
+    return refetched;
+  }
+
+  return created;
+}
+
+/**
+ * Partial update of memory settings.
+ */
+export async function updateMemorySettings({
+  userId,
+  patch,
+}: {
+  userId: string;
+  patch: Partial<
+    Pick<
+      MemorySettings,
+      | "memoryEnabled"
+      | "factsUpdatedSince"
+      | "factsSinceConsolidation"
+      | "lastConsolidatedAt"
+    >
+  >;
+}): Promise<void> {
+  await db
+    .update(memorySettings)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(memorySettings.userId, userId));
+}
+
+/**
+ * Increment factsSinceConsolidation counter and set factsUpdatedSince.
+ * Returns the new counter value.
+ */
+export async function incrementFactsSinceConsolidation({
+  userId,
+}: {
+  userId: string;
+}): Promise<number> {
+  const now = new Date();
+
+  // Ensure settings row exists
+  await db
+    .insert(memorySettings)
+    .values({ userId, createdAt: now, updatedAt: now })
+    .onConflictDoNothing();
+
+  const [result] = await db
+    .update(memorySettings)
+    .set({
+      factsSinceConsolidation: sql`"factsSinceConsolidation" + 1`,
+      factsUpdatedSince: now,
+      updatedAt: now,
+    })
+    .where(eq(memorySettings.userId, userId))
+    .returning({ factsSinceConsolidation: memorySettings.factsSinceConsolidation });
+
+  return result?.factsSinceConsolidation ?? 0;
+}
+
+// ============================================================================
+// User Profile Summary (ТЗ-RAG2)
+// ============================================================================
+
+/**
+ * Get the latest profile summary for a user.
+ */
+export async function getProfileSummary({
+  userId,
+}: {
+  userId: string;
+}): Promise<UserProfileSummary | null> {
+  const [result] = await db
+    .select()
+    .from(userProfileSummary)
+    .where(eq(userProfileSummary.userId, userId));
+
+  return result ?? null;
+}
+
+/**
+ * Insert or update profile summary (upsert on userId unique constraint).
+ */
+export async function upsertProfileSummary({
+  userId,
+  content,
+  factCount,
+  tokenCount,
+  costUsd,
+  modelId,
+}: {
+  userId: string;
+  content: string;
+  factCount: number;
+  tokenCount?: number;
+  costUsd?: number;
+  modelId?: string;
+}): Promise<void> {
+  const now = new Date();
+  await db
+    .insert(userProfileSummary)
+    .values({
+      userId,
+      content,
+      factCount,
+      tokenCount: tokenCount ?? null,
+      costUsd: costUsd != null ? String(costUsd) : null,
+      modelId: modelId ?? null,
+      generatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: userProfileSummary.userId,
+      set: {
+        content,
+        factCount,
+        tokenCount: tokenCount ?? null,
+        costUsd: costUsd != null ? String(costUsd) : null,
+        modelId: modelId ?? null,
+        generatedAt: now,
+      },
+    });
+}
+
+/**
+ * Get users eligible for nightly memory profile generation.
+ * Criteria: memoryEnabled + >= minFacts active facts + facts updated since last profile.
+ */
+export async function getUsersForMemoryProfile({
+  minFacts = 10,
+}: {
+  minFacts?: number;
+} = {}): Promise<Array<{ userId: string; factCount: number }>> {
+  const rows = await db.execute(sql`
+    SELECT
+      ms."userId",
+      COALESCE(fc.cnt, 0)::int AS "factCount"
+    FROM "memory_settings" ms
+    LEFT JOIN (
+      SELECT "userId", COUNT(*) AS cnt
+      FROM "memory_entry"
+      WHERE "supersededBy" IS NULL
+      GROUP BY "userId"
+    ) fc ON fc."userId" = ms."userId"
+    LEFT JOIN "user_profile_summary" ups ON ups."userId" = ms."userId"
+    WHERE ms."memoryEnabled" = true
+      AND COALESCE(fc.cnt, 0) >= ${minFacts}
+      AND (
+        ups."generatedAt" IS NULL
+        OR ms."factsUpdatedSince" > ups."generatedAt"
+      )
+  `);
+
+  return rows.rows.map((r: any) => ({
+    userId: String(r.userId),
+    factCount: Number(r.factCount),
+  }));
 }

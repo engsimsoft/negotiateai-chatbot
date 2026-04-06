@@ -28,6 +28,7 @@ import {
   searchSimilarMemories,
   supersedeMemoryEntry,
 } from "./memory-queries";
+import { incrementFactsSinceConsolidation } from "@/lib/db/queries";
 import { MEMORY_CATEGORIES, type MemoryCategory, type MemorySourceType } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -169,6 +170,18 @@ export async function extractAndStoreFacts(
         console.error(
           `[MemoryExtract] Failed to store fact "${fact.content.slice(0, 50)}...":`,
           error instanceof Error ? error.message : error,
+        );
+      }
+    }
+
+    // ТЗ-RAG2: Increment facts counter for mini-consolidation trigger
+    if (stats.stored > 0) {
+      try {
+        await incrementFactsSinceConsolidation({ userId: input.userId });
+      } catch (err) {
+        console.warn(
+          "[MemoryExtract] Failed to increment factsSinceConsolidation:",
+          err instanceof Error ? err.message : err,
         );
       }
     }

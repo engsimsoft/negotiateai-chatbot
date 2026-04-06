@@ -805,3 +805,67 @@ export const memoryEntry = pgTable(
 );
 
 export type MemoryEntry = InferSelectModel<typeof memoryEntry>;
+
+// ============================================================================
+// Memory Settings (ТЗ-RAG2)
+// ============================================================================
+
+export const memorySettings = pgTable(
+  "memory_settings",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .unique()
+      .references(() => user.id),
+    /** Global toggle: enable/disable MIND memory extraction + retrieval */
+    memoryEnabled: boolean("memoryEnabled").notNull().default(true),
+    /** Timestamp when facts were last updated (for profile regeneration gate) */
+    factsUpdatedSince: timestamp("factsUpdatedSince"),
+    /** Counter: new facts since last consolidation (triggers mini-consolidation at threshold) */
+    factsSinceConsolidation: integer("factsSinceConsolidation")
+      .notNull()
+      .default(0),
+    /** When was the last consolidation (full or mini) run */
+    lastConsolidatedAt: timestamp("lastConsolidatedAt"),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdx: index("memory_settings_user_idx").on(table.userId),
+  })
+);
+
+export type MemorySettings = InferSelectModel<typeof memorySettings>;
+
+// ============================================================================
+// User Profile Summary — Opus nightly profile (ТЗ-RAG2)
+// ============================================================================
+
+export const userProfileSummary = pgTable(
+  "user_profile_summary",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .unique()
+      .references(() => user.id),
+    /** Narrative profile content (800-1200 words, Russian) */
+    content: text("content").notNull(),
+    /** Number of active facts used to generate this profile */
+    factCount: integer("factCount").notNull(),
+    /** Approximate token count of the profile content */
+    tokenCount: integer("tokenCount"),
+    /** Cost of generation in USD */
+    costUsd: numeric("costUsd", { precision: 10, scale: 6 }),
+    /** Model used for generation */
+    modelId: varchar("modelId", { length: 64 }),
+    /** When this profile was generated */
+    generatedAt: timestamp("generatedAt").notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdx: index("user_profile_summary_user_idx").on(table.userId),
+  })
+);
+
+export type UserProfileSummary = InferSelectModel<typeof userProfileSummary>;
