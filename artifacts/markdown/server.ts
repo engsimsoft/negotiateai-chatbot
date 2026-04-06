@@ -2,13 +2,14 @@ import { smoothStream, streamText } from "ai";
 import { updateDocumentPrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
 import { createDocumentHandler } from "@/lib/artifacts/server";
+import { logUsage } from "@/lib/ai/usage-utils";
 
 export const markdownDocumentHandler = createDocumentHandler<"markdown">({
   kind: "markdown",
-  onCreateDocument: async ({ title, dataStream }) => {
+  onCreateDocument: async ({ title, dataStream, session }) => {
     let draftContent = "";
 
-    const { fullStream } = streamText({
+    const result = streamText({
       model: myProvider.languageModel("artifact-model"),
       system: `Напиши документ на тему, используя Markdown форматирование.
 
@@ -37,7 +38,7 @@ export const markdownDocumentHandler = createDocumentHandler<"markdown">({
       prompt: title,
     });
 
-    for await (const delta of fullStream) {
+    for await (const delta of result.fullStream) {
       const { type } = delta;
 
       if (type === "text-delta") {
@@ -53,12 +54,18 @@ export const markdownDocumentHandler = createDocumentHandler<"markdown">({
       }
     }
 
+    // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+    if (session?.user?.id) {
+      const usage = await result.totalUsage;
+      logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:markdown" });
+    }
+
     return draftContent;
   },
-  onUpdateDocument: async ({ document, description, dataStream }) => {
+  onUpdateDocument: async ({ document, description, dataStream, session }) => {
     let draftContent = "";
 
-    const { fullStream } = streamText({
+    const result = streamText({
       model: myProvider.languageModel("artifact-model"),
       system: updateDocumentPrompt(document.content, "markdown"),
       experimental_transform: smoothStream({ chunking: "word" }),
@@ -73,7 +80,7 @@ export const markdownDocumentHandler = createDocumentHandler<"markdown">({
       },
     });
 
-    for await (const delta of fullStream) {
+    for await (const delta of result.fullStream) {
       const { type } = delta;
 
       if (type === "text-delta") {
@@ -87,6 +94,12 @@ export const markdownDocumentHandler = createDocumentHandler<"markdown">({
           transient: true,
         });
       }
+    }
+
+    // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+    if (session?.user?.id) {
+      const usage = await result.totalUsage;
+      logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:markdown" });
     }
 
     return draftContent;

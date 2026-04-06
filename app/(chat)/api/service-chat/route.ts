@@ -826,23 +826,23 @@ export async function POST(request: Request) {
               debugStepDataQueue.push(stepData);
             }
           },
-          onFinish: async ({ usage }) => {
+          onFinish: async ({ totalUsage }) => {
             const totalTime = Date.now() - startTime;
             if (firstTokenTime === null) firstTokenTime = totalTime;
 
-            // ТЗ-CACHE2: Usage logging (fire-and-forget)
+            // ТЗ-PIPELINE1: Use totalUsage (sum of all steps), not per-step usage
             const resolvedModelId = myProvider.languageModel(modelId).modelId;
             logUsage({
               userId,
-              usage,
+              usage: totalUsage,
               modelId: resolvedModelId,
               chatMode: `service:${context}`,
               chatId: managerChatId ?? null,
               durationMs: totalTime,
             });
 
-            // ТЗ-DEV1: Emit debug finish summary
-            const finishUsage = extractUsageForPricing(usage);
+            // ТЗ-DEV1: Emit debug finish summary (totalUsage for accurate display)
+            const finishUsage = extractUsageForPricing(totalUsage);
             emitDebugFinish(dataStream, {
               schemaVersion: DEBUG_EVENT_SCHEMA_VERSION,
               totalNoCacheInputTokens: finishUsage.noCacheInputTokens,

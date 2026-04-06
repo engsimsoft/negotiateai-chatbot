@@ -32,12 +32,12 @@ export async function POST(request: Request) {
       system: prompt.systemPrompt,
       messages: await convertToModelMessages(messages),
       temperature: 1.0,
-      onFinish: async ({ usage }) => {
-        // ТЗ-CACHE2: Usage logging (skip if no auth)
+      // ТЗ-PIPELINE1: Use totalUsage (sum of all steps)
+      onFinish: async ({ totalUsage }) => {
         if (userId) {
           logUsage({
             userId,
-            usage,
+            usage: totalUsage,
             modelId: resolvedModelId,
             chatMode: "legacy:ben",
           });

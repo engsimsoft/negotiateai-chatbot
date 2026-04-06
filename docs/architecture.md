@@ -26,6 +26,7 @@
 │  │  Business Logic (lib/)                               │  │
 │  │  ├── ai/providers.ts   - AI Provider config + pricing  │  │
 │  │  ├── ai/pipeline-trace.ts - Pipeline trace (v3.58)    │  │
+│  │  ├── ai/retry-with-logging.ts - Retry wrapper with per-attempt logging (v3.69) │
 │  │  ├── ai/tools/         - AI-инструменты              │  │
 │  │  ├── briefing/         - Briefing pipeline + types + research engine (v3.27, v3.52) │
 │  │  ├── podcast/          - Podcast Engine (v3.43)           │

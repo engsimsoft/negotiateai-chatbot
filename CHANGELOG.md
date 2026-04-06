@@ -12,6 +12,33 @@
 
 ---
 
+## [3.69.0] - 2026-04-06 - ReliablePipelineObservability
+
+**ТЗ-PIPELINE1**: Надёжный учёт расходов и прозрачность pipeline. До фикса терялось 74% token usage; после — дельта <1% vs Anthropic Console.
+
+### Fixed
+- **Multi-step usage потери (CRITICAL)**: `onFinish: ({ usage })` во всех streaming routes записывал usage последнего step-а вместо total. Заменено на `onFinish: ({ totalUsage })` в 4 routes: chat, service-chat, task-expert-chat, ben
+- **Artifacts — 0 логирования**: 5 artifact handlers (text, markdown, excel, reveal, pptx) использовали Sonnet 4.6 без единого `logUsage`. Добавлено `result.totalUsage` + `logUsage()` во все
+- **Pipeline SDK retry скрытый**: AI SDK default `maxRetries=2` делал до 3 попыток за кулисами без логирования. Добавлено `maxRetries: 0` в briefing-author, briefing-section-author, briefing-filter, script-generator
+- **Pipeline stream crash**: "Controller is already closed" при ошибке pipeline mid-stream. Добавлен `safeEnqueue` wrapper в briefing generate route
+
+### Added
+- `lib/ai/retry-with-logging.ts` — Retry-обёртка с per-attempt логированием: каждая попытка записывается в `ai_usage_log` + trace
+- Pipeline Trace Drawer: секция **URL Verification** с детальным списком URLs (✓ verified / ✗ fabricated)
+- Pipeline Trace Drawer: **Retry History** в стадиях — показывает каждую попытку с ошибкой
+- `AiCallAttempt` тип + `attempts?` поле в `AiCallTrace` для retry visibility
+- `urlVerification` prop в `PipelineTraceFooter` → `PipelineTraceDrawer`
+- Artifact usage logging: chatModes `artifact:text`, `artifact:markdown`, `artifact:excel`, `artifact:reveal`, `artifact:pptx`
+
+### Removed
+- `AUTHOR_MODEL_FALLBACK` (claude-sonnet-4-5-20250929) — legacy fallback модель с той же ценой, заменена на retry с основной моделью
+
+### Verified
+- Anthropic Console vs БД: $0.52 vs $0.519 (настройка брифинга, дельта <1%)
+- Anthropic Console vs БД: $0.07 vs $0.0735 (генерация брифинга, дельта ~0%)
+
+---
+
 ## [3.68.0] - 2026-04-06 - FullCostCoverage
 
 **ТЗ-BILLING1**: Закрытие слепых зон в учёте расходов — Deepgram voice-to-text и Gemini Vision OCR теперь всегда логируются в `ai_usage_log`.

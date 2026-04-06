@@ -2,13 +2,14 @@ import { smoothStream, streamText } from "ai";
 import { updateDocumentPrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
 import { createDocumentHandler } from "@/lib/artifacts/server";
+import { logUsage } from "@/lib/ai/usage-utils";
 
 export const textDocumentHandler = createDocumentHandler<"text">({
   kind: "text",
-  onCreateDocument: async ({ title, dataStream }) => {
+  onCreateDocument: async ({ title, dataStream, session }) => {
     let draftContent = "";
 
-    const { fullStream } = streamText({
+    const result = streamText({
       model: myProvider.languageModel("artifact-model"),
       system: `Write about the given topic in PLAIN TEXT format.
 
@@ -38,7 +39,7 @@ Example format:
       prompt: title,
     });
 
-    for await (const delta of fullStream) {
+    for await (const delta of result.fullStream) {
       const { type } = delta;
 
       if (type === "text-delta") {
@@ -54,12 +55,18 @@ Example format:
       }
     }
 
+    // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+    if (session?.user?.id) {
+      const usage = await result.totalUsage;
+      logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:text" });
+    }
+
     return draftContent;
   },
-  onUpdateDocument: async ({ document, description, dataStream }) => {
+  onUpdateDocument: async ({ document, description, dataStream, session }) => {
     let draftContent = "";
 
-    const { fullStream } = streamText({
+    const result = streamText({
       model: myProvider.languageModel("artifact-model"),
       system: updateDocumentPrompt(document.content, "text"),
       experimental_transform: smoothStream({ chunking: "word" }),
@@ -74,7 +81,7 @@ Example format:
       },
     });
 
-    for await (const delta of fullStream) {
+    for await (const delta of result.fullStream) {
       const { type } = delta;
 
       if (type === "text-delta") {
@@ -88,6 +95,12 @@ Example format:
           transient: true,
         });
       }
+    }
+
+    // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+    if (session?.user?.id) {
+      const usage = await result.totalUsage;
+      logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:text" });
     }
 
     return draftContent;

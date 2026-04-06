@@ -6,11 +6,10 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
 import type { ModelCatalog } from "tokenlens/core";
-import { waitUntil } from "@vercel/functions";
-import { logUsage } from "@/lib/ai/usage-utils";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
+import { retryWithLogging } from "@/lib/ai/retry-with-logging";
 import type { LanguageModelUsage } from "ai";
-import { AUTHOR_MODEL, AUTHOR_MODEL_FALLBACK } from "./briefing-config";
+import { AUTHOR_MODEL } from "./briefing-config";
 import type { FilteredItem } from "./briefing-filter";
 import type { RawContent } from "./source-fetchers/types";
 import type { BriefingArticle } from "./briefing-types";
@@ -158,83 +157,49 @@ export async function generateArticle(
   const startTime = Date.now();
   const warnings: string[] = [];
 
-  let object: BriefingArticle;
-  let usage: LanguageModelUsage | undefined;
-  let finishReason = "stop";
-  let usedModel = AUTHOR_MODEL;
-  let retryCount = 0;
-  let fallbackUsed: string | undefined;
-  let primaryError: string | undefined;
+  // ТЗ-PIPELINE1: retryWithLogging replaces hidden SDK retry + manual fallback.
+  // maxRetries:0 disables AI SDK internal retry. Our wrapper logs every attempt.
+  const { result: object, usage, attempts, totalDurationMs } = await retryWithLogging(
+    async () => {
+      const res = await generateObject({
+        model: anthropic(AUTHOR_MODEL),
+        schema: briefingArticleSchema,
+        system: SYSTEM_PROMPT,
+        prompt: userMessage,
+        maxOutputTokens: maxTokens,
+        maxRetries: 0,
+      });
+      console.log(`[Briefing Author] model=${AUTHOR_MODEL} maxOutputTokens=${maxTokens} usage:`, JSON.stringify(res.usage));
+      return { result: res.object, usage: res.usage };
+    },
+    { maxAttempts: 3, userId, modelId: AUTHOR_MODEL, chatMode: "briefing:author" },
+  );
 
-  try {
-    // Note: thinking/effort not used here — Anthropic prohibits thinking when
-    // tool_choice is forced (generateObject uses tool_choice internally)
-    const result = await generateObject({
-      model: anthropic(AUTHOR_MODEL),
-      schema: briefingArticleSchema,
-      system: SYSTEM_PROMPT,
-      prompt: userMessage,
-      maxOutputTokens: maxTokens,
-    });
-    object = result.object;
-    usage = result.usage;
-    finishReason = result.finishReason ?? "stop";
-    console.log(`[Briefing Author] model=${AUTHOR_MODEL} maxOutputTokens=${maxTokens} usage:`, JSON.stringify(result.usage));
-    console.log(`[Briefing Author] finishReason=${result.finishReason}`);
-  } catch (err) {
-    primaryError = err instanceof Error ? err.message : String(err);
-    console.warn(
-      `[Briefing] Primary model ${AUTHOR_MODEL} failed, trying ${AUTHOR_MODEL_FALLBACK}:`,
-      primaryError,
-    );
-    retryCount = 1;
-    fallbackUsed = AUTHOR_MODEL_FALLBACK;
-    usedModel = AUTHOR_MODEL_FALLBACK;
-    warnings.push(`Primary model ${AUTHOR_MODEL} failed: ${primaryError}`);
-
-    const result = await generateObject({
-      model: anthropic(AUTHOR_MODEL_FALLBACK),
-      schema: briefingArticleSchema,
-      system: SYSTEM_PROMPT,
-      prompt: userMessage,
-      maxOutputTokens: maxTokens,
-    });
-    object = result.object;
-    usage = result.usage;
-    finishReason = result.finishReason ?? "stop";
-  }
-
-  const durationMs = Date.now() - startTime;
-
-  // ТЗ-CACHE2+TOKENS1: Usage logging — real usage from AI SDK (not fake shape)
-  if (userId && usage) {
-    waitUntil(logUsage({
-      userId,
-      usage,
-      modelId: usedModel,
-      chatMode: "briefing:author",
-      durationMs,
-    }));
+  const retryCount = attempts.length - 1;
+  if (retryCount > 0) {
+    warnings.push(`Retried ${retryCount} time(s). Errors: ${attempts.filter(a => a.error).map(a => a.error).join("; ")}`);
   }
 
   const ai = buildAiCallTrace(
     {
-      modelId: usedModel,
+      modelId: AUTHOR_MODEL,
       usage,
-      finishReason,
+      finishReason: "stop",
       promptPreview: userMessage.slice(0, 500),
       retryCount,
-      fallbackUsed,
-      durationMs,
+      durationMs: totalDurationMs,
     },
     catalog,
   );
-  ai.error = primaryError;
+  // ТЗ-PIPELINE1: Attach per-attempt history for DevPanel retry visibility
+  if (attempts.length > 1) {
+    ai.attempts = attempts.map(a => ({ attempt: a.attempt, error: a.error, durationMs: a.durationMs }));
+  }
 
   const trace: PipelineStageTrace = {
     stage: "author",
     startedAt: new Date(startTime).toISOString(),
-    durationMs,
+    durationMs: totalDurationMs,
     ai,
     errors: [],
     warnings,

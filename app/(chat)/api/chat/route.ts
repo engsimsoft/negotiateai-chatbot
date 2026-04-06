@@ -700,7 +700,8 @@ export async function POST(request: Request) {
               debugStepDataQueue.push(stepData);
             }
           },
-          onFinish: async ({ usage }) => {
+          // ТЗ-PIPELINE1: Use totalUsage (sum of all steps), not per-step usage
+          onFinish: async ({ totalUsage }) => {
             const totalTime = Date.now() - startTime;
             if (firstTokenTime === null) {
               firstTokenTime = totalTime;
@@ -718,7 +719,7 @@ export async function POST(request: Request) {
               const effectiveModelId =
                 resolvedModelId ?? (isProjectChat ? `project:${tier}` : chatMode);
 
-              finalMergedUsage = buildAppUsage(effectiveModelId, usage);
+              finalMergedUsage = buildAppUsage(effectiveModelId, totalUsage);
               // costUsd for DB audit (AiUsageLog) — derived from costRub / RUB_PER_USD
               costUsd =
                 finalMergedUsage.costRub.totalRub > 0
@@ -733,14 +734,14 @@ export async function POST(request: Request) {
               // state doesn't get stuck waiting.
               const fallbackModelId =
                 resolvedModelId ?? (isProjectChat ? `project:${tier}` : chatMode);
-              finalMergedUsage = buildAppUsage(fallbackModelId, usage);
+              finalMergedUsage = buildAppUsage(fallbackModelId, totalUsage);
               dataStream.write({ type: "data-usage", data: finalMergedUsage });
             }
 
             // ТЗ-OPT1+FIX1+CACHE2: Store usage data for logging after guardian analysis completes
             const logModelId = resolvedModelId || (isProjectChat ? `project:${tier}` : chatMode);
             const logChatMode = isProjectChat ? `project:${tier}` : chatMode;
-            const usageFields = extractUsageFields(usage);
+            const usageFields = extractUsageFields(totalUsage);
             usageLogMeta = {
               modelId: logModelId,
               ...usageFields,
@@ -750,7 +751,7 @@ export async function POST(request: Request) {
             };
 
             // ТЗ-DEV1: Emit debug finish summary
-            const finishUsage = extractUsageForPricing(usage);
+            const finishUsage = extractUsageForPricing(totalUsage);
             emitDebugFinish(dataStream, {
               schemaVersion: DEBUG_EVENT_SCHEMA_VERSION,
               totalNoCacheInputTokens: finishUsage.noCacheInputTokens,

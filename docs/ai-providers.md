@@ -1,7 +1,7 @@
 # AI-провайдеры и модели
 
-**Версия:** 3.2.0
-**Последнее обновление:** 2026-03-01
+**Версия:** 3.3.0
+**Последнее обновление:** 2026-04-06
 **Статус:** 3 провайдера, 4 модели Anthropic + 4 модели Gemini + 2 модели Perplexity
 
 ---
@@ -25,6 +25,7 @@
 - [lib/ai/chat-mode-config.ts](../lib/ai/chat-mode-config.ts) — chatMode → модель
 - [lib/ai/model-tiers.ts](../lib/ai/model-tiers.ts) — уровни моделей для проектов
 - [lib/briefing/briefing-config.ts](../lib/briefing/briefing-config.ts) — модели для брифинга (фильтр Gemini + автор Claude)
+- [lib/ai/retry-with-logging.ts](../lib/ai/retry-with-logging.ts) — retry wrapper с per-attempt usage logging (v3.69.0)
 
 ---
 
@@ -139,8 +140,7 @@
 | Snapshot Creator | `lib/ai/clerks/snapshot-creator.ts` | `claude-haiku` | 0.1 | — | env: `SNAPSHOT_CLERK_MODEL` |
 | Клерк-анализатор файлов | `api/projects/[id]/analyze-file/route.ts` | `claude-haiku` | 0.1 | — | Hardcoded |
 | Project Summary | `api/projects/[id]/generate-summary/route.ts` | `claude-haiku` | — | — | Hardcoded |
-| **Briefing: Автор** | `lib/briefing/briefing-author.ts` | **`claude-sonnet-4-6`** | — | — | generateObject, maxOutputTokens по volume |
-| **Briefing: Fallback** | `lib/briefing/briefing-author.ts` | `claude-sonnet-4-5-20250929` | — | — | При ошибке primary |
+| **Briefing: Автор** | `lib/briefing/briefing-author.ts` | **`claude-sonnet-4-6`** | — | — | generateObject, maxOutputTokens по volume, retryWithLogging (v3.69.0) |
 | **Meeting: Суммаризатор** | `lib/meeting/meeting-pipeline.ts` | **`claude-sonnet-4-6`** | 0.3 | 8192 | generateText, 3 уровня (compact/standard/detailed) |
 
 ### Google Gemini — Backend
@@ -235,7 +235,7 @@ const cost = calculateCostRub('claude-sonnet-4-6', { inputTokens: 1000, outputTo
 const ttsCost = calculateTtsCostRub(30); // 30 секунд
 ```
 
-`MODEL_PRICING_RUB` поддерживает: Claude (Haiku, Sonnet, Opus, fallback Sonnet 4.5), Gemini (2.0 Flash, 2.5 Flash), Perplexity (Sonar Pro, Sonar Deep Research).
+`MODEL_PRICING_RUB` поддерживает: Claude (Haiku, Sonnet, Opus), Gemini (2.0 Flash, 2.5 Flash), Perplexity (Sonar Pro, Sonar Deep Research).
 
 Non-token провайдеры (v3.66.0):
 ```typescript
@@ -310,6 +310,7 @@ PERPLEXITY_API_KEY=your_perplexity_api_key
 
 | Дата | Версия | Изменения |
 |------|--------|-----------|
+| 2026-04-06 | 3.3.0 | ТЗ-PIPELINE1: Removed AUTHOR_MODEL_FALLBACK (claude-sonnet-4-5-20250929), added retryWithLogging for briefing-author/section-author, artifact handlers now log usage |
 | 2026-03-01 | 3.2.0 | ТЗ-CACHE1: Prompt Caching (cacheControl: ephemeral) для всех streaming routes (per-message providerOptions на system message) |
 | 2026-02-22 | 3.1.1 | Добавлены Perplexity (sonar-pro, sonar-deep-research), Podcast модели (gemini-2.5-flash скрипт, gemini-2.5-flash-preview-tts TTS), `@google/genai` SDK для TTS |
 | 2026-02-21 | 3.1.0 | Briefing Author → Claude Sonnet 4.6 (из Gemini 3 Pro), effort для 3 точек (онбординг, профессор, ревьюер), Gemini остался только для фильтра + OCR |
@@ -322,4 +323,4 @@ PERPLEXITY_API_KEY=your_perplexity_api_key
 
 ---
 
-**Обновлено:** 2026-03-01
+**Обновлено:** 2026-04-06

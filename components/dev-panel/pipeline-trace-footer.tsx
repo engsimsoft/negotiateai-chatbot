@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from "react";
 import type {
   PipelineStageTrace,
   PipelineTraceSummary,
+  UrlVerificationTrace,
 } from "@/lib/ai/pipeline-trace";
 import { PipelineTraceDrawer } from "./pipeline-trace-drawer";
 
@@ -31,12 +32,15 @@ interface PipelineTraceFooterProps {
   summary: PipelineTraceSummary | null;
   /** Whether pipeline is currently running */
   isGenerating: boolean;
+  /** ТЗ-PIPELINE1: URL verification data for drawer */
+  urlVerification?: UrlVerificationTrace | null;
 }
 
 export function PipelineTraceFooter({
   stages = [],
   summary,
   isGenerating,
+  urlVerification,
 }: PipelineTraceFooterProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -143,6 +147,7 @@ export function PipelineTraceFooter({
         onOpenChange={setDrawerOpen}
         stages={stages}
         summary={summary}
+        urlVerification={urlVerification}
       />
     </>
   );

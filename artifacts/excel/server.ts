@@ -5,6 +5,7 @@
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { streamText } from "ai";
 import { myProvider } from "@/lib/ai/providers";
+import { logUsage } from "@/lib/ai/usage-utils";
 import { put } from "@vercel/blob";
 import ExcelJS from "exceljs";
 import type { ExcelData, ExcelSheet, ThemeId } from "@/lib/ai/tools/excel/types";
@@ -170,7 +171,7 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
       };
     } else {
       // Generate with AI
-      const { fullStream } = streamText({
+      const result = streamText({
         model: myProvider.languageModel("artifact-model"),
         system: EXCEL_SYSTEM_PROMPT,
         prompt: title,
@@ -178,12 +179,18 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
 
       // Performance: Use array.join instead of string concatenation
       const chunks: string[] = [];
-      for await (const delta of fullStream) {
+      for await (const delta of result.fullStream) {
         if (delta.type === "text-delta") {
           chunks.push(delta.text);
         }
       }
       const jsonContent = chunks.join("");
+
+      // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+      if (session?.user?.id) {
+        const usage = await result.totalUsage;
+        logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:excel" });
+      }
 
       // Parse JSON response
       try {
@@ -255,7 +262,7 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
     }
 
     // Generate update with AI
-    const { fullStream } = streamText({
+    const result = streamText({
       model: myProvider.languageModel("artifact-model"),
       system: `${EXCEL_SYSTEM_PROMPT}
 
@@ -268,12 +275,18 @@ ${JSON.stringify(excelData, null, 2)}
 
     // Performance: Use array.join instead of string concatenation
     const chunks: string[] = [];
-    for await (const delta of fullStream) {
+    for await (const delta of result.fullStream) {
       if (delta.type === "text-delta") {
         chunks.push(delta.text);
       }
     }
     const jsonContent = chunks.join("");
+
+    // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+    if (session?.user?.id) {
+      const usage = await result.totalUsage;
+      logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:excel" });
+    }
 
     // Parse updated JSON
     try {

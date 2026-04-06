@@ -1,5 +1,6 @@
 import { smoothStream, streamText } from "ai";
 import { myProvider } from "@/lib/ai/providers";
+import { logUsage } from "@/lib/ai/usage-utils";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { put } from "@vercel/blob";
 import pptxgen from "pptxgenjs";
@@ -107,7 +108,7 @@ interface PptxDocumentContent {
 export const presentationPptxDocumentHandler =
   createDocumentHandler<"presentation-pptx">({
     kind: "presentation-pptx",
-    onCreateDocument: async ({ title, dataStream }) => {
+    onCreateDocument: async ({ title, dataStream, session }) => {
       let fullContent = "";
 
       // Detect theme from title
@@ -125,17 +126,23 @@ export const presentationPptxDocumentHandler =
       });
 
       // Generate slides using AI
-      const { fullStream } = streamText({
+      const result = streamText({
         model: myProvider.languageModel("artifact-model"),
         system: PPTX_SYSTEM_PROMPT,
         experimental_transform: smoothStream({ chunking: "word" }),
         prompt: `Create a presentation about: ${title}`,
       });
 
-      for await (const delta of fullStream) {
+      for await (const delta of result.fullStream) {
         if (delta.type === "text-delta") {
           fullContent += delta.text;
         }
+      }
+
+      // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+      if (session?.user?.id) {
+        const usage = await result.totalUsage;
+        logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:pptx" });
       }
 
       const slides = parseSlides(fullContent);
@@ -216,7 +223,7 @@ export const presentationPptxDocumentHandler =
       return JSON.stringify(storedContent);
     },
 
-    onUpdateDocument: async ({ document, description, dataStream }) => {
+    onUpdateDocument: async ({ document, description, dataStream, session }) => {
       let fullContent = "";
 
       // Parse existing content
@@ -243,7 +250,7 @@ export const presentationPptxDocumentHandler =
         transient: true,
       });
 
-      const { fullStream } = streamText({
+      const result = streamText({
         model: myProvider.languageModel("artifact-model"),
         system: `${PPTX_SYSTEM_PROMPT}
 
@@ -257,10 +264,16 @@ Generate the COMPLETE updated slides array (not just changes).`,
         prompt: description,
       });
 
-      for await (const delta of fullStream) {
+      for await (const delta of result.fullStream) {
         if (delta.type === "text-delta") {
           fullContent += delta.text;
         }
+      }
+
+      // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+      if (session?.user?.id) {
+        const usage = await result.totalUsage;
+        logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:pptx" });
       }
 
       const slides = parseSlides(fullContent);

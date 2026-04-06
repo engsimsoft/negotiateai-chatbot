@@ -482,7 +482,7 @@ export function BriefingPageClient({
         <div className="shrink-0 border-t px-3 py-1">
           <div className="flex items-center gap-3">
             <span className="font-mono text-[10px] text-muted-foreground/50">Briefing</span>
-            <PipelineTraceFooter stages={initialBriefingTrace.stages} summary={initialBriefingTrace.summary} isGenerating={false} />
+            <PipelineTraceFooter stages={initialBriefingTrace.stages} summary={initialBriefingTrace.summary} isGenerating={false} urlVerification={initialBriefingTrace.urlVerification} />
             {initialPodcastTrace && (
               <>
                 <span className="font-mono text-[10px] text-muted-foreground/50">Podcast</span>

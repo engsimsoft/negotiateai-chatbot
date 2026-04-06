@@ -108,11 +108,13 @@ export async function generateScript(
     const prompt =
       attempt >= 2 ? baseMessage + RETRY_REINFORCEMENT : baseMessage;
 
+    // ТЗ-PIPELINE1: maxRetries:0 — disable hidden SDK retry (own content-based retry below)
     const result = await generateText({
       model: google(SCRIPT_MODEL),
       system: SYSTEM_PROMPT,
       prompt,
       maxOutputTokens: 2048,
+      maxRetries: 0,
     });
 
     // ТЗ-DEV2: Accumulate usage across retries (AI SDK v5: inputTokens/outputTokens)

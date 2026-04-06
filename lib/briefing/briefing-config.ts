@@ -32,9 +32,6 @@ export const FILTER_MODEL = "gemini-2.0-flash";
 /** Stage 2: Author — article generation (Anthropic Claude) */
 export const AUTHOR_MODEL = "claude-sonnet-4-6";
 
-/** Fallback author if primary is unavailable */
-export const AUTHOR_MODEL_FALLBACK = "claude-sonnet-4-5-20250929";
-
 // --- Cron ---
 
 /** ТЗ-TG4a: Cron interval in minutes (Vercel Cron schedule) */

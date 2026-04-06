@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-02-27
+**Обновлено:** 2026-04-06
 
 ---
 
@@ -44,6 +44,7 @@
 | **Podcast: TTS** | Gemini 2.5 Flash TTS | ✅ Работает | Озвучка сценария (multi-speaker: Host + Expert) (v3.43) |
 | **Meeting: Транскрипция** | Deepgram Nova-3 | ✅ Работает | Batch transcription аудио встреч (русский, diarize) (v3.61) |
 | **Meeting: Суммаризация** | Claude Sonnet 4.6 | ✅ Работает | Генерация структурированного резюме встречи (3 уровня) (v3.61) |
+| **Artifact handlers** | Claude Sonnet 4.6 | ✅ Работает | Генерация/обновление артефактов (text, markdown, excel, reveal, pptx), chatMode: `artifact:*` (v3.69) |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
 
 ---
@@ -353,7 +354,7 @@ lib/briefing/save-briefing-profile.ts                       # Логика со�
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Claude Sonnet 4.6 (`claude-sonnet-4-6`), fallback: `claude-sonnet-4-5-20250929` |
+| **Модель** | Claude Sonnet 4.6 (`claude-sonnet-4-6`), retryWithLogging (v3.69.0, no fallback model) |
 | **Тип** | Backend (внутренний вызов в generate/route.ts) |
 | **Вход** | ~30 FilteredItem[] + userTopics + settings |
 | **Выход** | BriefingArticle (связная статья с markdown-секциями, inline-ссылками, источниками) |

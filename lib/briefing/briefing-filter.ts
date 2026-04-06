@@ -66,8 +66,10 @@ Content: ${item.content}`,
 
   const userPrompt = `Filter these ${items.length} articles:\n\n${articlesText}`;
 
+  // ТЗ-PIPELINE1: maxRetries:0 — disable hidden SDK retry
   const { object, usage } = await generateObject({
     model: google(FILTER_MODEL),
+    maxRetries: 0,
     schema: filterResultSchema,
     system: `You are a news filter for a morning briefing service.
 Your job is to select the ${MAX_FILTER_CANDIDATES} best news candidates from the raw feed.

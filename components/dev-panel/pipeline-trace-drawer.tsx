@@ -19,6 +19,7 @@ import { ChevronRight } from "lucide-react";
 import type {
   PipelineStageTrace,
   PipelineTraceSummary,
+  UrlVerificationTrace,
 } from "@/lib/ai/pipeline-trace";
 
 function formatDuration(ms: number): string {
@@ -179,6 +180,24 @@ function StagesSection({ stages }: { stages: PipelineStageTrace[] }) {
                 {stage.ai.error && (
                   <KV label="Error" value={stage.ai.error} warn />
                 )}
+                {/* ТЗ-PIPELINE1: Per-attempt retry history */}
+                {stage.ai.attempts && stage.ai.attempts.length > 1 && (
+                  <div className="mt-1.5 space-y-1 border-t border-border/50 pt-1.5">
+                    <span className="font-mono text-[10px] font-semibold text-amber-600">
+                      Retry History ({stage.ai.attempts.length} attempts)
+                    </span>
+                    {stage.ai.attempts.map((a) => (
+                      <div key={a.attempt} className="flex items-baseline justify-between gap-2 font-mono text-[10px]">
+                        <span className={a.error ? "text-destructive" : "text-emerald-600"}>
+                          #{a.attempt + 1} {a.error ? "✗" : "✓"} {formatDuration(a.durationMs)}
+                        </span>
+                        {a.error && (
+                          <span className="truncate text-destructive/70">{a.error.slice(0, 80)}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             {stage.dataFlow && (
@@ -248,6 +267,50 @@ function FetchSection({ stages }: { stages: PipelineStageTrace[] }) {
 }
 
 // ---------------------------------------------------------------------------
+// URL Verification section (hallucination detection)
+// ---------------------------------------------------------------------------
+
+function UrlVerificationSection({ verification }: { verification: UrlVerificationTrace }) {
+  if (!verification || verification.urlsInArticle.length === 0) return null;
+
+  return (
+    <Section title={`URL Verification (${verification.summary.total})`} defaultOpen={verification.summary.fabricated > 0}>
+      <div className="space-y-1 rounded-md border bg-muted/30 p-3">
+        <div className="mb-2 flex gap-3 font-mono text-[11px]">
+          <span className="text-emerald-600">{verification.summary.verified} verified</span>
+          {verification.summary.fabricated > 0 && (
+            <span className="text-destructive">{verification.summary.fabricated} fabricated</span>
+          )}
+          {verification.summary.modified > 0 && (
+            <span className="text-amber-600">{verification.summary.modified} modified</span>
+          )}
+        </div>
+        <div className="space-y-1">
+          {verification.urlsInArticle.map((check, i) => (
+            <div key={i} className="flex items-start gap-1.5 font-mono text-[10px]">
+              <span className={
+                check.sourceStage === "fabricated"
+                  ? "shrink-0 text-destructive"
+                  : "shrink-0 text-emerald-600"
+              }>
+                {check.sourceStage === "fabricated" ? "✗" : "✓"}
+              </span>
+              <span className={
+                check.sourceStage === "fabricated"
+                  ? "truncate text-destructive/80"
+                  : "truncate text-muted-foreground"
+              }>
+                {check.url}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Raw JSON section
 // ---------------------------------------------------------------------------
 
@@ -270,11 +333,13 @@ export function PipelineTraceDrawer({
   onOpenChange,
   stages,
   summary,
+  urlVerification,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   stages: PipelineStageTrace[];
   summary: PipelineTraceSummary | null;
+  urlVerification?: UrlVerificationTrace | null;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -291,6 +356,7 @@ export function PipelineTraceDrawer({
           <CostBreakdownSection stages={stages} totalCost={summary?.totalCostRub ?? stages.reduce((sum, s) => sum + (s.ai?.costRub ?? 0), 0)} />
           <StagesSection stages={stages} />
           <FetchSection stages={stages} />
+          {urlVerification && <UrlVerificationSection verification={urlVerification} />}
           <RawSection stages={stages} summary={summary} />
         </div>
       </SheetContent>

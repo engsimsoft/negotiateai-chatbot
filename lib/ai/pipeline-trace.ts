@@ -25,6 +25,13 @@ import { extractUsageForPricing } from "./usage-utils";
 // Types: AI call trace
 // ---------------------------------------------------------------------------
 
+/** ТЗ-PIPELINE1: Per-attempt data for retry visibility in DevPanel */
+export interface AiCallAttempt {
+  attempt: number;
+  error?: string;
+  durationMs: number;
+}
+
 export interface AiCallTrace {
   modelId: string;
   promptPreview: string; // first 500 chars of system or user prompt
@@ -40,6 +47,8 @@ export interface AiCallTrace {
   retryCount: number; // 0 = first attempt succeeded
   fallbackUsed?: string; // modelId of fallback model if primary failed
   error?: string; // error message if call failed
+  /** ТЗ-PIPELINE1: Per-attempt history for retry visibility */
+  attempts?: AiCallAttempt[];
 }
 
 // ---------------------------------------------------------------------------

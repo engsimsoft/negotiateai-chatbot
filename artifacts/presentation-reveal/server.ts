@@ -1,6 +1,7 @@
 import { smoothStream, streamText } from "ai";
 import { updateDocumentPrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
+import { logUsage } from "@/lib/ai/usage-utils";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import {
   type Slide,
@@ -100,21 +101,21 @@ function extractThemeFromTitle(title: string): string {
 export const presentationRevealDocumentHandler =
   createDocumentHandler<"presentation-reveal">({
     kind: "presentation-reveal",
-    onCreateDocument: async ({ title, dataStream }) => {
+    onCreateDocument: async ({ title, dataStream, session }) => {
       let fullContent = "";
 
       // Detect theme from title
       const themeId = extractThemeFromTitle(title);
       const theme = getThemeById(themeId);
 
-      const { fullStream } = streamText({
+      const result = streamText({
         model: myProvider.languageModel("artifact-model"),
         system: PRESENTATION_SYSTEM_PROMPT,
         experimental_transform: smoothStream({ chunking: "word" }),
         prompt: `Create a presentation about: ${title}`,
       });
 
-      for await (const delta of fullStream) {
+      for await (const delta of result.fullStream) {
         if (delta.type === "text-delta") {
           fullContent += delta.text;
 
@@ -128,6 +129,12 @@ export const presentationRevealDocumentHandler =
             transient: true,
           });
         }
+      }
+
+      // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+      if (session?.user?.id) {
+        const usage = await result.totalUsage;
+        logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:reveal" });
       }
 
       // Parse slides and generate final HTML
@@ -155,7 +162,7 @@ export const presentationRevealDocumentHandler =
 
       return storedContent;
     },
-    onUpdateDocument: async ({ document, description, dataStream }) => {
+    onUpdateDocument: async ({ document, description, dataStream, session }) => {
       let fullContent = "";
 
       // Parse existing content
@@ -171,7 +178,7 @@ export const presentationRevealDocumentHandler =
 
       const theme = getThemeById(existingData.themeId);
 
-      const { fullStream } = streamText({
+      const result = streamText({
         model: myProvider.languageModel("artifact-model"),
         system: `${PRESENTATION_SYSTEM_PROMPT}
 
@@ -185,7 +192,7 @@ Generate the COMPLETE updated slides array (not just changes).`,
         prompt: description,
       });
 
-      for await (const delta of fullStream) {
+      for await (const delta of result.fullStream) {
         if (delta.type === "text-delta") {
           fullContent += delta.text;
 
@@ -198,6 +205,12 @@ Generate the COMPLETE updated slides array (not just changes).`,
             transient: true,
           });
         }
+      }
+
+      // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+      if (session?.user?.id) {
+        const usage = await result.totalUsage;
+        logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:reveal" });
       }
 
       const slides = parseSlides(fullContent);

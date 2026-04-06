@@ -7,10 +7,9 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import type { LanguageModelUsage } from "ai";
 import type { ModelCatalog } from "tokenlens/core";
-import { waitUntil } from "@vercel/functions";
-import { logUsage } from "@/lib/ai/usage-utils";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
-import { AUTHOR_MODEL, AUTHOR_MODEL_FALLBACK } from "./briefing-config";
+import { retryWithLogging } from "@/lib/ai/retry-with-logging";
+import { AUTHOR_MODEL } from "./briefing-config";
 import type { FilteredItem } from "./briefing-filter";
 import type { RawContent } from "./source-fetchers/types";
 import type { BriefingArticleSection } from "./briefing-types";
@@ -127,80 +126,47 @@ export async function generateSection(
   const startTime = Date.now();
   const warnings: string[] = [];
 
-  let object: BriefingArticleSection;
-  let usage: LanguageModelUsage | undefined;
-  let finishReason = "stop";
-  let usedModel = AUTHOR_MODEL;
-  let retryCount = 0;
-  let fallbackUsed: string | undefined;
-  let primaryError: string | undefined;
+  // ТЗ-PIPELINE1: retryWithLogging replaces hidden SDK retry + manual fallback
+  const { result: object, usage, attempts, totalDurationMs } = await retryWithLogging(
+    async () => {
+      const res = await generateObject({
+        model: anthropic(AUTHOR_MODEL),
+        schema: sectionSchema,
+        system: SECTION_SYSTEM_PROMPT,
+        prompt: userMessage,
+        maxOutputTokens: 8192,
+        maxRetries: 0,
+      });
+      console.log(`[Section Author] model=${AUTHOR_MODEL} usage:`, JSON.stringify(res.usage));
+      return { result: res.object, usage: res.usage };
+    },
+    { maxAttempts: 3, userId, modelId: AUTHOR_MODEL, chatMode: "briefing:section-author" },
+  );
 
-  try {
-    const result = await generateObject({
-      model: anthropic(AUTHOR_MODEL),
-      schema: sectionSchema,
-      system: SECTION_SYSTEM_PROMPT,
-      prompt: userMessage,
-      maxOutputTokens: 8192,
-    });
-    object = result.object;
-    usage = result.usage;
-    finishReason = result.finishReason ?? "stop";
-    console.log(`[Section Author] model=${AUTHOR_MODEL} usage:`, JSON.stringify(result.usage));
-  } catch (err) {
-    primaryError = err instanceof Error ? err.message : String(err);
-    console.warn(
-      `[Section Author] Primary model ${AUTHOR_MODEL} failed, trying ${AUTHOR_MODEL_FALLBACK}:`,
-      primaryError,
-    );
-    retryCount = 1;
-    fallbackUsed = AUTHOR_MODEL_FALLBACK;
-    usedModel = AUTHOR_MODEL_FALLBACK;
-    warnings.push(`Primary model ${AUTHOR_MODEL} failed: ${primaryError}`);
-
-    const result = await generateObject({
-      model: anthropic(AUTHOR_MODEL_FALLBACK),
-      schema: sectionSchema,
-      system: SECTION_SYSTEM_PROMPT,
-      prompt: userMessage,
-      maxOutputTokens: 8192,
-    });
-    object = result.object;
-    usage = result.usage;
-    finishReason = result.finishReason ?? "stop";
-  }
-
-  const durationMs = Date.now() - startTime;
-
-  // ТЗ-CACHE2+TOKENS1: Usage logging — real usage from AI SDK (not fake shape)
-  if (userId && usage) {
-    waitUntil(logUsage({
-      userId,
-      usage,
-      modelId: usedModel,
-      chatMode: "briefing:section-author",
-      durationMs,
-    }));
+  const retryCount = attempts.length - 1;
+  if (retryCount > 0) {
+    warnings.push(`Retried ${retryCount} time(s). Errors: ${attempts.filter(a => a.error).map(a => a.error).join("; ")}`);
   }
 
   const ai = buildAiCallTrace(
     {
-      modelId: usedModel,
+      modelId: AUTHOR_MODEL,
       usage,
-      finishReason,
+      finishReason: "stop",
       promptPreview: userMessage.slice(0, 500),
       retryCount,
-      fallbackUsed,
-      durationMs,
+      durationMs: totalDurationMs,
     },
     catalog,
   );
-  ai.error = primaryError;
+  if (attempts.length > 1) {
+    ai.attempts = attempts.map(a => ({ attempt: a.attempt, error: a.error, durationMs: a.durationMs }));
+  }
 
   const trace: PipelineStageTrace = {
     stage: "section-refresh",
     startedAt: new Date(startTime).toISOString(),
-    durationMs,
+    durationMs: totalDurationMs,
     ai,
     errors: [],
     warnings,

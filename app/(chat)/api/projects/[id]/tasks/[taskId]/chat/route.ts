@@ -364,20 +364,21 @@ export async function POST(
               debugStepDataQueue.push(stepData);
             }
           },
-          onFinish: async ({ usage }) => {
+          // ТЗ-PIPELINE1: Use totalUsage (sum of all steps), not per-step usage
+          onFinish: async ({ totalUsage }) => {
             const totalTime = Date.now() - startTime;
             if (firstTokenTime === null) {
               firstTokenTime = totalTime;
             }
             console.log(
-              `[TaskExpert] Task ${taskId}: TTFT = ${firstTokenTime}ms, Total = ${totalTime}ms, Usage = ${JSON.stringify(usage)}`
+              `[TaskExpert] Task ${taskId}: TTFT = ${firstTokenTime}ms, Total = ${totalTime}ms, Usage = ${JSON.stringify(totalUsage)}`
             );
 
             // ТЗ-OPT1+CACHE2: Usage logging (fire-and-forget)
             const TIER_ALIAS: Record<string, string> = { executor: "claude-haiku", expert: "claude-sonnet", professor: "claude-opus" };
             const resolvedModelId = myProvider.languageModel(TIER_ALIAS[tier] || "claude-sonnet").modelId;
-            const costUsd = await calcCostUsd(resolvedModelId, usage);
-            const usageFields = extractUsageFields(usage);
+            const costUsd = await calcCostUsd(resolvedModelId, totalUsage);
+            const usageFields = extractUsageFields(totalUsage);
             saveAiUsageLog({
               chatId,
               userId: session.user.id,
@@ -389,7 +390,7 @@ export async function POST(
             }).catch(() => {});
 
             // ТЗ-DEV1: Emit debug finish summary
-            const finishUsage = extractUsageForPricing(usage);
+            const finishUsage = extractUsageForPricing(totalUsage);
             emitDebugFinish(dataStream, {
               schemaVersion: DEBUG_EVENT_SCHEMA_VERSION,
               totalNoCacheInputTokens: finishUsage.noCacheInputTokens,

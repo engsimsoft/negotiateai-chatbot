@@ -21,23 +21,39 @@ export async function POST() {
 
   const encoder = new TextEncoder();
 
+  // ТЗ-PIPELINE1: SafeEmit prevents "Controller is already closed" crash
+  // when pipeline throws after partial stream output
   const stream = new ReadableStream({
     async start(controller) {
-      const emit = (event: BriefingProgressEvent) => {
-        controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+      let closed = false;
+
+      const safeEnqueue = (data: string) => {
+        if (!closed) {
+          try {
+            controller.enqueue(encoder.encode(data));
+          } catch {
+            closed = true;
+          }
+        }
       };
 
-      // ТЗ-DEV2: Emit trace events into the same NDJSON stream (dev mode only)
+      const emit = (event: BriefingProgressEvent) => {
+        safeEnqueue(JSON.stringify(event) + "\n");
+      };
+
       const emitTrace = isSimplyDevMode
         ? (data: Record<string, unknown>) => {
-            controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
+            safeEnqueue(JSON.stringify(data) + "\n");
           }
         : undefined;
 
       try {
         await runBriefingPipeline({ userId, onProgress: emit, onTrace: emitTrace });
       } finally {
-        controller.close();
+        if (!closed) {
+          closed = true;
+          controller.close();
+        }
       }
     },
   });
