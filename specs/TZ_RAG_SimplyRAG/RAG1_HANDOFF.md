@@ -1,17 +1,52 @@
 # Передача сессии ТЗ-RAG1: MIND Extract + Retrieve
 
 **Дата:** 2026-04-06
-**Сессия:** 1 (все этапы завершены)
+**Сессия:** 1 (ТЗ-RAG1 ЗАВЕРШЁН, v3.71.0)
+**Коммит:** `0fe397a feat(tz-rag1): MIND Extract + Retrieve — v3.71.0`
 
 ---
 
-## Статус этапов
-- [x] Этап 1: Промпт извлечения + extract.ts
-- [x] Этап 2: Retrieval + инжекция в prompt
-- [x] Этап 3: Интеграция в chat/route.ts
-- [x] Этап 4: Cost tracking
-- [x] Этап 5: Dev panel — RagSection
-- [x] Этап 6: Финализация
+## Статус: ТЗ-RAG1 ЗАВЕРШЁН
+
+Все 6 этапов выполнены, протестированы, задокументированы, закоммичены.
+
+## Что сделано в RAG-1 (v3.71.0)
+
+### Новые файлы
+- `lib/prompts/memory/extract.md` — промпт для Sonnet: извлечение фактов из пар сообщений
+- `lib/ai/memory/extract.ts` — extractFactsFromMessages (generateObject) + extractAndStoreFacts (extract → embed → dedup → upsert)
+- `lib/ai/memory/retrieve.ts` — retrieveMemoryContext (semantic search top-5) + formatMemoryForPrompt (XML `<memory>`)
+- `components/dev-panel/sections/rag-section.tsx` — MIND Memory секция в Dev Panel
+- `docs/decisions/040-mind-extract-retrieve-architecture.md` — ADR
+
+### Изменённые файлы
+- `app/(chat)/api/chat/route.ts` — retrieve перед streamText + extract fire-and-forget в onFinish
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — аналогично (sourceType="project")
+- `lib/ai/debug-events.ts` — +DebugRagData, +emitDebugRag
+- `components/dev-panel/dev-panel-provider.tsx` — парсинг data-debug-rag
+- `components/dev-panel/dev-panel-drawer.tsx` — +RagSection
+- `lib/ai/memory/index.ts` — re-exports extract + retrieve
+- Документация: CHANGELOG, CLAUDE.md, SIMPLY_STATUS, package.json, docs/ai-providers.md
+
+### Ключевые решения
+- **Zod number()** — Anthropic API не поддерживает min/max → валидация через промпт
+- **Voyage costUsd** — costUsdOverride (суммы слишком мелкие для RUB-rounding)
+- **emitDebugRag** — должен быть ПОСЛЕ emitDebugPrompt (parseBatches нуждается в active batch)
+- **VOYAGE_API_KEY** — обновлён на новый ключ (pa-ZmaI-...), старый не работал
+
+## Следующие фазы (PHASES.md)
+
+| Фаза | Версия | Статус | Что делать |
+|------|--------|--------|------------|
+| RAG-2 | 3.72.0 | ⬜ | MIND Consolidation + Profile + UI (управление фактами, объединение, пользовательский интерфейс) |
+| RAG-3 | 3.73.0 | ⬜ | Compaction (бесконечный чат) — независим от RAG-2 |
+| RAG-4 | 3.74.0 | ⬜ | Библиотека MVP (загрузка документов + search) |
+
+## Для новой сессии
+
+1. Прочитать `specs/TZ_RAG_SimplyRAG/PHASES.md` → выбрать следующую фазу
+2. Прочитать `SIMPLY_STATUS.md` → текущее состояние
+3. Следовать `specs/WORKFLOW.md`
 
 ## Что сделано (RAG-0, v3.70.0)
 

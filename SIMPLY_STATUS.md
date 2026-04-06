@@ -484,6 +484,43 @@ components/projects/
 - `components/dev-panel/dev-panel-footer.tsx` — fallback ~
 - `components/dev-panel/sections/timeline-section.tsx` — + reasoning tokens
 
+### ТЗ-RAG1: MIND Extract + Retrieve — ✅ ЗАВЕРШЁН (v3.71.0)
+
+**Выполнено:**
+- **Extract pipeline** (`lib/ai/memory/extract.ts`) — Claude Sonnet извлекает факты из пар сообщений (user+assistant) через `generateObject()` + Zod-схема. Fire-and-forget в `onFinish` — не увеличивает latency ответа
+- **Retrieve + inject** (`lib/ai/memory/retrieve.ts`) — semantic search top-5 фактов через Voyage AI, инжекция XML-блока `<memory>` в system prompt с мягкой формулировкой "Из предыдущих разговоров известно..."
+- **Дедупликация** — cosine similarity > 0.92 + category match → supersede старый факт (не дублирует)
+- **Интеграция** — chat/expertise/create + project tasks. Оба route: retrieve перед streamText, extract в onFinish
+- **Graceful degradation** — при ошибке Voyage API чат работает без памяти (log warning, не crash)
+- **Dev Panel — RagSection** — секция "MIND Memory": category badges (fact/task/preference/calendar/person/decision), similarity scores, confidence, voyage tokens, duration
+- **Cost tracking** — `memory:extract` (Claude Sonnet), `memory:embed` (Voyage-4), `memory:search` (Voyage-4-lite) в ai_usage_log с costUsd
+
+**Ключевые файлы:**
+- `lib/ai/memory/extract.ts` — extractFactsFromMessages + extractAndStoreFacts
+- `lib/ai/memory/retrieve.ts` — retrieveMemoryContext + formatMemoryForPrompt
+- `lib/prompts/memory/extract.md` — промпт извлечения (категории, confidence, правила)
+- `components/dev-panel/sections/rag-section.tsx` — MIND Memory секция в Dev Panel
+- `docs/decisions/040-mind-extract-retrieve-architecture.md` — ADR
+
+**Детали:** [specs/TZ_RAG_SimplyRAG/RAG1_ROADMAP.md](specs/TZ_RAG_SimplyRAG/RAG1_ROADMAP.md)
+
+### ТЗ-RAG0: SimplyRAG Infrastructure — ✅ ЗАВЕРШЁН (v3.70.0)
+
+**Выполнено:**
+- **pgvector v0.8.0** в Neon PostgreSQL — vector(1024) + HNSW-индекс
+- **Таблица `memory_entry`** — хранение фактов (embedding, category, confidence, sourceType, supersededBy chain)
+- **Voyage AI клиент** — raw fetch к `/v1/embeddings`, voyage-4 (indexing) + voyage-4-lite (queries)
+- **Memory queries** — CRUD + similarity search (cosine distance `<=>`)
+- **Pricing** — Voyage в MODEL_PRICING_RUB
+
+**Ключевые файлы:**
+- `lib/ai/memory/voyage-client.ts` — Voyage AI embeddings
+- `lib/ai/memory/memory-queries.ts` — pgvector CRUD + search
+- `lib/ai/memory/types.ts` — MemoryCategory, MemorySourceType
+- `docs/decisions/039-pgvector-voyage-ai-rag-infrastructure.md` — ADR
+
+**Детали:** [specs/TZ_RAG_SimplyRAG/ROADMAP.md](specs/TZ_RAG_SimplyRAG/ROADMAP.md)
+
 ### ТЗ-PIPELINE1: ReliablePipelineObservability — ✅ ЗАВЕРШЁН (v3.69.0)
 
 **Выполнено:**
@@ -1508,7 +1545,7 @@ components/projects/
 | Этап | Описание | Приоритет |
 |------|----------|-----------|
 | **8** | Инструменты Фаза 1 (Perplexity ✅, Plus AI, Ideogram) | 🔄 В работе |
-| **9** | RAG (База знаний) | 🟡 Средний |
+| **9** | RAG: MIND extract+retrieve ✅ v3.71.0, Consolidation+UI 📋, Compaction 📋, Библиотека 📋 | 🔄 В работе |
 | **10** | Chat Memory | 🟡 Средний |
 | **11** | Мультипровайдер (GPT) | 🟡 Средний |
 | **12** | Биллинг (Pay-as-you-go) | 🟡 Средний |
