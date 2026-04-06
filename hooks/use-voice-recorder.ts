@@ -37,6 +37,8 @@ export function useVoiceRecorder(
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const maxDurationTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // ТЗ-BILLING1: track recording start time for cost logging
+  const recordingStartRef = useRef<number>(0);
 
   // Check availability on mount
   useEffect(() => {
@@ -121,6 +123,20 @@ export function useVoiceRecorder(
 
   // Stop recording
   const stopRecording = useCallback(() => {
+    // ТЗ-BILLING1: log Deepgram usage (fire-and-forget)
+    if (recordingStartRef.current > 0) {
+      const durationSeconds = (Date.now() - recordingStartRef.current) / 1000;
+      recordingStartRef.current = 0;
+      if (durationSeconds >= 0.5) {
+        fetch("/api/deepgram/usage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ durationSeconds }),
+        }).catch(() => {
+          // Fire-and-forget — don't break UX if logging fails
+        });
+      }
+    }
     cleanup();
     updateState("idle");
     setInterimTranscript("");
@@ -195,6 +211,8 @@ export function useVoiceRecorder(
 
       ws.onopen = () => {
         updateState("recording");
+        // ТЗ-BILLING1: mark recording start for duration calculation
+        recordingStartRef.current = Date.now();
 
         // Start max duration timer (auto-stop after 3 minutes)
         maxDurationTimerRef.current = setTimeout(() => {
