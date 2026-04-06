@@ -22,6 +22,10 @@ export { embedText, embedTexts } from "./voyage-client";
 export type { ExtractedFact } from "./extract";
 export { extractFactsFromMessages, extractAndStoreFacts } from "./extract";
 
+// Consolidation
+export type { ConsolidationStats } from "./consolidate";
+export { consolidateUserMemory, miniConsolidateUserMemory } from "./consolidate";
+
 // Retrieval + prompt injection
 export type { RetrievalResult } from "./retrieve";
 export { retrieveMemoryContext, formatMemoryForPrompt } from "./retrieve";

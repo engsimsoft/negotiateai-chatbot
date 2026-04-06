@@ -29,7 +29,11 @@ import {
   supersedeMemoryEntry,
 } from "./memory-queries";
 import { incrementFactsSinceConsolidation } from "@/lib/db/queries";
+import { miniConsolidateUserMemory } from "./consolidate";
 import { MEMORY_CATEGORIES, type MemoryCategory, type MemorySourceType } from "./types";
+
+/** ТЗ-RAG2: Number of new facts before triggering mini-consolidation */
+const MINI_CONSOLIDATION_THRESHOLD = 20;
 
 // ---------------------------------------------------------------------------
 // Prompt (cached at module level)
@@ -174,10 +178,21 @@ export async function extractAndStoreFacts(
       }
     }
 
-    // ТЗ-RAG2: Increment facts counter for mini-consolidation trigger
+    // ТЗ-RAG2: Increment facts counter + trigger mini-consolidation at threshold
     if (stats.stored > 0) {
       try {
-        await incrementFactsSinceConsolidation({ userId: input.userId });
+        const newCount = await incrementFactsSinceConsolidation({ userId: input.userId });
+        if (newCount >= MINI_CONSOLIDATION_THRESHOLD) {
+          console.log(
+            `[MemoryExtract] Threshold reached (${newCount} facts), triggering mini-consolidation`,
+          );
+          void miniConsolidateUserMemory(input.userId).catch((err) =>
+            console.warn(
+              "[MemoryExtract] Mini-consolidation failed (non-blocking):",
+              err instanceof Error ? err.message : err,
+            ),
+          );
+        }
       } catch (err) {
         console.warn(
           "[MemoryExtract] Failed to increment factsSinceConsolidation:",
