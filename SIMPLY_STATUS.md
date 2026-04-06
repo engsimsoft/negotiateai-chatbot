@@ -484,6 +484,19 @@ components/projects/
 - `components/dev-panel/dev-panel-footer.tsx` — fallback ~
 - `components/dev-panel/sections/timeline-section.tsx` — + reasoning tokens
 
+### ТЗ-RAG2: MIND Consolidation + Profile + UI — ✅ ЗАВЕРШЁН (v3.72.0)
+
+**Выполнено:**
+- **Sonnet консолидация** (`lib/ai/memory/consolidate.ts`) — гибрид: полная ревизия (ночной cron) + мини-ревизия (каждые 20 новых фактов, event-triggered из extract.ts). Actions: supersede/merge/remove
+- **Opus-профиль** (`lib/ai/memory/profile.ts`) — ночной cron генерирует нарративный профиль (800-1200 слов) из всех фактов. Инжектируется как `<user-profile>` перед `<memory>` — два слоя контекста
+- **Memory API** — `/api/user/memory` (GET facts, DELETE), `/api/user/memory/settings` (GET/PATCH memoryEnabled)
+- **UI «Память»** (`components/settings/memory-section.tsx`) — секция на /settings: toggle вкл/выкл, профиль read-only, список фактов с category badges, удаление одного/всех
+- **memoryEnabled gate** — пользователь может отключить извлечение + retrieval через UI
+- **DB** — таблицы `memory_settings` (factsSinceConsolidation, memoryEnabled) + `user_profile_summary` (content, factCount, costUsd)
+- **Cron** — `0 0 * * *` (3:00 MSK): consolidation → profile, p-limit(3), saveCronRunLog
+
+**Детали:** [specs/TZ_RAG_SimplyRAG/RAG2_ROADMAP.md](specs/TZ_RAG_SimplyRAG/RAG2_ROADMAP.md)
+
 ### ТЗ-RAG1: MIND Extract + Retrieve — ✅ ЗАВЕРШЁН (v3.71.0)
 
 **Выполнено:**

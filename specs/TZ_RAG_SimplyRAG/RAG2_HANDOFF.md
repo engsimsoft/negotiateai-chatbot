@@ -1,15 +1,16 @@
 # Передача сессии ТЗ-RAG2: MIND Consolidation + Profile + UI
 
-**Дата:** 2026-04-06
-**Сессия:** 1
+**Дата:** 2026-04-07
+**Сессия:** 1 (ТЗ-RAG2 ЗАВЕРШЁН, v3.72.0)
 
-## Статус этапов
-- [ ] Этап 1: DB — memory_settings + user_profile_summary ← ТЕКУЩИЙ
-- [ ] Этап 2: Consolidation — Sonnet ревизия фактов
-- [ ] Этап 3: Opus-профиль + Cron
-- [ ] Этап 4: API памяти
-- [ ] Этап 5: UI секция «Память» на /settings
-- [ ] Этап 6: Финализация
+## Статус: ТЗ-RAG2 ЗАВЕРШЁН
+
+- [x] Этап 1: DB — memory_settings + user_profile_summary
+- [x] Этап 2: Consolidation — Sonnet ревизия (full + mini)
+- [x] Этап 3: Opus-профиль + Cron
+- [x] Этап 4: API памяти + memoryEnabled gate
+- [x] Этап 5: UI секция «Память» на /settings
+- [x] Этап 6: Финализация (docs, ADR 041, v3.72.0)
 
 ## Решения архитектора (согласованы)
 1. Консолидация — гибрид: ночной batch cron + event-triggered мини-ревизия каждые 20 фактов
@@ -18,11 +19,12 @@
 4. UI — секция «Память» на `/settings`, не отдельная страница
 5. `memory_settings` — отдельная таблица по паттерну `briefingSettings` (включает factsSinceConsolidation счётчик)
 
-## Следующая сессия: начни с
-1. Прочитать RAG2_ROADMAP.md → Этап 1
-2. Создать таблицы memory_settings + user_profile_summary
-3. Создать миграцию и применить
-4. Добавить query-функции
+## Следующие фазы (PHASES.md)
+
+| Фаза | Версия | Статус |
+|------|--------|--------|
+| RAG-3 | 3.73.0 | ⬜ Compaction (бесконечный чат, замена snapshot-системы) |
+| RAG-4 | 3.74.0 | ⬜ Библиотека MVP (загрузка документов + search) |
 
 ## Ключевые файлы
 - `lib/db/schema.ts:395-418` — паттерн briefingSettings (для memory_settings)
