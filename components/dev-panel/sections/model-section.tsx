@@ -64,6 +64,20 @@ export function ModelSection({ data }: { data: DevPanelMessageData }) {
             <span>{ttft}ms</span>
           </>
         )}
+
+        {data.compaction && (
+          <>
+            <span className="text-muted-foreground">Compaction</span>
+            <span className={data.compaction.triggered ? "font-medium text-amber-600 dark:text-amber-400" : ""}>
+              {data.compaction.triggered ? "Triggered" : "Not triggered"}
+            </span>
+            {data.compaction.triggered && data.compaction.iterations.map((it, i) => (
+              <div key={i} className="col-span-2 ml-2 font-mono text-xs text-muted-foreground">
+                {it.type}: {it.inputTokens.toLocaleString("ru-RU")} in / {it.outputTokens.toLocaleString("ru-RU")} out
+              </div>
+            ))}
+          </>
+        )}
       </div>
     </section>
   );

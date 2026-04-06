@@ -92,6 +92,18 @@ export interface DebugPromptData {
   contextInjections: string[];
 }
 
+/** ТЗ-RAG3: Compaction debug data */
+export interface DebugCompactionData {
+  /** Whether compaction was triggered in this response */
+  triggered: boolean;
+  /** Iterations breakdown (compaction + message) */
+  iterations: Array<{
+    type: 'compaction' | 'message';
+    inputTokens: number;
+    outputTokens: number;
+  }>;
+}
+
 /** ТЗ-RAG1: MIND memory debug data */
 export interface DebugRagData {
   /** User query used for retrieval */
@@ -169,6 +181,18 @@ export function emitDebugPrompt(
   if (!isSimplyDevMode) return;
   dataStream.write({
     type: "data-debug-prompt",
+    data,
+  });
+}
+
+/** ТЗ-RAG3: Emit compaction debug event */
+export function emitDebugCompaction(
+  dataStream: DataStreamWriter,
+  data: DebugCompactionData,
+): void {
+  if (!isSimplyDevMode) return;
+  dataStream.write({
+    type: "data-debug-compaction",
     data,
   });
 }

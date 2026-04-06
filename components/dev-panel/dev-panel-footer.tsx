@@ -118,6 +118,12 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
             <span>{formatDuration(duration)}</span>
           </>
         )}
+        {data.compaction?.triggered && (
+          <>
+            <span className={isError ? "text-destructive/30" : "text-muted-foreground/30"}>&middot;</span>
+            <span className="text-amber-600 dark:text-amber-400">Compaction</span>
+          </>
+        )}
         {isStreaming && (
           <>
             <span className="text-muted-foreground/30">&middot;</span>

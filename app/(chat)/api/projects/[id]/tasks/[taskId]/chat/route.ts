@@ -19,6 +19,7 @@ import {
   emitDebugGuardian,
   emitDebugFinish,
   emitDebugPrompt,
+  emitDebugCompaction,
   truncateForDebug,
   DEBUG_EVENT_SCHEMA_VERSION,
   type DebugStepData,
@@ -323,6 +324,7 @@ export async function POST(
     let firstTokenTime: number | null = null;
 
     const stream = createUIMessageStream({
+      originalMessages: uiMessages,
       execute: async ({ writer: dataStream }) => {
         // ТЗ-C1.5: Send usage annotation BEFORE streaming starts
         dataStream.write({
@@ -359,6 +361,19 @@ export async function POST(
             { role: 'system' as const, content: finalSystemPrompt, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },
             ...sanitizeCoreMessages(await convertToModelMessages(uiMessages)),
           ],
+          // ТЗ-RAG3: Anthropic Compaction API — automatic context management
+          providerOptions: {
+            anthropic: {
+              contextManagement: {
+                edits: [{
+                  type: 'compact_20260112' as const,
+                  trigger: { type: 'input_tokens' as const, value: 100_000 },
+                  pauseAfterCompaction: false,
+                  instructions: 'Сохрани обязательно: имена людей и организаций, даты и дедлайны, принятые решения и обоснования, числа и суммы, контекст текущего проекта/задачи, незавершённые задачи и открытые вопросы, предпочтения пользователя, контекст задачи, связь с планом проекта, результаты предыдущих шагов. Удали: повторяющиеся приветствия, промежуточные рассуждения если итог зафиксирован, дублирующуюся информацию, технические детали tool calls если результат уже в контексте.',
+                }]
+              }
+            }
+          },
           temperature: 1.0,
           stopWhen: stepCountIs(5),
           experimental_activeTools: getActiveToolNames(isProjectChat),
@@ -403,7 +418,7 @@ export async function POST(
             }
           },
           // ТЗ-PIPELINE1: Use totalUsage (sum of all steps), not per-step usage
-          onFinish: async ({ totalUsage }) => {
+          onFinish: async ({ totalUsage, providerMetadata }) => {
             const totalTime = Date.now() - startTime;
             if (firstTokenTime === null) {
               firstTokenTime = totalTime;
@@ -443,6 +458,28 @@ export async function POST(
               modelId: resolvedModelId,
               finishReason: "stop",
             });
+
+            // ТЗ-RAG3: Emit compaction debug event if compaction occurred
+            const anthropicMeta = providerMetadata?.anthropic as
+              | { iterations?: Array<{ type: string; input_tokens: number; output_tokens: number }> }
+              | undefined;
+            const iterations = anthropicMeta?.iterations;
+            if (iterations && iterations.length > 0) {
+              const hasCompaction = iterations.some((it) => it.type === "compaction");
+              emitDebugCompaction(dataStream, {
+                triggered: hasCompaction,
+                iterations: iterations.map((it) => ({
+                  type: it.type as "compaction" | "message",
+                  inputTokens: it.input_tokens,
+                  outputTokens: it.output_tokens,
+                })),
+              });
+              if (hasCompaction) {
+                console.log(
+                  `[Compaction] Task ${taskId}: compaction triggered — ${iterations.length} iterations`
+                );
+              }
+            }
           },
         });
 
@@ -627,7 +664,10 @@ export async function POST(
       },
       generateId: generateUUID,
       onFinish: async ({ messages }) => {
-        const messagesToSave = messages.map((currentMessage) => {
+        // Only save NEW messages (not the original ones already in DB)
+        const originalIds = new Set(uiMessages.map((m) => m.id));
+        const newMessages = messages.filter((m) => !originalIds.has(m.id));
+        const messagesToSave = newMessages.map((currentMessage) => {
           const filteredParts = currentMessage.parts.filter((part: any) => {
             const type = part.type;
             if (type === "text" || type === "step-start" || type === "step-finish") {
