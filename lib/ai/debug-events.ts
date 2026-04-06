@@ -92,6 +92,25 @@ export interface DebugPromptData {
   contextInjections: string[];
 }
 
+/** ТЗ-RAG1: MIND memory debug data */
+export interface DebugRagData {
+  /** User query used for retrieval */
+  query: string;
+  /** Retrieved facts */
+  facts: Array<{
+    content: string;
+    category: string;
+    similarity: number;
+    confidence: number;
+  }>;
+  /** Number of facts injected into prompt */
+  factsInjected: number;
+  /** Voyage API tokens consumed */
+  voyageTokens: number;
+  /** Search duration in ms */
+  searchDurationMs: number;
+}
+
 // ---------------------------------------------------------------------------
 // Data stream writer type (minimal interface)
 // ---------------------------------------------------------------------------
@@ -151,8 +170,18 @@ export function emitDebugPrompt(
   dataStream.write({
     type: "data-debug-prompt",
     data,
-    // Note: NOT transient — AI SDK v5 does not deliver transient events to onData callback.
-    // Safe because debug events are only emitted when SIMPLY_DEV_MODE=true.
+  });
+}
+
+/** ТЗ-RAG1: Emit MIND memory debug event */
+export function emitDebugRag(
+  dataStream: DataStreamWriter,
+  data: DebugRagData,
+): void {
+  if (!isSimplyDevMode) return;
+  dataStream.write({
+    type: "data-debug-rag",
+    data,
   });
 }
 

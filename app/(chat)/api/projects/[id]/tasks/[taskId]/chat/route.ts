@@ -43,6 +43,8 @@ import { extractUsageFields, extractUsageForPricing } from "@/lib/ai/usage-utils
 import { createStepTracker } from "@/lib/ai/tool-call-guardian";
 import { ChatSDKError } from "@/lib/errors";
 import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages } from "@/lib/utils";
+import { retrieveMemoryContext } from "@/lib/ai/memory/retrieve";
+import { extractAndStoreFacts } from "@/lib/ai/memory/extract";
 
 export const maxDuration = 180;
 
@@ -196,8 +198,32 @@ export async function POST(
       messagesTokens + systemPromptTokens + newMessageTokens
     );
 
-    // ТЗ-C1.5: System signal injection at threshold
+    // ТЗ-RAG1: Retrieve MIND memory facts for project tasks
     let finalSystemPrompt = systemPromptText;
+    {
+      try {
+        const userQueryText = message.parts
+          .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
+          .map((p: any) => p.text)
+          .join("\n");
+
+        if (userQueryText.length >= 5) {
+          const memoryResult = await retrieveMemoryContext(
+            session.user.id,
+            userQueryText,
+            { chatId },
+          );
+
+          if (memoryResult.promptBlock) {
+            finalSystemPrompt += `\n\n${memoryResult.promptBlock}`;
+          }
+        }
+      } catch (error) {
+        console.warn("[MIND] Retrieve failed in task chat (non-blocking):", error instanceof Error ? error.message : error);
+      }
+    }
+
+    // ТЗ-C1.5: System signal injection at threshold
     if (
       estimatedPercent >= SNAPSHOT_THRESHOLD * 100 &&
       !contextState?.suggestionActive
@@ -626,6 +652,34 @@ export async function POST(
 
         if (messagesToSave.length > 0) {
           await saveMessages({ messages: messagesToSave });
+        }
+
+        // ТЗ-RAG1: Extract facts from task conversation (fire-and-forget)
+        {
+          const userText = message.parts
+            .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
+            .map((p: any) => p.text)
+            .join("\n");
+
+          const assistantText = messages
+            .filter((m) => m.role === "assistant")
+            .flatMap((m) => m.parts)
+            .filter((p: any) => p.type === "text" && p.text?.trim())
+            .map((p: any) => p.text)
+            .join("\n");
+
+          if (userText.length >= 10 && assistantText.length >= 10) {
+            void extractAndStoreFacts({
+              userId: session.user.id,
+              userMessage: userText,
+              assistantMessage: assistantText,
+              sourceType: "project",
+              sourceChatId: chatId,
+              sourceProjectId: projectId,
+            }).catch((err) =>
+              console.warn("[MIND] Extract failed in task chat (non-blocking):", err instanceof Error ? err.message : err)
+            );
+          }
         }
       },
       onError: () => {

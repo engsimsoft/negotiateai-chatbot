@@ -40,10 +40,13 @@ import {
   emitDebugGuardian,
   emitDebugFinish,
   emitDebugPrompt,
+  emitDebugRag,
   truncateForDebug,
   DEBUG_EVENT_SCHEMA_VERSION,
   type DebugStepData,
 } from "@/lib/ai/debug-events";
+import { retrieveMemoryContext } from "@/lib/ai/memory/retrieve";
+import { extractAndStoreFacts } from "@/lib/ai/memory/extract";
 import {
   addChatSnapshot,
   createStreamId,
@@ -483,6 +486,48 @@ export async function POST(request: Request) {
           systemPromptText += `\n\n<previous_context>\n${snapshotContext}\n</previous_context>`;
         }
 
+        // ТЗ-RAG1: Retrieve MIND memory facts and inject into system prompt
+        // Scope: chat, expertise, create (not service chats, not professor pipeline)
+        const isMemoryEnabled = ["chat", "expertise", "create"].includes(chatMode);
+        let memoryDebugData: Parameters<typeof emitDebugRag>[1] | null = null;
+        if (isMemoryEnabled) {
+          try {
+            const userQueryText = message.parts
+              .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
+              .map((p: any) => p.text)
+              .join("\n");
+
+            if (userQueryText.length >= 5) {
+              const memoryResult = await retrieveMemoryContext(
+                session.user.id,
+                userQueryText,
+                { chatId: id },
+              );
+
+              if (memoryResult.promptBlock) {
+                systemPromptText += `\n\n${memoryResult.promptBlock}`;
+              }
+
+              // Save for debug emit (after emitDebugPrompt creates the batch)
+              memoryDebugData = {
+                query: userQueryText.slice(0, 200),
+                facts: memoryResult.facts.map((f) => ({
+                  content: f.entry.content,
+                  category: f.entry.category,
+                  similarity: f.similarity,
+                  confidence: Number(f.entry.confidence ?? 1),
+                })),
+                factsInjected: memoryResult.facts.length,
+                voyageTokens: memoryResult.voyageTokens,
+                searchDurationMs: memoryResult.durationMs,
+              };
+            }
+          } catch (error) {
+            // Graceful degradation: memory unavailable — chat continues without it
+            console.warn("[MIND] Retrieve failed (non-blocking):", error instanceof Error ? error.message : error);
+          }
+        }
+
         // ТЗ-C3: Calculate estimated usage for context management
         const systemPromptTokens = estimateMessageTokens([
           { type: "text", text: systemPromptText },
@@ -567,6 +612,7 @@ export async function POST(request: Request) {
           if (userProfile?.displayName || userProfile?.bio) injections.push("user-profile");
           if (snapshotContext) injections.push("snapshot-context");
           if (isProjectChat) injections.push("project-context");
+          if (systemPromptText.includes("<memory>")) injections.push("mind-memory");
           emitDebugPrompt(dataStream, {
             systemPromptPreview: systemPromptText.slice(0, 500),
             systemPromptLength: systemPromptText.length,
@@ -577,6 +623,11 @@ export async function POST(request: Request) {
             hasSnapshotContext: !!snapshotContext,
             contextInjections: injections,
           });
+        }
+
+        // ТЗ-RAG1: Emit debug rag AFTER prompt (so parseBatches has an active batch)
+        if (memoryDebugData) {
+          emitDebugRag(dataStream, memoryDebugData);
         }
 
         // ТЗ-C3: Generate assistant message ID upfront (needed for snapshot tool)
@@ -1032,6 +1083,33 @@ export async function POST(request: Request) {
           void autoNameChat(id, session.user.id!).catch((err) =>
             console.error("[generate-title] Background error:", err)
           );
+        }
+
+        // ТЗ-RAG1: Extract facts from conversation (fire-and-forget)
+        if (["chat", "expertise", "create"].includes(chatMode)) {
+          const userText = message.parts
+            .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
+            .map((p: any) => p.text)
+            .join("\n");
+
+          const assistantText = messages
+            .filter((m) => m.role === "assistant")
+            .flatMap((m) => m.parts)
+            .filter((p: any) => p.type === "text" && p.text?.trim())
+            .map((p: any) => p.text)
+            .join("\n");
+
+          if (userText.length >= 10 && assistantText.length >= 10) {
+            void extractAndStoreFacts({
+              userId: session.user.id,
+              userMessage: userText,
+              assistantMessage: assistantText,
+              sourceType: chatMode as "chat" | "expertise" | "create",
+              sourceChatId: id,
+            }).catch((err) =>
+              console.warn("[MIND] Extract failed (non-blocking):", err instanceof Error ? err.message : err)
+            );
+          }
         }
 
         if (finalMergedUsage) {

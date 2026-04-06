@@ -166,6 +166,14 @@
 | Project Summary | `api/projects/[id]/generate-summary/route.ts` | `claude-haiku` | — | — | Hardcoded |
 | **Briefing: Автор** | `lib/briefing/briefing-author.ts` | **`claude-sonnet-4-6`** | — | — | generateObject, maxOutputTokens по volume, retryWithLogging (v3.69.0) |
 | **Meeting: Суммаризатор** | `lib/meeting/meeting-pipeline.ts` | **`claude-sonnet-4-6`** | 0.3 | 8192 | generateText, 3 уровня (compact/standard/detailed) |
+| **MIND: Извлечение фактов** | `lib/ai/memory/extract.ts` | **`claude-sonnet-4-6`** | 0.1 | — | generateObject, fire-and-forget в onFinish, chatMode: `memory:extract` |
+
+### Voyage AI — Embeddings
+
+| Функция | Файл | Модель | Цена / 1M tok | Примечание |
+|---------|------|--------|---------------|------------|
+| MIND: Embed фактов | `lib/ai/memory/extract.ts` | `voyage-4` | $0.06 | chatMode: `memory:embed`, costUsdOverride |
+| MIND: Search запрос | `lib/ai/memory/retrieve.ts` | `voyage-4-lite` | $0.02 | chatMode: `memory:search`, costUsdOverride |
 
 ### Google Gemini — Backend
 

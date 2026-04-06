@@ -8,10 +8,32 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- RAG-1: MIND Extract + Retrieve (извлечение фактов из чатов, semantic search)
 - RAG-2: MIND Consolidation + Profile + UI
 - RAG-3: Compaction (бесконечный чат)
 - RAG-4: Библиотека MVP (загрузка документов + search)
+
+---
+
+## [3.71.0] - 2026-04-06 - MIND Extract + Retrieve
+
+**ТЗ-RAG1**: AI запоминает факты из разговоров и использует их в будущих чатах. Полный цикл: extract → embed → store → retrieve → inject в prompt.
+
+### Added
+- **Промпт извлечения** (`lib/prompts/memory/extract.md`) — Claude Sonnet извлекает факты о пользователе из пар сообщений (user+assistant), structured JSON с category и confidence
+- **Extract pipeline** (`lib/ai/memory/extract.ts`) — `extractFactsFromMessages()` через `generateObject()` + Zod-схема, `extractAndStoreFacts()` — полный pipeline: extract → embed → deduplicate (cosine > 0.92 + category match → supersede) → insert
+- **Retrieve + inject** (`lib/ai/memory/retrieve.ts`) — `retrieveMemoryContext()` semantic search top-5 фактов, `formatMemoryForPrompt()` — XML-блок `<memory>` с мягкой формулировкой
+- **Интеграция в chat/route.ts** — retrieve ПЕРЕД streamText (chatMode: chat/expertise/create), extract fire-and-forget в onFinish
+- **Интеграция в task chat route** — аналогично, sourceType="project", sourceProjectId
+- **Dev Panel — RagSection** (`components/dev-panel/sections/rag-section.tsx`) — секция "MIND Memory": category badges, similarity scores, confidence, voyage tokens, duration
+- **DebugRagData + emitDebugRag** — debug event для Dev Panel, `mind-memory` в contextInjections
+- **Cost tracking** — `memory:extract` (Claude Sonnet), `memory:embed` (Voyage-4), `memory:search` (Voyage-4-lite) в ai_usage_log с costUsd
+
+### Technical Details
+- **Graceful degradation:** при ошибке Voyage API чат работает без памяти (log warning, не crash)
+- **Дедупликация:** cosine > 0.92 + category match → supersede старый факт
+- **Бюджет контекста:** ~500 токенов на блок памяти (top-5 фактов)
+- **Формат:** мягкая форма "Из предыдущих разговоров известно..." — не навязывает
+- **Voyage costUsd:** override (pricing слишком мелкий для RUB-rounding)
 
 ---
 

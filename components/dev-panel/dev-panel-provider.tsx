@@ -16,6 +16,7 @@ import {
   type DebugFinishData,
   type DebugGuardianData,
   type DebugPromptData,
+  type DebugRagData,
 } from "@/lib/ai/debug-events";
 import type { ChatMessage } from "@/lib/types";
 
@@ -25,6 +26,7 @@ import type { ChatMessage } from "@/lib/types";
 
 export interface DevPanelMessageData {
   prompt?: DebugPromptData;
+  rag?: DebugRagData;
   steps: DebugStepData[];
   guardians: DebugGuardianData[];
   finish?: DebugFinishData;
@@ -143,6 +145,9 @@ function parseBatches(dataStream: DataStreamEvent[]): DevPanelMessageData[] {
           steps: [],
           guardians: [],
         };
+        break;
+      case "data-debug-rag":
+        if (current) current.rag = d as unknown as DebugRagData;
         break;
       case "data-debug-step":
         if (current) current.steps.push(d as unknown as DebugStepData);

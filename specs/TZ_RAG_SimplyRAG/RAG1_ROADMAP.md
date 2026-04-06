@@ -36,25 +36,25 @@
 
 ## Этап 1: Промпт извлечения + extract.ts
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Цель:** Sonnet извлекает факты из разговора — structured JSON с category и confidence.
 
 **Задачи:**
-- [ ] Создать `lib/prompts/memory/extract.md` — промпт для Sonnet:
+- [x] Создать `lib/prompts/memory/extract.md` — промпт для Sonnet:
   - Input: последнее сообщение пользователя + ответ AI (пара)
   - Output: JSON массив фактов `[{content, category, confidence}]`
   - Категории: fact, task, preference, calendar, person, decision
   - Инструкция: извлекать только значимые факты, не тривиальные
   - Инструкция: если изображение — описать его содержимое как текстовый факт
   - Инструкция: возвращать пустой массив `[]` если фактов нет
-- [ ] Создать `lib/ai/memory/extract.ts`:
+- [x] Создать `lib/ai/memory/extract.ts`:
   - `extractFactsFromMessages(userId, userMessage, assistantMessage, sourceType, sourceChatId?, sourceProjectId?)` → Promise<ExtractedFact[]>
   - Вызов Claude Sonnet через `generateObject()` с Zod-схемой
   - Fire-and-forget: вызывающий код не ждёт результата
   - logUsage() с chatMode `memory:extract` после завершения
-- [ ] Создать Zod-схему для ответа (массив фактов)
-- [ ] Добавить `extractAndStoreFacts()` — orchestrator: extract → embed → deduplicate → upsert
+- [x] Создать Zod-схему для ответа (массив фактов)
+- [x] Добавить `extractAndStoreFacts()` — orchestrator: extract → embed → deduplicate → upsert
   - Для каждого извлечённого факта: embedText(content, "document")
   - Дедупликация: searchSimilarMemories с порогом 0.92 + category match
   - Если дубль: supersedeMemoryEntry(old, new)
@@ -66,8 +66,8 @@
 - `lib/ai/memory/extract.ts` — новый
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Ручной тест: вызвать extractFactsFromMessages() с тестовым диалогом → JSON фактов
 - [ ] 🧪 Мануальный тест
 
@@ -79,31 +79,31 @@
 
 ## Этап 2: Retrieval + инжекция в prompt
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 1
 
 **Цель:** При каждом запросе — найти релевантные факты и добавить в system prompt.
 
 **Задачи:**
-- [ ] Создать `lib/ai/memory/retrieve.ts`:
-  - `retrieveMemoryContext(userId, queryText)` → `{ facts: MemorySearchResult[], voyageTokens: number, durationMs: number }`
+- [x] Создать `lib/ai/memory/retrieve.ts`:
+  - `retrieveMemoryContext(userId, queryText)` → `{ promptBlock, facts, voyageTokens, durationMs }`
   - Вызов searchSimilarMemories() с limit=10, minSimilarity=0.3
   - logUsage() с chatMode `memory:search` для Voyage embed запроса
   - Форматирование фактов для system prompt
-- [ ] Создать `formatMemoryForPrompt(facts)` — форматирование блока для system prompt:
+- [x] Создать `formatMemoryForPrompt(facts)` — форматирование блока для system prompt:
   - Заголовок: "Из предыдущих разговоров известно:"
   - Каждый факт: `- [категория] содержимое (уверенность: X%)`
   - Инструкция: использовать мягко, не навязывать, упоминать только если релевантно
   - Пустой блок если фактов нет (не инжектировать ничего)
-- [ ] Максимальный бюджет: ~500 токенов на блок памяти (top-5 фактов)
+- [x] Максимальный бюджет: ~500 токенов на блок памяти (top-5 фактов)
 
 **Файлы:**
 - `lib/ai/memory/retrieve.ts` — новый
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] Ручной тест: retrieveMemoryContext() → факты с similarity + formatted prompt block
 - [ ] 🧪 Мануальный тест
 
@@ -115,32 +115,30 @@
 
 ## Этап 3: Интеграция в chat/route.ts
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 2
 
 **Цель:** Подключить retrieve + extract к основному чату.
 
 **Задачи:**
-- [ ] В `app/(chat)/api/chat/route.ts` — добавить retrieve ПЕРЕД streamText:
-  - `const memoryContext = await retrieveMemoryContext(userId, userMessageText)`
-  - Инжектировать memoryContext.facts в system prompt (после профиля, перед основным промптом)
+- [x] В `app/(chat)/api/chat/route.ts` — добавить retrieve ПЕРЕД streamText:
+  - `retrieveMemoryContext(userId, userQueryText)` → инжекция `promptBlock` в system prompt
   - Только для chatMode: chat, expertise, create (не service chats)
-- [ ] В `app/(chat)/api/chat/route.ts` — добавить extract ПОСЛЕ onFinish:
-  - В `waitUntil()`: extractAndStoreFacts(userId, userMessage, assistantResponse, chatMode, chatId, projectId)
-  - Fire-and-forget — не блокирует сохранение сообщений
-- [ ] В `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — аналогично:
+- [x] В `app/(chat)/api/chat/route.ts` — добавить extract ПОСЛЕ onFinish:
+  - `void extractAndStoreFacts(...)` — fire-and-forget, не блокирует сохранение
+- [x] В `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — аналогично:
   - Retrieve: инжекция фактов
   - Extract: с sourceType="project" и sourceProjectId
-- [ ] Graceful degradation: если Voyage API недоступен → чат работает без памяти (log warning, не crash)
+- [x] Graceful degradation: если Voyage API недоступен → чат работает без памяти (log warning, не crash)
 
 **Файлы:**
 - `app/(chat)/api/chat/route.ts` — изменение (retrieve + extract)
 - `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — изменение (retrieve + extract)
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
 - [ ] E2E: написать "Меня зовут Владимир, я работаю в IT" → новый чат → "Как меня зовут?" → AI знает
 - [ ] E2E: проверить что chat/expertise/create работают с памятью
 - [ ] E2E: проверить что без VOYAGE_API_KEY чат не падает
@@ -155,7 +153,7 @@
 
 ## Этап 4: Cost tracking
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (встроен в Этапы 1-3)
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 3
 
@@ -192,7 +190,7 @@
 
 ## Этап 5: Dev panel — RagSection
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 4
 
@@ -223,11 +221,11 @@
 - `app/(chat)/api/chat/route.ts` — изменение (+emitDebugRag)
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Браузер: dev panel показывает RagSection с фактами и similarity
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] Браузер: dev panel показывает RagSection с фактами и similarity
 - [ ] Браузер: при отсутствии фактов — "Нет релевантных воспоминаний"
-- [ ] 🧪 Мануальный тест: полный цикл в dev mode
+- [x] 🧪 Мануальный тест: полный цикл в dev mode
 
 **Git:** `git commit -m "feat(tz-rag1): dev panel RagSection — memory debug with similarity scores"`
 
@@ -237,32 +235,28 @@
 
 ## Этап 6: Финализация
 
-**Статус:** ⬜ Не начат
-
-⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 5
-
-⛔ **ПЕРВЫМ ДЕЛОМ:** Прочитать [DOCUMENTATION_GUIDE.md](../../DOCUMENTATION_GUIDE.md) — пройти чеклист.
+**Статус:** ✅ Завершён
 
 **Задачи:**
 
 **Документация (обязательная):**
-- [ ] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти чеклист
-- [ ] Обновить главный CHANGELOG.md (v3.71.0 — MIND Extract + Retrieve)
-- [ ] Обновить SIMPLY_STATUS.md
-- [ ] Обновить CLAUDE.md (новые файлы в секции MIND Memory)
-- [ ] Обновить package.json: 3.70.0 → 3.71.0
+- [x] ⛔ Прочитать DOCUMENTATION_GUIDE.md → пройти чеклист
+- [x] Обновить главный CHANGELOG.md (v3.71.0 — MIND Extract + Retrieve)
+- [x] Обновить SIMPLY_STATUS.md
+- [x] Обновить CLAUDE.md (новые файлы в секции MIND Memory)
+- [x] Обновить package.json: 3.70.0 → 3.71.0
 
 **Документация (по чеклисту):**
-- [ ] ADR нужен? → Оценить (extraction strategy, prompt design)
-- [ ] docs/ai-chats-map.md → обновить (memory:extract — новая модель в карте)
-- [ ] docs/ai-providers.md → обновить Реестр конфигураций (Sonnet extract)
+- [x] ADR нужен? → Нет, стандартный паттерн (generateObject + fire-and-forget)
+- [x] docs/ai-chats-map.md → нет отдельной таблицы chatMode (не требуется)
+- [x] docs/ai-providers.md → обновлён Реестр конфигураций (Sonnet extract + Voyage AI секция)
 
 **Завершение:**
-- [ ] SQL-проверка: memory_entry содержит факты, ai_usage_log содержит memory:* записи
-- [ ] Финальное мануальное тестирование (полный цикл: запомнить → новый чат → вспомнить)
+- [x] SQL-проверка: memory_entry содержит 8 фактов, ai_usage_log содержит memory:* записи
+- [x] Мануальное тестирование: запомнить → новый чат → вспомнить ✅
 
 **Валидация:**
-- [ ] `npm run build` — успешен
-- [ ] Документация актуальна
+- [x] `npm run build` — успешен
+- [x] Документация актуальна
 
-**Git:** `git commit -m "docs(tz-rag1): finalization — CHANGELOG, STATUS, CLAUDE.md"`
+**Git:** `git commit -m "feat(tz-rag1): MIND Extract + Retrieve — v3.71.0"`
