@@ -12,6 +12,29 @@
 
 ---
 
+## [3.67.0] - 2026-04-06 - SdkNativeUsageTracking
+
+**ТЗ-TOKENS1**: Полный рефакторинг учёта токенов и расчёта стоимости AI-запросов на нативные disjoint-поля AI SDK v6. Устраняет overcount 5-10× в user-facing UI и расхождение <1% с Anthropic Console.
+
+### Added
+- `lib/ai/providers.ts` — `MODEL_CONTEXT_WINDOW` (Sonnet/Opus 4.6 = 1M native, Haiku 4.5 = 200K), `getContextWindow()`, `CostBreakdownRub` тип, `calculateCostBreakdownRub()` per-component helper, `extractUsageForPricing()` client-safe SSOT
+- `lib/usage.ts` — новый self-contained `AppUsage` контракт (disjoint tokens + costRub breakdown + contextWindow snapshot), `buildAppUsage()`, `mergeAppUsage()` для кумулятивного аккумулятора сессии, `normalizeStoredAppUsage()` для legacy DB rows
+- `app/(dashboard)/admin/cost-audit/page.tsx` — 4-я summary card "Cache hit rate", таблица "Расходы по моделям" с breakdown: Fresh in / Cache read (зелёный) / Cache write (жёлтый) / Reasoning
+- `docs/decisions/035-sdk-native-usage-tracking.md` — ADR
+
+### Changed
+- `app/(chat)/api/chat/route.ts` — onFinish строит `AppUsage` через `buildAppUsage()` (SSOT), убран вызов `tokenlens/helpers.getUsage()` (additive-формула дважды считала cache-токены)
+- `components/elements/context.tsx` — переписан popover: disjoint breakdown, суммы RUB из SSOT, цветовая индикация (cache_read зелёный, cache_write жёлтый), кумулятивный "Расход за сессию"
+- `components/chat.tsx` — `setUsage(prev => mergeAppUsage(prev, incoming))` вместо last-message-only замены
+- `lib/ai/tokenlens-catalog.ts` — удалён re-export `getUsage` из `tokenlens/helpers`
+- `lib/ai/usage-utils.ts` — `extractUsageForPricing` перенесён в `providers.ts` (client-safe), здесь re-export
+- `lib/db/queries.ts` — `getCostByModel()` возвращает disjoint breakdown (freshInputTokens, cacheReadTokens, cacheWriteTokens, reasoningTokens)
+
+### Fixed
+- **Context popover overcount 5.6×:** Legacy tokenlens additive-формула умножала суммарный input (fresh + cache) на fresh-rate, считая cache-токены дважды. Теперь используется `calculateCostBreakdownRub()` с disjoint-полями
+
+---
+
 ## [3.66.0] - 2026-04-05 - BriefingCostControl
 
 **ТЗ-COSTCTRL**: Устранение 4 дефектов briefing/podcast cron подсистемы — delivery invariants, fail-fast pipeline, guaranteed cost logging, 100% cost coverage.
