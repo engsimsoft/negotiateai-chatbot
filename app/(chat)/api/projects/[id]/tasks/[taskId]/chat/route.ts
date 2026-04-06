@@ -198,28 +198,40 @@ export async function POST(
       messagesTokens + systemPromptTokens + newMessageTokens
     );
 
-    // ТЗ-RAG1: Retrieve MIND memory facts for project tasks
+    // ТЗ-RAG1/RAG2: Retrieve MIND memory facts for project tasks
+    // Gate: check user's memoryEnabled setting
     let finalSystemPrompt = systemPromptText;
+    let isMemoryEnabled = true;
     {
       try {
-        const userQueryText = message.parts
-          .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
-          .map((p: any) => p.text)
-          .join("\n");
+        const { getMemorySettings } = await import("@/lib/db/queries");
+        const memSettings = await getMemorySettings({ userId: session.user.id });
+        isMemoryEnabled = memSettings.memoryEnabled;
+      } catch {
+        // Default to enabled
+      }
 
-        if (userQueryText.length >= 5) {
-          const memoryResult = await retrieveMemoryContext(
-            session.user.id,
-            userQueryText,
-            { chatId },
-          );
+      if (isMemoryEnabled) {
+        try {
+          const userQueryText = message.parts
+            .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
+            .map((p: any) => p.text)
+            .join("\n");
 
-          if (memoryResult.promptBlock) {
-            finalSystemPrompt += `\n\n${memoryResult.promptBlock}`;
+          if (userQueryText.length >= 5) {
+            const memoryResult = await retrieveMemoryContext(
+              session.user.id,
+              userQueryText,
+              { chatId },
+            );
+
+            if (memoryResult.promptBlock) {
+              finalSystemPrompt += `\n\n${memoryResult.promptBlock}`;
+            }
           }
+        } catch (error) {
+          console.warn("[MIND] Retrieve failed in task chat (non-blocking):", error instanceof Error ? error.message : error);
         }
-      } catch (error) {
-        console.warn("[MIND] Retrieve failed in task chat (non-blocking):", error instanceof Error ? error.message : error);
       }
     }
 
@@ -655,7 +667,8 @@ export async function POST(
         }
 
         // ТЗ-RAG1: Extract facts from task conversation (fire-and-forget)
-        {
+        // ТЗ-RAG2: Respects memoryEnabled setting
+        if (isMemoryEnabled) {
           const userText = message.parts
             .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
             .map((p: any) => p.text)

@@ -431,6 +431,9 @@ export async function POST(request: Request) {
       durationMs: number;
     } | null = null;
 
+    // ТЗ-RAG2: Shared flag for memory gate (used in both execute and onFinish)
+    let isMemoryEnabled = ["chat", "expertise", "create"].includes(chatMode);
+
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         // ТЗ-03: Build system prompt - different for project vs regular chat
@@ -489,7 +492,16 @@ export async function POST(request: Request) {
 
         // ТЗ-RAG1/RAG2: MIND memory — profile + retrieval
         // Scope: chat, expertise, create (not service chats, not professor pipeline)
-        const isMemoryEnabled = ["chat", "expertise", "create"].includes(chatMode);
+        // Gate: check user's memoryEnabled setting (isMemoryEnabled hoisted above createUIMessageStream)
+        if (isMemoryEnabled) {
+          try {
+            const { getMemorySettings } = await import("@/lib/db/queries");
+            const memSettings = await getMemorySettings({ userId: session.user.id });
+            isMemoryEnabled = memSettings.memoryEnabled;
+          } catch {
+            // If settings check fails, default to enabled
+          }
+        }
         let memoryDebugData: Parameters<typeof emitDebugRag>[1] | null = null;
         if (isMemoryEnabled) {
           // ТЗ-RAG2: Inject Opus profile (stable "who is this person" context)
@@ -1098,7 +1110,8 @@ export async function POST(request: Request) {
         }
 
         // ТЗ-RAG1: Extract facts from conversation (fire-and-forget)
-        if (["chat", "expertise", "create"].includes(chatMode)) {
+        // ТЗ-RAG2: Respects memoryEnabled setting (checked earlier in execute)
+        if (isMemoryEnabled) {
           const userText = message.parts
             .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
             .map((p: any) => p.text)
