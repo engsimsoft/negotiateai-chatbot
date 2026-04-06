@@ -138,6 +138,11 @@ const MODEL_PRICING_RUB: Record<string, ModelPricing> = {
   // Perplexity (no prompt caching)
   "sonar-pro":                   { input: 0.30,  output: 1.50,  cached: 0, cacheWrite: 0 },
   "sonar-deep-research":         { input: 0.20,  output: 0.80,  cached: 0, cacheWrite: 0 },
+
+  // Voyage AI embeddings (ТЗ-RAG0) — input only, no output tokens
+  // voyage-4: $0.06/1M tokens, voyage-4-lite: $0.02/1M tokens
+  "voyage-4":                    { input: 0.006, output: 0,     cached: 0, cacheWrite: 0 },
+  "voyage-4-lite":               { input: 0.002, output: 0,     cached: 0, cacheWrite: 0 },
 };
 
 /**

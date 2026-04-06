@@ -2,7 +2,7 @@
 
 **Версия:** 3.3.0
 **Последнее обновление:** 2026-04-06
-**Статус:** 3 провайдера, 4 модели Anthropic + 4 модели Gemini + 2 модели Perplexity
+**Статус:** 4 провайдера, 4 модели Anthropic + 4 модели Gemini + 2 модели Perplexity + 2 модели Voyage AI
 
 ---
 
@@ -63,6 +63,18 @@
 
 > Perplexity используется для инструмента Deep Research (sonar-pro / sonar-deep-research). Доступен в режимах expertise, create и проектных чатах.
 
+### Voyage AI (Embeddings + RAG)
+
+| Параметр | Значение |
+|----------|----------|
+| SDK | REST API (fetch) — паттерн perplexity-client.ts |
+| API Key | `VOYAGE_API_KEY` |
+| Endpoint | `https://api.voyageai.com/v1/embeddings` |
+| Документация | https://docs.voyageai.com/ |
+| Клиент | `lib/ai/memory/voyage-client.ts` |
+
+> Voyage AI — единый провайдер для embeddings и reranking. Рекомендован Anthropic. Используется для MIND (память из чатов) и Библиотеки (база знаний). Shared embedding space: voyage-4 (indexing) + voyage-4-lite (queries).
+
 ---
 
 ## Модели
@@ -94,6 +106,18 @@
 |--------|-------------|---------------|--------|
 | **Sonar Pro** | `sonar-pro` | Deep Research: быстрый мультишаговый поиск (5-15 сек) | `lib/ai/tools/deep-research.ts` |
 | **Sonar Deep Research** | `sonar-deep-research` | Deep Research: исчерпывающее исследование (30-120 сек) | `lib/ai/tools/deep-research.ts` |
+
+### Voyage AI Embeddings
+
+| Модель | Реальный ID | Цена / 1M tok | Размерность | Использование | Конфиг |
+|--------|-------------|---------------|-------------|---------------|--------|
+| **Voyage 4** | `voyage-4` | $0.06 | 1024 | Embedding фактов MIND (input_type: document) | `lib/ai/memory/voyage-client.ts` |
+| **Voyage 4 Lite** | `voyage-4-lite` | $0.02 | 1024 | Embedding запросов (input_type: query, shared space) | `lib/ai/memory/voyage-client.ts` |
+
+**Планируемые (RAG-4):**
+- `voyage-context-3` ($0.18/1M) — contextualized chunk embeddings для документов
+- `voyage-multimodal-3.5` ($0.12/1M text) — мультимодальные эмбеддинги (текст + изображения)
+- `rerank-2.5` ($0.05/1M) — instruction-following reranker
 
 ---
 
@@ -235,7 +259,7 @@ const cost = calculateCostRub('claude-sonnet-4-6', { inputTokens: 1000, outputTo
 const ttsCost = calculateTtsCostRub(30); // 30 секунд
 ```
 
-`MODEL_PRICING_RUB` поддерживает: Claude (Haiku, Sonnet, Opus), Gemini (2.0 Flash, 2.5 Flash), Perplexity (Sonar Pro, Sonar Deep Research).
+`MODEL_PRICING_RUB` поддерживает: Claude (Haiku, Sonnet, Opus), Gemini (2.0 Flash, 2.5 Flash), Perplexity (Sonar Pro, Sonar Deep Research), Voyage AI (voyage-4, voyage-4-lite).
 
 Non-token провайдеры (v3.66.0):
 ```typescript
@@ -284,6 +308,9 @@ GOOGLE_GENERATIVE_AI_API_KEY=your_google_api_key
 
 # Perplexity (для Deep Research)
 PERPLEXITY_API_KEY=your_perplexity_api_key
+
+# Voyage AI (для embeddings + RAG)
+VOYAGE_API_KEY=your_voyage_api_key
 ```
 
 ### Где получить ключи
@@ -293,6 +320,7 @@ PERPLEXITY_API_KEY=your_perplexity_api_key
 | Anthropic | https://console.anthropic.com/settings/keys |
 | Google AI | https://aistudio.google.com/apikey |
 | Perplexity | https://www.perplexity.ai/settings/api |
+| Voyage AI | https://dash.voyageai.com/ |
 
 ---
 

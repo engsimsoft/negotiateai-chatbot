@@ -8,7 +8,46 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- Этап 8+: Инструменты Фаза 1 (Plus AI, Ideogram), RAG, Chat Memory, биллинг
+- RAG-1: MIND Extract + Retrieve (извлечение фактов из чатов, semantic search)
+- RAG-2: MIND Consolidation + Profile + UI
+- RAG-3: Compaction (бесконечный чат)
+- RAG-4: Библиотека MVP (загрузка документов + search)
+
+---
+
+## [3.70.0] - 2026-04-06 - SimplyRAG Infrastructure
+
+**ТЗ-RAG0**: Фундамент RAG-системы Simply — pgvector, Voyage AI, vector search. Первый шаг к персональной памяти (MIND) и базе знаний (Библиотека).
+
+### Added
+- **pgvector extension** (v0.8.0) — включён в Neon PostgreSQL
+- **Таблица `memory_entry`** — хранение фактов из разговоров (vector(1024), category, confidence, sourceType, supersededBy chain)
+- **HNSW-индекс** — approximate nearest neighbor search (cosine similarity, m=16, ef_construction=64)
+- **4 составных индекса** — userId+category, userId+createdAt, partial index (active only), self-ref FK
+- **Voyage AI клиент** (`lib/ai/memory/voyage-client.ts`) — raw fetch к `/v1/embeddings`, модели voyage-4 (indexing) + voyage-4-lite (queries), batch до 128 текстов
+- **Memory queries** (`lib/ai/memory/memory-queries.ts`) — insertMemoryEntry, embedAndInsertMemory, searchSimilarMemories, getMemoryEntriesByUser, countUserMemories, supersedeMemoryEntry, deleteMemoryEntry, deleteAllUserMemories
+- **Types** (`lib/ai/memory/types.ts`) — MemoryCategory (6 типов), MemorySourceType (4 типа), SearchOptions, VoyageEmbedResponse
+- **Public API** (`lib/ai/memory/index.ts`) — единая точка экспорта
+- **Voyage AI pricing** в `providers.ts` → MODEL_PRICING_RUB (voyage-4: 0.006₽/1K, voyage-4-lite: 0.002₽/1K)
+- `VOYAGE_API_KEY` в `.env.example`
+- Миграция `0048_memory-entry.sql`
+
+### Technical Details
+- **Провайдер:** Voyage AI (единый для embeddings + reranking, один API-ключ)
+- **Паттерн:** raw fetch (как perplexity-client.ts), не SDK
+- **Размерность:** 1024 (дефолт Voyage 4, Matryoshka-совместим)
+- **Shared space:** voyage-4 и voyage-4-lite создают эмбеддинги в одном пространстве
+- **Верификация:** cosine similarity "Встреча с Петровым" ↔ "Когда встреча с Петровым?" = 0.64
+
+### Files
+- `lib/ai/memory/voyage-client.ts` — новый
+- `lib/ai/memory/memory-queries.ts` — новый
+- `lib/ai/memory/types.ts` — новый
+- `lib/ai/memory/index.ts` — новый
+- `lib/db/schema.ts` — +customType vector, +memoryEntry table
+- `lib/ai/providers.ts` — +Voyage pricing
+- `lib/db/migrations/0048_memory-entry.sql` — новый
+- `.env.example` — +VOYAGE_API_KEY
 
 ---
 

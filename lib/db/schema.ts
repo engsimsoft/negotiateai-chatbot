@@ -1,7 +1,8 @@
-import type { InferSelectModel } from "drizzle-orm";
+import { sql, type InferSelectModel } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  customType,
   foreignKey,
   index,
   integer,
@@ -17,6 +18,20 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+
+// pgvector: custom type for vector(1024) columns (ТЗ-RAG0)
+const vector = customType<{ data: number[]; driverData: string }>({
+  dataType() {
+    return "vector(1024)";
+  },
+  toDriver(value: number[]): string {
+    return `[${value.join(",")}]`;
+  },
+  fromDriver(value: string): number[] {
+    // pgvector returns "[0.1,0.2,...]" format
+    return JSON.parse(value) as number[];
+  },
+});
 import type { AppUsage } from "../usage";
 
 // ============================================================================
@@ -734,3 +749,59 @@ export const cronRunLog = pgTable("CronRunLog", {
 });
 
 export type CronRunLog = InferSelectModel<typeof cronRunLog>;
+
+// ============================================================================
+// MIND Memory (ТЗ-RAG0)
+// ============================================================================
+
+export const memoryEntry = pgTable(
+  "memory_entry",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    content: text("content").notNull(),
+    embedding: vector("embedding").notNull(),
+    /** fact | task | preference | calendar | person | decision */
+    category: varchar("category", { length: 32 }).notNull(),
+    /** 0.0–1.0, how confident the extraction model was */
+    confidence: numeric("confidence", { precision: 3, scale: 2 })
+      .notNull()
+      .default("1.00"),
+    /** chat | expertise | create | project */
+    sourceType: varchar("sourceType", { length: 32 }).notNull(),
+    sourceChatId: uuid("sourceChatId").references(() => chat.id, {
+      onDelete: "set null",
+    }),
+    sourceProjectId: uuid("sourceProjectId").references(() => project.id, {
+      onDelete: "set null",
+    }),
+    /** Points to the newer fact that replaced this one */
+    supersededBy: uuid("supersededBy"),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+  },
+  (table) => ({
+    // Composite indexes for filtered queries
+    userCategoryIdx: index("memory_entry_user_category_idx").on(
+      table.userId,
+      table.category
+    ),
+    userCreatedAtIdx: index("memory_entry_user_created_idx").on(
+      table.userId,
+      table.createdAt
+    ),
+    // Partial index: only active (non-superseded) entries
+    activeIdx: index("memory_entry_active_idx")
+      .on(table.userId)
+      .where(sql`"supersededBy" IS NULL`),
+    // Self-referencing FK for supersededBy chain
+    supersededByRef: foreignKey({
+      columns: [table.supersededBy],
+      foreignColumns: [table.id],
+    }).onDelete("set null"),
+  })
+);
+
+export type MemoryEntry = InferSelectModel<typeof memoryEntry>;
