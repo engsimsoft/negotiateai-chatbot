@@ -56,7 +56,7 @@ export function getStandardTools({
   return {
     getCurrentDate,
     getWeather,
-    ...(isProjectChat ? {} : { readDocument }),
+    ...(isProjectChat ? {} : { readDocument: readDocument({ userId: session.user?.id ?? "" }) }),
     ...(isProjectChat && projectId
       ? { readProjectFile: readProjectFile({ projectId }) }
       : {}),

@@ -81,7 +81,10 @@ async function suggestFilePaths(filepath: string): Promise<string[]> {
   }
 }
 
-export const readDocument = tool({
+/**
+ * ТЗ-BILLING1: Factory that closes over userId so Vision OCR can log Gemini cost.
+ */
+export const readDocument = ({ userId }: { userId: string }) => tool({
   description: `Read a document from the knowledge base (knowledge/ folder).
 Supports: DOCX, PDF (including scanned/OCR), TXT, MD, JPG, JPEG, PNG.
 PDF and image files are processed using Claude Vision OCR for accurate text extraction.
@@ -165,7 +168,7 @@ Example usage:
         try {
           const buffer = await fs.readFile(absolutePath);
           const mediaType = ext === ".png" ? "image/png" : "image/jpeg";
-          const content = await extractTextFromImage(buffer, mediaType);
+          const content = await extractTextFromImage(buffer, mediaType, userId);
 
           return {
             success: true,
@@ -187,7 +190,7 @@ Example usage:
         // For PDF, use Claude Vision OCR (supports both text and scanned PDFs)
         try {
           const buffer = await fs.readFile(absolutePath);
-          const result = await extractTextFromPDF(buffer);
+          const result = await extractTextFromPDF(buffer, userId);
 
           return {
             success: true,

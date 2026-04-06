@@ -43,8 +43,8 @@ export interface VisionOCRResult {
 export async function extractTextFromImage(
   imageBuffer: Buffer,
   mediaType: "image/png" | "image/jpeg",
-  /** ТЗ-CACHE2: userId for usage logging (optional — not available from tool context) */
-  userId?: string,
+  /** ТЗ-BILLING1: userId required — Gemini cost must always be logged. */
+  userId: string,
 ): Promise<string> {
   console.log(`[Vision OCR] Processing image (${Math.round(imageBuffer.length / 1024)}KB, ${mediaType})`);
   const startTime = Date.now();
@@ -79,16 +79,14 @@ export async function extractTextFromImage(
       `[Vision OCR] Image processed in ${processingTime}ms, extracted ${text.length} chars`
     );
 
-    // ТЗ-CACHE2: Usage logging (userId not available from tool context)
-    if (userId) {
-      logUsage({
-        userId,
-        usage,
-        modelId: "gemini-2.5-flash",
-        chatMode: "util:vision-ocr",
-        durationMs: processingTime,
-      });
-    }
+    // ТЗ-BILLING1: Always log Gemini Vision cost
+    logUsage({
+      userId,
+      usage,
+      modelId: "gemini-2.5-flash",
+      chatMode: "util:vision-ocr",
+      durationMs: processingTime,
+    });
 
     return text;
   } catch (error) {
@@ -109,8 +107,8 @@ export async function extractTextFromImage(
  */
 export async function extractTextFromPDF(
   pdfBuffer: Buffer,
-  /** ТЗ-CACHE2: userId for usage logging (optional — not available from tool context) */
-  userId?: string,
+  /** ТЗ-BILLING1: userId required — Gemini cost must always be logged. */
+  userId: string,
 ): Promise<VisionOCRResult> {
   console.log(`[Vision OCR] Processing PDF (${Math.round(pdfBuffer.length / 1024)}KB)`);
   const startTime = Date.now();
@@ -145,16 +143,14 @@ export async function extractTextFromPDF(
       `[Vision OCR] PDF processed in ${processingTime}ms, extracted ${text.length} chars`
     );
 
-    // ТЗ-CACHE2: Usage logging (userId not available from tool context)
-    if (userId) {
-      logUsage({
-        userId,
-        usage,
-        modelId: "gemini-2.5-flash",
-        chatMode: "util:vision-ocr",
-        durationMs: processingTime,
-      });
-    }
+    // ТЗ-BILLING1: Always log Gemini Vision cost
+    logUsage({
+      userId,
+      usage,
+      modelId: "gemini-2.5-flash",
+      chatMode: "util:vision-ocr",
+      durationMs: processingTime,
+    });
 
     return {
       text,
