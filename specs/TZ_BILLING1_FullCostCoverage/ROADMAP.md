@@ -11,8 +11,8 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 3 |
-| Завершено | 0 / 3 |
-| Текущий этап | 1 |
+| Завершено | 3 / 3 ✅ |
+| Текущий этап | Завершён |
 | Сессий (оценка) | 1 |
 
 **Критерий успеха:** SQL-запрос `SELECT * FROM ai_usage_log WHERE costUsd IS NULL AND createdAt > NOW() - INTERVAL '1 day'` возвращает 0 строк для chat/expertise/create chatModes + tool:voice-input + util:vision-ocr.
@@ -136,7 +136,7 @@ LIMIT 5;
 
 ### Этап 3: Финализация
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 **Цель:** Документация, version bump, archive.
 
 ⛔ **ПЕРВЫМ ДЕЛОМ:** Прочитать `DOCUMENTATION_GUIDE.md` → пройти чеклист.

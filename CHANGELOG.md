@@ -12,6 +12,25 @@
 
 ---
 
+## [3.68.0] - 2026-04-06 - FullCostCoverage
+
+**ТЗ-BILLING1**: Закрытие слепых зон в учёте расходов — Deepgram voice-to-text и Gemini Vision OCR теперь всегда логируются в `ai_usage_log`.
+
+### Added
+- `app/(chat)/api/deepgram/usage/route.ts` — новый endpoint: принимает `durationSeconds` от клиента, вычисляет `calculateDeepgramCostUsd()`, логирует как `chatMode: "tool:voice-input"`, `modelId: "deepgram-nova-3"`
+
+### Changed
+- `hooks/use-voice-recorder.ts` — трекинг длительности записи (`recordingStartRef`), POST на `/api/deepgram/usage` при остановке (fire-and-forget, пропускает <0.5с)
+- `lib/ai/vision-ocr.ts` — `userId` параметр в `extractTextFromImage()` и `extractTextFromPDF()` сделан **обязательным** (был optional → Gemini cost молча не логировался)
+- `lib/ai/tools/read-document.ts` — преобразован из plain export в фабрику `readDocument({ userId })` с closure
+- `lib/ai/tools/chat-tools.ts` — пробрасывает `session.user.id` в `readDocument` factory
+
+### Fixed
+- **Deepgram voice cost не учитывался** — WebSocket шёл из браузера напрямую, сервер не знал длительность записи. Теперь duration отправляется на сервер после каждой записи
+- **Gemini Vision OCR cost не логировался** — `readDocument` tool вызывал `extractTextFromImage/PDF` без userId, logUsage молча пропускал. Теперь userId обязателен (TSC enforcement)
+
+---
+
 ## [3.67.0] - 2026-04-06 - SdkNativeUsageTracking
 
 **ТЗ-TOKENS1**: Полный рефакторинг учёта токенов и расчёта стоимости AI-запросов на нативные disjoint-поля AI SDK v6. Устраняет overcount 5-10× в user-facing UI и расхождение <1% с Anthropic Console.
