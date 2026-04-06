@@ -26,6 +26,10 @@ export { extractFactsFromMessages, extractAndStoreFacts } from "./extract";
 export type { ConsolidationStats } from "./consolidate";
 export { consolidateUserMemory, miniConsolidateUserMemory } from "./consolidate";
 
+// Profile generation
+export type { ProfileGenerationResult } from "./profile";
+export { generateUserProfile, getProfileBlock } from "./profile";
+
 // Retrieval + prompt injection
 export type { RetrievalResult } from "./retrieve";
 export { retrieveMemoryContext, formatMemoryForPrompt } from "./retrieve";

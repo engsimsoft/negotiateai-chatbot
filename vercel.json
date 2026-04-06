@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/memory-profile",
+      "schedule": "0 0 * * *"
+    },
+    {
       "path": "/api/cron/briefing",
       "schedule": "0 5 * * *"
     }

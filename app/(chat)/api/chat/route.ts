@@ -46,6 +46,7 @@ import {
   type DebugStepData,
 } from "@/lib/ai/debug-events";
 import { retrieveMemoryContext } from "@/lib/ai/memory/retrieve";
+import { getProfileBlock } from "@/lib/ai/memory/profile";
 import { extractAndStoreFacts } from "@/lib/ai/memory/extract";
 import {
   addChatSnapshot,
@@ -486,11 +487,22 @@ export async function POST(request: Request) {
           systemPromptText += `\n\n<previous_context>\n${snapshotContext}\n</previous_context>`;
         }
 
-        // ТЗ-RAG1: Retrieve MIND memory facts and inject into system prompt
+        // ТЗ-RAG1/RAG2: MIND memory — profile + retrieval
         // Scope: chat, expertise, create (not service chats, not professor pipeline)
         const isMemoryEnabled = ["chat", "expertise", "create"].includes(chatMode);
         let memoryDebugData: Parameters<typeof emitDebugRag>[1] | null = null;
         if (isMemoryEnabled) {
+          // ТЗ-RAG2: Inject Opus profile (stable "who is this person" context)
+          try {
+            const profileBlock = await getProfileBlock(session.user.id);
+            if (profileBlock) {
+              systemPromptText += `\n\n${profileBlock}`;
+            }
+          } catch (error) {
+            console.warn("[MIND] Profile load failed (non-blocking):", error instanceof Error ? error.message : error);
+          }
+
+          // ТЗ-RAG1: Retrieve relevant facts for current query
           try {
             const userQueryText = message.parts
               .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
