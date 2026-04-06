@@ -484,6 +484,24 @@ components/projects/
 - `components/dev-panel/dev-panel-footer.tsx` — fallback ~
 - `components/dev-panel/sections/timeline-section.tsx` — + reasoning tokens
 
+### ТЗ-PIPELINE1: ReliablePipelineObservability — ✅ ЗАВЕРШЁН (v3.69.0)
+
+**Выполнено:**
+- **Fix multi-step usage (CRITICAL)** — `onFinish: ({ usage })` → `onFinish: ({ totalUsage })` в 4 streaming routes. До фикса терялось 74% tokens (159K в Console vs 42K в БД). После фикса дельта <1%
+- **Artifact usage logging** — 5 artifact handlers (text, markdown, excel, reveal, pptx) использовали Sonnet 4.6 без logUsage. Добавлено `result.totalUsage` + `logUsage()` с chatModes `artifact:*`
+- **Pipeline retry transparency** — `maxRetries: 0` отключает скрытые SDK retry. `retryWithLogging()` логирует каждую попытку отдельно (briefing-author, section-author)
+- **Removed fallback Sonnet 4.5** — `AUTHOR_MODEL_FALLBACK` удалён (та же цена, нет смысла). Retry с основной моделью через обёртку
+- **Safe stream controller** — safeEnqueue wrapper предотвращает "Controller is already closed" crash
+- **DevPanel extensions** — Retry History в Stages, URL Verification секция (✓/✗ маркеры для детекции галлюцинаций)
+
+**Ключевые файлы:**
+- `lib/ai/retry-with-logging.ts` — retry-обёртка с per-attempt logging
+- `lib/ai/pipeline-trace.ts` — AiCallAttempt тип для retry visibility
+- `docs/decisions/037-total-usage-and-retry-logging.md` — ADR решения
+- `docs/decisions/038-cost-tracking-architecture.md` — ADR полной архитектуры учёта расходов
+
+**Детали:** [_archive/TZ_PIPELINE1_ReliablePipelineObservability/](_archive/TZ_PIPELINE1_ReliablePipelineObservability/)
+
 ### ТЗ-CACHE2: UnifiedUsageLogging — ✅ ЗАВЕРШЁН
 
 **Выполнено:**
@@ -1545,6 +1563,9 @@ components/projects/
 - [docs/decisions/](docs/decisions/) — ADR
 
 **ТЗ (архив):**
+- [_archive/TZ_PIPELINE1_ReliablePipelineObservability/](_archive/TZ_PIPELINE1_ReliablePipelineObservability/) — ТЗ-PIPELINE1 Reliable Pipeline Observability (v3.69.0)
+- [_archive/TZ_BILLING1_FullCostCoverage/](_archive/TZ_BILLING1_FullCostCoverage/) — ТЗ-BILLING1 Full Cost Coverage (v3.68.0)
+- [_archive/TZ_TOKENS1_SdkNativeUsage/](_archive/TZ_TOKENS1_SdkNativeUsage/) — ТЗ-TOKENS1 SDK Native Usage Tracking (v3.67.0)
 - [specs/TZ_COSTCTRL_BriefingCostControl/](specs/TZ_COSTCTRL_BriefingCostControl/) — ТЗ-COSTCTRL Briefing Cost Control (v3.66.0)
 - [_archive/TZ_BF4_PerSectionRefresh/](_archive/TZ_BF4_PerSectionRefresh/) — ТЗ-BF4 PerSectionRefresh
 - [_archive/TZ_BF2_SimplyNews/](_archive/TZ_BF2_SimplyNews/) — ТЗ-BF2 SimplyNews
