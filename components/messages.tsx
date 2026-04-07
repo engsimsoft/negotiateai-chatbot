@@ -61,17 +61,9 @@ function PureMessages({
 
   useEffect(() => {
     if (status === "submitted") {
-      requestAnimationFrame(() => {
-        const container = messagesContainerRef.current;
-        if (container) {
-          container.scrollTo({
-            top: container.scrollHeight,
-            behavior: "smooth",
-          });
-        }
-      });
+      scrollToBottom("smooth");
     }
-  }, [status, messagesContainerRef]);
+  }, [status, scrollToBottom]);
 
   // ТЗ-C1.5: Find the last snapshot boundary for dimming old messages
   // Priority 1: tool-created snapshot (visible in message parts)
@@ -116,9 +108,8 @@ function PureMessages({
 
   return (
     <div
-      className="overscroll-behavior-contain -webkit-overflow-scrolling-touch flex-1 touch-pan-y overflow-y-scroll"
+      className="overscroll-behavior-contain -webkit-overflow-scrolling-touch flex flex-1 flex-col-reverse touch-pan-y overflow-y-scroll"
       ref={messagesContainerRef}
-      style={{ overflowAnchor: "none" }}
     >
       <Conversation className="mx-auto flex min-w-0 max-w-4xl flex-col gap-4 md:gap-6">
         <ConversationContent className="flex flex-col gap-4 px-2 py-4 md:gap-6 md:px-4">

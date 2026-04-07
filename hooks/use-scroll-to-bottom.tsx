@@ -15,10 +15,10 @@ export function useScrollToBottom() {
     if (!containerRef.current) {
       return;
     }
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-
-    // Check if we are within 100px of the bottom (like v0 does)
-    setIsAtBottom(scrollTop + clientHeight >= scrollHeight - 100);
+    // With flex-direction: column-reverse, scrollTop=0 means "at the bottom" (newest).
+    // Scrolling up gives negative scrollTop values.
+    const { scrollTop } = containerRef.current;
+    setIsAtBottom(scrollTop >= -100);
   }, []);
 
   useEffect(() => {
@@ -75,11 +75,8 @@ export function useScrollToBottom() {
   useEffect(() => {
     if (scrollBehavior && containerRef.current) {
       const container = containerRef.current;
-      const scrollOptions: ScrollToOptions = {
-        top: container.scrollHeight,
-        behavior: scrollBehavior,
-      };
-      container.scrollTo(scrollOptions);
+      // With column-reverse, "bottom" (newest) is scrollTop=0
+      container.scrollTo({ top: 0, behavior: scrollBehavior });
       setScrollBehavior(false);
     }
   }, [scrollBehavior, setScrollBehavior]);

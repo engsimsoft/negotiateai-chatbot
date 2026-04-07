@@ -28,7 +28,9 @@ import { createFallbackSnapshot } from "@/lib/ai/clerks/snapshot-creator";
 import {
   SNAPSHOT_THRESHOLD,
   FALLBACK_MESSAGE_PAIRS,
+  SIMPLY_SLIDING_WINDOW_SIZE,
   calcUsagePercent,
+  trimToUserStart,
 } from "@/lib/ai/context-limits";
 import { executeProfessorPipeline } from "@/lib/ai/professor-pipeline";
 import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
@@ -333,11 +335,16 @@ export async function POST(request: Request) {
 
     // Загружаем сообщения с учётом токенов нового сообщения
     // maxTokens = 140K, оставляем ~60K для system prompt (10K) + response (50K)
-    const messagesFromDb = await getMessagesByChatId({
+    // ТЗ-SlidingWindow: Simply uses hard message limit (20) instead of token budget
+    const isSimply = chatMode === "simply";
+    const messagesFromDbRaw = await getMessagesByChatId({
       id,
-      maxTokens: 140000 - newMessageTokens, // Вычитаем токены нового сообщения
-      minMessages: 20,
+      maxTokens: isSimply ? undefined : 140000 - newMessageTokens,
+      minMessages: isSimply ? SIMPLY_SLIDING_WINDOW_SIZE : 20,
+      maxMessages: isSimply ? SIMPLY_SLIDING_WINDOW_SIZE : 200,
     });
+    // ТЗ-SlidingWindow: ensure window starts with user message (don't orphan tool/assistant)
+    const messagesFromDb = isSimply ? trimToUserStart(messagesFromDbRaw) : messagesFromDbRaw;
 
     // ТЗ-C3/RAG3: Snapshot context management — only for Haiku chats (chatMode="chat"/"simply")
     // Sonnet/Opus use Anthropic Compaction API instead
