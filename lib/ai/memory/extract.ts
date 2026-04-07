@@ -16,7 +16,7 @@ import path from "path";
 import { generateObject } from "ai";
 import { z } from "zod";
 
-import { claudeSonnet } from "@/lib/ai/providers";
+import { claudeSonnet, claudeHaiku } from "@/lib/ai/providers";
 import { logUsage } from "@/lib/ai/usage-utils";
 import { calcCostUsd } from "@/lib/ai/tokenlens-catalog";
 import {
@@ -30,7 +30,7 @@ import {
 } from "./memory-queries";
 import { incrementFactsSinceConsolidation } from "@/lib/db/queries";
 import { miniConsolidateUserMemory } from "./consolidate";
-import { MEMORY_CATEGORIES, type MemoryCategory, type MemorySourceType } from "./types";
+import { MEMORY_CATEGORIES, type MemoryCategory, type MemorySourceType, type MemorySearchResult } from "./types";
 
 /** ТЗ-RAG2: Number of new facts before triggering mini-consolidation */
 const MINI_CONSOLIDATION_THRESHOLD = 20;
@@ -72,8 +72,10 @@ export type ExtractedFact = z.infer<typeof extractedFactSchema>;
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Cosine similarity threshold for deduplication */
-const DEDUP_SIMILARITY_THRESHOLD = 0.92;
+/** Cosine similarity threshold for deduplication candidates.
+ * Low threshold (0.55) to catch semantically similar facts with different wording.
+ * Candidates are then verified by LLM to avoid false positives. */
+const DEDUP_CANDIDATE_THRESHOLD = 0.55;
 
 /** Max facts to extract per message pair */
 const MAX_FACTS_PER_EXTRACTION = 10;
@@ -216,6 +218,69 @@ export async function extractAndStoreFacts(
 }
 
 // ---------------------------------------------------------------------------
+// Internal: LLM-based duplicate verification (Haiku — fast & cheap)
+// ---------------------------------------------------------------------------
+
+const deduplicationSchema = z.object({
+  duplicateOf: z
+    .string()
+    .nullable()
+    .describe("ID существующего факта, если новый факт дублирует его. null если это новый уникальный факт."),
+});
+
+async function verifyDuplicatesWithLLM(
+  newFact: string,
+  candidates: MemorySearchResult[],
+): Promise<MemorySearchResult[]> {
+  if (candidates.length === 0) return [];
+
+  const candidateList = candidates
+    .map((c) => `- ID: ${c.entry.id} | "${c.entry.content}" (sim: ${c.similarity.toFixed(3)})`)
+    .join("\n");
+
+  try {
+    const { object } = await generateObject({
+      model: claudeHaiku,
+      maxRetries: 0,
+      schema: deduplicationSchema,
+      system: `Ты проверяешь дубликаты фактов в памяти пользователя.
+
+Новый факт хотят сохранить. Есть кандидаты из базы — факты на похожую тему.
+
+Определи: новый факт ДУБЛИРУЕТ один из существующих? Дублирование = тот же смысл, та же тема, даже если сформулировано иначе. Обновлённая версия факта тоже считается дубликатом (supersede старый).
+
+Если дубликат — верни ID самого релевантного существующего факта.
+Если это действительно новый факт — верни null.`,
+      prompt: `Новый факт: "${newFact}"
+
+Кандидаты из базы:
+${candidateList}`,
+      temperature: 0,
+    });
+
+    if (object.duplicateOf) {
+      const match = candidates.find((c) => c.entry.id === object.duplicateOf);
+      if (match) {
+        console.log(
+          `[MemoryDedup] LLM confirmed duplicate: "${newFact.slice(0, 40)}..." ≈ "${match.entry.content.slice(0, 40)}..."`,
+        );
+        return [match];
+      }
+    }
+  } catch (error) {
+    console.warn(
+      "[MemoryDedup] LLM verification failed, falling back to embedding-only:",
+      error instanceof Error ? error.message : error,
+    );
+    // Fallback: if LLM fails, use highest similarity candidate if above 0.85
+    const best = candidates[0];
+    if (best && best.similarity >= 0.85) return [best];
+  }
+
+  return [];
+}
+
+// ---------------------------------------------------------------------------
 // Internal: process a single fact
 // ---------------------------------------------------------------------------
 
@@ -249,16 +314,22 @@ async function processAndStoreFact(
     costUsdOverride: voyageEmbedCostUsd,
   });
 
-  // Deduplicate: check for existing similar facts with same category
-  const { results: similar } = await searchSimilarMemories(
+  // Deduplicate: two-level check
+  // Level 1: embedding similarity (low threshold to find candidates)
+  const { results: candidates } = await searchSimilarMemories(
     input.userId,
     fact.content,
     {
-      limit: 3,
-      minSimilarity: DEDUP_SIMILARITY_THRESHOLD,
+      limit: 5,
+      minSimilarity: DEDUP_CANDIDATE_THRESHOLD,
       category: fact.category as MemoryCategory,
     },
   );
+
+  // Level 2: LLM verification — is this really the same fact?
+  const similar = candidates.length > 0
+    ? await verifyDuplicatesWithLLM(fact.content, candidates)
+    : [];
 
   if (similar.length > 0) {
     // Supersede the most similar existing fact

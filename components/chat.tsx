@@ -466,8 +466,8 @@ export function Chat({
         />
 
         <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl flex-col gap-0 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
-            {/* ТЗ-C3: Context usage indicator */}
-            <ContextIndicator percent={contextPercent} />
+            {/* ТЗ-C3/RAG3: Context indicator only for Haiku chats (Sonnet/Opus use Compaction) */}
+            {currentChatMode === "chat" && <ContextIndicator percent={contextPercent} />}
             {!isReadonly && (
               <MultimodalInput
                 attachments={attachments}

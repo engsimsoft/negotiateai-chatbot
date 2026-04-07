@@ -335,38 +335,44 @@ export async function POST(request: Request) {
       minMessages: 20,
     });
 
-    // ТЗ-C3: Load snapshot state for context management
-    const chatWithState = await getChatWithSnapshotState({ chatId: id });
-    const snapshots = chatWithState?.snapshots || [];
-    const contextState = chatWithState?.contextState || null;
+    // ТЗ-C3/RAG3: Snapshot context management — only for Haiku chats (chatMode="chat")
+    // Sonnet/Opus use Anthropic Compaction API instead
     let snapshotContext: string | undefined;
     let messagesForModel = messagesFromDb;
 
-    // ТЗ-C3: Snapshot-aware message trimming
-    if (snapshots.length > 0) {
-      const lastSnapshot = snapshots[snapshots.length - 1];
-      const snapshotMsgIndex = messagesFromDb.findIndex(
-        (m) => m.id === lastSnapshot.messageId
-      );
+    // contextState is used later in threshold checking for Haiku
+    let contextState: { suggestionActive: boolean; messagesSinceSuggestion: number } | null = null;
 
-      if (snapshotMsgIndex >= 0) {
-        const snapshotMsg = messagesFromDb[snapshotMsgIndex];
-        const snapshotPart = (snapshotMsg.parts as any[])?.find(
-          (p: any) =>
-            p.type === "tool-createSnapshot" && p.output?.fullMarkdown
+    if (chatMode === "chat") {
+      const chatWithState = await getChatWithSnapshotState({ chatId: id });
+      const snapshots = chatWithState?.snapshots || [];
+      contextState = chatWithState?.contextState || null;
+
+      if (snapshots.length > 0) {
+        const lastSnapshot = snapshots[snapshots.length - 1];
+        const snapshotMsgIndex = messagesFromDb.findIndex(
+          (m) => m.id === lastSnapshot.messageId
         );
-        snapshotContext =
-          snapshotPart?.output?.fullMarkdown ||
-          `## Итог\n${lastSnapshot.summary}`;
-        messagesForModel = messagesFromDb.slice(snapshotMsgIndex + 1);
-      } else {
-        snapshotContext =
-          lastSnapshot.fullMarkdown || `## Итог\n${lastSnapshot.summary}`;
-      }
 
-      console.log(
-        `[ContextMgmt] Chat ${id}: snapshot found, trimmed ${messagesFromDb.length - messagesForModel.length} messages, snapshotContext = ${snapshotContext!.length} chars`
-      );
+        if (snapshotMsgIndex >= 0) {
+          const snapshotMsg = messagesFromDb[snapshotMsgIndex];
+          const snapshotPart = (snapshotMsg.parts as any[])?.find(
+            (p: any) =>
+              p.type === "tool-createSnapshot" && p.output?.fullMarkdown
+          );
+          snapshotContext =
+            snapshotPart?.output?.fullMarkdown ||
+            `## Итог\n${lastSnapshot.summary}`;
+          messagesForModel = messagesFromDb.slice(snapshotMsgIndex + 1);
+        } else {
+          snapshotContext =
+            lastSnapshot.fullMarkdown || `## Итог\n${lastSnapshot.summary}`;
+        }
+
+        console.log(
+          `[ContextMgmt] Chat ${id}: snapshot found, trimmed ${messagesFromDb.length - messagesForModel.length} messages, snapshotContext = ${snapshotContext!.length} chars`
+        );
+      }
     }
 
     // Claude API не поддерживает text/plain как file attachment — конвертируем в text
@@ -554,71 +560,73 @@ export async function POST(request: Request) {
           }
         }
 
-        // ТЗ-C3: Calculate estimated usage for context management
-        const systemPromptTokens = estimateMessageTokens([
-          { type: "text", text: systemPromptText },
-        ]);
-        const estimatedPercent = calcUsagePercent(
-          totalHistoryTokens + systemPromptTokens + newMessageTokens
-        );
+        // ТЗ-C3/RAG3: Snapshot context management — only for Haiku chats
+        // Sonnet/Opus use Compaction API (providerOptions.anthropic.contextManagement)
+        if (chatMode === "chat") {
+          const systemPromptTokens = estimateMessageTokens([
+            { type: "text", text: systemPromptText },
+          ]);
+          const estimatedPercent = calcUsagePercent(
+            totalHistoryTokens + systemPromptTokens + newMessageTokens
+          );
 
-        // ТЗ-C3: Context suggestion injection
-        if (
-          estimatedPercent >= SNAPSHOT_THRESHOLD * 100 &&
-          !contextState?.suggestionActive
-        ) {
-          systemPromptText += `\n\n[SYSTEM: Контекстное окно заполнено на ${Math.round(estimatedPercent)}%. Мягко предложи пользователю зафиксировать итог разговора. Если пользователь согласится, вызови tool createSnapshot.]`;
-          await updateChatContextState({
-            chatId: id,
-            contextState: { suggestionActive: true, messagesSinceSuggestion: 0 },
-          });
-        } else if (contextState?.suggestionActive) {
-          const newCount = (contextState.messagesSinceSuggestion || 0) + 1;
-
-          if (newCount >= FALLBACK_MESSAGE_PAIRS) {
-            // ТЗ-C3: Fallback — model ignored suggestion, clerk creates snapshot
-            console.log(
-              `[ContextMgmt] Chat ${id}: fallback triggered (${newCount} messages since suggestion)`
-            );
-            const fallbackResult = await createFallbackSnapshot({
-              chatTitle: chat?.title || undefined,
-              chatMessages: messagesFromDb,
-              userId: session.user.id,
-            });
-
-            if (fallbackResult) {
-              await addChatSnapshot({
-                chatId: id,
-                messageId: `fallback-${generateUUID()}`,
-                summary: fallbackResult.shortSummary,
-                fullMarkdown: fallbackResult.fullMarkdown,
-              });
-              await resetChatContextState({ chatId: id });
-              console.log(
-                `[ContextMgmt] Chat ${id}: fallback snapshot saved — will apply on next request`
-              );
-            } else {
-              await resetChatContextState({ chatId: id });
-              console.warn(
-                `[ContextMgmt] Chat ${id}: fallback clerk failed — contextState reset`
-              );
-            }
-          } else {
+          // Context suggestion injection
+          if (
+            estimatedPercent >= SNAPSHOT_THRESHOLD * 100 &&
+            !contextState?.suggestionActive
+          ) {
+            systemPromptText += `\n\n[SYSTEM: Контекстное окно заполнено на ${Math.round(estimatedPercent)}%. Мягко предложи пользователю зафиксировать итог разговора. Если пользователь согласится, вызови tool createSnapshot.]`;
             await updateChatContextState({
               chatId: id,
-              contextState: {
-                ...contextState,
-                messagesSinceSuggestion: newCount,
-              },
+              contextState: { suggestionActive: true, messagesSinceSuggestion: 0 },
             });
-          }
-        }
+          } else if (contextState?.suggestionActive) {
+            const newCount = (contextState.messagesSinceSuggestion || 0) + 1;
 
-        // ТЗ-C3: Emit context usage to client
-        dataStream.write({
-          type: "data-context-usage",
-          data: { percent: Math.round(estimatedPercent), tokens: totalHistoryTokens + systemPromptTokens },
-        });
+            if (newCount >= FALLBACK_MESSAGE_PAIRS) {
+              console.log(
+                `[ContextMgmt] Chat ${id}: fallback triggered (${newCount} messages since suggestion)`
+              );
+              const fallbackResult = await createFallbackSnapshot({
+                chatTitle: chat?.title || undefined,
+                chatMessages: messagesFromDb,
+                userId: session.user.id,
+              });
+
+              if (fallbackResult) {
+                await addChatSnapshot({
+                  chatId: id,
+                  messageId: `fallback-${generateUUID()}`,
+                  summary: fallbackResult.shortSummary,
+                  fullMarkdown: fallbackResult.fullMarkdown,
+                });
+                await resetChatContextState({ chatId: id });
+                console.log(
+                  `[ContextMgmt] Chat ${id}: fallback snapshot saved — will apply on next request`
+                );
+              } else {
+                await resetChatContextState({ chatId: id });
+                console.warn(
+                  `[ContextMgmt] Chat ${id}: fallback clerk failed — contextState reset`
+                );
+              }
+            } else {
+              await updateChatContextState({
+                chatId: id,
+                contextState: {
+                  ...contextState,
+                  messagesSinceSuggestion: newCount,
+                },
+              });
+            }
+          }
+
+          // Emit context usage to client (for ContextIndicator)
+          dataStream.write({
+            type: "data-context-usage",
+            data: { percent: Math.round(estimatedPercent), tokens: totalHistoryTokens + systemPromptTokens },
+          });
+        }
 
         // ТЗ-PX: Emit research depth override for dev UI
         if (researchDepth) {

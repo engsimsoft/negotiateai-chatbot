@@ -57,7 +57,7 @@
 
 ## Этап 2: Очистить snapshot из Sonnet/Opus routes
 
-**Статус:** ⬜ Не начат
+**Статус:** 🔄 В работе
 
 ⛔ НЕ НАЧИНАТЬ без подтверждения Этапа 1
 
@@ -68,12 +68,12 @@
 **Задачи:**
 
 **Очистить task chat route (полностью — всегда Sonnet/Opus):**
-- [ ] 2.1 `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — убрать ВСЮ snapshot-логику: imports (createFallbackSnapshot, SNAPSHOT_THRESHOLD, FALLBACK_MESSAGE_PAIRS, calcUsagePercent, getChatWithSnapshotState, addChatSnapshot, resetChatContextState, updateChatContextState), snapshot state loading, snapshot-aware message trimming, `<previous_context>` injection, context-usage event emission, threshold checking, fallback creation, contextState updates
-- [ ] 2.2 `components/projects/task-chat.tsx` — убрать ContextIndicator (project tasks = Sonnet/Opus, compaction управляет контекстом)
+- [x] 2.1 `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — убрана ВСЯ snapshot-логика: imports, snapshot state loading, trimming, threshold/fallback, context-usage event
+- [x] 2.2 `components/projects/task-chat.tsx` — убран ContextIndicator (import, state, handler, JSX)
 
 **Сделать snapshot условным в chat route (только для chatMode="chat"):**
-- [ ] 2.3 `app/(chat)/api/chat/route.ts` — обернуть snapshot-логику в `if (chatMode === "chat")` guard: snapshot state loading, trimming, `<previous_context>` injection, threshold checking, fallback creation, contextState updates, context-usage event
-- [ ] 2.4 `components/chat.tsx` — показывать ContextIndicator только для chatMode="chat" (передать chatMode prop или условие)
+- [x] 2.3 `app/(chat)/api/chat/route.ts` — snapshot-логика обёрнута в `if (chatMode === "chat")` guard
+- [x] 2.4 `components/chat.tsx` — ContextIndicator показывается только для `currentChatMode === "chat"`
 
 **Файлы:**
 - `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — полная очистка snapshot

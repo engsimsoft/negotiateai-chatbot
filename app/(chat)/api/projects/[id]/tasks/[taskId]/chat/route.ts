@@ -25,20 +25,14 @@ import {
   type DebugStepData,
 } from "@/lib/ai/debug-events";
 import {
-  addChatSnapshot,
   createStreamId,
   getCompletedTaskSummaries,
-  getChatWithSnapshotState,
   getMessagesByChatId,
   getProjectById,
   getProjectTaskById,
-  resetChatContextState,
   saveAiUsageLog,
   saveMessages,
-  updateChatContextState,
 } from "@/lib/db/queries";
-import { calcUsagePercent, SNAPSHOT_THRESHOLD, FALLBACK_MESSAGE_PAIRS } from "@/lib/ai/context-limits";
-import { createFallbackSnapshot } from "@/lib/ai/clerks/snapshot-creator";
 import { calcCostUsd, getTokenlensCatalog, calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
 import { extractUsageFields, extractUsageForPricing } from "@/lib/ai/usage-utils";
 import { createStepTracker } from "@/lib/ai/tool-call-guardian";
@@ -129,65 +123,29 @@ export async function POST(
       return new ChatSDKError("forbidden:chat", "Chat does not belong to this task").toResponse();
     }
 
-    // Load messages + completed tasks + snapshot state in parallel
+    // Load messages + completed tasks in parallel
     const newMessageTokens = estimateMessageTokens(message.parts);
-    const [messagesFromDb, completedTasks, chatWithState] = await Promise.all([
+    const [messagesFromDb, completedTasks] = await Promise.all([
       getMessagesByChatId({
         id: chatId,
         maxTokens: 140000 - newMessageTokens,
         minMessages: 20,
       }),
       getCompletedTaskSummaries({ projectId }),
-      getChatWithSnapshotState({ chatId }),
     ]);
 
-    // ТЗ-C1.5: Snapshot-aware message trimming
-    const snapshots = chatWithState?.snapshots || [];
-    const contextState = chatWithState?.contextState || null;
-    let snapshotContext: string | undefined;
-    let messagesForModel = messagesFromDb;
-
-    if (snapshots.length > 0) {
-      const lastSnapshot = snapshots[snapshots.length - 1];
-      const snapshotMsgIndex = messagesFromDb.findIndex(
-        (m) => m.id === lastSnapshot.messageId
-      );
-
-      if (snapshotMsgIndex >= 0) {
-        // Extract fullMarkdown from the snapshot message's tool-createSnapshot part
-        const snapshotMsg = messagesFromDb[snapshotMsgIndex];
-        const snapshotPart = (snapshotMsg.parts as any[])?.find(
-          (p: any) =>
-            p.type === "tool-createSnapshot" && p.output?.fullMarkdown
-        );
-        snapshotContext =
-          snapshotPart?.output?.fullMarkdown ||
-          `## Итог\n${lastSnapshot.summary}`;
-        // Only send messages after the snapshot to the model
-        messagesForModel = messagesFromDb.slice(snapshotMsgIndex + 1);
-      } else {
-        // Snapshot message not in loaded set — use fullMarkdown (clerk) or summary
-        snapshotContext =
-          lastSnapshot.fullMarkdown || `## Итог\n${lastSnapshot.summary}`;
-      }
-
-      console.log(
-        `[TaskExpert] Task ${taskId}: snapshot found, trimmed ${messagesFromDb.length - messagesForModel.length} messages, snapshotContext = ${snapshotContext!.length} chars`
-      );
-    }
-
+    const messagesForModel = messagesFromDb;
     const uiMessages = [...convertToUIMessages(messagesForModel), message as any];
 
-    // Build expert prompt (with snapshotContext if available)
+    // Build expert prompt
     const systemPromptText = buildTaskExpertPrompt({
       project,
       task,
       completedTasks,
       manifest: project.manifestJson,
-      snapshotContext,
     });
 
-    // ТЗ-C1.5: Estimated usage BEFORE streaming
+    // Token counting for debug info
     const messagesTokens = messagesForModel.reduce(
       (sum, m) => sum + (m.tokenCount || estimateMessageTokens(m.parts as any)),
       0
@@ -195,9 +153,6 @@ export async function POST(
     const systemPromptTokens = estimateMessageTokens([
       { type: "text", text: systemPromptText },
     ]);
-    const estimatedPercent = calcUsagePercent(
-      messagesTokens + systemPromptTokens + newMessageTokens
-    );
 
     // ТЗ-RAG1/RAG2: Retrieve MIND memory facts for project tasks
     // Gate: check user's memoryEnabled setting
@@ -236,61 +191,6 @@ export async function POST(
       }
     }
 
-    // ТЗ-C1.5: System signal injection at threshold
-    if (
-      estimatedPercent >= SNAPSHOT_THRESHOLD * 100 &&
-      !contextState?.suggestionActive
-    ) {
-      finalSystemPrompt += `\n\n[SYSTEM: Контекстное окно заполнено на ${estimatedPercent}%. Мягко предложи пользователю зафиксировать прогресс. Если пользователь согласится, вызови tool createSnapshot.]`;
-      await updateChatContextState({
-        chatId,
-        contextState: { suggestionActive: true, messagesSinceSuggestion: 0 },
-      });
-    } else if (contextState?.suggestionActive) {
-      const newCount = (contextState.messagesSinceSuggestion || 0) + 1;
-
-      if (newCount >= FALLBACK_MESSAGE_PAIRS) {
-        // ТЗ-C1.5: Fallback — model ignored suggestion, clerk creates snapshot
-        console.log(
-          `[TaskExpert] Task ${taskId}: fallback triggered (${newCount} messages since suggestion)`
-        );
-        const fallbackResult = await createFallbackSnapshot({
-          taskTitle: task.title,
-          taskGoal: task.goal || "",
-          chatMessages: messagesFromDb,
-          userId: session.user.id,
-        });
-
-        if (fallbackResult) {
-          await addChatSnapshot({
-            chatId,
-            messageId: `fallback-${generateUUID()}`,
-            summary: fallbackResult.shortSummary,
-            fullMarkdown: fallbackResult.fullMarkdown,
-          });
-          await resetChatContextState({ chatId });
-          console.log(
-            `[TaskExpert] Task ${taskId}: fallback snapshot saved — will apply on next request`
-          );
-        } else {
-          // Clerk failed — reset state to avoid infinite retries
-          await resetChatContextState({ chatId });
-          console.warn(
-            `[TaskExpert] Task ${taskId}: fallback clerk failed — contextState reset`
-          );
-        }
-      } else {
-        // Increment messagesSinceSuggestion counter
-        await updateChatContextState({
-          chatId,
-          contextState: {
-            ...contextState,
-            messagesSinceSuggestion: newCount,
-          },
-        });
-      }
-    }
-
     // Save user message before streaming
     await saveMessages({
       messages: [
@@ -309,7 +209,7 @@ export async function POST(
     const streamId = generateUUID();
     await createStreamId({ streamId, chatId });
 
-    // ТЗ-C1.5: Generate assistant message ID upfront (needed for snapshot tool)
+    // Generate assistant message ID upfront
     const assistantMessageId = generateUUID();
 
     // Model: use selected tier (Исполнитель/Эксперт/Профессор)
@@ -326,16 +226,9 @@ export async function POST(
     const stream = createUIMessageStream({
       originalMessages: uiMessages,
       execute: async ({ writer: dataStream }) => {
-        // ТЗ-C1.5: Send usage annotation BEFORE streaming starts
-        dataStream.write({
-          type: "data-context-usage",
-          data: { percent: estimatedPercent, tokens: messagesTokens + systemPromptTokens },
-        });
-
         // ТЗ-DEV1: Emit debug prompt info
         {
           const injections: string[] = ["project-context"];
-          if (snapshotContext) injections.push("snapshot-context");
           emitDebugPrompt(dataStream, {
             systemPromptPreview: finalSystemPrompt.slice(0, 500),
             systemPromptLength: finalSystemPrompt.length,
@@ -343,7 +236,7 @@ export async function POST(
             chatMode: `project:${tier}`,
             isProjectChat: true,
             projectTier: tier,
-            hasSnapshotContext: !!snapshotContext,
+            hasSnapshotContext: false,
             contextInjections: injections,
           });
         }
