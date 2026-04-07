@@ -484,6 +484,27 @@ components/projects/
 - `components/dev-panel/dev-panel-footer.tsx` — fallback ~
 - `components/dev-panel/sections/timeline-section.tsx` — + reasoning tokens
 
+### ТЗ-RAG3: Compaction — Бесконечный чат — ✅ ЗАВЕРШЁН (v3.73.0)
+
+**Выполнено:**
+- **Anthropic Compaction API** (`compact_20260112`) — включён для Sonnet/Opus routes (expertise, create, project tasks). Trigger: 100K input tokens. Haiku не поддерживает → snapshot остаётся для `chatMode="chat"`
+- **Dual strategy** — Compaction для Sonnet/Opus, snapshot для Haiku. Snapshot-логика в chat route обёрнута в `if (chatMode === "chat")`
+- **Task chat route** — полностью очищен от snapshot-логики (всегда Sonnet/Opus)
+- **DevPanel** — Compaction badge в footer (amber), iterations breakdown в model-section, compaction block в cost-breakdown
+- **Message persistence fix** — добавлен `originalMessages` в `createUIMessageStream`, без него SDK не сохранял сообщения в БД
+- **MIND двухуровневая дедупликация** — embedding candidates (порог 0.55) → LLM Haiku верификация. Решает проблему дублирования фактов при разных формулировках
+- **Cumulative usage** — usage popup после перезагрузки показывает накопленную сумму сессии, не последнее сообщение
+- **Extract prompt** — настроен на запоминание багов, решений, архитектурных выборов
+
+**Ключевые файлы:**
+- `app/(chat)/api/chat/route.ts` — compaction (условный), originalMessages, cumulative usage
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — compaction, очистка snapshot
+- `lib/ai/memory/extract.ts` — двухуровневая дедупликация (verifyDuplicatesWithLLM)
+- `lib/ai/debug-events.ts` — DebugCompactionData
+- `docs/decisions/042-compaction-dual-strategy.md` — ADR
+
+**Детали:** [specs/TZ_RAG_SimplyRAG/RAG3_ROADMAP.md](specs/TZ_RAG_SimplyRAG/RAG3_ROADMAP.md)
+
 ### ТЗ-RAG2: MIND Consolidation + Profile + UI — ✅ ЗАВЕРШЁН (v3.72.0)
 
 **Выполнено:**
@@ -502,7 +523,7 @@ components/projects/
 **Выполнено:**
 - **Extract pipeline** (`lib/ai/memory/extract.ts`) — Claude Sonnet извлекает факты из пар сообщений (user+assistant) через `generateObject()` + Zod-схема. Fire-and-forget в `onFinish` — не увеличивает latency ответа
 - **Retrieve + inject** (`lib/ai/memory/retrieve.ts`) — semantic search top-5 фактов через Voyage AI, инжекция XML-блока `<memory>` в system prompt с мягкой формулировкой "Из предыдущих разговоров известно..."
-- **Дедупликация** — cosine similarity > 0.92 + category match → supersede старый факт (не дублирует)
+- **Дедупликация** — двухуровневая (v3.73.0): embedding candidates (cosine > 0.55 + category match) → LLM Haiku верификация → supersede старый факт
 - **Интеграция** — chat/expertise/create + project tasks. Оба route: retrieve перед streamText, extract в onFinish
 - **Graceful degradation** — при ошибке Voyage API чат работает без памяти (log warning, не crash)
 - **Dev Panel — RagSection** — секция "MIND Memory": category badges (fact/task/preference/calendar/person/decision), similarity scores, confidence, voyage tokens, duration
@@ -1021,10 +1042,12 @@ components/projects/
 
 **Детали:** [_archive/TZ_DesignSystem/](_archive/TZ_DesignSystem/)
 
-### ТЗ-C1.5: Context Window Management — ✅ ЗАВЕРШЁН
+### ТЗ-C1.5: Context Window Management — ✅ ЗАВЕРШЁН (обновлено v3.73.0)
+
+**Обновление v3.73.0:** Snapshot-система теперь используется только для Haiku-чатов (`chatMode="chat"`). Sonnet/Opus routes используют Anthropic Compaction API (см. ТЗ-RAG3).
 
 **Выполнено:**
-- **Автоматическое управление контекстом** — snapshot-система для сжатия истории чата с Экспертом при заполнении контекстного окна
+- **Автоматическое управление контекстом** — snapshot-система для сжатия истории чата (только Haiku) при заполнении контекстного окна
 - **`createSnapshot` tool** — Эксперт создаёт структурированный итог диалога (shortSummary + fullMarkdown из 6 параметров)
 - **Snapshot-aware trimming** — после snapshot модель видит только snapshot + новые сообщения
 - **Usage monitoring** — оценка использования контекста до стриминга, annotation `data-context-usage`
@@ -1558,7 +1581,7 @@ components/projects/
 | Этап | Описание | Приоритет |
 |------|----------|-----------|
 | **8** | Инструменты Фаза 1 (Perplexity ✅, Plus AI, Ideogram) | 🔄 В работе |
-| **9** | RAG: MIND extract+retrieve ✅ v3.71.0, Consolidation+UI 📋, Compaction 📋, Библиотека 📋 | 🔄 В работе |
+| **9** | RAG: MIND extract+retrieve ✅ v3.71.0, Consolidation+Profile+UI ✅ v3.72.0, Compaction ✅ v3.73.0, Библиотека 📋 | 🔄 В работе |
 | **10** | Chat Memory | 🟡 Средний |
 | **11** | Мультипровайдер (GPT) | 🟡 Средний |
 | **12** | Биллинг (Pay-as-you-go) | 🟡 Средний |
@@ -1575,7 +1598,7 @@ components/projects/
 
 | Метрика | Значение |
 |---------|----------|
-| Версия | 3.29.0 |
+| Версия | 3.73.0 |
 | Статус | Active development |
 | Voice Input | Deepgram Nova-3 (русский) |
 | Архитектура промптов | Skills + Agents (v3.3) |
