@@ -71,7 +71,7 @@ import {
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
-import { buildAppUsage, type AppUsage } from "@/lib/usage";
+import { buildAppUsage, mergeAppUsage, normalizeStoredAppUsage, type AppUsage } from "@/lib/usage";
 import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages } from "@/lib/utils";
 // ТЗ-07A: generateTitleFromUserMessage больше не используется здесь
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
@@ -1190,9 +1190,14 @@ export async function POST(request: Request) {
 
         if (finalMergedUsage) {
           try {
+            // Merge with previous session usage so reload shows cumulative total
+            const prevUsage = normalizeStoredAppUsage(chat?.lastContext as AppUsage | null | undefined);
+            const cumulativeUsage = prevUsage
+              ? mergeAppUsage(prevUsage, finalMergedUsage)
+              : finalMergedUsage;
             await updateChatLastContextById({
               chatId: id,
-              context: finalMergedUsage,
+              context: cumulativeUsage,
             });
           } catch (err) {
             console.warn("Unable to persist last usage for chat", id, err);
