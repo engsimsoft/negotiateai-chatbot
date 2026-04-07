@@ -21,6 +21,7 @@ import { fetchUrl } from "./fetch-url";
 import { deepResearch } from "./deep-research";
 import { loadSkill } from "./load-skill";
 import { readTelegramChannel } from "./read-telegram-channel";
+import { saveFact } from "./save-fact";
 
 interface GetStandardToolsParams {
   session: Session;
@@ -50,7 +51,7 @@ export function getStandardTools({
   projectId,
   chatId,
   messageId,
-  chatMode: _chatMode,
+  chatMode,
   researchDepth,
 }: GetStandardToolsParams) {
   return {
@@ -72,6 +73,10 @@ export function getStandardTools({
     parseExcel,
     loadSkill,
     readTelegramChannel,
+    // ТЗ-SaveFact: only for Simply Chat
+    ...(chatMode === "simply"
+      ? { saveFact: saveFact({ userId: session.user?.id ?? "", chatId }) }
+      : {}),
   };
 }
 
@@ -91,6 +96,7 @@ const ALL_TOOL_NAMES = [
   "readProjectFile",
   "createSnapshot",
   "readTelegramChannel",
+  "saveFact",
 ] as const;
 
 type ToolName = (typeof ALL_TOOL_NAMES)[number];
@@ -143,6 +149,11 @@ export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode):
   // Filter out expensive tools for chatMode 'chat' (Haiku)
   if (chatMode === "chat") {
     return baseTools.filter((t) => !CHAT_MODE_EXCLUDED_TOOLS.includes(t));
+  }
+
+  // ТЗ-SaveFact: saveFact only available in Simply Chat
+  if (chatMode === "simply") {
+    return [...baseTools, "saveFact"];
   }
 
   return baseTools;

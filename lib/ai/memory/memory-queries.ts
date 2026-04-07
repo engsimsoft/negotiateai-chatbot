@@ -50,6 +50,7 @@ export async function insertMemoryEntry(
       category: entry.category,
       confidence: String(entry.confidence ?? 1.0),
       sourceType: entry.sourceType,
+      source: entry.source ?? "extracted",
       sourceChatId: entry.sourceChatId ?? null,
       sourceProjectId: entry.sourceProjectId ?? null,
     })
@@ -121,6 +122,7 @@ export async function searchSimilarMemories(
       category: memoryEntry.category,
       confidence: memoryEntry.confidence,
       sourceType: memoryEntry.sourceType,
+      source: memoryEntry.source,
       sourceChatId: memoryEntry.sourceChatId,
       sourceProjectId: memoryEntry.sourceProjectId,
       supersededBy: memoryEntry.supersededBy,
@@ -147,6 +149,7 @@ export async function searchSimilarMemories(
         category: row.category,
         confidence: row.confidence,
         sourceType: row.sourceType,
+        source: row.source,
         sourceChatId: row.sourceChatId,
         sourceProjectId: row.sourceProjectId,
         supersededBy: row.supersededBy,

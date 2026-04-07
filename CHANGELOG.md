@@ -12,6 +12,28 @@
 
 ---
 
+## [3.75.0] - 2026-04-07 - Tool saveFact — гарантированная запись в MIND
+
+**ТЗ-SaveFact**: AI-tool для гарантированной записи фактов в MIND Memory по явному запросу пользователя. Решает проблему "AI говорит Запомнил, но ничего не записал".
+
+### Added
+- **Tool `saveFact`** — записывает факт в MIND Memory с embedding, дедупликацией и категорией. Только для Simply Chat
+- **Колонка `source`** в `memory_entry` — различает `"extracted"` (фоновый Extract) и `"explicit"` (saveFact tool)
+- **Тип `MemorySource`** — `"extracted" | "explicit"` в `lib/ai/memory/types.ts`
+- **Tool activity indicator** — "Сохраняю в память" / "Сохранено в память" с иконкой Brain
+
+### Changed
+- **Промпт Simply Chat** — секция `<quick_commands>` заменена на `<memory>` с инструкциями для saveFact
+- **`getStandardTools()`** — saveFact включается условно при `chatMode === "simply"`
+- **`getActiveToolNames()`** — saveFact добавляется в active tools для Simply
+
+### Technical
+- Миграция `0050_save-fact-source.sql` — `ALTER TABLE memory_entry ADD COLUMN "source"`
+- Переиспользование инфраструктуры RAG: `embedText()`, `searchSimilarMemories()`, `verifyDuplicatesWithLLM()`, `insertMemoryEntry()`, `supersedeMemoryEntry()`
+- Usage logging через `memory:save-fact` chatMode
+
+---
+
 ## [3.74.0] - 2026-04-07 - Simply Chat + Context Dashboard
 
 **ТЗ-KITT**: Persistent Simply Chat, кнопка «Думать» (Sonnet override), dashboard «Мой контекст», категория `idea` в MIND Memory.

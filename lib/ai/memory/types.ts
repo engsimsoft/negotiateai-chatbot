@@ -37,6 +37,17 @@ export const MEMORY_SOURCE_TYPES = [
 export type MemorySourceType = (typeof MEMORY_SOURCE_TYPES)[number];
 
 // ---------------------------------------------------------------------------
+// Source (how the fact was created)
+// ---------------------------------------------------------------------------
+
+export const MEMORY_SOURCES = [
+  "extracted", // background Extract pipeline
+  "explicit",  // user explicitly asked AI to remember (saveFact tool)
+] as const;
+
+export type MemorySource = (typeof MEMORY_SOURCES)[number];
+
+// ---------------------------------------------------------------------------
 // New memory entry (for insertion)
 // ---------------------------------------------------------------------------
 
@@ -47,6 +58,7 @@ export interface NewMemoryEntry {
   category: MemoryCategory;
   confidence?: number;
   sourceType: MemorySourceType;
+  source?: MemorySource;
   sourceChatId?: string | null;
   sourceProjectId?: string | null;
 }

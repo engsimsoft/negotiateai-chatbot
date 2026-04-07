@@ -777,6 +777,8 @@ export const memoryEntry = pgTable(
     sourceProjectId: uuid("sourceProjectId").references(() => project.id, {
       onDelete: "set null",
     }),
+    /** How the fact was created: "extracted" (background) | "explicit" (saveFact tool) */
+    source: varchar("source", { length: 32 }).notNull().default("extracted"),
     /** Points to the newer fact that replaced this one */
     supersededBy: uuid("supersededBy"),
     createdAt: timestamp("createdAt").notNull().defaultNow(),

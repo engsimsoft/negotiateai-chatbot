@@ -341,6 +341,7 @@ async function processAndStoreFact(
       category: fact.category,
       confidence: fact.confidence,
       sourceType: input.sourceType,
+      source: "extracted",
       sourceChatId: input.sourceChatId ?? null,
       sourceProjectId: input.sourceProjectId ?? null,
     });
@@ -361,6 +362,7 @@ async function processAndStoreFact(
       category: fact.category,
       confidence: fact.confidence,
       sourceType: input.sourceType,
+      source: "extracted",
       sourceChatId: input.sourceChatId ?? null,
       sourceProjectId: input.sourceProjectId ?? null,
     });
