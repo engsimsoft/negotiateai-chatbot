@@ -8,8 +8,31 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- RAG-3: Compaction (бесконечный чат)
 - RAG-4: Библиотека MVP (загрузка документов + search)
+
+---
+
+## [3.73.0] - 2026-04-07 - Compaction + MIND Dedup Fix
+
+**ТЗ-RAG3**: Anthropic Compaction API для Sonnet/Opus, snapshot остаётся для Haiku. Двухуровневая дедупликация MIND Memory.
+
+### Added
+- **Compaction API** (`compact_20260112`) — включён для expertise/create/project routes (Sonnet 4.6 / Opus 4.6). Trigger: 100K input tokens. Instructions на русском
+- **DevPanel Compaction** — badge "Compaction" в footer (amber), iterations breakdown в model-section, compaction block в cost-breakdown-section
+- **Debug events** — `DebugCompactionData` + `emitDebugCompaction()` в `lib/ai/debug-events.ts`
+- **LLM-дедупликация MIND** — двухуровневая: embedding candidates (порог 0.55) → Haiku верификация. Решает проблему дублирования фактов
+
+### Changed
+- **Snapshot → условный** — работает только для `chatMode="chat"` (Haiku). Sonnet/Opus routes полностью очищены от snapshot-логики
+- **Task chat route** — удалена вся snapshot-логика (imports, state loading, trimming, fallback, context-usage event)
+- **ContextIndicator** — показывается только для Haiku-чатов. Удалён из task-chat.tsx
+- **Message persistence** — добавлен `originalMessages` в `createUIMessageStream` для корректного сохранения сообщений в БД
+
+### Fixed
+- **Критический: сообщения не сохранялись в БД** — SDK без `originalMessages` не активировал persistence mode
+- **Duplicate key error** — с `originalMessages` SDK возвращал ВСЕ сообщения, добавлена фильтрация новых
+- **Haiku crash на Compaction** — Haiku 4.5 не поддерживает Compaction API, добавлена условная логика
+- **MIND дублирование фактов** — порог 0.92 не ловил перефразированные факты, заменён на LLM-верификацию
 
 ---
 

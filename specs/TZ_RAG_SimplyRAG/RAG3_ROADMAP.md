@@ -104,8 +104,8 @@
 **Цель:** Корректный учёт compaction tokens в cost breakdown и polish DevPanel.
 
 **Задачи:**
-- [ ] 3.1 Проверить что `logUsage()` корректно учитывает суммарные токены при compaction (SDK суммирует iterations автоматически — верифицировать в логах)
-- [ ] 3.2 В DevPanel cost-breakdown-section — показать compaction iteration отдельной строкой (если есть)
+- [x] 3.1 Проверено: SDK (`@ai-sdk/anthropic:1645`) суммирует iterations автоматически в top-level usage — `logUsage()` корректен без изменений
+- [x] 3.2 В DevPanel cost-breakdown-section — compaction iterations блок (amber border) + секция показывается при compaction даже для single-step
 
 **Файлы:**
 - `components/dev-panel/sections/cost-breakdown-section.tsx` — compaction iteration display

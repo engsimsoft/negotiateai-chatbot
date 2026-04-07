@@ -66,7 +66,7 @@ function computePerStepCosts(data: DevPanelMessageData): StepCost[] {
 // ---------------------------------------------------------------------------
 
 export function CostBreakdownSection({ data }: { data: DevPanelMessageData }) {
-  if (data.steps.length < 2) return null;
+  if (data.steps.length < 2 && !data.compaction?.triggered) return null;
 
   const stepCosts = computePerStepCosts(data);
   const totalCost = stepCosts.reduce((sum, s) => sum + s.cost, 0);
@@ -126,6 +126,19 @@ export function CostBreakdownSection({ data }: { data: DevPanelMessageData }) {
             </div>
           )}
         </div>
+        {data.compaction?.triggered && (
+          <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1.5">
+            <div className="font-mono text-[10px] font-medium text-amber-600 dark:text-amber-400">
+              Compaction iterations
+            </div>
+            {data.compaction.iterations.map((it, i) => (
+              <div key={i} className="flex justify-between font-mono text-[10px] text-muted-foreground">
+                <span>{it.type}</span>
+                <span>{it.inputTokens.toLocaleString("ru-RU")} in / {it.outputTokens.toLocaleString("ru-RU")} out</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
