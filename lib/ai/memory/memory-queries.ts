@@ -209,6 +209,59 @@ export async function countUserMemories(userId: string): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
+// Count by category (for /context dashboard)
+// ---------------------------------------------------------------------------
+
+export interface CategorySummary {
+  category: string;
+  count: number;
+  preview: string[]; // top-2 most recent facts
+}
+
+/**
+ * Get counts and top-2 preview facts per category for a user.
+ * Only returns categories that have at least one active fact.
+ */
+export async function getMemorySummaryByCategory(
+  userId: string,
+): Promise<CategorySummary[]> {
+  // Get all active facts ordered by recency
+  const allFacts = await db
+    .select({
+      category: memoryEntry.category,
+      content: memoryEntry.content,
+    })
+    .from(memoryEntry)
+    .where(
+      and(eq(memoryEntry.userId, userId), isNull(memoryEntry.supersededBy)),
+    )
+    .orderBy(desc(memoryEntry.createdAt));
+
+  // Group by category
+  const grouped = new Map<string, string[]>();
+  for (const fact of allFacts) {
+    const list = grouped.get(fact.category) ?? [];
+    list.push(fact.content);
+    grouped.set(fact.category, list);
+  }
+
+  // Build summary with top-2 preview
+  const summaries: CategorySummary[] = [];
+  for (const [category, contents] of grouped) {
+    summaries.push({
+      category,
+      count: contents.length,
+      preview: contents.slice(0, 2),
+    });
+  }
+
+  // Sort by count descending
+  summaries.sort((a, b) => b.count - a.count);
+
+  return summaries;
+}
+
+// ---------------------------------------------------------------------------
 // Supersede (replace old fact with new one)
 // ---------------------------------------------------------------------------
 

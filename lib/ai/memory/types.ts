@@ -17,6 +17,7 @@ export const MEMORY_CATEGORIES = [
   "calendar",   // dates, meetings, events
   "person",     // people, contacts, relationships
   "decision",   // decisions made, conclusions reached
+  "idea",       // ideas, concepts, brainstorming
 ] as const;
 
 export type MemoryCategory = (typeof MEMORY_CATEGORIES)[number];

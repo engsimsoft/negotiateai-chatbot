@@ -36,6 +36,7 @@ Root Layout (app/layout.tsx)
 │   │   Theme Toggle: ✅ (в dropdown SidebarUserNav)
 │   │
 │   ├── / → redirect → /dashboard
+│   ├── /simply → persistent Simply Chat (один на пользователя, Haiku/Sonnet)
 │   ├── /chat → новый чат
 │   ├── /chat/[id] → существующий чат
 │   ├── /projects/[id]/chat → чат проекта
@@ -68,6 +69,9 @@ Root Layout (app/layout.tsx)
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │
 │   ├── /groups → ListDetailPage (← Dashboard + "Группы Telegram" + UserMenu)
+│   │   User Menu: ✅   Theme Toggle: ✅
+│   │
+│   ├── /context → ContextPage (← Главная + "Мой контекст" + UserMenu, 7 карточек MIND + Opus-профиль)
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │
 │   ├── /meeting → MeetingPage (← Dashboard + "Запись встречи" + UserMenu, state machine: input→result→viewing)

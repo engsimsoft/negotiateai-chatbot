@@ -12,6 +12,27 @@
 
 ---
 
+## [3.74.0] - 2026-04-07 - Simply Chat + Context Dashboard
+
+**ТЗ-KITT**: Persistent Simply Chat, кнопка «Думать» (Sonnet override), dashboard «Мой контекст», категория `idea` в MIND Memory.
+
+### Added
+- **Simply Chat** (`/simply`) — persistent чат, один на пользователя. Haiku по умолчанию, Sonnet при «Думать»
+- **Кнопка «Думать»** — toggle в toolbar Simply-чата, переключает на Sonnet для одного сообщения
+- **Dashboard «Мой контекст»** (`/context`) — 7 карточек MIND по категориям (count + top-2 preview), Opus-профиль, кнопки управления
+- **MIND категория `idea`** — идеи, концепции, планы на будущее. Извлекается автоматически
+- **Быстрые команды** — «идея: ...», «запомни: ...», «задача: ...», «решение: ...» в Simply Chat
+- **API** `GET /api/user/memory/context` — факты сгруппированные по категориям
+- **Карточка «Мой контекст»** на главной (Brain icon, factCount → /context)
+- **Cache fix** — MIND retrieved facts вынесены из system prompt в отдельный system message без cacheControl
+
+### Changed
+- **Главная** — ввод текста → redirect на `/simply` (вместо `/chat`)
+- **Sidebar** — пункт "Simply" (MessageCircle), скрытие "Новый чат"/"Все чаты" для simply mode
+- **Simply скрыт** из sidebar history, /chats query, auto-naming отключено
+
+---
+
 ## [3.73.0] - 2026-04-07 - Compaction + MIND Dedup Fix
 
 **ТЗ-RAG3**: Anthropic Compaction API для Sonnet/Opus, snapshot остаётся для Haiku. Двухуровневая дедупликация MIND Memory.

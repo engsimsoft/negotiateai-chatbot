@@ -22,6 +22,7 @@
 
 | Чат | Модель | Статус | Назначение |
 |-----|--------|--------|-----------|
+| **Simply Chat (chatMode=simply)** | Claude Haiku / Sonnet (think) | ✅ Работает | Persistent чат, кнопка «Думать» (v3.74) |
 | **Чат (chatMode=chat)** | Claude Haiku | ✅ Работает | Обычный чат |
 | **Экспертиза (chatMode=expertise)** | Claude Sonnet | ✅ Работает | Точные ответы с проверкой фактов |
 | **Создание (chatMode=create)** | Claude Sonnet | ✅ Работает | Презентации, отчёты, изображения |
