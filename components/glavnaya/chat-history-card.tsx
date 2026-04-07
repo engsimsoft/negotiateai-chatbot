@@ -1,28 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, MessageCircle } from "lucide-react";
+import { ArrowRight, Brain } from "lucide-react";
 
-interface ChatHistoryCardProps {
-  count: number;
+/**
+ * ТЗ-KITT: "Мой контекст" card — replaces "История чатов"
+ * Shows MIND memory stats, links to /context dashboard
+ */
+
+interface ContextCardProps {
+  factCount: number;
 }
 
-export function ChatHistoryCard({ count }: ChatHistoryCardProps) {
-  const label = count === 1 ? "чат" : count >= 2 && count <= 4 ? "чата" : "чатов";
+export function ContextCard({ factCount }: ContextCardProps) {
+  const label =
+    factCount === 0
+      ? "Пусто"
+      : factCount === 1
+        ? "1 факт"
+        : factCount >= 2 && factCount <= 4
+          ? `${factCount} факта`
+          : `${factCount} фактов`;
 
   return (
     <Link
-      href="/chats"
+      href="/context"
       className="group flex shrink-0 items-center gap-2.5 rounded-2xl border border-border bg-background px-4 py-3.5 shadow-sm transition-all hover:border-primary hover:shadow-md"
       style={{ minWidth: 160 }}
     >
-      <span className="text-xl">💬</span>
+      <Brain className="size-5 text-primary" />
       <div className="flex flex-col">
         <span className="text-sm font-semibold text-foreground">
-          История чатов
+          Мой контекст
         </span>
         <span className="text-xs text-muted-foreground">
-          {count} {label}
+          {label}
         </span>
       </div>
       <ArrowRight className="ml-1 size-4 text-muted-foreground/50 transition-colors group-hover:text-primary" />

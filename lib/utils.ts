@@ -77,6 +77,8 @@ export function getChatUrl(
     return `/projects/${projectId}/chat/${chatId}`;
   }
   switch (chatMode) {
+    case "simply":
+      return "/simply";
     case "expertise":
       return `/expertise/${chatId}`;
     case "create":

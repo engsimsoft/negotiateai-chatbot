@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { User } from "next-auth";
-import { Home, MessageSquarePlus, History } from "lucide-react";
+import { Home, MessageCircle, MessageSquarePlus, History } from "lucide-react";
 import { generateUUID, getChatUrl } from "@/lib/utils";
 import { SidebarHistory } from "@/components/sidebar-history";
 import { SidebarUserNav } from "@/components/sidebar-user-nav";
@@ -24,7 +24,7 @@ import {
 import { useThemeSync } from "@/hooks/use-theme-sync";
 
 // Типы контекста sidebar (ТЗ-07A, ТЗ-RG)
-export type ChatMode = "chat" | "expertise" | "create";
+export type ChatMode = "chat" | "simply" | "expertise" | "create";
 
 export type SidebarContext =
   | { type: "general"; chatMode: ChatMode }
@@ -38,6 +38,11 @@ function getSidebarContext(pathname: string): SidebarContext {
   const projectMatch = pathname.match(/^\/projects\/([^/]+)\/chat/);
   if (projectMatch) {
     return { type: "project", projectId: projectMatch[1] };
+  }
+
+  // ТЗ-KITT: /simply → persistent chat
+  if (pathname.startsWith("/simply")) {
+    return { type: "general", chatMode: "simply" };
   }
 
   // ТЗ-RG: Detect chatMode from route group URLs
@@ -143,21 +148,34 @@ export function AppSidebar({ user }: AppSidebarProps) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
+              {/* ТЗ-KITT: Simply — persistent chat */}
               <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip={getNewChatLabel()}
-                  onClick={() => {
-                    setOpenMobile(false);
-                    router.push(getNewChatUrl());
-                    router.refresh();
-                  }}
-                >
-                  <MessageSquarePlus className="size-4" />
-                  <span>{getNewChatLabel()}</span>
+                <SidebarMenuButton asChild tooltip="Simply">
+                  <Link href="/simply" onClick={() => setOpenMobile(false)}>
+                    <MessageCircle className="size-4" />
+                    <span>Simply</span>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {context.type === "general" && (
+              {/* ТЗ-KITT: Hide "New chat" and "All chats" for simply mode */}
+              {chatMode !== "simply" && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    tooltip={getNewChatLabel()}
+                    onClick={() => {
+                      setOpenMobile(false);
+                      router.push(getNewChatUrl());
+                      router.refresh();
+                    }}
+                  >
+                    <MessageSquarePlus className="size-4" />
+                    <span>{getNewChatLabel()}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
+              {context.type === "general" && chatMode !== "simply" && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild tooltip={getAllChatsLabel()}>
                     <Link href={getAllChatsHref()} onClick={() => setOpenMobile(false)}>
@@ -171,15 +189,20 @@ export function AppSidebar({ user }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarSeparator className="group-data-[collapsible=icon]:hidden" />
+        {/* ТЗ-KITT: Simply has no chat history — one persistent chat */}
+        {chatMode !== "simply" && (
+          <>
+            <SidebarSeparator className="group-data-[collapsible=icon]:hidden" />
 
-        {/* История чатов — скрыта в icon mode (паттерн Claude) */}
-        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-          <SidebarGroupLabel>{getContextTitle()}</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarHistory user={user} context={context} chatMode={chatMode} />
-          </SidebarGroupContent>
-        </SidebarGroup>
+            {/* История чатов — скрыта в icon mode (паттерн Claude) */}
+            <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+              <SidebarGroupLabel>{getContextTitle()}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarHistory user={user} context={context} chatMode={chatMode} />
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
 
       <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>

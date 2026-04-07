@@ -6,14 +6,14 @@ import { CompactInput } from "@/components/input";
  * GlavnayaInput — поле ввода на главной странице
  *
  * Использует CompactInput с provider="google"
- * При отправке редиректит в /chat
+ * ТЗ-KITT: При отправке редиректит в /simply (persistent chat)
  */
 
 export function GlavnayaInput() {
   return (
     <CompactInput
       provider="google"
-      redirectPath="/chat"
+      redirectPath="/simply"
       placeholder="Спросите что угодно..."
     />
   );

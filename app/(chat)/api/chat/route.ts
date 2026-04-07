@@ -87,6 +87,9 @@ async function autoNameChat(chatId: string, userId: string): Promise<void> {
   const chat = await getChatById({ id: chatId });
   if (!chat || chat.isRenamed) return;
 
+  // ТЗ-KITT: Simply chat is never auto-named
+  if (chat.chatMode === "simply") return;
+
   // Skip if already auto-named (title changed from default)
   if (chat.title !== "Новый чат") return;
 
@@ -248,6 +251,7 @@ export async function POST(request: Request) {
       projectId,
       projectModelTier,
       researchDepth,
+      think,
     } = requestBody;
 
     const session = await auth();
@@ -335,7 +339,7 @@ export async function POST(request: Request) {
       minMessages: 20,
     });
 
-    // ТЗ-C3/RAG3: Snapshot context management — only for Haiku chats (chatMode="chat")
+    // ТЗ-C3/RAG3: Snapshot context management — only for Haiku chats (chatMode="chat"/"simply")
     // Sonnet/Opus use Anthropic Compaction API instead
     let snapshotContext: string | undefined;
     let messagesForModel = messagesFromDb;
@@ -343,7 +347,9 @@ export async function POST(request: Request) {
     // contextState is used later in threshold checking for Haiku
     let contextState: { suggestionActive: boolean; messagesSinceSuggestion: number } | null = null;
 
-    if (chatMode === "chat") {
+    // ТЗ-KITT: Simply in think mode uses Sonnet → no snapshot, use compaction instead
+    const isHaikuChat = chatMode === "chat" || (chatMode === "simply" && !think);
+    if (isHaikuChat) {
       const chatWithState = await getChatWithSnapshotState({ chatId: id });
       const snapshots = chatWithState?.snapshots || [];
       contextState = chatWithState?.contextState || null;
@@ -439,7 +445,7 @@ export async function POST(request: Request) {
     } | null = null;
 
     // ТЗ-RAG2: Shared flag for memory gate (used in both execute and onFinish)
-    let isMemoryEnabled = ["chat", "expertise", "create"].includes(chatMode);
+    let isMemoryEnabled = ["chat", "simply", "expertise", "create"].includes(chatMode);
 
     const stream = createUIMessageStream({
       originalMessages: uiMessages,
@@ -489,7 +495,11 @@ export async function POST(request: Request) {
               ? buildCreatePrompt(promptContext)
               : buildChatPrompt(promptContext);
           systemPromptText = builtPrompt.systemPrompt;
-          const chatModelId = getModelForChatMode(chatMode);
+          // ТЗ-KITT: Think mode overrides Haiku → Sonnet for this message
+          const chatModelId = (think && chatMode === "simply")
+            ? "claude-sonnet"
+            : getModelForChatMode(chatMode);
+          console.log(`[Chat API] Model selection: chatMode=${chatMode}, think=${think}, model=${chatModelId}`);
           modelToUse = myProvider.languageModel(chatModelId);
         }
 
@@ -511,8 +521,12 @@ export async function POST(request: Request) {
           }
         }
         let memoryDebugData: Parameters<typeof emitDebugRag>[1] | null = null;
+        // ТЗ-KITT/CACHE: MIND memory split into stable (profile → system prompt, cached)
+        // and dynamic (retrieved facts → separate message, NOT cached) to preserve prompt caching
+        let mindDynamicBlock = "";
         if (isMemoryEnabled) {
           // ТЗ-RAG2: Inject Opus profile (stable "who is this person" context)
+          // Profile changes only on nightly cron → safe to cache with system prompt
           try {
             const profileBlock = await getProfileBlock(session.user.id);
             if (profileBlock) {
@@ -523,6 +537,7 @@ export async function POST(request: Request) {
           }
 
           // ТЗ-RAG1: Retrieve relevant facts for current query
+          // Facts change per query → kept OUTSIDE system prompt to preserve cache
           try {
             const userQueryText = message.parts
               .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
@@ -537,7 +552,7 @@ export async function POST(request: Request) {
               );
 
               if (memoryResult.promptBlock) {
-                systemPromptText += `\n\n${memoryResult.promptBlock}`;
+                mindDynamicBlock = memoryResult.promptBlock;
               }
 
               // Save for debug emit (after emitDebugPrompt creates the batch)
@@ -560,9 +575,9 @@ export async function POST(request: Request) {
           }
         }
 
-        // ТЗ-C3/RAG3: Snapshot context management — only for Haiku chats
+        // ТЗ-C3/RAG3: Snapshot context management — only for Haiku chats (chat/simply)
         // Sonnet/Opus use Compaction API (providerOptions.anthropic.contextManagement)
-        if (chatMode === "chat") {
+        if (isHaikuChat) {
           const systemPromptTokens = estimateMessageTokens([
             { type: "text", text: systemPromptText },
           ]);
@@ -734,7 +749,8 @@ export async function POST(request: Request) {
         }
 
         // ТЗ-RAG3: Compaction only for models that support it (Sonnet/Opus, NOT Haiku)
-        const supportsCompaction = chatMode !== "chat" || isProjectChat;
+        // ТЗ-KITT: Simply uses Haiku by default → no compaction (uses snapshot instead)
+        const supportsCompaction = !isHaikuChat || isProjectChat;
         const compactionOptions = supportsCompaction ? {
           anthropic: {
             contextManagement: {
@@ -753,7 +769,10 @@ export async function POST(request: Request) {
           model: modelToUse,
           // ТЗ-CACHE1: system as message with per-message cacheControl (top-level providerOptions doesn't mark messages)
           messages: [
+            // System prompt (stable) — cached via cacheControl
             { role: 'system' as const, content: systemPromptText, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },
+            // ТЗ-KITT/CACHE: MIND retrieved facts (dynamic per query) — NOT cached
+            ...(mindDynamicBlock ? [{ role: 'system' as const, content: mindDynamicBlock }] : []),
             ...sanitizeCoreMessages(await convertToModelMessages(uiMessages)),
           ],
           providerOptions: compactionOptions,
@@ -815,7 +834,10 @@ export async function POST(request: Request) {
             let resolvedModelId: string | undefined;
             let costUsd: number | null = null;
             try {
-              const chatModelId = getModelForChatMode(chatMode);
+              // ТЗ-KITT: Think mode uses Sonnet — must match model selection above
+              const chatModelId = (think && chatMode === "simply")
+                ? "claude-sonnet"
+                : getModelForChatMode(chatMode);
               resolvedModelId = myProvider.languageModel(chatModelId).modelId;
               const effectiveModelId =
                 resolvedModelId ?? (isProjectChat ? `project:${tier}` : chatMode);
@@ -1180,7 +1202,7 @@ export async function POST(request: Request) {
               userId: session.user.id,
               userMessage: userText,
               assistantMessage: assistantText,
-              sourceType: chatMode as "chat" | "expertise" | "create",
+              sourceType: chatMode as "chat" | "simply" | "expertise" | "create",
               sourceChatId: id,
             }).catch((err) =>
               console.warn("[MIND] Extract failed (non-blocking):", err instanceof Error ? err.message : err)

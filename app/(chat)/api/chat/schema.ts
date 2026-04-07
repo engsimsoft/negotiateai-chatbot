@@ -35,6 +35,8 @@ export const postRequestBodySchema = z.object({
   projectModelTier: z.enum(["executor", "expert", "professor"]).optional(),
   // ТЗ-PX: Override depth for deepResearch (dev-mode UI switcher)
   researchDepth: z.enum(["pro", "deep"]).optional(),
+  // ТЗ-KITT: Think mode — use Sonnet for this message
+  think: z.boolean().optional(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

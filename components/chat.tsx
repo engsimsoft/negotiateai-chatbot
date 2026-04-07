@@ -94,6 +94,9 @@ export function Chat({
   // ТЗ-PX: Research depth override (dev-mode only)
   const [researchDepth, setResearchDepth] = useState<"pro" | "deep" | undefined>(undefined);
   const researchDepthRef = useRef(researchDepth);
+  // ТЗ-KITT: "Think" mode — one-shot Sonnet for current message
+  const [think, setThink] = useState(false);
+  const thinkRef = useRef(think);
   const [retryState, setRetryState] = useState({ count: 0, maxRetries: 3 });
   const [delayState, setDelayState] = useState<"normal" | "slow" | "timeout">(
     "normal"
@@ -126,6 +129,10 @@ export function Chat({
   useEffect(() => {
     researchDepthRef.current = researchDepth;
   }, [researchDepth]);
+
+  useEffect(() => {
+    thinkRef.current = think;
+  }, [think]);
 
   const clearDelayTimers = useCallback(() => {
     if (slowTimerRef.current) {
@@ -205,6 +212,8 @@ export function Chat({
               ...(projectId && { projectId }),
               ...(projectId && { projectModelTier: currentProjectTierRef.current }),
               ...(researchDepthRef.current && { researchDepth: researchDepthRef.current }),
+              // ТЗ-KITT: Think mode (one-shot Sonnet)
+              ...(thinkRef.current && { think: true }),
               ...request.body,
             },
           };
@@ -492,6 +501,8 @@ export function Chat({
                 onProjectModelChange={setCurrentProjectTier}
                 researchDepth={researchDepth}
                 onResearchDepthChange={setResearchDepth}
+                think={think}
+                onThinkChange={setThink}
               />
             )}
         </div>

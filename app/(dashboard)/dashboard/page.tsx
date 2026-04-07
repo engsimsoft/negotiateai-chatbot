@@ -1,14 +1,15 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
-import { getUserById, getGeneralChatsCount, getBriefingHistory, getBriefingSettings, getMeetingRecords, getMeetingRecordsCount } from "@/lib/db/queries";
+import { getUserById, getBriefingHistory, getBriefingSettings, getMeetingRecords, getMeetingRecordsCount } from "@/lib/db/queries";
+import { countUserMemories } from "@/lib/ai/memory/memory-queries";
 import { getSimplyNewsData } from "@/lib/briefing/simply-news-utils";
 import {
   GlavnayaHeader,
   GlavnayaGreeting,
   GlavnayaInput,
   ModeCardsSection,
-  ChatHistoryCard,
+  ContextCard,
   ToolsSection,
 } from "@/components/glavnaya";
 
@@ -20,9 +21,9 @@ export default async function DashboardPage() {
   }
 
   // Get user profile, chat count, latest briefing, and meeting records from database
-  const [userProfile, generalChatsCount, briefingHistoryRows, briefingSettings, meetingRecords, meetingRecordCount] = await Promise.all([
+  const [userProfile, memoryFactCount, briefingHistoryRows, briefingSettings, meetingRecords, meetingRecordCount] = await Promise.all([
     getUserById(session.user.id),
-    getGeneralChatsCount({ userId: session.user.id }),
+    countUserMemories(session.user.id),
     getBriefingHistory({ userId: session.user.id, limit: 1 }),
     getBriefingSettings({ userId: session.user.id }),
     getMeetingRecords({ userId: session.user.id, limit: 1 }),
@@ -53,9 +54,7 @@ export default async function DashboardPage() {
         <section className="mb-12">
           <GlavnayaGreeting displayName={displayName} />
           <div className="flex items-stretch gap-3">
-            {generalChatsCount > 0 && (
-              <ChatHistoryCard count={generalChatsCount} />
-            )}
+            <ContextCard factCount={memoryFactCount} />
             <GlavnayaInput />
           </div>
         </section>

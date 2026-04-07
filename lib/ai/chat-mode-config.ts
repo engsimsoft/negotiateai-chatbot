@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 
-export const chatModeSchema = z.enum(["chat", "expertise", "create"]);
+export const chatModeSchema = z.enum(["chat", "expertise", "create", "simply"]);
 export type ChatMode = z.infer<typeof chatModeSchema>;
 
 interface ChatModeEntry {
@@ -24,6 +24,11 @@ export const CHAT_MODE_CONFIG: Record<ChatMode, ChatModeEntry> = {
     modelId: "claude-haiku",
     displayName: "Haiku",
     tools: null, // All standard tools
+  },
+  simply: {
+    modelId: "claude-haiku",
+    displayName: "Simply",
+    tools: null, // All standard tools — KITT дворецкий
   },
   expertise: {
     modelId: "claude-sonnet",

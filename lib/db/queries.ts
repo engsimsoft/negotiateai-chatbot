@@ -10,6 +10,7 @@ import {
   gte,
   inArray,
   isNull,
+  ne,
   notInArray,
   lt,
   sql,
@@ -235,6 +236,50 @@ export async function saveChat({
   }
 }
 
+/**
+ * ТЗ-KITT: Get or create the persistent "Simply" chat for a user.
+ * Each user has exactly one chat with chatMode="simply".
+ */
+export async function getOrCreateSimplyChat(userId: string) {
+  try {
+    // Try to find existing Simply chat
+    const [existing] = await db
+      .select()
+      .from(chat)
+      .where(
+        and(eq(chat.userId, userId), eq(chat.chatMode, "simply"))
+      )
+      .limit(1);
+
+    if (existing) return existing;
+
+    // Create new Simply chat
+    const id = generateUUID();
+    await db.insert(chat).values({
+      id,
+      createdAt: new Date(),
+      userId,
+      title: "Simply",
+      visibility: "private",
+      chatMode: "simply",
+      isRenamed: true, // prevent auto-naming
+    });
+
+    const [created] = await db
+      .select()
+      .from(chat)
+      .where(eq(chat.id, id));
+
+    return created;
+  } catch (error) {
+    console.error("[getOrCreateSimplyChat] Error:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get or create Simply chat"
+    );
+  }
+}
+
 export async function deleteChatById({ id }: { id: string }) {
   try {
     await db.delete(vote).where(eq(vote.chatId, id));
@@ -307,9 +352,11 @@ export async function getChatsByUserId({
     // Performance: Exclude lastContext (heavy JSONB) from history listing
     // ТЗ-03: Filter out project chats - only show free chats (projectId = null)
     // ТЗ-RG: Filter by chatMode when provided
+    // ТЗ-KITT: Always exclude simply chats from history listing
     const baseCondition = and(
       eq(chat.userId, id),
       isNull(chat.projectId),
+      ne(chat.chatMode, "simply"),
       chatMode ? eq(chat.chatMode, chatMode) : undefined
     );
 

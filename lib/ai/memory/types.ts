@@ -27,6 +27,7 @@ export type MemoryCategory = (typeof MEMORY_CATEGORIES)[number];
 
 export const MEMORY_SOURCE_TYPES = [
   "chat",
+  "simply",
   "expertise",
   "create",
   "project",

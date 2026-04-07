@@ -75,6 +75,8 @@ function PureMultimodalInput({
   onProjectModelChange,
   researchDepth,
   onResearchDepthChange,
+  think,
+  onThinkChange,
 }: {
   chatId: string;
   chatMode?: string;
@@ -100,6 +102,9 @@ function PureMultimodalInput({
   // ТЗ-PX: Research depth override (dev-mode only)
   researchDepth?: "pro" | "deep";
   onResearchDepthChange?: (depth: "pro" | "deep" | undefined) => void;
+  // ТЗ-KITT: Think mode (one-shot Sonnet)
+  think?: boolean;
+  onThinkChange?: (think: boolean) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -451,6 +456,25 @@ function PureMultimodalInput({
                 disabled={status !== "ready"}
               />
             )}
+            {/* ТЗ-KITT: Think button — one-shot Sonnet for Simply mode */}
+            {chatMode === "simply" && onThinkChange && (
+              <Button
+                className={cn(
+                  "h-8 rounded-lg px-2.5 text-xs font-medium transition-colors",
+                  think
+                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                    : "hover:bg-accent text-muted-foreground"
+                )}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onThinkChange(!think);
+                }}
+                title={think ? "Режим «Думать» включён — Sonnet" : "Включить режим «Думать» (Sonnet)"}
+                variant="ghost"
+              >
+                <span>{think ? "🧠 Думать" : "💡 Думать"}</span>
+              </Button>
+            )}
             {isProjectChat && (
               <ModelSelectorCompact
                 onModelChange={onModelChange}
@@ -462,7 +486,7 @@ function PureMultimodalInput({
             )}
             {/* ТЗ-PX: Dev-mode research depth toggle */}
             {process.env.NODE_ENV === "development" &&
-              chatMode !== "chat" &&
+              chatMode !== "chat" && chatMode !== "simply" &&
               onResearchDepthChange && (
                 <Button
                   className="h-8 rounded-lg px-2 text-xs font-medium transition-colors hover:bg-accent"
@@ -560,6 +584,9 @@ export const MultimodalInput = memo(
       return false;
     }
     if (prevProps.researchDepth !== nextProps.researchDepth) {
+      return false;
+    }
+    if (prevProps.think !== nextProps.think) {
       return false;
     }
 
