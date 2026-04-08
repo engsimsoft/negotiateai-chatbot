@@ -1,23 +1,20 @@
-// ТЗ-BF4 + ТЗ-DEV2: Generate a single briefing section using Claude Sonnet
+// ТЗ-Briefing-1: Generate a single briefing section using MiniMax M2.7
+// (migrated from Claude Sonnet 4.6, generateObject → generateText + JSON.parse + Zod)
 
 import fs from "fs";
 import path from "path";
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { generateObject } from "ai";
+import { streamText } from "ai";
 import { z } from "zod";
 import type { LanguageModelUsage } from "ai";
 import type { ModelCatalog } from "tokenlens/core";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { retryWithLogging } from "@/lib/ai/retry-with-logging";
+import { minimaxM27Long } from "@/lib/ai/providers";
 import { AUTHOR_MODEL } from "./briefing-config";
 import type { FilteredItem } from "./briefing-filter";
 import type { RawContent } from "./source-fetchers/types";
 import type { BriefingArticleSection } from "./briefing-types";
 import type { BriefingTopic } from "@/lib/db/schema";
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 // Zod schema for a single section
 const articleSourceSchema = z.object({
@@ -73,6 +70,30 @@ const SECTION_SYSTEM_PROMPT = `${BASE_SYSTEM_PROMPT}
 4. topicId, topicName и emoji должны совпадать с запрошенными
 `;
 
+// --- JSON schema description for prompt injection ---
+
+const SECTION_JSON_INSTRUCTION = `
+
+Ответь строго в формате JSON. Без markdown-обёртки (\`\`\`json), без пояснений до или после JSON.
+
+JSON-схема ответа:
+{
+  "topicId": "string — id темы",
+  "topicName": "string — название темы",
+  "emoji": "string — эмодзи темы",
+  "content": "string — текст секции (markdown)",
+  "newsCount": "number — количество новостей в секции",
+  "sources": [
+    {
+      "title": "string — заголовок источника",
+      "url": "string — URL источника",
+      "sourceName": "string — название издания",
+      "tier": "string — уровень (flagship/respected/niche/community)",
+      "summary": "string — краткое описание что взято из этого источника"
+    }
+  ]
+}`;
+
 interface SectionAuthorInput {
   candidates: FilteredItem[];
   fullTexts: Map<string, RawContent>;
@@ -92,6 +113,7 @@ interface SectionAuthorInput {
 
 /**
  * Generate a single briefing section for per-topic refresh.
+ * Pattern: generateText → JSON.parse → Zod validation (MiniMax M2.7).
  */
 export async function generateSection(
   input: SectionAuthorInput,
@@ -126,19 +148,28 @@ export async function generateSection(
   const startTime = Date.now();
   const warnings: string[] = [];
 
-  // ТЗ-PIPELINE1: retryWithLogging replaces hidden SDK retry + manual fallback
-  const { result: object, usage, attempts, totalDurationMs } = await retryWithLogging(
+  // ТЗ-Briefing-1: generateText + JSON.parse + Zod (MiniMax M2.7)
+  // JSON.parse and Zod.parse inside callback — errors trigger automatic retry
+  const { result: section, usage, attempts, totalDurationMs } = await retryWithLogging(
     async () => {
-      const res = await generateObject({
-        model: anthropic(AUTHOR_MODEL),
-        schema: sectionSchema,
-        system: SECTION_SYSTEM_PROMPT,
+      const res = streamText({
+        model: minimaxM27Long,
+        system: SECTION_SYSTEM_PROMPT + SECTION_JSON_INSTRUCTION,
         prompt: userMessage,
         maxOutputTokens: 8192,
+        temperature: 0.7,
         maxRetries: 0,
       });
-      console.log(`[Section Author] model=${AUTHOR_MODEL} usage:`, JSON.stringify(res.usage));
-      return { result: res.object, usage: res.usage };
+      // Consume stream to get full text (keeps connection alive for thinking models)
+      const text = await res.text;
+      const usage = await res.usage;
+      console.log(`[Section Author] model=${AUTHOR_MODEL} usage:`, JSON.stringify(usage));
+
+      // Clean markdown wrapper and parse JSON
+      const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
+      const parsed = sectionSchema.parse(JSON.parse(cleaned));
+
+      return { result: parsed, usage };
     },
     { maxAttempts: 3, userId, modelId: AUTHOR_MODEL, chatMode: "briefing:section-author" },
   );
@@ -172,7 +203,7 @@ export async function generateSection(
     warnings,
   };
 
-  return { section: object, tokensUsed: ai.totalTokens, trace };
+  return { section, tokensUsed: ai.totalTokens, trace };
 }
 
 // --- Volume instruction for single section ---

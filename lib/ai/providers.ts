@@ -10,7 +10,7 @@ import { isTestEnvironment } from "../constants";
  * Primary provider: Anthropic Claude (via @ai-sdk/anthropic)
  * Model map: claude-haiku (fast), claude-sonnet (balanced), claude-opus (best quality)
  *
- * Google Gemini retained only for vision-ocr.ts (separate instance, not through myProvider).
+ * Google Gemini retained only for podcast pipeline (script-generator, tts-gemini).
  */
 
 const anthropic = createAnthropic({
@@ -58,6 +58,19 @@ export const minimaxM27 = (() => {
   return model;
 })();
 
+// MiniMax M2.7 with extended timeout — for briefing pipeline (large prompts, thinking model)
+// Default fetch timeout ~60s is not enough for MiniMax reasoning on 30K+ token prompts
+const minimaxLongProvider = createMinimaxOpenAI({
+  fetch: async (url, init) => {
+    return fetch(url, { ...init, signal: AbortSignal.timeout(180_000) });
+  },
+});
+export const minimaxM27Long = (() => {
+  const model = minimaxLongProvider("MiniMax-M2.7") as any;
+  model.config = { ...model.config, includeUsage: true };
+  return model;
+})();
+
 export function getClaudeModel(name: "haiku" | "sonnet" | "opus") {
   switch (name) {
     case "haiku":
@@ -101,10 +114,8 @@ export const MODEL_CONTEXT_WINDOW: Record<string, number> = {
   "claude-haiku":                200_000,
   // Legacy (fallback)
   "claude-sonnet-4-5-20250929":  200_000,
-  // Gemini (for completeness — used in vision-ocr, briefing)
-  "gemini-2.0-flash":            1_000_000,
+  // Gemini (used in podcast pipeline)
   "gemini-2.5-flash":            1_000_000,
-  "gemini-3-flash-preview":        1_000_000,
   // MiniMax M2.7
   "MiniMax-M2.7":                204_800,
 };
@@ -141,10 +152,8 @@ const MODEL_PRICING_RUB: Record<string, ModelPricing> = {
   "claude-haiku":                { input: 0.10,  output: 0.50,  cached: 0.010, cacheWrite: 0.125 },
   "claude-opus":                 { input: 0.50,  output: 2.50,  cached: 0.050, cacheWrite: 0.625 },
 
-  // Google Gemini (USD prices × 100, no prompt caching)
-  // Flash 2.0:  $0.10/1M in, $0.40/1M out
+  // Google Gemini (USD prices × 100, no prompt caching) — retained for podcast pipeline
   // Flash 2.5:  $0.15/1M in, $0.60/1M out
-  "gemini-2.0-flash":            { input: 0.01,  output: 0.04,  cached: 0.003, cacheWrite: 0 },
   "gemini-2.5-flash":            { input: 0.015, output: 0.06,  cached: 0.004, cacheWrite: 0 },
 
   // Perplexity (no prompt caching)
@@ -154,10 +163,6 @@ const MODEL_PRICING_RUB: Record<string, ModelPricing> = {
   // MiniMax M2.7 (ТЗ-MinimaxCleanup)
   // $0.30/1M in, $1.20/1M out, cache_read $0.06/1M, cache_write $0.375/1M
   "MiniMax-M2.7":                  { input: 0.03,  output: 0.12,  cached: 0.006, cacheWrite: 0.0375 },
-
-  // Google Gemini 3 Flash Preview (ТЗ-MinimaxCleanup — vision for Simply)
-  // Pricing TBD — using Gemini 2.5 Flash rates as estimate
-  "gemini-3-flash-preview":        { input: 0.015, output: 0.06,  cached: 0.004, cacheWrite: 0 },
 
   // Voyage AI embeddings (ТЗ-RAG0) — input only, no output tokens
   // voyage-4: $0.06/1M tokens, voyage-4-lite: $0.02/1M tokens

@@ -1,14 +1,15 @@
-// ТЗ-BRIEFING-AUTHOR-CLAUDE + ТЗ-DEV2: Stage 2 — Generate article using Claude Sonnet 4.6
+// ТЗ-Briefing-1: Stage 2 — Generate article using MiniMax M2.7
+// (migrated from Claude Sonnet 4.6, generateObject → generateText + JSON.parse + Zod)
 
 import fs from "fs";
 import path from "path";
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { generateObject } from "ai";
+import { streamText } from "ai";
 import { z } from "zod";
 import type { ModelCatalog } from "tokenlens/core";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { retryWithLogging } from "@/lib/ai/retry-with-logging";
 import type { LanguageModelUsage } from "ai";
+import { minimaxM27Long } from "@/lib/ai/providers";
 import { AUTHOR_MODEL } from "./briefing-config";
 import type { FilteredItem } from "./briefing-filter";
 import type { RawContent } from "./source-fetchers/types";
@@ -24,10 +25,6 @@ const PROMPT_PATH = path.join(
   "briefing-author.md",
 );
 const SYSTEM_PROMPT = fs.readFileSync(PROMPT_PATH, "utf-8");
-
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 // --- Zod schemas for BriefingArticle ---
 
@@ -61,6 +58,44 @@ const briefingArticleSchema = z.object({
   outro: z.string(),
   meta: articleMetaSchema,
 });
+
+// --- JSON schema description for prompt injection ---
+
+const JSON_SCHEMA_DESCRIPTION = `{
+  "title": "string — заголовок брифинга",
+  "intro": "string — вступление (2-3 предложения)",
+  "sections": [
+    {
+      "topicId": "string — id темы (из списка тем пользователя)",
+      "topicName": "string — название темы",
+      "emoji": "string — эмодзи темы",
+      "content": "string — текст секции (markdown)",
+      "newsCount": "number — количество новостей в секции",
+      "sources": [
+        {
+          "title": "string — заголовок источника",
+          "url": "string — URL источника",
+          "sourceName": "string — название издания",
+          "tier": "string — уровень (flagship/respected/niche/community)",
+          "summary": "string — краткое описание что взято из этого источника"
+        }
+      ]
+    }
+  ],
+  "outro": "string — заключение (1-2 предложения)",
+  "meta": {
+    "totalNews": "number — общее количество новостей",
+    "topicsCount": "number — количество тем",
+    "readingTimeMinutes": "number — оценка времени чтения"
+  }
+}`;
+
+const JSON_INSTRUCTION = `
+
+Ответь строго в формате JSON. Без markdown-обёртки (\`\`\`json), без пояснений до или после JSON.
+
+JSON-схема ответа:
+${JSON_SCHEMA_DESCRIPTION}`;
 
 // --- Tier mapping (old catalog names → prompt names) ---
 
@@ -118,9 +153,10 @@ const MAX_TOKENS_BY_VOLUME: Record<string, number> = {
 };
 
 /**
- * Stage 2: Generate briefing article using Claude Sonnet 4.6.
- * System prompt = persona + rules (from .md file).
+ * Stage 2: Generate briefing article using MiniMax M2.7.
+ * System prompt = persona + rules (from .md file) + JSON schema instruction.
  * User message = formatted candidates + user settings + date.
+ * Pattern: generateText → JSON.parse → Zod validation (same as MIND pipeline).
  */
 export async function generateArticle(
   input: AuthorInput,
@@ -157,20 +193,28 @@ export async function generateArticle(
   const startTime = Date.now();
   const warnings: string[] = [];
 
-  // ТЗ-PIPELINE1: retryWithLogging replaces hidden SDK retry + manual fallback.
-  // maxRetries:0 disables AI SDK internal retry. Our wrapper logs every attempt.
-  const { result: object, usage, attempts, totalDurationMs } = await retryWithLogging(
+  // ТЗ-Briefing-1: generateText + JSON.parse + Zod (MiniMax M2.7)
+  // JSON.parse and Zod.parse inside callback — errors trigger automatic retry via retryWithLogging
+  const { result: article, usage, attempts, totalDurationMs } = await retryWithLogging(
     async () => {
-      const res = await generateObject({
-        model: anthropic(AUTHOR_MODEL),
-        schema: briefingArticleSchema,
-        system: SYSTEM_PROMPT,
+      const res = streamText({
+        model: minimaxM27Long,
+        system: SYSTEM_PROMPT + JSON_INSTRUCTION,
         prompt: userMessage,
         maxOutputTokens: maxTokens,
+        temperature: 0.7,
         maxRetries: 0,
       });
-      console.log(`[Briefing Author] model=${AUTHOR_MODEL} maxOutputTokens=${maxTokens} usage:`, JSON.stringify(res.usage));
-      return { result: res.object, usage: res.usage };
+      // Consume stream to get full text (keeps connection alive for thinking models)
+      const text = await res.text;
+      const usage = await res.usage;
+      console.log(`[Briefing Author] model=${AUTHOR_MODEL} maxOutputTokens=${maxTokens} usage:`, JSON.stringify(usage));
+
+      // Clean markdown wrapper and parse JSON
+      const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
+      const parsed = briefingArticleSchema.parse(JSON.parse(cleaned));
+
+      return { result: parsed, usage };
     },
     { maxAttempts: 3, userId, modelId: AUTHOR_MODEL, chatMode: "briefing:author" },
   );
@@ -205,7 +249,7 @@ export async function generateArticle(
     warnings,
   };
 
-  return { article: object, tokensUsed: ai.totalTokens, trace };
+  return { article, tokensUsed: ai.totalTokens, trace };
 }
 
 // --- Volume instruction block (pressure point #2: top of user message) ---

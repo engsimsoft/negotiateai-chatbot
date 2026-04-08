@@ -1,18 +1,15 @@
-// ТЗ-BR1 + ТЗ-DEV2: Stage 1 — Filter & deduplicate using Gemini 2.0 Flash
+// ТЗ-Briefing-1: Stage 1 — Filter & deduplicate using MiniMax M2.7
+// (migrated from Gemini 2.0 Flash, generateObject → generateText + JSON.parse + Zod)
 
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { generateObject } from "ai";
+import { streamText } from "ai";
 import { z } from "zod";
 import type { ModelCatalog } from "tokenlens/core";
 import { waitUntil } from "@vercel/functions";
 import { logUsage } from "@/lib/ai/usage-utils";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
+import { minimaxM27Long } from "@/lib/ai/providers";
 import { FILTER_MODEL, MAX_FILTER_CANDIDATES } from "./briefing-config";
 import type { RawContent } from "./source-fetchers/types";
-
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-});
 
 export const filteredItemSchema = z.object({
   sourceItemId: z.string(),
@@ -29,8 +26,28 @@ const filterResultSchema = z.object({
   candidates: z.array(filteredItemSchema),
 });
 
+// --- JSON schema description for prompt injection ---
+
+const FILTER_JSON_INSTRUCTION = `
+
+Ответь строго в формате JSON. Без markdown-обёртки (\`\`\`json), без пояснений до или после JSON.
+
+JSON-схема ответа:
+{
+  "candidates": [
+    {
+      "sourceItemId": "string — EXACT itemId from [src-N] bracket of the source article",
+      "title": "string — headline",
+      "url": "string — article URL",
+      "sourceName": "string — publication name",
+      "topicId": "string — topic category from allowed list",
+      "oneLinerSummary": "string — one sentence factual summary"
+    }
+  ]
+}`;
+
 /**
- * Stage 1: Filter raw content using Gemini Flash.
+ * Stage 1: Filter raw content using MiniMax M2.7.
  * - Deduplicates (same story from multiple sources → keep best)
  * - Removes ads/promo
  * - Removes stale content (>48h unless important)
@@ -66,12 +83,7 @@ Content: ${item.content}`,
 
   const userPrompt = `Filter these ${items.length} articles:\n\n${articlesText}`;
 
-  // ТЗ-PIPELINE1: maxRetries:0 — disable hidden SDK retry
-  const { object, usage } = await generateObject({
-    model: google(FILTER_MODEL),
-    maxRetries: 0,
-    schema: filterResultSchema,
-    system: `You are a news filter for a morning briefing service.
+  const systemPrompt = `You are a news filter for a morning briefing service.
 Your job is to select the ${MAX_FILTER_CANDIDATES} best news candidates from the raw feed.
 
 Available topic categories: ${topicIds.join(", ")}
@@ -86,9 +98,25 @@ Rules:
 7. Return up to ${MAX_FILTER_CANDIDATES} candidates, sorted by importance
 8. sourceItemId is REQUIRED. Return the EXACT itemId from the square brackets [src-N] of the source article the news was extracted from. For example, if the news comes from [src-3], set sourceItemId to "src-3".
 
-Output JSON with "candidates" array.`,
+Output JSON with "candidates" array.` + FILTER_JSON_INSTRUCTION;
+
+  // ТЗ-Briefing-1: streamText + JSON.parse + Zod (MiniMax M2.7)
+  // Using streamText instead of generateText — keeps connection alive for thinking model
+  const res = streamText({
+    model: minimaxM27Long,
+    system: systemPrompt,
     prompt: userPrompt,
+    temperature: 0.1,
+    maxRetries: 0,
   });
+
+  // Consume stream to get full text
+  const text = await res.text;
+  const usage = await res.usage;
+
+  // Clean markdown wrapper and parse JSON
+  const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
+  const object = filterResultSchema.parse(JSON.parse(cleaned));
 
   const candidates = object.candidates.slice(0, MAX_FILTER_CANDIDATES);
 

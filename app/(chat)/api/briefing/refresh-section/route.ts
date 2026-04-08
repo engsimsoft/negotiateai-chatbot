@@ -22,7 +22,7 @@ import {
 import { ChatSDKError } from "@/lib/errors";
 import { getTokenlensCatalog } from "@/lib/ai/tokenlens-catalog";
 
-export const maxDuration = 60;
+export const maxDuration = 180; // ТЗ-Briefing-1: MiniMax M2.7 thinking model needs more time
 
 export async function POST(request: Request) {
   const session = await auth();

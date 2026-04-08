@@ -26,11 +26,11 @@ export const JINA_READER_TIMEOUT = 10_000;
 
 // --- AI Models ---
 
-/** Stage 1: Filter — cheap & fast (Google Gemini) */
-export const FILTER_MODEL = "gemini-2.0-flash";
+/** Stage 1: Filter — cheap & fast (MiniMax M2.7, ТЗ-Briefing-1) */
+export const FILTER_MODEL = "MiniMax-M2.7";
 
-/** Stage 2: Author — article generation (Anthropic Claude) */
-export const AUTHOR_MODEL = "claude-sonnet-4-6";
+/** Stage 2: Author — article generation (MiniMax M2.7, ТЗ-Briefing-1) */
+export const AUTHOR_MODEL = "MiniMax-M2.7";
 
 // --- Cron ---
 

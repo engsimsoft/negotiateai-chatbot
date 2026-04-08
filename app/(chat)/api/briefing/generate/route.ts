@@ -8,7 +8,7 @@ import type { BriefingProgressEvent } from "@/lib/briefing/briefing-types";
 import { isSimplyDevMode } from "@/lib/constants";
 import { ChatSDKError } from "@/lib/errors";
 
-export const maxDuration = 90;
+export const maxDuration = 240; // ТЗ-Briefing-1: MiniMax M2.7 thinking model needs more time
 
 export async function POST() {
   const session = await auth();
