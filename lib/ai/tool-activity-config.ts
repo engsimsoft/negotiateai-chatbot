@@ -8,7 +8,7 @@
  */
 
 import type { LucideIcon } from "lucide-react";
-import { Brain, FileText, FlaskConical, FolderOpen, Globe, Pencil, Search, Send, Table2 } from "lucide-react";
+import { FileText, FlaskConical, FolderOpen, Globe, Pencil, Search, Send, Table2 } from "lucide-react";
 
 export interface ToolActivityConfig {
   icon: LucideIcon;
@@ -104,19 +104,6 @@ export const TOOL_ACTIVITY_CONFIG: Record<string, ToolActivityConfig> = {
       if (typeof result?.originalLength === "number")
         parts.push(`${Math.round(result.originalLength / 1000)}k символов`);
       return parts.length > 0 ? parts.join(" — ") : null;
-    },
-  },
-
-  saveFact: {
-    icon: Brain,
-    activeLabel: "Сохраняю в память",
-    doneLabel: "Сохранено в память",
-    argsFormatter: (args) => args?.content?.slice(0, 60) || null,
-    resultFormatter: (result) => {
-      if (!result?.success) return "Ошибка сохранения";
-      if (result.action === "merged") return "Обновлено";
-      if (result.action === "duplicate_skipped") return "Уже записано";
-      return "Записано";
     },
   },
 

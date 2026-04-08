@@ -26,9 +26,9 @@ export const CHAT_MODE_CONFIG: Record<ChatMode, ChatModeEntry> = {
     tools: null, // All standard tools
   },
   simply: {
-    modelId: "claude-haiku",
+    modelId: "MiniMax-M2.7",
     displayName: "Simply",
-    tools: null, // All standard tools — KITT дворецкий
+    tools: null, // Tools disabled at route level for MiniMax/Gemini
   },
   expertise: {
     modelId: "claude-sonnet",

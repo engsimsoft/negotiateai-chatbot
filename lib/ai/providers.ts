@@ -95,6 +95,9 @@ export const MODEL_CONTEXT_WINDOW: Record<string, number> = {
   // Gemini (for completeness — used in vision-ocr, briefing)
   "gemini-2.0-flash":            1_000_000,
   "gemini-2.5-flash":            1_000_000,
+  "gemini-3-flash-preview":        1_000_000,
+  // MiniMax M2.7
+  "MiniMax-M2.7":                204_800,
 };
 
 /** Returns context window size for a model. Defaults to 200K if unknown. */
@@ -138,6 +141,14 @@ const MODEL_PRICING_RUB: Record<string, ModelPricing> = {
   // Perplexity (no prompt caching)
   "sonar-pro":                   { input: 0.30,  output: 1.50,  cached: 0, cacheWrite: 0 },
   "sonar-deep-research":         { input: 0.20,  output: 0.80,  cached: 0, cacheWrite: 0 },
+
+  // MiniMax M2.7 (ТЗ-MinimaxCleanup)
+  // $0.30/1M in, $1.20/1M out, cache_read $0.06/1M, cache_write $0.375/1M
+  "MiniMax-M2.7":                  { input: 0.03,  output: 0.12,  cached: 0.006, cacheWrite: 0.0375 },
+
+  // Google Gemini 3 Flash Preview (ТЗ-MinimaxCleanup — vision for Simply)
+  // Pricing TBD — using Gemini 2.5 Flash rates as estimate
+  "gemini-3-flash-preview":        { input: 0.015, output: 0.06,  cached: 0.004, cacheWrite: 0 },
 
   // Voyage AI embeddings (ТЗ-RAG0) — input only, no output tokens
   // voyage-4: $0.06/1M tokens, voyage-4-lite: $0.02/1M tokens

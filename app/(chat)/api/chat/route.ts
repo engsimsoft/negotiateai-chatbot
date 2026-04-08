@@ -18,6 +18,8 @@ import { buildChatPrompt, buildExpertisePrompt, buildCreatePrompt } from "@/lib/
 import type { BuildContext } from "@/lib/prompts";
 import { buildProjectContext } from "@/lib/prompts/contexts";
 import { myProvider } from "@/lib/ai/providers";
+import { minimax } from "vercel-minimax-ai-provider";
+import { google } from "@ai-sdk/google";
 import {
   getProjectModel,
   isValidModelTier,
@@ -28,9 +30,7 @@ import { createFallbackSnapshot } from "@/lib/ai/clerks/snapshot-creator";
 import {
   SNAPSHOT_THRESHOLD,
   FALLBACK_MESSAGE_PAIRS,
-  SIMPLY_SLIDING_WINDOW_SIZE,
   calcUsagePercent,
-  trimToUserStart,
 } from "@/lib/ai/context-limits";
 import { executeProfessorPipeline } from "@/lib/ai/professor-pipeline";
 import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
@@ -223,6 +223,17 @@ async function convertTextFilesInAllMessages(
 }
 
 
+/**
+ * ТЗ-MinimaxCleanup: Check if user message contains non-text attachments
+ * (images, PDFs, documents — but NOT text/plain which is already converted to text parts)
+ */
+function hasAttachments(parts: any[]): boolean {
+  return parts.some((p: any) =>
+    p.type === "image" ||
+    (p.type === "file" && p.mediaType !== "text/plain")
+  );
+}
+
 export async function POST(request: Request) {
   let requestBody: PostRequestBody;
 
@@ -335,16 +346,12 @@ export async function POST(request: Request) {
 
     // Загружаем сообщения с учётом токенов нового сообщения
     // maxTokens = 140K, оставляем ~60K для system prompt (10K) + response (50K)
-    // ТЗ-SlidingWindow: Simply uses hard message limit (20) instead of token budget
-    const isSimply = chatMode === "simply";
-    const messagesFromDbRaw = await getMessagesByChatId({
+    const messagesFromDb = await getMessagesByChatId({
       id,
-      maxTokens: isSimply ? undefined : 140000 - newMessageTokens,
-      minMessages: isSimply ? SIMPLY_SLIDING_WINDOW_SIZE : 20,
-      maxMessages: isSimply ? SIMPLY_SLIDING_WINDOW_SIZE : 200,
+      maxTokens: 140000 - newMessageTokens,
+      minMessages: 20,
+      maxMessages: 200,
     });
-    // ТЗ-SlidingWindow: ensure window starts with user message (don't orphan tool/assistant)
-    const messagesFromDb = isSimply ? trimToUserStart(messagesFromDbRaw) : messagesFromDbRaw;
 
     // ТЗ-C3/RAG3: Snapshot context management — only for Haiku chats (chatMode="chat"/"simply")
     // Sonnet/Opus use Anthropic Compaction API instead
@@ -354,8 +361,9 @@ export async function POST(request: Request) {
     // contextState is used later in threshold checking for Haiku
     let contextState: { suggestionActive: boolean; messagesSinceSuggestion: number } | null = null;
 
-    // ТЗ-KITT: Simply in think mode uses Sonnet → no snapshot, use compaction instead
-    const isHaikuChat = chatMode === "chat" || (chatMode === "simply" && !think);
+    // Snapshot context management: only for chatMode="chat" (Haiku)
+    // Simply uses MiniMax/Gemini — no snapshot, no compaction (будет Extract при сжатии)
+    const isHaikuChat = chatMode === "chat";
     if (isHaikuChat) {
       const chatWithState = await getChatWithSnapshotState({ chatId: id });
       const snapshots = chatWithState?.snapshots || [];
@@ -502,12 +510,24 @@ export async function POST(request: Request) {
               ? buildCreatePrompt(promptContext)
               : buildChatPrompt(promptContext);
           systemPromptText = builtPrompt.systemPrompt;
-          // ТЗ-KITT: Think mode overrides Haiku → Sonnet for this message
-          const chatModelId = (think && chatMode === "simply")
-            ? "claude-sonnet"
-            : getModelForChatMode(chatMode);
-          console.log(`[Chat API] Model selection: chatMode=${chatMode}, think=${think}, model=${chatModelId}`);
-          modelToUse = myProvider.languageModel(chatModelId);
+          // ТЗ-MinimaxCleanup: Model routing for Simply Chat
+          // Priority: think → Sonnet, attachments → Gemini 3 Flash, default → MiniMax M2.7
+          if (chatMode === "simply") {
+            if (think) {
+              modelToUse = myProvider.languageModel("claude-sonnet");
+              console.log(`[Chat API] Model selection: chatMode=simply, think=true, model=claude-sonnet`);
+            } else if (hasAttachments(message.parts)) {
+              modelToUse = google("gemini-3-flash-preview");
+              console.log(`[Chat API] Model selection: chatMode=simply, attachments=true, model=gemini-3-flash-preview`);
+            } else {
+              modelToUse = minimax("MiniMax-M2.7");
+              console.log(`[Chat API] Model selection: chatMode=simply, model=MiniMax-M2.7`);
+            }
+          } else {
+            const chatModelId = getModelForChatMode(chatMode);
+            console.log(`[Chat API] Model selection: chatMode=${chatMode}, model=${chatModelId}`);
+            modelToUse = myProvider.languageModel(chatModelId);
+          }
         }
 
         // ТЗ-C3: Inject previous snapshot context into system prompt
@@ -755,9 +775,10 @@ export async function POST(request: Request) {
           return; // Exit execute for professor mode
         }
 
-        // ТЗ-RAG3: Compaction only for models that support it (Sonnet/Opus, NOT Haiku)
-        // ТЗ-KITT: Simply uses Haiku by default → no compaction (uses snapshot instead)
-        const supportsCompaction = !isHaikuChat || isProjectChat;
+        // ТЗ-RAG3: Compaction only for Anthropic models that support it (Sonnet/Opus, NOT Haiku)
+        // ТЗ-MinimaxCleanup: Simply uses MiniMax/Gemini — no compaction
+        const isAnthropicModel = chatMode !== "simply" || think;
+        const supportsCompaction = isAnthropicModel && (!isHaikuChat || isProjectChat);
         const compactionOptions = supportsCompaction ? {
           anthropic: {
             contextManagement: {
@@ -771,24 +792,32 @@ export async function POST(request: Request) {
           }
         } : undefined;
 
+        // ТЗ-MinimaxCleanup: Simply with MiniMax/Gemini — no tools, no Anthropic cacheControl
+        const isSimplyNonAnthropicModel = chatMode === "simply" && !think;
+
         // Standard streaming mode (non-professor)
         const result = streamText({
           model: modelToUse,
-          // ТЗ-CACHE1: system as message with per-message cacheControl (top-level providerOptions doesn't mark messages)
           messages: [
-            // System prompt (stable) — cached via cacheControl
-            { role: 'system' as const, content: systemPromptText, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },
+            // System prompt — with Anthropic cacheControl only for Anthropic models
+            {
+              role: 'system' as const,
+              content: systemPromptText,
+              ...(isAnthropicModel ? { providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } } : {}),
+            },
             // ТЗ-KITT/CACHE: MIND retrieved facts (dynamic per query) — NOT cached
             ...(mindDynamicBlock ? [{ role: 'system' as const, content: mindDynamicBlock }] : []),
             ...sanitizeCoreMessages(await convertToModelMessages(uiMessages)),
           ],
           providerOptions: compactionOptions,
-          temperature: 1.0,
-          stopWhen: stepCountIs(5),
-          // ТЗ-C1: Tools extracted to shared module (lib/ai/tools/chat-tools.ts)
-          experimental_activeTools: getActiveToolNames(isProjectChat, chatMode),
+          temperature: isSimplyNonAnthropicModel ? 0.7 : 1.0,
+          ...(isSimplyNonAnthropicModel ? {} : { stopWhen: stepCountIs(5) }),
+          // ТЗ-C1: Tools — disabled for Simply with MiniMax/Gemini
+          ...(isSimplyNonAnthropicModel ? {} : {
+            experimental_activeTools: getActiveToolNames(isProjectChat, chatMode),
+            tools: getStandardTools({ session, dataStream, isProjectChat, projectId: projectId || undefined, chatId: id, messageId: assistantMessageId, chatMode, researchDepth }),
+          }),
           experimental_transform: smoothStream({ chunking: "word" }),
-          tools: getStandardTools({ session, dataStream, isProjectChat, projectId: projectId || undefined, chatId: id, messageId: assistantMessageId, chatMode, researchDepth }),
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
             functionId: "stream-text",
@@ -841,11 +870,19 @@ export async function POST(request: Request) {
             let resolvedModelId: string | undefined;
             let costUsd: number | null = null;
             try {
-              // ТЗ-KITT: Think mode uses Sonnet — must match model selection above
-              const chatModelId = (think && chatMode === "simply")
-                ? "claude-sonnet"
-                : getModelForChatMode(chatMode);
-              resolvedModelId = myProvider.languageModel(chatModelId).modelId;
+              // ТЗ-MinimaxCleanup: Resolve model ID matching selection logic above
+              if (chatMode === "simply") {
+                if (think) {
+                  resolvedModelId = myProvider.languageModel("claude-sonnet").modelId;
+                } else if (hasAttachments(message.parts)) {
+                  resolvedModelId = "gemini-3-flash-preview";
+                } else {
+                  resolvedModelId = "MiniMax-M2.7";
+                }
+              } else {
+                const chatModelId = getModelForChatMode(chatMode);
+                resolvedModelId = myProvider.languageModel(chatModelId).modelId;
+              }
               const effectiveModelId =
                 resolvedModelId ?? (isProjectChat ? `project:${tier}` : chatMode);
 
@@ -1191,7 +1228,8 @@ export async function POST(request: Request) {
 
         // ТЗ-RAG1: Extract facts from conversation (fire-and-forget)
         // ТЗ-RAG2: Respects memoryEnabled setting (checked earlier in execute)
-        if (isMemoryEnabled) {
+        // ТЗ-MinimaxCleanup: Skip extract for simply — will be replaced by Extract-on-compaction
+        if (isMemoryEnabled && chatMode !== "simply") {
           const userText = message.parts
             .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
             .map((p: any) => p.text)
