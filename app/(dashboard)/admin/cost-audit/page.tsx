@@ -28,11 +28,12 @@ import {
 // ---------------------------------------------------------------------------
 
 const PRESETS = [
-  { label: "24ч",  period: "hour"  as CostPeriod, range: 24,  days: 1   },
-  { label: "7д",   period: "day"   as CostPeriod, range: 7,   days: 7   },
-  { label: "30д",  period: "day"   as CostPeriod, range: 30,  days: 30  },
-  { label: "3м",   period: "month" as CostPeriod, range: 3,   days: 90  },
-  { label: "12м",  period: "month" as CostPeriod, range: 12,  days: 365 },
+  { label: "1ч",   period: "hour"  as CostPeriod, range: 1,   hours: 1      },
+  { label: "24ч",  period: "hour"  as CostPeriod, range: 24,  hours: 24     },
+  { label: "7д",   period: "day"   as CostPeriod, range: 7,   hours: 168    },
+  { label: "30д",  period: "day"   as CostPeriod, range: 30,  hours: 720    },
+  { label: "3м",   period: "month" as CostPeriod, range: 3,   hours: 2160   },
+  { label: "12м",  period: "month" as CostPeriod, range: 12,  hours: 8760   },
 ] as const;
 
 type PresetLabel = (typeof PRESETS)[number]["label"];
@@ -112,9 +113,9 @@ export default async function CostAuditPage({
     getInvalidDeliveryStateUsers(),
     getLastCronRuns(10),
     getCostByPeriod(preset.period, preset.range),
-    getCostByChatModeForRange(preset.days),
-    getCostByModel(preset.days),
-    getNullCostRecordsForRange(preset.days),
+    getCostByChatModeForRange(preset.hours),
+    getCostByModel(preset.hours),
+    getNullCostRecordsForRange(preset.hours),
   ]);
 
   const totalCost = costByPeriod.reduce((sum, r) => sum + (r.totalUsd ?? 0), 0);

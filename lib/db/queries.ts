@@ -4737,14 +4737,43 @@ export async function getCostByPeriod(
   }));
 }
 
-/** Total cost by chatMode for the last N days (used in audit with variable range) */
-export async function getCostByChatModeForRange(days: number): Promise<CostByChatMode[]> {
-  return getCostByChatMode(days);
+/** Total cost by chatMode for the last N hours (used in audit with variable range) */
+export async function getCostByChatModeForRange(hours: number): Promise<CostByChatMode[]> {
+  const rows = await db.execute(sql`
+    SELECT
+      "chatMode",
+      SUM(CAST("costUsd" AS numeric)) AS "totalUsd",
+      COUNT(*) AS count
+    FROM "ai_usage_log"
+    WHERE "createdAt" > NOW() - INTERVAL '${sql.raw(String(hours))} hours'
+    GROUP BY "chatMode"
+    ORDER BY "totalUsd" DESC NULLS LAST
+  `);
+  return rows.rows.map((r: any) => ({
+    chatMode: String(r.chatMode),
+    totalUsd: r.totalUsd != null ? Number(r.totalUsd) : null,
+    count: Number(r.count),
+  }));
 }
 
-/** Count of NULL costUsd records for variable range */
-export async function getNullCostRecordsForRange(days: number): Promise<NullCostRecord[]> {
-  return getNullCostRecords(days);
+/** Count of NULL costUsd records for the last N hours */
+export async function getNullCostRecordsForRange(hours: number): Promise<NullCostRecord[]> {
+  const rows = await db.execute(sql`
+    SELECT
+      "chatMode",
+      "modelId",
+      COUNT(*) AS count
+    FROM "ai_usage_log"
+    WHERE "costUsd" IS NULL
+      AND "createdAt" > NOW() - INTERVAL '${sql.raw(String(hours))} hours'
+    GROUP BY "chatMode", "modelId"
+    ORDER BY count DESC
+  `);
+  return rows.rows.map((r: any) => ({
+    chatMode: String(r.chatMode),
+    modelId: String(r.modelId),
+    count: Number(r.count),
+  }));
 }
 
 export interface CostByModel {
@@ -4762,7 +4791,7 @@ export interface CostByModel {
 }
 
 /** Total cost grouped by modelId for last N days. ТЗ-TOKENS1 Этап 7: breakdown by cache type. */
-export async function getCostByModel(days: number): Promise<CostByModel[]> {
+export async function getCostByModel(hours: number): Promise<CostByModel[]> {
   const rows = await db.execute(sql`
     SELECT
       "modelId",
@@ -4774,7 +4803,7 @@ export async function getCostByModel(days: number): Promise<CostByModel[]> {
       SUM("outputTokens") AS "outputTokens",
       SUM("thinkingTokens") AS "reasoningTokens"
     FROM "ai_usage_log"
-    WHERE "createdAt" > NOW() - INTERVAL '${sql.raw(String(days))} days'
+    WHERE "createdAt" > NOW() - INTERVAL '${sql.raw(String(hours))} hours'
     GROUP BY "modelId"
     ORDER BY "totalUsd" DESC NULLS LAST
   `);
