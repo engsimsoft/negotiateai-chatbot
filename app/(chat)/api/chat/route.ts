@@ -18,7 +18,16 @@ import { buildChatPrompt, buildExpertisePrompt, buildCreatePrompt } from "@/lib/
 import type { BuildContext } from "@/lib/prompts";
 import { buildProjectContext } from "@/lib/prompts/contexts";
 import { myProvider } from "@/lib/ai/providers";
-import { minimax } from "vercel-minimax-ai-provider";
+import { createMinimaxOpenAI } from "vercel-minimax-ai-provider";
+
+// MiniMax OpenAI provider with includeUsage enabled for streaming usage data
+// (reasoning tokens, cache tokens). Default provider doesn't set this.
+const minimaxProvider = createMinimaxOpenAI();
+function minimaxModel(modelId: string) {
+  const model = minimaxProvider(modelId) as any;
+  model.config = { ...model.config, includeUsage: true };
+  return model;
+}
 import { google } from "@ai-sdk/google";
 import {
   getProjectModel,
@@ -30,6 +39,10 @@ import { createFallbackSnapshot } from "@/lib/ai/clerks/snapshot-creator";
 import {
   SNAPSHOT_THRESHOLD,
   FALLBACK_MESSAGE_PAIRS,
+  SIMPLY_CONTEXT_LIMIT,
+  EXTRACT_THRESHOLD_SOFT,
+  EXTRACT_THRESHOLD_HARD,
+  EXTRACT_PAUSE_MS,
   calcUsagePercent,
 } from "@/lib/ai/context-limits";
 import { executeProfessorPipeline } from "@/lib/ai/professor-pipeline";
@@ -50,7 +63,7 @@ import {
 } from "@/lib/ai/debug-events";
 import { retrieveMemoryContext } from "@/lib/ai/memory/retrieve";
 import { getProfileBlock } from "@/lib/ai/memory/profile";
-import { extractAndStoreFacts } from "@/lib/ai/memory/extract";
+import { extractAndStoreFacts, batchExtractFacts } from "@/lib/ai/memory/extract";
 import {
   addChatSnapshot,
   createStreamId,
@@ -345,12 +358,15 @@ export async function POST(request: Request) {
     );
 
     // Загружаем сообщения с учётом токенов нового сообщения
-    // maxTokens = 140K, оставляем ~60K для system prompt (10K) + response (50K)
+    // ТЗ-ExtractCompression: simply загружает только extractedAt IS NULL (safety-cap 180K)
+    // Остальные chatMode: maxTokens = 140K, оставляем ~60K для system prompt (10K) + response (50K)
+    const isSimplyChat = chatMode === "simply";
     const messagesFromDb = await getMessagesByChatId({
       id,
-      maxTokens: 140000 - newMessageTokens,
+      maxTokens: isSimplyChat ? 180000 - newMessageTokens : 140000 - newMessageTokens,
       minMessages: 20,
       maxMessages: 200,
+      excludeExtracted: isSimplyChat,
     });
 
     // ТЗ-C3/RAG3: Snapshot context management — only for Haiku chats (chatMode="chat"/"simply")
@@ -438,6 +454,7 @@ export async function POST(request: Request) {
           attachments: [],
           createdAt: new Date(),
           tokenCount: estimateMessageTokens(message.parts),
+          extractedAt: null,
         },
       ],
     });
@@ -520,7 +537,7 @@ export async function POST(request: Request) {
               modelToUse = google("gemini-3-flash-preview");
               console.log(`[Chat API] Model selection: chatMode=simply, attachments=true, model=gemini-3-flash-preview`);
             } else {
-              modelToUse = minimax("MiniMax-M2.7");
+              modelToUse = minimaxModel("MiniMax-M2.7");
               console.log(`[Chat API] Model selection: chatMode=simply, model=MiniMax-M2.7`);
             }
           } else {
@@ -599,6 +616,44 @@ export async function POST(request: Request) {
           } catch (error) {
             // Graceful degradation: memory unavailable — chat continues without it
             console.warn("[MIND] Retrieve failed (non-blocking):", error instanceof Error ? error.message : error);
+          }
+        }
+
+        // ТЗ-ExtractCompression: threshold-based batch extraction for simply
+        if (isSimplyChat && isMemoryEnabled) {
+          const systemPromptTokensForExtract = estimateMessageTokens([
+            { type: "text", text: systemPromptText },
+          ]);
+          const mindTokens = mindDynamicBlock
+            ? estimateMessageTokens([{ type: "text", text: mindDynamicBlock }])
+            : 0;
+          const totalContext = systemPromptTokensForExtract + mindTokens + totalHistoryTokens + newMessageTokens;
+          const usagePercent = calcUsagePercent(totalContext, SIMPLY_CONTEXT_LIMIT);
+
+          // Determine pause since last message
+          const lastMessageTime = messagesFromDb.length > 0
+            ? messagesFromDb[messagesFromDb.length - 1].createdAt.getTime()
+            : 0;
+          const pauseMs = lastMessageTime > 0 ? Date.now() - lastMessageTime : 0;
+
+          const shouldExtract =
+            usagePercent >= EXTRACT_THRESHOLD_HARD * 100 ||
+            (usagePercent >= EXTRACT_THRESHOLD_SOFT * 100 && pauseMs >= EXTRACT_PAUSE_MS);
+
+          if (shouldExtract) {
+            console.log(
+              `[MIND] Batch extract triggered: ${usagePercent}% of context used (${totalContext} tokens), pause=${Math.round(pauseMs / 1000)}s`,
+            );
+            void batchExtractFacts({
+              userId: session.user.id,
+              chatId: id,
+              messages: messagesFromDb,
+            }).catch((err) =>
+              console.warn(
+                "[MIND] Batch extract failed (non-blocking):",
+                err instanceof Error ? err.message : err,
+              ),
+            );
           }
         }
 
@@ -1194,6 +1249,7 @@ export async function POST(request: Request) {
             attachments: [],
             chatId: id,
             tokenCount,
+            extractedAt: null,
           };
         }).filter((msg) => {
           // Don't save empty assistant messages (no useful content after filtering)

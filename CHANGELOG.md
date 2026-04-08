@@ -12,6 +12,32 @@
 
 ---
 
+## [3.78.0] - 2026-04-08 - Extract при сжатии
+
+**ТЗ-ExtractCompression**: Автоматическое извлечение фактов в MIND когда контекст Simply Chat приближается к лимиту. Пороговая система (80% + пауза / 95% без паузы) + ночной cron как страховка.
+
+### Added
+- **`extractedAt`** — колонка в таблице Message_v2 (миграция 0052)
+- **`batchExtractFacts()`** — batch-извлечение фактов из 50 сообщений одним вызовом Sonnet
+- **`extract-batch.md`** — промпт для batch extraction (отдельный от single-pair)
+- **Пороговый триггер** — 80% контекста + пауза 10мин или 95% без паузы → fire-and-forget extraction
+- **Ночной cron** — страховка: batch extract для необработанных сообщений старше 24ч (перед консолидацией)
+- **`SIMPLY_CONTEXT_LIMIT = 200K`** — реальный лимит контекстного окна (min MiniMax 204K / Sonnet 200K)
+- **`excludeExtracted`** — параметр в `getMessagesByChatId` для фильтрации обработанных сообщений
+- **`markMessagesExtracted()`** — пометка сообщений после extraction
+- **`getUsersWithStaleSimplyMessages()`** — query для ночного cron
+- **`getUnextractedSimplyMessages()`** — query для batch extraction
+
+### Changed
+- **Simply history loading** — загружает только `extractedAt IS NULL` с safety-cap 180K (было: все с 140K)
+- **Модели MIND** — Extract, консолидация, профиль переведены на MiniMax M2.7 (было: Sonnet + Opus)
+- **Метод генерации** — generateObject → generateText + JSON.parse + Zod (MiniMax не поддерживает generateObject)
+- **Пороги** — 60%/80% вместо 80%/95% (более ранний Extract)
+- **Консолидация + профиль** — событийные триггеры (≥10 фактов) вместо ежедневного cron
+- **Cron `memory-profile`** — только страховка (stale messages >24h), без безусловного consolidation/profile
+
+---
+
 ## [3.77.0] - 2026-04-08 - MiniMax M2.7 + Gemini 3 Flash + расчистка
 
 **ТЗ-MinimaxCleanup**: Замена Haiku на MiniMax M2.7 в Simply Chat, маршрутизация по типу контента (MiniMax / Gemini / Sonnet), удаление устаревшего кода.

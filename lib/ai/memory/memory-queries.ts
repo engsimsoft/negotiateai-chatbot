@@ -7,12 +7,12 @@
 
 import "server-only";
 
-import { and, eq, isNull, sql, desc } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql, desc } from "drizzle-orm";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import ws from "ws";
 
-import { memoryEntry } from "@/lib/db/schema";
+import { memoryEntry, message } from "@/lib/db/schema";
 import type {
   NewMemoryEntry,
   MemoryCategory,
@@ -53,6 +53,7 @@ export async function insertMemoryEntry(
       source: entry.source ?? "extracted",
       sourceChatId: entry.sourceChatId ?? null,
       sourceProjectId: entry.sourceProjectId ?? null,
+      metadata: entry.metadata ?? null,
     })
     .returning({ id: memoryEntry.id });
 
@@ -125,6 +126,7 @@ export async function searchSimilarMemories(
       source: memoryEntry.source,
       sourceChatId: memoryEntry.sourceChatId,
       sourceProjectId: memoryEntry.sourceProjectId,
+      metadata: memoryEntry.metadata,
       supersededBy: memoryEntry.supersededBy,
       createdAt: memoryEntry.createdAt,
       updatedAt: memoryEntry.updatedAt,
@@ -152,6 +154,7 @@ export async function searchSimilarMemories(
         source: row.source,
         sourceChatId: row.sourceChatId,
         sourceProjectId: row.sourceProjectId,
+        metadata: row.metadata,
         supersededBy: row.supersededBy,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
@@ -265,6 +268,20 @@ export async function getMemorySummaryByCategory(
 }
 
 // ---------------------------------------------------------------------------
+// Update metadata (ТЗ-SaveFactV2)
+// ---------------------------------------------------------------------------
+
+export async function updateMemoryMetadata(
+  id: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  await db
+    .update(memoryEntry)
+    .set({ metadata, updatedAt: new Date() })
+    .where(eq(memoryEntry.id, id));
+}
+
+// ---------------------------------------------------------------------------
 // Supersede (replace old fact with new one)
 // ---------------------------------------------------------------------------
 
@@ -308,4 +325,23 @@ export async function deleteAllUserMemories(userId: string): Promise<number> {
     .returning({ id: memoryEntry.id });
 
   return result.length;
+}
+
+// ---------------------------------------------------------------------------
+// ТЗ-ExtractCompression: Mark messages as extracted
+// ---------------------------------------------------------------------------
+
+/**
+ * Mark messages as extracted (set extractedAt = NOW()).
+ * Called after batchExtractFacts processes a batch of messages.
+ */
+export async function markMessagesExtracted(
+  messageIds: string[],
+): Promise<void> {
+  if (messageIds.length === 0) return;
+
+  await db
+    .update(message)
+    .set({ extractedAt: new Date() })
+    .where(inArray(message.id, messageIds));
 }

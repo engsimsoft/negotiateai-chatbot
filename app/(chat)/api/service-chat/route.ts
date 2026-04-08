@@ -719,6 +719,7 @@ export async function POST(request: Request) {
             attachments: [],
             createdAt: new Date(),
             tokenCount: 0,
+            extractedAt: null,
           }],
         });
       }
@@ -874,6 +875,7 @@ export async function POST(request: Request) {
                   attachments: [],
                   createdAt: new Date(),
                   tokenCount: 0,
+                  extractedAt: null,
                 }],
               });
             }

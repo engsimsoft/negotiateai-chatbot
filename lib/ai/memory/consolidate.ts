@@ -12,10 +12,10 @@ import "server-only";
 
 import fs from "fs";
 import path from "path";
-import { generateObject } from "ai";
+import { generateText } from "ai";
 import { z } from "zod";
 
-import { claudeSonnet } from "@/lib/ai/providers";
+import { minimaxM27 } from "@/lib/ai/providers";
 import { logUsage } from "@/lib/ai/usage-utils";
 import {
   getMemoryEntriesByUser,
@@ -137,11 +137,10 @@ async function runConsolidation(
   const factsText = formatFactsForPrompt(facts);
   const userPrompt = `<facts>\n${factsText}\n</facts>`;
 
-  // Call Sonnet
-  const { object, usage } = await generateObject({
-    model: claudeSonnet,
+  // Call MiniMax M2.7 (generateText + JSON.parse + Zod)
+  const { text, usage } = await generateText({
+    model: minimaxM27,
     maxRetries: 0,
-    schema: consolidationResultSchema,
     system: CONSOLIDATE_SYSTEM_PROMPT,
     prompt: userPrompt,
     temperature: 0.1,
@@ -149,11 +148,26 @@ async function runConsolidation(
 
   const durationMs = Date.now() - startTime;
 
+  // Parse JSON response
+  let object: z.infer<typeof consolidationResultSchema>;
+  try {
+    const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
+    object = consolidationResultSchema.parse(JSON.parse(cleaned));
+  } catch (parseErr) {
+    console.error(
+      `[MemoryConsolidate] Failed to parse MiniMax response:`,
+      parseErr instanceof Error ? parseErr.message : parseErr,
+      `\nRaw text: ${text.slice(0, 500)}`,
+    );
+    stats.durationMs = Date.now() - startTime;
+    return stats;
+  }
+
   // Log usage
   logUsage({
     userId,
     usage,
-    modelId: claudeSonnet.modelId,
+    modelId: "MiniMax-M2.7",
     chatMode: "memory:consolidate",
     durationMs,
   });

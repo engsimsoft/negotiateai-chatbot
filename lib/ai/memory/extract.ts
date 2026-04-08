@@ -13,10 +13,10 @@ import "server-only";
 
 import fs from "fs";
 import path from "path";
-import { generateObject } from "ai";
+import { generateObject, generateText } from "ai";
 import { z } from "zod";
 
-import { claudeSonnet, claudeHaiku } from "@/lib/ai/providers";
+import { claudeSonnet, claudeHaiku, minimaxM27 } from "@/lib/ai/providers";
 import { logUsage } from "@/lib/ai/usage-utils";
 import { calcCostUsd } from "@/lib/ai/tokenlens-catalog";
 import {
@@ -27,9 +27,11 @@ import {
   insertMemoryEntry,
   searchSimilarMemories,
   supersedeMemoryEntry,
+  markMessagesExtracted,
 } from "./memory-queries";
 import { incrementFactsSinceConsolidation } from "@/lib/db/queries";
-import { miniConsolidateUserMemory } from "./consolidate";
+import { miniConsolidateUserMemory, consolidateUserMemory } from "./consolidate";
+import { generateUserProfile } from "./profile";
 import { MEMORY_CATEGORIES, type MemoryCategory, type MemorySourceType, type MemorySearchResult } from "./types";
 
 /** ТЗ-RAG2: Number of new facts before triggering mini-consolidation */
@@ -47,6 +49,15 @@ const EXTRACT_PROMPT_PATH = path.join(
   "extract.md",
 );
 const EXTRACT_SYSTEM_PROMPT = fs.readFileSync(EXTRACT_PROMPT_PATH, "utf-8");
+
+const EXTRACT_BATCH_PROMPT_PATH = path.join(
+  process.cwd(),
+  "lib",
+  "prompts",
+  "memory",
+  "extract-batch.md",
+);
+const EXTRACT_BATCH_SYSTEM_PROMPT = fs.readFileSync(EXTRACT_BATCH_PROMPT_PATH, "utf-8");
 
 // ---------------------------------------------------------------------------
 // Zod schema for structured extraction
@@ -211,6 +222,202 @@ export async function extractAndStoreFacts(
   } catch (error) {
     console.error(
       "[MemoryExtract] Pipeline failed:",
+      error instanceof Error ? error.message : error,
+    );
+    return stats;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ТЗ-ExtractCompression: batchExtractFacts — batch extraction from conversation
+// ---------------------------------------------------------------------------
+
+/** Max messages per batch extraction */
+const MAX_BATCH_MESSAGES = 50;
+
+/** Max facts from a single batch extraction */
+const MAX_BATCH_FACTS = 30;
+
+interface BatchExtractInput {
+  userId: string;
+  chatId: string;
+  messages: Array<{ id: string; role: string; parts: unknown; createdAt: Date }>;
+}
+
+interface BatchExtractResult {
+  processed: number;
+  extracted: number;
+  stored: number;
+}
+
+/**
+ * Batch extraction pipeline: format conversation → extract facts (one Sonnet call) →
+ * embed → deduplicate → store → mark messages as extracted.
+ *
+ * Designed for fire-and-forget when context approaches threshold.
+ */
+export async function batchExtractFacts(
+  input: BatchExtractInput,
+): Promise<BatchExtractResult> {
+  const { userId, chatId, messages } = input;
+  const stats: BatchExtractResult = { processed: 0, extracted: 0, stored: 0 };
+
+  try {
+    // Take oldest messages first, cap at MAX_BATCH_MESSAGES
+    const batch = messages.slice(0, MAX_BATCH_MESSAGES);
+    stats.processed = batch.length;
+
+    if (batch.length === 0) {
+      return stats;
+    }
+
+    console.log(
+      `[MIND] Batch extract started: ${batch.length} messages for user ${userId}`,
+    );
+
+    // Format conversation block
+    const conversationBlock = batch
+      .map((msg) => {
+        const role = msg.role === "user" ? "User" : "Assistant";
+        const text = (msg.parts as Array<{ type: string; text?: string }>)
+          .filter((p) => p.type === "text" && p.text?.trim())
+          .map((p) => p.text)
+          .join("\n");
+        return `[${role}]\n${text}`;
+      })
+      .filter((block) => block.length > 10) // skip empty blocks
+      .join("\n\n---\n\n");
+
+    if (conversationBlock.length < 20) {
+      // Not enough text content to extract from
+      await markMessagesExtracted(batch.map((m) => m.id));
+      console.log("[MIND] Batch extract: not enough text, marking as extracted");
+      return stats;
+    }
+
+    const startTime = Date.now();
+
+    // Single MiniMax M2.7 call for the whole batch (generateText + JSON.parse + Zod)
+    const { text, usage } = await generateText({
+      model: minimaxM27,
+      maxRetries: 0,
+      system: EXTRACT_BATCH_SYSTEM_PROMPT,
+      prompt: conversationBlock,
+      temperature: 0.1,
+    });
+
+    const durationMs = Date.now() - startTime;
+
+    // Parse JSON response
+    let parsedResult: z.infer<typeof extractionResultSchema>;
+    try {
+      const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
+      parsedResult = extractionResultSchema.parse(JSON.parse(cleaned));
+    } catch (parseErr) {
+      console.error(
+        `[MIND] Batch extract: failed to parse MiniMax response:`,
+        parseErr instanceof Error ? parseErr.message : parseErr,
+        `\nRaw text: ${text.slice(0, 500)}`,
+      );
+      // Still mark messages as extracted to avoid retry loop
+      await markMessagesExtracted(batch.map((m) => m.id));
+      return stats;
+    }
+
+    // Log usage
+    logUsage({
+      userId,
+      usage,
+      modelId: "MiniMax-M2.7",
+      chatMode: "tool:batch-extract",
+      chatId,
+      durationMs,
+    });
+
+    const facts = parsedResult.facts.slice(0, MAX_BATCH_FACTS);
+    stats.extracted = facts.length;
+
+    console.log(
+      `[MIND] Batch extract: ${facts.length} facts from ${batch.length} messages (${durationMs}ms)`,
+    );
+
+    // Process each fact through existing embed → dedup → store pipeline
+    let storedCount = 0;
+    let supersededCount = 0;
+    for (const fact of facts) {
+      try {
+        const factStats = { stored: 0, superseded: 0 };
+        await processAndStoreFact(
+          {
+            userId,
+            userMessage: "",
+            assistantMessage: "",
+            sourceType: "simply",
+            sourceChatId: chatId,
+          },
+          fact,
+          factStats,
+        );
+        storedCount += factStats.stored;
+        supersededCount += factStats.superseded;
+      } catch (error) {
+        console.error(
+          `[MIND] Batch extract: failed to store fact "${fact.content.slice(0, 50)}...":`,
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+
+    stats.stored = storedCount;
+
+    // Mark ALL batch messages as extracted (even if no facts found)
+    await markMessagesExtracted(batch.map((m) => m.id));
+
+    // ТЗ-ExtractCompression V2: Event chain — consolidation if ≥10 facts stored
+    if (storedCount >= 10) {
+      console.log(
+        `[MIND] Batch extract: ${storedCount} facts stored, triggering consolidation`,
+      );
+      void (async () => {
+        try {
+          const consolidationStats = await consolidateUserMemory(userId);
+          const totalChanged = consolidationStats.superseded + consolidationStats.merged + consolidationStats.removed;
+          console.log(
+            `[MIND] Consolidation after extract: ${totalChanged} changes (superseded=${consolidationStats.superseded}, merged=${consolidationStats.merged}, removed=${consolidationStats.removed})`,
+          );
+
+          // Event chain — profile if ≥10 facts changed
+          if (totalChanged >= 10) {
+            console.log(`[MIND] Consolidation: ${totalChanged} changes, triggering profile generation`);
+            await generateUserProfile(userId);
+          }
+        } catch (err) {
+          console.warn(
+            "[MIND] Post-extract chain failed (non-blocking):",
+            err instanceof Error ? err.message : err,
+          );
+        }
+      })().catch(() => {});
+    } else if (storedCount > 0) {
+      // Fewer than 10 — just increment counter for future mini-consolidation
+      try {
+        await incrementFactsSinceConsolidation({ userId });
+      } catch (err) {
+        console.warn(
+          "[MIND] Batch extract: failed to increment consolidation counter:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
+    console.log(
+      `[MIND] Batch extract done: ${stats.processed} processed, ${stats.extracted} extracted, ${stats.stored} stored, ${supersededCount} superseded`,
+    );
+
+    return stats;
+  } catch (error) {
+    console.error(
+      "[MIND] Batch extract failed:",
       error instanceof Error ? error.message : error,
     );
     return stats;

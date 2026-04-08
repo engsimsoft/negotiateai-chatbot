@@ -13,7 +13,7 @@ import fs from "fs";
 import path from "path";
 import { generateText } from "ai";
 
-import { claudeOpus } from "@/lib/ai/providers";
+import { minimaxM27 } from "@/lib/ai/providers";
 import { logUsage } from "@/lib/ai/usage-utils";
 import { calcCostUsd } from "@/lib/ai/tokenlens-catalog";
 import { getMemoryEntriesByUser } from "./memory-queries";
@@ -106,7 +106,7 @@ export async function generateUserProfile(
 
   // Generate profile via Opus
   const { text, usage } = await generateText({
-    model: claudeOpus,
+    model: minimaxM27,
     maxRetries: 0,
     system: PROFILE_SYSTEM_PROMPT,
     prompt: userPrompt,
@@ -116,7 +116,7 @@ export async function generateUserProfile(
   const durationMs = Date.now() - startTime;
 
   // Calculate cost
-  const costUsd = (await calcCostUsd(claudeOpus.modelId, usage)) ?? 0;
+  const costUsd = (await calcCostUsd("MiniMax-M2.7", usage)) ?? 0;
 
   // Estimate token count of the profile text (~4 chars per token for Russian)
   const tokenCount = Math.ceil(text.length / 4);
@@ -125,7 +125,7 @@ export async function generateUserProfile(
   logUsage({
     userId,
     usage,
-    modelId: claudeOpus.modelId,
+    modelId: "MiniMax-M2.7",
     chatMode: "memory:profile",
     durationMs,
   });
@@ -137,7 +137,7 @@ export async function generateUserProfile(
     factCount: facts.length,
     tokenCount,
     costUsd,
-    modelId: claudeOpus.modelId,
+    modelId: "MiniMax-M2.7",
   });
 
   console.log(

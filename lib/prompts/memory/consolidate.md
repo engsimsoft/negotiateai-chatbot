@@ -35,5 +35,11 @@
 </rules>
 
 <output_format>
-Верни JSON массив действий. Если все факты актуальны — верни пустой массив `[]`.
+Верни ТОЛЬКО валидный JSON объект. Формат:
+
+{"actions": [{"factId": "uuid", "action": "supersede|merge|remove", "supersededById": "uuid", "mergedContent": "...", "reason": "..."}, ...]}
+
+Если все факты актуальны — верни {"actions": []}.
+
+СТРОГО: никакого Markdown, никаких ```json блоков, никаких комментариев, никакого текста до или после JSON. Только чистый JSON.
 </output_format>

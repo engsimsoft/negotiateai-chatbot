@@ -20,7 +20,7 @@ export { embedText, embedTexts } from "./voyage-client";
 
 // Extraction pipeline
 export type { ExtractedFact } from "./extract";
-export { extractFactsFromMessages, extractAndStoreFacts } from "./extract";
+export { extractFactsFromMessages, extractAndStoreFacts, batchExtractFacts } from "./extract";
 
 // Consolidation
 export type { ConsolidationStats } from "./consolidate";
@@ -44,4 +44,5 @@ export {
   supersedeMemoryEntry,
   deleteMemoryEntry,
   deleteAllUserMemories,
+  markMessagesExtracted,
 } from "./memory-queries";

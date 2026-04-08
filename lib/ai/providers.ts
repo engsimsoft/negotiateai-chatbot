@@ -1,4 +1,5 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createMinimaxOpenAI } from "vercel-minimax-ai-provider";
 import type { LanguageModelUsage } from "ai";
 import { customProvider } from "ai";
 import { isTestEnvironment } from "../constants";
@@ -48,6 +49,14 @@ export const myProvider = isTestEnvironment
 export const claudeHaiku = anthropic("claude-haiku-4-5-20251001");
 export const claudeSonnet = anthropic("claude-sonnet-4-6");
 export const claudeOpus = anthropic("claude-opus-4-6");
+
+// MiniMax M2.7 — shared export for memory pipelines (extract, consolidate, profile)
+const minimaxProvider = createMinimaxOpenAI();
+export const minimaxM27 = (() => {
+  const model = minimaxProvider("MiniMax-M2.7") as any;
+  model.config = { ...model.config, includeUsage: true };
+  return model;
+})();
 
 export function getClaudeModel(name: "haiku" | "sonnet" | "opus") {
   switch (name) {

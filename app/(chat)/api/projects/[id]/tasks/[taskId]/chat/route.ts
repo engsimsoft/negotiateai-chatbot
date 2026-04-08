@@ -202,6 +202,7 @@ export async function POST(
           attachments: [],
           createdAt: new Date(),
           tokenCount: estimateMessageTokens(message.parts),
+          extractedAt: null,
         },
       ],
     });
@@ -580,6 +581,7 @@ export async function POST(
             attachments: [],
             chatId,
             tokenCount: estimateMessageTokens(filteredParts),
+            extractedAt: null,
           };
         }).filter((msg) => {
           // Don't save empty assistant messages (no useful content after filtering)

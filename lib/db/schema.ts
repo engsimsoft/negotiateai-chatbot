@@ -271,6 +271,7 @@ export const message = pgTable("Message_v2", {
   attachments: json("attachments").notNull(),
   createdAt: timestamp("createdAt").notNull(),
   tokenCount: integer("tokenCount").default(0),
+  extractedAt: timestamp("extractedAt"),
 });
 
 export type DBMessage = InferSelectModel<typeof message>;
@@ -779,6 +780,8 @@ export const memoryEntry = pgTable(
     }),
     /** How the fact was created: "extracted" (background) | "explicit" (saveFact tool) */
     source: varchar("source", { length: 32 }).notNull().default("extracted"),
+    /** ТЗ-SaveFactV2: Structured metadata (task status, calendar date/time) */
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     /** Points to the newer fact that replaced this one */
     supersededBy: uuid("supersededBy"),
     createdAt: timestamp("createdAt").notNull().defaultNow(),

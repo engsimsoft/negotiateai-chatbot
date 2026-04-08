@@ -1,10 +1,17 @@
-// ТЗ-RAG2: Nightly cron — consolidation (Sonnet) → profile generation (Opus)
+// ТЗ-ExtractCompression V2: Nightly cron — ONLY safety net for stale simply messages
+// Consolidation + profile are now event-triggered (inside batchExtractFacts chain)
 // Schedule: 0 0 * * * (0:00 UTC = 3:00 MSK, before briefing at 5:00 UTC)
 
-import { consolidateUserMemory } from "@/lib/ai/memory/consolidate";
-import { generateUserProfile } from "@/lib/ai/memory/profile";
-import { getUsersForMemoryProfile, saveCronRunLog } from "@/lib/db/queries";
+import { batchExtractFacts } from "@/lib/ai/memory/extract";
+import {
+  getUsersWithStaleSimplyMessages,
+  getUnextractedSimplyMessages,
+  saveCronRunLog,
+} from "@/lib/db/queries";
 import pLimit from "p-limit";
+
+/** 24 hours in milliseconds */
+const STALE_MESSAGE_AGE_MS = 24 * 60 * 60 * 1000;
 
 export const maxDuration = 240;
 
@@ -22,108 +29,87 @@ export async function GET(request: Request) {
     `[cron/memory-profile] Triggered at ${startedAt.toISOString()}`,
   );
 
-  // Find eligible users (memoryEnabled + >= 10 facts + facts updated since last profile)
-  const users = await getUsersForMemoryProfile({ minFacts: 10 });
-
-  if (users.length === 0) {
-    console.log("[cron/memory-profile] No eligible users");
-    const finishedAt = new Date();
-    await saveCronRunLog({
-      cronName: "memory-profile",
-      startedAt,
-      finishedAt,
-      usersProcessed: 0,
-      usersSkipped: 0,
-      usersFailed: 0,
-      results: [],
-    });
-    return Response.json({ ok: true, usersProcessed: 0 });
-  }
-
-  console.log(
-    `[cron/memory-profile] Found ${users.length} eligible user(s):`,
-    users.map((u) => `${u.userId}(${u.factCount} facts)`),
-  );
-
-  // Process users with concurrency limit
-  const limit = pLimit(3);
-  const results: Array<{
+  // Find users with unextracted simply messages older than 24h
+  const extractResults: Array<{
     userId: string;
-    status: string;
-    consolidation?: { superseded: number; merged: number; removed: number };
-    profile?: { factCount: number; tokenCount: number; costUsd: number };
-    error?: string;
+    processed: number;
+    extracted: number;
+    stored: number;
   }> = [];
 
-  const tasks = users.map((user) =>
-    limit(async () => {
-      const result = await processUser(user.userId);
-      results.push(result);
-    }),
-  );
+  try {
+    const staleUsers = await getUsersWithStaleSimplyMessages(STALE_MESSAGE_AGE_MS);
 
-  await Promise.allSettled(tasks);
+    if (staleUsers.length === 0) {
+      console.log("[cron/memory-profile] No stale messages found, nothing to do");
+      const finishedAt = new Date();
+      await saveCronRunLog({
+        cronName: "memory-profile",
+        startedAt,
+        finishedAt,
+        usersProcessed: 0,
+        usersSkipped: 0,
+        usersFailed: 0,
+        results: [],
+      });
+      return Response.json({ ok: true, usersProcessed: 0 });
+    }
+
+    console.log(
+      `[cron/memory-profile] Found ${staleUsers.length} user(s) with stale simply messages`,
+    );
+
+    // batchExtractFacts handles the full chain:
+    // extract → consolidation (if ≥10 stored) → profile (if ≥10 changed)
+    const limit = pLimit(3);
+    const tasks = staleUsers.map((userId) =>
+      limit(async () => {
+        try {
+          const { chatId, messages } = await getUnextractedSimplyMessages(userId, 50);
+          if (messages.length === 0) return;
+
+          const result = await batchExtractFacts({ userId, chatId, messages });
+          extractResults.push({
+            userId,
+            processed: result.processed,
+            extracted: result.extracted,
+            stored: result.stored,
+          });
+          console.log(
+            `[cron/memory-profile] User ${userId}: batch extracted ${result.extracted} facts from ${result.processed} messages`,
+          );
+        } catch (err) {
+          console.error(
+            `[cron/memory-profile] User ${userId}: batch extract failed:`,
+            err instanceof Error ? err.message : err,
+          );
+        }
+      }),
+    );
+
+    await Promise.allSettled(tasks);
+  } catch (err) {
+    console.error(
+      "[cron/memory-profile] Stale message check failed:",
+      err instanceof Error ? err.message : err,
+    );
+  }
 
   const finishedAt = new Date();
-  const usersProcessed = results.filter((r) => r.status === "done").length;
-  const usersFailed = results.filter((r) => r.status === "error").length;
-
-  console.log("[cron/memory-profile] Results:", results);
 
   await saveCronRunLog({
     cronName: "memory-profile",
     startedAt,
     finishedAt,
-    usersProcessed,
+    usersProcessed: extractResults.length,
     usersSkipped: 0,
-    usersFailed,
-    results,
+    usersFailed: 0,
+    results: extractResults.map((r) => ({ ...r, status: "extracted" })),
   });
 
   return Response.json({
     ok: true,
-    usersProcessed: users.length,
-    results,
+    usersProcessed: extractResults.length,
+    extractResults,
   });
-}
-
-async function processUser(userId: string): Promise<{
-  userId: string;
-  status: string;
-  consolidation?: { superseded: number; merged: number; removed: number };
-  profile?: { factCount: number; tokenCount: number; costUsd: number };
-  error?: string;
-}> {
-  try {
-    // Step 1: Consolidation (Sonnet review)
-    console.log(`[cron/memory-profile] User ${userId}: consolidating...`);
-    const consolidation = await consolidateUserMemory(userId);
-
-    // Step 2: Profile generation (Opus)
-    console.log(`[cron/memory-profile] User ${userId}: generating profile...`);
-    const profile = await generateUserProfile(userId);
-
-    console.log(
-      `[cron/memory-profile] User ${userId}: done — ${profile.factCount} facts, ${profile.tokenCount} tokens, $${profile.costUsd.toFixed(4)}`,
-    );
-
-    return {
-      userId,
-      status: "done",
-      consolidation: {
-        superseded: consolidation.superseded,
-        merged: consolidation.merged,
-        removed: consolidation.removed,
-      },
-      profile: {
-        factCount: profile.factCount,
-        tokenCount: profile.tokenCount,
-        costUsd: profile.costUsd,
-      },
-    };
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error(`[cron/memory-profile] User ${userId}: error:`, err);
-    return { userId, status: "error", error: errorMessage };
-  }
 }

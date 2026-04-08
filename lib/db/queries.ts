@@ -280,6 +280,65 @@ export async function getOrCreateSimplyChat(userId: string) {
   }
 }
 
+/**
+ * ТЗ-ExtractCompression: Get unextracted messages from simply chats for a user.
+ * Returns oldest messages first (ASC) — they are first candidates for extraction.
+ */
+export async function getUnextractedSimplyMessages(
+  userId: string,
+  limit = 50,
+): Promise<{ chatId: string; messages: DBMessage[] }> {
+  // Find the user's simply chat
+  const [simplyChat] = await db
+    .select({ id: chat.id })
+    .from(chat)
+    .where(and(eq(chat.userId, userId), eq(chat.chatMode, "simply")))
+    .limit(1);
+
+  if (!simplyChat) {
+    return { chatId: "", messages: [] };
+  }
+
+  const messages = await db
+    .select()
+    .from(message)
+    .where(
+      and(
+        eq(message.chatId, simplyChat.id),
+        isNull(message.extractedAt),
+      ),
+    )
+    .orderBy(asc(message.createdAt))
+    .limit(limit);
+
+  return { chatId: simplyChat.id, messages };
+}
+
+/**
+ * ТЗ-ExtractCompression: Find users who have stale unextracted simply messages.
+ * "Stale" = extractedAt IS NULL AND createdAt older than minAgeMs.
+ * Used by nightly cron as a safety net.
+ */
+export async function getUsersWithStaleSimplyMessages(
+  minAgeMs: number,
+): Promise<string[]> {
+  const cutoff = new Date(Date.now() - minAgeMs);
+
+  const rows = await db
+    .selectDistinct({ userId: chat.userId })
+    .from(chat)
+    .innerJoin(message, eq(message.chatId, chat.id))
+    .where(
+      and(
+        eq(chat.chatMode, "simply"),
+        isNull(message.extractedAt),
+        lt(message.createdAt, cutoff),
+      ),
+    );
+
+  return rows.map((r) => r.userId);
+}
+
 export async function deleteChatById({ id }: { id: string }) {
   try {
     await db.delete(vote).where(eq(vote.chatId, id));
@@ -459,18 +518,25 @@ export async function getMessagesByChatId({
   maxTokens = 140000,
   minMessages = 20,
   maxMessages = 200, // Hard limit to prevent loading thousands of messages
+  excludeExtracted = false, // ТЗ-ExtractCompression: only load messages where extractedAt IS NULL
 }: {
   id: string;
   maxTokens?: number;
   minMessages?: number;
   maxMessages?: number;
+  excludeExtracted?: boolean;
 }) {
   try {
     // Performance: Load only last N messages from DB (not all)
+    // ТЗ-ExtractCompression: for simply, exclude already-extracted messages
+    const whereCondition = excludeExtracted
+      ? and(eq(message.chatId, id), isNull(message.extractedAt))
+      : eq(message.chatId, id);
+
     const allMessages = await db
       .select()
       .from(message)
-      .where(eq(message.chatId, id))
+      .where(whereCondition)
       .orderBy(desc(message.createdAt))
       .limit(maxMessages);
 

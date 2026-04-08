@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.77.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.78.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -107,7 +107,7 @@
 - `app/(chat)/simply/page.tsx` — Маршрут `/simply` (Server Component, persistent chat)
 - `lib/db/queries.ts` — `getOrCreateSimplyChat(userId)` — один чат на пользователя
 - `lib/prompts/chat/simply-chat.md` — System prompt Simply Chat (роль, навигация)
-- Маршрутизация модели: текст → MiniMax M2.7, фото/PDF → Gemini 3 Flash Preview, «Думать» → Sonnet
+- Маршрутизация модели: текст → MiniMax M2.7, фото/PDF → Gemini 3 Flash Preview, «Думать» → Sonnet. **Детали:** [docs/ai-minimax.md](docs/ai-minimax.md)
 - `components/input/input-think-button.tsx` — Кнопка «Думать» (toggle → Sonnet override)
 
 **Context Dashboard (v3.74.0 — ТЗ-KITT):**
@@ -327,27 +327,28 @@
 - `lib/prompts/experts/task-expert.md` — Промпт Эксперта
 - `lib/prompts/build-task-expert-prompt.ts` — Prompt builder (project + task + completedTasks + manifest)
 
-**Context Window Management (v3.18.0 — ТЗ-C1.5, v3.73.0 — ТЗ-RAG3 Compaction, v3.76.0 — ТЗ-SlidingWindow):**
-- **Sliding Window** (v3.76.0) — Simply Chat отправляет в API только последние 20 сообщений (`SIMPLY_SLIDING_WINDOW_SIZE`). Старые сообщения остаются в БД (скролл). MIND + Opus-профиль покрывают долговременную память
+**Context Window Management (v3.18.0 — ТЗ-C1.5, v3.73.0 — ТЗ-RAG3 Compaction, v3.78.0 — ТЗ-ExtractCompression):**
+- **Extract-on-compression** (v3.78.0) — Simply Chat: при 60% контекста (+ пауза 10мин) или 80% → batch extraction фактов (MiniMax M2.7) → обработанные сообщения исключаются из загрузки (`extractedAt IS NULL`). Событийная цепочка: ≥10 фактов → консолидация (MiniMax) → ≥10 изменений → профиль (MiniMax). Safety-cap 180K. Ночной cron как страховка (>24ч)
 - **Compaction API** (v3.73.0) — Anthropic `compact_20260112` для Sonnet/Opus (expertise, create, project tasks). Trigger: 100K input tokens. Конфигурация через `providerOptions.anthropic.contextManagement` в streamText
 - **Snapshot** (legacy, только Haiku `chatMode="chat"`) — самодельная суммаризация для Haiku 4.5 (не поддерживает Compaction)
-- `lib/ai/context-limits.ts` — Конфиг (CONTEXT_BUDGET, SIMPLY_SLIDING_WINDOW_SIZE, SNAPSHOT_THRESHOLD, FALLBACK_MESSAGE_PAIRS, trimToUserStart)
+- `lib/ai/context-limits.ts` — Конфиг (CONTEXT_BUDGET, SIMPLY_CONTEXT_LIMIT, EXTRACT_THRESHOLD_SOFT/HARD, EXTRACT_PAUSE_MS, SNAPSHOT_THRESHOLD, FALLBACK_MESSAGE_PAIRS)
 - `lib/ai/tools/create-snapshot.ts` — Tool createSnapshot — только для Haiku
 - `lib/ai/clerks/snapshot-creator.ts` — Fallback-клерк — только для Haiku
 - `lib/prompts/clerks/snapshot-creator.md` — Промпт fallback-клерка
 - `components/projects/snapshot-card.tsx` — SnapshotCard + SnapshotDivider
 - `components/projects/context-indicator.tsx` — Progress bar над input — только для Haiku
 
-**MIND Memory / RAG (v3.70.0 — ТЗ-RAG0, v3.71.0 — ТЗ-RAG1, v3.72.0 — ТЗ-RAG2):**
+**MIND Memory / RAG (v3.70.0 — ТЗ-RAG0, v3.71.0 — ТЗ-RAG1, v3.72.0 — ТЗ-RAG2, v3.78.0 — ТЗ-ExtractCompression):**
 - `lib/ai/memory/voyage-client.ts` — Voyage AI клиент (raw fetch, embed + batch, voyage-4 / voyage-4-lite)
 - `lib/ai/memory/memory-queries.ts` — CRUD + similarity search (pgvector cosine distance `<=>`), server-only
 - `lib/ai/memory/types.ts` — MemoryCategory (6), MemorySourceType (4), SearchOptions, VoyageEmbedResponse
-- `lib/ai/memory/extract.ts` — extractFactsFromMessages (Claude Sonnet + generateObject), extractAndStoreFacts (extract → embed → dedup → upsert), мини-консолидация триггер ← v3.72.0, двухуровневая дедупликация (embedding 0.55 + Haiku LLM verify) ← v3.73.0
+- `lib/ai/memory/extract.ts` — extractFactsFromMessages (Claude Sonnet + generateObject), extractAndStoreFacts (extract → embed → dedup → upsert), batchExtractFacts (batch из 50 сообщений, один Sonnet call) ← v3.78.0, мини-консолидация триггер ← v3.72.0, двухуровневая дедупликация (embedding 0.55 + Haiku LLM verify) ← v3.73.0
 - `lib/ai/memory/retrieve.ts` — retrieveMemoryContext (semantic search top-5), formatMemoryForPrompt (XML `<memory>` блок) ← v3.71.0
 - `lib/ai/memory/consolidate.ts` — consolidateUserMemory (полная ревизия, Sonnet), miniConsolidateUserMemory (event-triggered каждые 20 фактов) ← v3.72.0
 - `lib/ai/memory/profile.ts` — generateUserProfile (Opus нарративный профиль), getProfileBlock (XML `<user-profile>`) ← v3.72.0
 - `lib/ai/memory/index.ts` — Public API exports
 - `lib/prompts/memory/extract.md` — Промпт извлечения фактов (категории, confidence, правила) ← v3.71.0
+- `lib/prompts/memory/extract-batch.md` — Промпт batch-извлечения (целый фрагмент диалога) ← v3.78.0
 - `lib/prompts/memory/consolidate.md` — Промпт ревизии фактов (supersede/merge/remove) ← v3.72.0
 - `lib/prompts/memory/profile.md` — Промпт Opus-профиля (нарративный, 800-1200 слов) ← v3.72.0
 - `lib/db/schema.ts` — +customType vector(1024), +memoryEntry table, +memorySettings table, +userProfileSummary table ← v3.72.0
@@ -355,7 +356,8 @@
 - `lib/db/migrations/0049_memory-settings-and-profile.sql` — memory_settings + user_profile_summary ← v3.72.0
 - `app/(chat)/api/user/memory/route.ts` — GET (список фактов) / DELETE (один или все) ← v3.72.0
 - `app/(chat)/api/user/memory/settings/route.ts` — GET/PATCH (memoryEnabled toggle) ← v3.72.0
-- `app/api/cron/memory-profile/route.ts` — Ночной cron: консолидация (Sonnet) → профиль (Opus), 0:00 UTC ← v3.72.0
+- `lib/db/migrations/0052_extract-at-column.sql` — extractedAt в Message_v2 ← v3.78.0
+- `app/api/cron/memory-profile/route.ts` — Ночной cron: только страховка — batch extract stale (>24h), цепочка событий внутри (consolidation → profile), 0:00 UTC ← v3.72.0, v3.78.0
 - `components/settings/memory-section.tsx` — UI секция «Память» на /settings (toggle, профиль, факты, удаление) ← v3.72.0
 - `components/dev-panel/sections/rag-section.tsx` — DevPanel секция MIND Memory (category badges, similarity, tokens) ← v3.71.0
 
@@ -434,7 +436,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-MinimaxCleanup (v3.77.0 — MiniMaxM27+GeminiFlash+Cleanup), ТЗ-SlidingWindow (v3.76.0 — StableCostSlidingWindow), ТЗ-SaveFact (v3.75.0 — GuaranteedMINDWrite), ТЗ-KITT (v3.74.0 — SimplyChat+ContextDashboard), ТЗ-RAG3 (v3.73.0 — CompactionDualStrategy), ТЗ-RAG2 (v3.72.0 — MINDConsolidationProfileUI), ТЗ-RAG1 (v3.71.0 — MINDExtractRetrieve), ТЗ-RAG0 (v3.70.0 — SimplyRAG Infrastructure), ТЗ-PIPELINE1 (v3.69.0 — ReliablePipelineObservability), ТЗ-BILLING1 (v3.68.0 — FullCostCoverage), ТЗ-TOKENS1 (v3.67.0 — SdkNativeUsageTracking), ТЗ-COSTCTRL (v3.66.0 — BriefingCostControl), ТЗ-SDK6 (v3.65.0 — AiSdkV6Migration), ТЗ-CACHE3 (v3.64.0 — UnifiedCostUI), ТЗ-CACHE2 (v3.63.0 — UnifiedUsageLogging), ТЗ-MR2 (v3.62.0 — MeetingRegenerate+PDF), ТЗ-MR (v3.61.0 — MeetingRecorderMVP), ТЗ-CACHE1 (v3.60.0 — PromptCaching), ТЗ-DEV3 (v3.59.0 — OnboardingDevPanel), ТЗ-DEV2 (v3.58.0 — PipelineObservability), ТЗ-DEV1 (v3.57.0 — DeveloperPanel), ТЗ-TG5 (v3.56.0 — ClosedGroups), HOTFIX-PodcastFromCron (v3.55.1 — ADR 027), ТЗ-TG4b (v3.55.0 — TelegramDelivery), ТЗ-TG4a (v3.54.0 — BackgroundBriefing), ТЗ-FIX3 (v3.53.0 — OnboardingRestore), ТЗ-FIX2 (v3.52.0 — ResearchProgressMode), ТЗ-FIX1.2 (v3.51.0 — GuardianBlocking), ТЗ-FIX1 (v3.50.0 — ToolCallGuardian), ТЗ-TG3 (v3.49.0 — TelegramBotInfrastructure), ТЗ-TG2 (v3.48.0 — OnboardingTelegram), ТЗ-TG1 (v3.47.0 — TelegramPhase1), ТЗ-OPT1 (v3.46.0 — UsageLogging + SonnetMigration), PATCH-podcast (v3.45.1 — PodcastFixes), ТЗ-BF5 (v3.45.0 — BriefingDedup), ТЗ-Б2 (v3.44.0 — PodcastUI), ТЗ-Б1 (v3.43.0 — PodcastEngine), ТЗ-BF4 (v3.42.0 — PerSectionRefresh), ТЗ-BF3 (v3.41.0 — BriefingSidebarRedesign), ТЗ-BF2 (v3.40.0 — SimplyNews), ТЗ-BF1 (v3.39.0 — BriefingUIRefactor), ТЗ-BRIEFING-AUTHOR-CLAUDE (v3.38.0 — BriefingAuthorClaude), PATCH-volume (v3.37.1 — BriefingVolumePromptEnforcement), ТЗ-BF1-fix (v3.37.0 — BriefingItemIdFix), ТЗ-BRIEFING-VOLUME (v3.36.0 — BriefingVolume), ТЗ-WS2 (v3.35.0 — JinaReader), ТЗ-WS1 (v3.34.0 — CharsetUnification), ТЗ-HF1 (v3.33.1 — BriefingPEUpdate), ТЗ-А5 (v3.33.0 — BriefingProgress), ТЗ-А4 (v3.32.0 — BriefingIssuePage), ТЗ-А3 (v3.31.0 — BriefingAuthor), ТЗ-A2 (v3.30.0 — BriefingOnboarding), ТЗ-PX+FU (v3.29.0 — DeepResearch + FetchUrl), ТЗ-A1 (v3.28.0 — BriefingLanding), ТЗ-BR3 (v3.27.1 — PromptIntegration), ТЗ-BR2 (v3.27.0 — BriefingUI), ТЗ-BR1 (v3.26.0 — MorningBriefingBackend), ТЗ-RG (v3.25.0 — RouteGroups), ТЗ-DV2 (v3.24.0 — DashboardV2), ТЗ-C4 (v3.23.0 — AnthropicProviderSwitch), ТЗ-C3 (v3.22.0 — ChatContextManagement), ТЗ-08CS (v3.21.0 — ChatSidebar + RightSidebar), ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-ExtractCompression (v3.78.0 — ExtractOnCompression), ТЗ-MinimaxCleanup (v3.77.0 — MiniMaxM27+GeminiFlash+Cleanup), ТЗ-SlidingWindow (v3.76.0 — StableCostSlidingWindow), ТЗ-SaveFact (v3.75.0 — GuaranteedMINDWrite), ТЗ-KITT (v3.74.0 — SimplyChat+ContextDashboard), ТЗ-RAG3 (v3.73.0 — CompactionDualStrategy), ТЗ-RAG2 (v3.72.0 — MINDConsolidationProfileUI), ТЗ-RAG1 (v3.71.0 — MINDExtractRetrieve), ТЗ-RAG0 (v3.70.0 — SimplyRAG Infrastructure), ТЗ-PIPELINE1 (v3.69.0 — ReliablePipelineObservability), ТЗ-BILLING1 (v3.68.0 — FullCostCoverage), ТЗ-TOKENS1 (v3.67.0 — SdkNativeUsageTracking), ТЗ-COSTCTRL (v3.66.0 — BriefingCostControl), ТЗ-SDK6 (v3.65.0 — AiSdkV6Migration), ТЗ-CACHE3 (v3.64.0 — UnifiedCostUI), ТЗ-CACHE2 (v3.63.0 — UnifiedUsageLogging), ТЗ-MR2 (v3.62.0 — MeetingRegenerate+PDF), ТЗ-MR (v3.61.0 — MeetingRecorderMVP), ТЗ-CACHE1 (v3.60.0 — PromptCaching), ТЗ-DEV3 (v3.59.0 — OnboardingDevPanel), ТЗ-DEV2 (v3.58.0 — PipelineObservability), ТЗ-DEV1 (v3.57.0 — DeveloperPanel), ТЗ-TG5 (v3.56.0 — ClosedGroups), HOTFIX-PodcastFromCron (v3.55.1 — ADR 027), ТЗ-TG4b (v3.55.0 — TelegramDelivery), ТЗ-TG4a (v3.54.0 — BackgroundBriefing), ТЗ-FIX3 (v3.53.0 — OnboardingRestore), ТЗ-FIX2 (v3.52.0 — ResearchProgressMode), ТЗ-FIX1.2 (v3.51.0 — GuardianBlocking), ТЗ-FIX1 (v3.50.0 — ToolCallGuardian), ТЗ-TG3 (v3.49.0 — TelegramBotInfrastructure), ТЗ-TG2 (v3.48.0 — OnboardingTelegram), ТЗ-TG1 (v3.47.0 — TelegramPhase1), ТЗ-OPT1 (v3.46.0 — UsageLogging + SonnetMigration), PATCH-podcast (v3.45.1 — PodcastFixes), ТЗ-BF5 (v3.45.0 — BriefingDedup), ТЗ-Б2 (v3.44.0 — PodcastUI), ТЗ-Б1 (v3.43.0 — PodcastEngine), ТЗ-BF4 (v3.42.0 — PerSectionRefresh), ТЗ-BF3 (v3.41.0 — BriefingSidebarRedesign), ТЗ-BF2 (v3.40.0 — SimplyNews), ТЗ-BF1 (v3.39.0 — BriefingUIRefactor), ТЗ-BRIEFING-AUTHOR-CLAUDE (v3.38.0 — BriefingAuthorClaude), PATCH-volume (v3.37.1 — BriefingVolumePromptEnforcement), ТЗ-BF1-fix (v3.37.0 — BriefingItemIdFix), ТЗ-BRIEFING-VOLUME (v3.36.0 — BriefingVolume), ТЗ-WS2 (v3.35.0 — JinaReader), ТЗ-WS1 (v3.34.0 — CharsetUnification), ТЗ-HF1 (v3.33.1 — BriefingPEUpdate), ТЗ-А5 (v3.33.0 — BriefingProgress), ТЗ-А4 (v3.32.0 — BriefingIssuePage), ТЗ-А3 (v3.31.0 — BriefingAuthor), ТЗ-A2 (v3.30.0 — BriefingOnboarding), ТЗ-PX+FU (v3.29.0 — DeepResearch + FetchUrl), ТЗ-A1 (v3.28.0 — BriefingLanding), ТЗ-BR3 (v3.27.1 — PromptIntegration), ТЗ-BR2 (v3.27.0 — BriefingUI), ТЗ-BR1 (v3.26.0 — MorningBriefingBackend), ТЗ-RG (v3.25.0 — RouteGroups), ТЗ-DV2 (v3.24.0 — DashboardV2), ТЗ-C4 (v3.23.0 — AnthropicProviderSwitch), ТЗ-C3 (v3.22.0 — ChatContextManagement), ТЗ-08CS (v3.21.0 — ChatSidebar + RightSidebar), ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**
@@ -487,6 +489,7 @@ vercel --prod            # Deploy на Vercel
 **Техническая (AI):**
 - [docs/ai-chats-map.md](docs/ai-chats-map.md) — **Карта всех чатов и моделей (SSOT)**
 - [docs/ai-providers.md](docs/ai-providers.md) — Провайдеры, модели, цены
+- [docs/ai-minimax.md](docs/ai-minimax.md) — **MiniMax M2.7 — интеграция, pricing, ограничения**
 - [docs/ai-agents.md](docs/ai-agents.md) — Система промптов и помощники
 - [docs/ai-artifacts.md](docs/ai-artifacts.md) — Документы в холсте
 - [docs/ai-tools.md](docs/ai-tools.md) — Инструменты (search, vision)
@@ -593,4 +596,4 @@ specs/
 
 ---
 
-**Обновлено:** 2026-04-07
+**Обновлено:** 2026-04-08
