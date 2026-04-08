@@ -247,6 +247,35 @@ function hasAttachments(parts: any[]): boolean {
   );
 }
 
+/**
+ * ТЗ-SimplyToolsMinimax: Strip non-text file/image parts from messages for text-only models (MiniMax).
+ * MiniMax doesn't support images — AI SDK tries to download them and fails with timeout.
+ * Replaces image/file parts with a text placeholder so context is preserved.
+ */
+function stripMediaPartsForTextModel(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((msg) => {
+    if (!msg.parts || !Array.isArray(msg.parts)) return msg;
+    const hasMedia = msg.parts.some((p: any) =>
+      p.type === "image" || (p.type === "file" && p.mediaType !== "text/plain")
+    );
+    if (!hasMedia) return msg;
+
+    const filteredParts = msg.parts
+      .map((p: any) => {
+        if (p.type === "image") {
+          return { type: "text" as const, text: "[изображение]" };
+        }
+        if (p.type === "file" && p.mediaType !== "text/plain") {
+          const name = p.name || "файл";
+          return { type: "text" as const, text: `[${name}]` };
+        }
+        return p;
+      });
+
+    return { ...msg, parts: filteredParts } as ChatMessage;
+  });
+}
+
 export async function POST(request: Request) {
   let requestBody: PostRequestBody;
 
@@ -862,16 +891,18 @@ export async function POST(request: Request) {
             },
             // ТЗ-KITT/CACHE: MIND retrieved facts (dynamic per query) — NOT cached
             ...(mindDynamicBlock ? [{ role: 'system' as const, content: mindDynamicBlock }] : []),
-            ...sanitizeCoreMessages(await convertToModelMessages(uiMessages)),
+            // ТЗ-SimplyToolsMinimax: strip images/files from history for text-only MiniMax
+            ...sanitizeCoreMessages(await convertToModelMessages(
+              isSimplyNonAnthropicModel ? stripMediaPartsForTextModel(uiMessages) : uiMessages
+            )),
           ],
           providerOptions: compactionOptions,
           temperature: isSimplyNonAnthropicModel ? 0.7 : 1.0,
-          ...(isSimplyNonAnthropicModel ? {} : { stopWhen: stepCountIs(5) }),
-          // ТЗ-C1: Tools — disabled for Simply with MiniMax/Gemini
-          ...(isSimplyNonAnthropicModel ? {} : {
-            experimental_activeTools: getActiveToolNames(isProjectChat, chatMode),
-            tools: getStandardTools({ session, dataStream, isProjectChat, projectId: projectId || undefined, chatId: id, messageId: assistantMessageId, chatMode, researchDepth }),
-          }),
+          stopWhen: stepCountIs(5),
+          // ТЗ-SimplyToolsMinimax: Tools enabled for all models including MiniMax.
+          // deepResearch filtered for simply (MiniMax) via SIMPLY_MODE_EXCLUDED_TOOLS in chat-tools.ts
+          experimental_activeTools: getActiveToolNames(isProjectChat, chatMode, think),
+          tools: getStandardTools({ session, dataStream, isProjectChat, projectId: projectId || undefined, chatId: id, messageId: assistantMessageId, chatMode, researchDepth }),
           experimental_transform: smoothStream({ chunking: "word" }),
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,

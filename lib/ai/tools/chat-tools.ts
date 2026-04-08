@@ -98,14 +98,18 @@ type ToolName = (typeof ALL_TOOL_NAMES)[number];
 /** Tools excluded for chatMode 'chat' (Haiku) — expensive research tools */
 const CHAT_MODE_EXCLUDED_TOOLS: ToolName[] = ["fetchUrl", "deepResearch"];
 
+/** Tools excluded for chatMode 'simply' (MiniMax) — expensive Perplexity API ($0.02-$0.80/call) */
+const SIMPLY_MODE_EXCLUDED_TOOLS: ToolName[] = ["deepResearch"];
+
 /**
  * Active tools list for experimental_activeTools.
  * Controls which tools the model can call.
  *
  * @param isProjectChat - true for project chats (separate tool set)
- * @param chatMode - chat mode for regular chats — filters expensive tools for 'chat' (Haiku)
+ * @param chatMode - chat mode for regular chats — filters expensive tools for 'chat' (Haiku) and 'simply' (MiniMax)
+ * @param think - true when "Думать" mode is active (Sonnet override) — unlocks all tools for simply
  */
-export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode): ToolName[] {
+export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode, think?: boolean): ToolName[] {
   if (isProjectChat) {
     return [
       "getCurrentDate",
@@ -143,6 +147,11 @@ export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode):
   // Filter out expensive tools for chatMode 'chat' (Haiku)
   if (chatMode === "chat") {
     return baseTools.filter((t) => !CHAT_MODE_EXCLUDED_TOOLS.includes(t));
+  }
+
+  // Filter out deepResearch for chatMode 'simply' (MiniMax) — unless "Думать" (Sonnet) is active
+  if (chatMode === "simply" && !think) {
+    return baseTools.filter((t) => !SIMPLY_MODE_EXCLUDED_TOOLS.includes(t));
   }
 
   return baseTools;

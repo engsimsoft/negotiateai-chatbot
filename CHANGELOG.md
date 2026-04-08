@@ -12,6 +12,22 @@
 
 ---
 
+## [3.79.0] - 2026-04-08 - Tools для Simply Chat (MiniMax)
+
+**ТЗ-SimplyToolsMinimax**: Включение 12 инструментов для chatMode=simply (MiniMax M2.7). Ранее все tools были отключены условием `isSimplyNonAnthropicModel`. Теперь MiniMax получает полный набор tools кроме deepResearch (дорогой Perplexity API).
+
+### Added
+- **`stripMediaPartsForTextModel()`** — фильтрация image/file parts из истории для текстовых моделей (MiniMax). Заменяет на `[изображение]` / `[файл]` плейсхолдеры. Решает AI_DownloadError при скачивании Vercel Blob с localhost
+- **`SIMPLY_MODE_EXCLUDED_TOOLS`** — список исключённых tools для chatMode=simply (`deepResearch`)
+- **Параметр `think`** в `getActiveToolNames()` — различает simply (MiniMax, без deepResearch) и simply+think (Sonnet, все tools)
+
+### Changed
+- **Simply Chat tools** — было: 0 tools, стало: 12 tools (все кроме deepResearch и readProjectFile)
+- **`stopWhen: stepCountIs(5)`** — теперь применяется для ВСЕХ моделей включая MiniMax (было: только Anthropic)
+- **История сообщений** — для MiniMax image/file parts заменяются на текстовые плейсхолдеры (предотвращает download errors)
+
+---
+
 ## [3.78.0] - 2026-04-08 - Extract при сжатии
 
 **ТЗ-ExtractCompression**: Автоматическое извлечение фактов в MIND когда контекст Simply Chat приближается к лимиту. Пороговая система (80% + пауза / 95% без паузы) + ночной cron как страховка.

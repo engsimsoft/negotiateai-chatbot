@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.78.0
+**Версия:** 3.79.0
 **Дата:** 2026-04-08
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -24,7 +24,7 @@
 
 | Особенность | Описание | Статус |
 |-------------|----------|--------|
-| **Simply Chat** | Persistent чат: MiniMax M2.7 (текст) + Gemini 3 Flash (vision) + Sonnet (думать), Extract-on-compression | ✅ v3.78.0 |
+| **Simply Chat** | Persistent чат: MiniMax M2.7 (текст, 12 tools) + Gemini 3 Flash (vision) + Sonnet (думать, 14 tools), Extract-on-compression | ✅ v3.79.0 |
 | **Мой контекст** | Dashboard MIND Memory — 7 категорий, Opus-профиль | ✅ v3.74.0 |
 | **Универсальный AI-чат** | Один мощный чат со всеми инструментами | ✅ |
 | **Проекты** | Изолированные рабочие пространства с Профессором, Менеджером, утверждением плана, картой задач, чатом с Экспертом, завершением задач и управлением контекстом | ✅ v3.18.0 |

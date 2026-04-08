@@ -1,8 +1,8 @@
 # Инструменты AI-агентов
 
-**Версия:** 3.52.0
-**Последнее обновление:** 2026-02-26
-**Статус:** 15 инструментов (+startResearch в v3.52.0)
+**Версия:** 3.78.0
+**Последнее обновление:** 2026-04-08
+**Статус:** 14 стандартных инструментов + 2 сервисных = 16 активных
 
 ---
 
@@ -18,25 +18,74 @@
 
 ## Обзор инструментов
 
+### Стандартные инструменты (14 шт)
+
+Регистрируются через `getStandardTools()` в `lib/ai/tools/chat-tools.ts`.
+
 | Инструмент | Описание | Доступ |
 |------------|----------|--------|
-| `webSearch` | Поиск в интернете (Brave API) | Все агенты (кроме chat) |
-| `deepResearch` | Глубокое исследование (Perplexity Sonar API) | Все агенты (кроме chat) |
-| `fetchUrl` | Чтение веб-страниц по URL (Readability + Jina Reader fallback) | Все агенты (кроме chat) |
-| `getWeather` | Погода по городу | Все агенты |
-| `getCurrentDate` | Текущая дата | Все агенты |
-| `readDocument` | Чтение из knowledge/ | Только обычные чаты |
-| `createDocument` | Создание артефактов (text, markdown, excel, presentations) | Все агенты (презентации — только Презентатор) |
-| `updateDocument` | Обновление артефактов | Все агенты |
-| `requestSuggestions` | Предложения по улучшению | Все агенты |
-| `parseExcel` | Анализ загруженных Excel-файлов | Все агенты |
-| `loadSkill` | Загрузка инструкций из SKILL.md | Все агенты |
-| `readProjectFile` | Чтение файлов проекта по имени из manifest | Только проектные чаты (Эксперт) |
-| `createSnapshot` | Фиксация прогресса диалога (сжатие контекста) | Все чаты (при наличии chatId + messageId) |
+| `getCurrentDate` | Текущая дата/время с таймзоной | Все агенты |
+| `getWeather` | Погода по городу (Open-Meteo) | Все агенты |
+| `webSearch` | Поиск в интернете (Brave API) | Все агенты (кроме chat/simply) |
+| `deepResearch` | Глубокое исследование (Perplexity Sonar API) | Все агенты (кроме chat/simply) |
+| `fetchUrl` | Чтение веб-страниц по URL (Readability + Jina Reader fallback) | Все агенты (кроме chat/simply) |
+| `readDocument` | Чтение из knowledge/ (DOCX, PDF, OCR) | Только обычные чаты |
 | `readTelegramChannel` | Чтение публичных Telegram-каналов (посты, даты, медиа) | Все агенты |
-| `startResearch` | Исследование источников по темам (Perplexity → verify → classify, progress streaming) | Только briefing-onboarding (v3.52.0) |
+| `createDocument` | Создание артефактов (text, markdown, excel, presentations) | Все агенты |
+| `updateDocument` | Обновление артефактов | Все агенты |
+| `requestSuggestions` | Предложения по улучшению текста | Все агенты |
+| `parseExcel` | Анализ загруженных Excel-файлов | Все агенты |
+| `loadSkill` | Загрузка инструкций из SKILL.md (6 скиллов) | Все агенты |
+| `readProjectFile` | Чтение файлов проекта по имени из manifest | Только проектные чаты (Эксперт) |
+| `createSnapshot` | Фиксация прогресса диалога (сжатие контекста) | Все чаты (chatId + messageId). Актуален для Haiku; Sonnet/Opus используют Compaction API |
+
+### Сервисные инструменты (2 шт)
+
+Определены inline в `app/(chat)/api/service-chat/route.ts`.
+
+| Инструмент | Контекст | Описание |
+|------------|----------|----------|
+| `updateProjectDraft` | project-creation | Обновление превью проекта (name, description, context) |
+| `updateBriefingPreview` | briefing-onboarding | Обновление профиля брифинга (topics, sources, settings) |
+
+> В контексте `briefing-onboarding` также доступны: `deepResearch`, `fetchUrl`, `readTelegramChannel` — для исследования тем и валидации источников.
 
 > **Примечание:** Excel создаётся через `createDocument(kind: "excel")`, редактируется через `updateDocument`. Отдельный `parseExcel` используется только для анализа **загруженных** пользователем файлов.
+
+### Удалённые инструменты
+
+| Инструмент | Был в версии | Удалён | Причина |
+|-----------|-------------|--------|---------|
+| `saveFact` | v3.75.0 | v3.76.0 | Заменён Extract-on-compression (v3.78.0) |
+| `startResearch` | v3.52.0 | — | Не отдельный tool, а внутренняя функция briefing research engine |
+
+---
+
+## Матрица доступности по режимам
+
+| Инструмент | chat (Haiku) | expertise (Sonnet) | create (Sonnet) | simply (MiniMax) | simply+Думать (Sonnet) | Project (Эксперт) |
+|-----------|:---:|:---:|:---:|:---:|:---:|:---:|
+| `getCurrentDate` | + | + | + | + | + | + |
+| `getWeather` | + | + | + | + | + | + |
+| `webSearch` | -- | + | + | + | + | + |
+| `deepResearch` | -- | + | + | -- | + | + |
+| `fetchUrl` | -- | + | + | + | + | + |
+| `readDocument` | + | + | + | + | + | -- |
+| `readTelegramChannel` | + | + | + | + | + | + |
+| `createDocument` | + | + | + | + | + | + |
+| `updateDocument` | + | + | + | + | + | + |
+| `requestSuggestions` | + | + | + | + | + | + |
+| `parseExcel` | + | + | + | + | + | + |
+| `loadSkill` | + | + | + | + | + | + |
+| `readProjectFile` | -- | -- | -- | -- | -- | + |
+| `createSnapshot` | + | + | + | + | + | + |
+
+**Примечания:**
+- **chat (Haiku):** `webSearch`, `deepResearch`, `fetchUrl` отфильтрованы через `CHAT_MODE_EXCLUDED_TOOLS` (дорогие для Haiku)
+- **simply (MiniMax):** 12 tools доступны (v3.79.0). `deepResearch` исключён через `SIMPLY_MODE_EXCLUDED_TOOLS` (дорогой Perplexity API). Image/file parts из истории заменяются на текстовые плейсхолдеры (`stripMediaPartsForTextModel`)
+- **simply+Думать (Sonnet):** Все 14 tools включая `deepResearch`. Модель переключается на Claude Sonnet при нажатии «Думать»
+- **readDocument:** Исключён из проектных чатов (документы уже в контексте через manifest)
+- **readProjectFile:** Доступен ТОЛЬКО в проектных чатах (нужен projectId)
 
 ---
 
@@ -847,21 +896,19 @@ export function getStandardTools({ session, dataStream, isProjectChat, projectId
     updateDocument: updateDocument({ session, dataStream }),
     requestSuggestions: requestSuggestions({ session, dataStream }),
     webSearch,
-    fetchUrl,                                                // v3.29.0
-    deepResearch: deepResearch({ defaultDepth: researchDepth }),  // v3.29.0 (factory)
+    fetchUrl,
+    deepResearch: deepResearch({ defaultDepth: researchDepth }),
     parseExcel,
     loadSkill,
-    readTelegramChannel,                                       // v3.47.0
-    // ТЗ-SaveFact: only for Simply Chat
-    ...(chatMode === "simply"
-      ? { saveFact: saveFact({ userId, chatId }) }
-      : {}),
+    readTelegramChannel,
   };
 }
 
 // chatMode-фильтрация: fetchUrl + deepResearch исключены для 'chat' (Haiku)
 const CHAT_MODE_EXCLUDED_TOOLS = ["fetchUrl", "deepResearch"];
 
+// Simply Chat (MiniMax): tools отключены на уровне route.ts (isSimplyNonAnthropicModel)
+// При «Думать» (think=true) → Sonnet → tools включены
 ```
 
 **Используется в:**
@@ -950,4 +997,4 @@ const CHAT_MODE_EXCLUDED_TOOLS = ["fetchUrl", "deepResearch"];
 
 ---
 
-**Обновлено:** 2026-02-26 (v3.52.0 — +startResearch tool, research engine, perplexity client extraction)
+**Обновлено:** 2026-04-08 (v3.78.0 — аудит: saveFact удалён, startResearch не tool, матрица доступности, Simply Chat tools)
