@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.76.0
-**Дата:** 2026-04-07
+**Версия:** 3.77.0
+**Дата:** 2026-04-08
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -24,7 +24,7 @@
 
 | Особенность | Описание | Статус |
 |-------------|----------|--------|
-| **Simply Chat** | Persistent чат с кнопкой «Думать» (Haiku/Sonnet), tool saveFact, скользящее окно (20 msg) | ✅ v3.76.0 |
+| **Simply Chat** | Persistent чат: MiniMax M2.7 (текст) + Gemini 3 Flash (vision) + Sonnet (думать), token-aware loading | ✅ v3.77.0 |
 | **Мой контекст** | Dashboard MIND Memory — 7 категорий, Opus-профиль | ✅ v3.74.0 |
 | **Универсальный AI-чат** | Один мощный чат со всеми инструментами | ✅ |
 | **Проекты** | Изолированные рабочие пространства с Профессором, Менеджером, утверждением плана, картой задач, чатом с Экспертом, завершением задач и управлением контекстом | ✅ v3.18.0 |
@@ -32,7 +32,7 @@
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG extract+retrieve+consolidation+profile ✅ v3.72.0, Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity ✅, Plus AI, Ideogram, AssemblyAI | 🔄 Фаза 1 |
 | **Запись встречи** | Аудио → Deepgram транскрипция → Claude резюме (3 формата, инструкции, регенерация, PDF) | ✅ v3.62.0 |
-| **AI-провайдер** | Anthropic Claude — основной и единственный (Gemini только для vision-ocr и briefing-фильтра) | ✅ v3.23.0 (@ai-sdk/anthropic) |
+| **AI-провайдер** | Мультипровайдер: MiniMax (Simply), Anthropic Claude (expertise/create/projects), Gemini (vision/briefing) | ✅ v3.77.0 |
 | **Smart Routing** | Автовыбор модели для экономии без потери качества | 📋 |
 | **Оплата в рублях** | ЮKassa, Тинькофф, СБП | 📋 |
 

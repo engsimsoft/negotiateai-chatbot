@@ -34,7 +34,6 @@
 | `readProjectFile` | Чтение файлов проекта по имени из manifest | Только проектные чаты (Эксперт) |
 | `createSnapshot` | Фиксация прогресса диалога (сжатие контекста) | Все чаты (при наличии chatId + messageId) |
 | `readTelegramChannel` | Чтение публичных Telegram-каналов (посты, даты, медиа) | Все агенты |
-| `saveFact` | Гарантированная запись факта в MIND Memory по явному запросу пользователя | Только Simply Chat (v3.75.0) |
 | `startResearch` | Исследование источников по темам (Perplexity → verify → classify, progress streaming) | Только briefing-onboarding (v3.52.0) |
 
 > **Примечание:** Excel создаётся через `createDocument(kind: "excel")`, редактируется через `updateDocument`. Отдельный `parseExcel` используется только для анализа **загруженных** пользователем файлов.

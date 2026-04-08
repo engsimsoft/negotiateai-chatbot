@@ -12,6 +12,35 @@
 
 ---
 
+## [3.77.0] - 2026-04-08 - MiniMax M2.7 + Gemini 3 Flash + расчистка
+
+**ТЗ-MinimaxCleanup**: Замена Haiku на MiniMax M2.7 в Simply Chat, маршрутизация по типу контента (MiniMax / Gemini / Sonnet), удаление устаревшего кода.
+
+### Added
+- **MiniMax M2.7** — дефолтная модель для Simply Chat (reasoning-модель, $0.30/1M input)
+- **Gemini 3 Flash Preview** — vision-модель для обработки изображений и документов в Simply
+- **Маршрутизация модели** — автоматический выбор: текст → MiniMax, фото/PDF → Gemini, «Думать» → Sonnet
+- **Функция `hasAttachments()`** — триггер переключения на vision-модель по типу контента
+
+### Removed
+- **saveFact / updateFact** — tools удалены (AI ненадёжен для записи, будет заменено Extract-on-compaction)
+- **Скользящее окно** — `SIMPLY_SLIDING_WINDOW_SIZE` и `trimToUserStart()` удалены, Simply использует token-aware loading
+- **extractAndStoreFacts для Simply** — отключён (остаётся для chat/expertise/create)
+
+### Changed
+- **chat-mode-config.ts** — Simply modelId: `claude-haiku` → `MiniMax-M2.7`
+- **providers.ts** — добавлен pricing MiniMax M2.7 и Gemini 3 Flash Preview, context window 204,800
+- **simply-chat.md** — удалён блок `<memory_instructions>` (65 строк инструкций saveFact)
+- **tsconfig.json** — `scripts/` исключён из проверки типов
+
+### Technical
+- `vercel-minimax-ai-provider` — новая зависимость (Anthropic-совместимый режим)
+- Маршрутизация через прямое создание модели (`minimax()` / `google()`) вместо `myProvider`
+- Anthropic-specific опции (cacheControl, compaction) отключены для MiniMax/Gemini
+- Temperature: 0.7 для MiniMax/Gemini, 1.0 для Anthropic
+
+---
+
 ## [3.76.0] - 2026-04-07 - Скользящее окно — стабильная стоимость Simply
 
 **ТЗ-SlidingWindow**: Скользящее окно для Simply Chat — отправляет в API только последние 20 сообщений вместо полной истории. MIND + Opus-профиль покрывают долговременную память.
