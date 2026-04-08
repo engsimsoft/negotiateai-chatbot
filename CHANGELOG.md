@@ -12,6 +12,24 @@
 
 ---
 
+## [3.80.0] - 2026-04-09 - Briefing Pipeline → MiniMax M2.7
+
+**ТЗ-Briefing-1**: Перевод всего briefing pipeline (Filter + Author + Section Refresh) с Gemini Flash / Claude Sonnet на MiniMax M2.7. Снижение стоимости в 6.6× ($0.074 → $0.011 за брифинг). Устранение геоблокировки Google API из РФ.
+
+### Changed
+- **Briefing Filter** — Gemini 2.0 Flash → MiniMax M2.7 (streamText + JSON.parse + Zod). Устраняет геоблокировку Google API
+- **Briefing Author** — Claude Sonnet 4.6 → MiniMax M2.7 (streamText + JSON.parse + Zod). Стоимость Author: $0.072 → $0.007
+- **Briefing Section Refresh** — аналогичная миграция на MiniMax M2.7
+- **`minimaxM27Long`** — новый shared export в providers.ts с 180s fetch timeout для больших промптов (thinking model)
+- **Route maxDuration** — generate: 90s → 240s, refresh-section: 60s → 180s (MiniMax thinking model)
+- **generateObject → streamText** — MiniMax не поддерживает generateObject; streamText держит соединение для thinking model
+
+### Removed
+- **Anthropic imports** из briefing-author.ts и briefing-section-author.ts (dead code)
+- **Google Generative AI import** из briefing-filter.ts (dead code)
+
+---
+
 ## [3.79.0] - 2026-04-08 - Tools для Simply Chat (MiniMax)
 
 **ТЗ-SimplyToolsMinimax**: Включение 12 инструментов для chatMode=simply (MiniMax M2.7). Ранее все tools были отключены условием `isSimplyNonAnthropicModel`. Теперь MiniMax получает полный набор tools кроме deepResearch (дорогой Perplexity API).

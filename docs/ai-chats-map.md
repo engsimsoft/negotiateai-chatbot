@@ -12,6 +12,7 @@
 >
 > **v3.30.0:** Briefing Onboarding — AI-собеседование для настройки брифинга (Claude Sonnet 4.6, split layout, deepResearch, edit mode).
 >
+> **v3.80.0:** Briefing Filter + Author → MiniMax M2.7 (из Gemini Flash + Claude Sonnet). Убрана геоблокировка Google API.
 > **v3.38.0:** Briefing Author → Claude Sonnet 4.6 (из Gemini). Effort для профессора и ревьюера.
 >
 > **v3.26.0:** Morning Briefing Backend — двухэтапный AI-пайплайн (Gemini Flash фильтр + Claude Sonnet автор) для генерации новостных сводок.
@@ -364,15 +365,15 @@ lib/briefing/save-briefing-profile.ts                       # Логика со�
 1. Endpoint получает POST с auth
 2. Загружает настройки, темы и источники пользователя из БД
 3. Параллельный fetch всех источников → RawContent[]
-4. Gemini Flash: фильтрация, дедупликация → FilteredItem[]
-5. Claude Sonnet 4.6: генерация статьи → BriefingArticle (intro, sections, sources, outro, meta)
+4. MiniMax M2.7: фильтрация, дедупликация → FilteredItem[] (streamText + JSON.parse + Zod)
+5. MiniMax M2.7: генерация статьи → BriefingArticle (streamText + JSON.parse + Zod)
 6. Сохранение в BriefingHistory
 
 **Файлы:**
 ```
 app/(chat)/api/briefing/generate/route.ts    # POST endpoint (auth, orchestration)
-lib/briefing/briefing-filter.ts              # Gemini Flash: filterAndDeduplicate()
-lib/briefing/briefing-author.ts              # Claude Sonnet 4.6: generateArticle()
+lib/briefing/briefing-filter.ts              # MiniMax M2.7: filterContent() (streamText + JSON.parse + Zod)
+lib/briefing/briefing-author.ts              # MiniMax M2.7: generateArticle() (streamText + JSON.parse + Zod)
 lib/briefing/briefing-config.ts              # Константы (модели, лимиты)
 lib/prompts/briefing/briefing-author.md      # Промпт автора (стиль Т—Ж)
 lib/briefing/source-fetchers/index.ts        # fetchSource() dispatcher

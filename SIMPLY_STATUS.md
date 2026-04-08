@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.79.0
-**Дата:** 2026-04-08
+**Версия:** 3.80.0
+**Дата:** 2026-04-09
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -32,7 +32,7 @@
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG extract+retrieve+consolidation+profile ✅ v3.72.0, Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity ✅, Plus AI, Ideogram, AssemblyAI | 🔄 Фаза 1 |
 | **Запись встречи** | Аудио → Deepgram транскрипция → Claude резюме (3 формата, инструкции, регенерация, PDF) | ✅ v3.62.0 |
-| **AI-провайдер** | Мультипровайдер: MiniMax (Simply), Anthropic Claude (expertise/create/projects), Gemini (vision/briefing) | ✅ v3.77.0 |
+| **AI-провайдер** | Мультипровайдер: MiniMax (Simply + Briefing), Anthropic Claude (expertise/create/projects), Gemini (vision + podcast) | ✅ v3.80.0 |
 | **Smart Routing** | Автовыбор модели для экономии без потери качества | 📋 |
 | **Оплата в рублях** | ЮKassa, Тинькофф, СБП | 📋 |
 
