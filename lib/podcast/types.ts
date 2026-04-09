@@ -9,8 +9,11 @@ export interface VoiceConfig {
   voiceName: string; // e.g. "Kore", "Puck"
 }
 
-export interface TTSProvider {
-  generateSpeech(script: string, voices: VoiceConfig[]): Promise<Buffer>;
+// --- Script Line (ТЗ-Briefing-2: per-replica TTS routing) ---
+
+export interface ScriptLine {
+  speaker: "host" | "expert";
+  text: string;
 }
 
 // --- Script Generation ---

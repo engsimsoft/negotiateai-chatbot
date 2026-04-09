@@ -9,6 +9,43 @@
 
 ### Planned (Next Steps)
 - RAG-4: Библиотека MVP (загрузка документов + search)
+- Briefing Map-Reduce: Chunking по темам для стабильности M2.7 на больших промптах
+
+---
+
+## [3.81.0] — 2026-04-09 — Podcast → MiniMax (ТЗ-Briefing-2)
+
+### Changed
+- **Podcast Script:** Gemini 2.5 Flash → MiniMax M2.7 (тот же что Author/Filter)
+- **Podcast TTS:** Gemini Flash TTS → MiniMax Speech 2.8 HD (нативный русский, без акцента)
+- **TTS Architecture:** мультиспикер (один вызов) → per-replica TTS (отдельный вызов на каждую реплику, pLimit(4))
+- **Audio format:** PCM→MP3 конвертация (lamejs) → MP3 напрямую от Speech API
+- **Голоса:** Gemini Kore+Iapetus → MiniMax `Russian_Professional_Broadcaster_v2` (Host) + `Russian_Overwhelmed_Vlogger_v1` (Expert)
+- **Промпт скриптрайтера:** обновлён для M2.7 — JSON+plain text парсер, интонационные теги, антипаттерны повторов
+
+### Removed
+- `@google/genai` — зависимость Gemini TTS (больше не используется)
+- `@ai-sdk/google` — зависимость Gemini AI SDK (больше не используется)
+- `lamejs` — PCM→MP3 конвертер (Speech 2.8 HD отдаёт MP3 напрямую)
+- `lib/podcast/tts-gemini.ts` — Gemini TTS провайдер
+- `lib/podcast/audio-converter.ts` — PCM→MP3 конвертация
+- `lib/podcast/lamejs.d.ts` — TypeScript declarations для lamejs
+- `next.config.ts` — lamejs из serverExternalPackages и outputFileTracingIncludes
+
+### Fixed
+- Briefing Author: дедупликация topicId при генерации (M2.7 мог создавать дубли при одной теме)
+- Briefing UI: null-guard для `article?.sections?.filter()` в briefing-page-client.tsx
+- Briefing Sidebar: уникальные React keys при дублирующихся topicId
+
+### Added
+- `lib/podcast/tts-minimax.ts` — MiniMax Speech 2.8 HD TTS клиент (per-replica, voice routing, hex→buffer)
+- `calculateMinimaxTtsCostUsd()` — pricing для Speech 2.8 HD ($0.10/1K chars)
+- Паузы `<#0.3#>` между репликами для естественных переходов
+
+### Cost Impact
+- TTS: ~$0.00006 (Gemini) → ~$0.10-0.15 (MiniMax Speech HD) — дороже, но quality несравнимо лучше
+- Script: ~$0.006 (Gemini) → ~$0.006 (MiniMax M2.7) — без изменений
+- Общая стоимость брифинга+подкаст: ~$0.19 → ~$0.17 (дешевле за счёт ТЗ-Briefing-1)
 
 ---
 

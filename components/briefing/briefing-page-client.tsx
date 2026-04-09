@@ -88,7 +88,7 @@ export function BriefingPageClient({
 
   // ТЗ-Б2: Podcast generation hook
   // Filter out Simply News — it's a platform communication channel, not user content for podcast
-  const podcastSections = article?.sections.filter((s) => s.topicId !== "simply_news") ?? [];
+  const podcastSections = article?.sections?.filter((s) => s.topicId !== "simply_news") ?? [];
   const allTopicIds = podcastSections.map((s) => s.topicId);
   const handlePodcastComplete = useCallback(
     (newUrls: AudioUrls, newDurations: AudioDurations, ready: number, failed: number) => {

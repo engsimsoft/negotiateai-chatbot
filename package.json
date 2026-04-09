@@ -1,6 +1,6 @@
 {
   "name": "simply",
-  "version": "3.80.0",
+  "version": "3.81.0",
   "description": "Simply — AI agents platform for Russian market",
   "private": true,
   "scripts": {
@@ -26,14 +26,12 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
-    "@ai-sdk/google": "^3.0.43",
     "@ai-sdk/react": "^3.0.118",
     "@codemirror/lang-javascript": "^6.2.2",
     "@codemirror/lang-python": "^6.1.6",
     "@codemirror/state": "^6.5.0",
     "@codemirror/theme-one-dark": "^6.1.2",
     "@codemirror/view": "^6.35.3",
-    "@google/genai": "^1.42.0",
     "@icons-pack/react-simple-icons": "^13.7.0",
     "@mozilla/readability": "^0.6.0",
     "@neondatabase/serverless": "^1.0.2",
@@ -75,7 +73,6 @@
     "html2pdf.js": "^0.14.0",
     "iconv-lite": "^0.7.2",
     "jsdom": "26.1.0",
-    "lamejs": "^1.2.1",
     "lucide-react": "^0.446.0",
     "mammoth": "^1.11.0",
     "nanoid": "^5.0.8",

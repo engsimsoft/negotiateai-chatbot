@@ -1,16 +1,17 @@
-// ТЗ-Б1 + ТЗ-DEV2: Script Generator — Gemini Flash generates dialogue script from article section
+// ТЗ-Briefing-2: Script Generator — M2-Her generates dialogue script from article section
+// Migrated from Gemini 2.5 Flash to MiniMax M2-Her for dialogue quality
 
 import fs from "fs";
 import path from "path";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
+import { minimaxM27 } from "@/lib/ai/providers";
 import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
 import type { ModelCatalog } from "tokenlens/core";
 import { waitUntil } from "@vercel/functions";
 import { logUsage } from "@/lib/ai/usage-utils";
 import type { PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import type { BriefingArticleSection } from "@/lib/briefing/briefing-types";
-import type { ScriptContext } from "./types";
+import type { ScriptContext, ScriptLine } from "./types";
 
 const PROMPT_PATH = path.join(
   process.cwd(),
@@ -21,14 +22,21 @@ const PROMPT_PATH = path.join(
 );
 const SYSTEM_PROMPT = fs.readFileSync(PROMPT_PATH, "utf-8");
 
-const SCRIPT_MODEL = "gemini-2.5-flash";
+const SCRIPT_MODEL = "MiniMax-M2.7";
 
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-});
+// JSON instruction for M2.7 (204K context, up to 16K output — no truncation issues)
+const JSON_INSTRUCTION = `
+
+## ФОРМАТ ОТВЕТА
+
+Ответь ТОЛЬКО валидным JSON. Никакого текста до или после JSON. Никакой markdown-обёртки.
+
+{"lines":[{"s":"h","t":"реплика ведущей"},{"s":"e","t":"реплика эксперта"}]}
+
+s = "h" (host) или "e" (expert). t = текст реплики. Минимум 10 реплик.`;
 
 /**
- * Build user message from section + context (per user template).
+ * Build user message from section + context.
  */
 function buildScriptwriterMessage(
   section: BriefingArticleSection,
@@ -64,39 +72,22 @@ function buildScriptwriterMessage(
   return parts.join("\n");
 }
 
-/**
- * Count replicas in script (lines starting with "Host:" or "Expert:").
- */
-function countReplicas(script: string): number {
-  return script
-    .split("\n")
-    .filter((line) => /^(Host|Expert):\s/.test(line)).length;
-}
-
-const MIN_SCRIPT_WORDS = 120;
+const MIN_SCRIPT_LINES = 6;
 const MAX_SCRIPT_RETRIES = 4;
 
-/**
- * Reinforcement suffix added to the prompt on retry attempts.
- * Gemini Flash sometimes produces ~40-word stubs; explicit length reminder helps.
- */
 const RETRY_REINFORCEMENT =
-  "\n\n---\nВАЖНО: Предыдущая попытка была слишком короткой. Сценарий ОБЯЗАН содержать 200-400 слов и 10-20 реплик. Напиши полноценный диалог по всему материалу секции.";
+  "\n\n---\nВАЖНО: Предыдущая попытка была слишком короткой. Сценарий ОБЯЗАН содержать 10-20 реплик и 200-400 слов. Напиши полноценный диалог по всему материалу секции. Ответь ТОЛЬКО JSON.";
 
 /**
  * Generate a dialogue script from a briefing section.
- * Returns the raw script text, replica count, and optional trace data.
- * Retries automatically if Gemini produces a truncated/short script,
- * adding a reinforcement prompt on attempts 2+.
+ * Returns parsed script lines, replica count, and optional trace data.
  */
 export async function generateScript(
   section: BriefingArticleSection,
   context: ScriptContext,
-  /** ТЗ-CACHE2: userId for usage logging */
   userId?: string,
-  /** ТЗ-CACHE3: TokenLens catalog for SSOT cost calculation */
   catalog?: ModelCatalog,
-): Promise<{ script: string; replicaCount: number; trace?: PipelineStageTrace }> {
+): Promise<{ script: string; lines: ScriptLine[]; replicaCount: number; trace?: PipelineStageTrace }> {
   const baseMessage = buildScriptwriterMessage(section, context);
   const startTime = Date.now();
   let totalPromptTokens = 0;
@@ -104,47 +95,67 @@ export async function generateScript(
   let lastFinishReason = "unknown";
 
   for (let attempt = 0; attempt <= MAX_SCRIPT_RETRIES; attempt++) {
-    // Add reinforcement on retry attempts 2+ (after 2 consecutive failures)
     const prompt =
       attempt >= 2 ? baseMessage + RETRY_REINFORCEMENT : baseMessage;
 
-    // ТЗ-PIPELINE1: maxRetries:0 — disable hidden SDK retry (own content-based retry below)
     const result = await generateText({
-      model: google(SCRIPT_MODEL),
-      system: SYSTEM_PROMPT,
+      model: minimaxM27,
+      system: SYSTEM_PROMPT + JSON_INSTRUCTION,
       prompt,
-      maxOutputTokens: 2048,
+      maxOutputTokens: 4096,
       maxRetries: 0,
+      temperature: 0.7,
     });
 
-    // ТЗ-DEV2: Accumulate usage across retries (AI SDK v5: inputTokens/outputTokens)
     totalPromptTokens += result.usage?.inputTokens ?? 0;
     totalCompletionTokens += result.usage?.outputTokens ?? 0;
     lastFinishReason = result.finishReason ?? "unknown";
 
-    const script = result.text.trim();
-    const replicaCount = countReplicas(script);
-    const wordCount = script.split(/\s+/).length;
+    const rawText = result.text.trim();
 
-    // Validate: Gemini Flash sometimes produces truncated scripts (< 50 words)
-    if (wordCount < MIN_SCRIPT_WORDS && attempt < MAX_SCRIPT_RETRIES) {
+    // Parse plain text "Host: text" / "Expert: text" format
+    const lines = parsePlainText(rawText);
+
+    if (lines.length < MIN_SCRIPT_LINES && attempt < MAX_SCRIPT_RETRIES) {
       console.warn(
-        `[podcast/script] ${section.topicId}: too short (${wordCount} words, ${replicaCount} replicas), retrying (${attempt + 1}/${MAX_SCRIPT_RETRIES})`,
+        `[podcast/script] ${section.topicId}: too few lines (${lines.length}), retrying (${attempt + 1}/${MAX_SCRIPT_RETRIES})`,
+      );
+      console.warn(
+        `[podcast/script] raw output preview: ${rawText.slice(0, 300)}`,
       );
       continue;
     }
 
-    if (wordCount < MIN_SCRIPT_WORDS) {
+    if (lines.length === 0) {
+      if (attempt < MAX_SCRIPT_RETRIES) continue;
       console.error(
-        `[podcast/script] ${section.topicId}: still too short after ${MAX_SCRIPT_RETRIES} retries (${wordCount} words) — giving up`,
+        `[podcast/script] ${section.topicId}: parse failed. Raw output: ${rawText.slice(0, 500)}`,
+      );
+      throw new Error(`Script parse failed after ${MAX_SCRIPT_RETRIES} retries`);
+    }
+
+    // Validate minimum lines
+    if (lines.length < MIN_SCRIPT_LINES && attempt < MAX_SCRIPT_RETRIES) {
+      console.warn(
+        `[podcast/script] ${section.topicId}: too few lines (${lines.length}), retrying (${attempt + 1}/${MAX_SCRIPT_RETRIES})`,
+      );
+      continue;
+    }
+
+    // Reconstruct plain text script for logging/debugging
+    const script = lines.map((l) => `${l.speaker === "host" ? "Host" : "Expert"}: ${l.text}`).join("\n");
+    const replicaCount = lines.length;
+    const wordCount = lines.reduce((sum, l) => sum + l.text.split(/\s+/).length, 0);
+
+    if (lines.length < MIN_SCRIPT_LINES) {
+      console.error(
+        `[podcast/script] ${section.topicId}: still too few lines after ${MAX_SCRIPT_RETRIES} retries (${lines.length}) — giving up`,
       );
     }
 
     const durationMs = Date.now() - startTime;
     const totalTokens = totalPromptTokens + totalCompletionTokens;
 
-    // ТЗ-CACHE2+TOKENS1: Usage logging — Gemini has no prompt caching,
-    // so all input tokens are fresh (no cache read/write).
     if (userId) {
       waitUntil(logUsage({
         userId,
@@ -190,17 +201,105 @@ export async function generateScript(
         inputCount: 1,
         outputCount: 1,
         droppedCount: 0,
-        droppedReasons: wordCount < MIN_SCRIPT_WORDS ? { too_short: 1 } : undefined,
+        droppedReasons: lines.length < MIN_SCRIPT_LINES ? { too_short: 1 } : undefined,
       },
       errors: [],
       warnings: attempt > 0
-        ? [`Retried ${attempt} time(s), final wordCount=${wordCount}`]
+        ? [`Retried ${attempt} time(s), final lineCount=${lines.length}, wordCount=${wordCount}`]
         : [],
     };
 
-    return { script, replicaCount, trace };
+    return { script, lines, replicaCount, trace };
   }
 
-  // Unreachable, but TypeScript needs it
   throw new Error("Script generation failed after retries");
+}
+
+/**
+ * Universal parser: handles any format M2-Her may return.
+ * Strategy: try JSON first, then plain text (multiline and inline).
+ */
+function parsePlainText(rawText: string): ScriptLine[] {
+  // Strategy 1: Try JSON parse (M2-Her sometimes returns JSON despite plain text instruction)
+  const jsonLines = tryParseJson(rawText);
+  if (jsonLines.length >= 4) return jsonLines;
+
+  // Strategy 2: Split by speaker labels (handles both multiline and inline)
+  // Regex splits on "Host:" or "Expert:" (with optional markdown bold ** and variations)
+  const speakerPattern = /(?:^|\n)\s*(?:\*\*)?(?:Host|Expert|Ведущая|Ведущий|Эксперт)(?:\*\*)?:\s*/gi;
+
+  // First, try to split inline text where multiple "Host: ... Expert: ..." are on one line
+  // by inserting newlines before each speaker label
+  const normalized = rawText.replace(
+    /(?<!\n)\s*(?:\*\*)?(?:Host|Expert|Ведущая|Ведущий|Эксперт)(?:\*\*)?:\s*/gi,
+    (match, offset) => (offset === 0 ? match : "\n" + match.trim()),
+  );
+
+  const lines: ScriptLine[] = [];
+  for (const line of normalized.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const hostMatch = trimmed.match(
+      /^(?:\*\*)?(?:Host|host|Ведущая|Ведущий)(?:\*\*)?:\s*(.+)/i
+    );
+    const expertMatch = trimmed.match(
+      /^(?:\*\*)?(?:Expert|expert|Эксперт)(?:\*\*)?:\s*(.+)/i
+    );
+
+    if (hostMatch) {
+      const cleaned = cleanReplicaText(hostMatch[1]);
+      if (cleaned) lines.push({ speaker: "host", text: cleaned });
+    } else if (expertMatch) {
+      const cleaned = cleanReplicaText(expertMatch[1]);
+      if (cleaned) lines.push({ speaker: "expert", text: cleaned });
+    }
+  }
+  return lines;
+}
+
+/** Try parsing raw text as JSON (handles markdown wrappers and various JSON shapes) */
+function tryParseJson(rawText: string): ScriptLine[] {
+  try {
+    const cleaned = rawText.replace(/```json\s*|```\s*/g, "").trim();
+    const obj = JSON.parse(cleaned);
+
+    // Shape: { "lines": [...] } or { "script": [...] } or just [...]
+    const arr = Array.isArray(obj) ? obj : (obj.lines ?? obj.script ?? []);
+    if (!Array.isArray(arr)) return [];
+
+    const lines: ScriptLine[] = [];
+    for (const item of arr) {
+      // Compact format: { s: "h"|"e", t: "text" }
+      if (item?.s && item?.t) {
+        const speaker = item.s === "h" ? "host" : item.s === "e" ? "expert" : null;
+        if (speaker) {
+          const cl = cleanReplicaText(String(item.t));
+          if (cl) lines.push({ speaker, text: cl });
+        }
+        continue;
+      }
+      // Full format: { speaker: "host"|"expert", text: "..." }
+      if (item?.speaker && item?.text) {
+        const speaker = String(item.speaker).toLowerCase();
+        if (speaker === "host" || speaker === "expert") {
+          const cl = cleanReplicaText(String(item.text));
+          if (cl) lines.push({ speaker, text: cl });
+        }
+      }
+    }
+    return lines;
+  } catch {
+    return [];
+  }
+}
+
+/** Remove unwanted artifacts from replica text (markdown bold, asterisk actions) */
+function cleanReplicaText(text: string): string {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, "$1")  // **bold** → bold (keep content)
+    .replace(/\*[^*]+\*/g, "")           // Remove *actions* like *кивает*
+    .replace(/\([^)]*хлопает[^)]*\)/gi, "")  // Remove (хлопает в ладоши) etc
+    .replace(/\s{2,}/g, " ")             // Collapse multiple spaces
+    .trim();
 }

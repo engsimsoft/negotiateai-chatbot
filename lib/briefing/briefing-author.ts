@@ -214,6 +214,23 @@ export async function generateArticle(
       const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
       const parsed = briefingArticleSchema.parse(JSON.parse(cleaned));
 
+      // Deduplicate sections by topicId — M2.7 may create multiple sections for same topic
+      const seen = new Map<string, number>();
+      const deduped = parsed.sections.filter((section, idx) => {
+        if (seen.has(section.topicId)) {
+          // Merge content into first occurrence
+          const firstIdx = seen.get(section.topicId)!;
+          parsed.sections[firstIdx].content += "\n\n" + section.content;
+          parsed.sections[firstIdx].newsCount += section.newsCount;
+          parsed.sections[firstIdx].sources.push(...section.sources);
+          return false;
+        }
+        seen.set(section.topicId, idx);
+        return true;
+      });
+      parsed.sections = deduped;
+      parsed.meta.topicsCount = deduped.length;
+
       return { result: parsed, usage };
     },
     { maxAttempts: 3, userId, modelId: AUTHOR_MODEL, chatMode: "briefing:author" },

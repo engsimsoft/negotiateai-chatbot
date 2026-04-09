@@ -300,9 +300,10 @@ export function buildTtsTrace(input: {
   audioDurationSeconds: number;
   retryCount?: number;
   error?: string;
+  charCount?: number;
 }): AiCallTrace {
   return {
-    modelId: "gemini-2.5-flash-preview-tts",
+    modelId: "speech-2.8-hd",
     promptPreview: "(TTS synthesis)",
     noCacheInputTokens: 0,
     cacheReadTokens: 0,
@@ -310,7 +311,9 @@ export function buildTtsTrace(input: {
     outputTokens: 0,
     reasoningTokens: 0,
     totalTokens: 0,
-    costRub: calculateTtsCostRub(input.audioDurationSeconds),
+    costRub: input.charCount
+      ? calculateTtsCostRub(input.charCount, true)
+      : calculateTtsCostRub(input.audioDurationSeconds, false),
     finishReason: input.error ? "error" : "stop",
     retryCount: input.retryCount ?? 0,
     error: input.error,

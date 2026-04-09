@@ -395,9 +395,9 @@ function SidebarContent({
               <span>Полный брифинг</span>
             </button>
 
-            {sections.map((section) => (
+            {sections.map((section, idx) => (
               <button
-                key={section.topicId}
+                key={`${section.topicId}-${idx}`}
                 type="button"
                 onClick={() => handleScrollTo(section.topicId)}
                 className={cn(
