@@ -349,20 +349,18 @@ export function calculateDeepgramCostUsd(audioSeconds: number): number {
   return Math.round(audioSeconds * USD_PER_SECOND * 1_000_000) / 1_000_000;
 }
 
-/** MiniMax Speech 2.8 HD TTS: $0.10/1K characters */
-export function calculateMinimaxTtsCostUsd(charCount: number): number {
-  const USD_PER_CHAR = 0.10 / 1000;
+/** Gemini TTS (gemini-2.5-flash-preview-tts): $4/1M characters */
+export function calculateGeminiTtsCostUsd(charCount: number): number {
+  const USD_PER_CHAR = 4 / 1_000_000;
   return Math.round(charCount * USD_PER_CHAR * 1_000_000) / 1_000_000;
 }
 
-/** MiniMax TTS cost in RUB (from char count). Used by pipeline traces. */
-export function calculateTtsCostRub(charCountOrDuration: number, isCharCount = true): number {
-  if (isCharCount) {
-    // $0.10/1K chars × 100 RUB/USD = ₽10/1K chars = ₽0.01/char
-    const RUB_PER_CHAR = 0.01;
-    return Math.round(charCountOrDuration * RUB_PER_CHAR * 100) / 100;
-  }
-  // Legacy: duration-based (kept for backward compat with existing traces)
-  const TTS_COST_RUB_PER_SECOND = 0.006;
-  return Math.round(charCountOrDuration * TTS_COST_RUB_PER_SECOND * 100) / 100;
+// ---------------------------------------------------------------------------
+// TTS Pricing (Google Gemini TTS — RUB helper for pipeline traces)
+// ---------------------------------------------------------------------------
+
+const TTS_COST_RUB_PER_SECOND = 0.006;
+
+export function calculateTtsCostRub(durationSeconds: number): number {
+  return Math.round(durationSeconds * TTS_COST_RUB_PER_SECOND * 100) / 100;
 }
