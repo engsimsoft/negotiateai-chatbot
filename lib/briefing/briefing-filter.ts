@@ -8,6 +8,7 @@ import { waitUntil } from "@vercel/functions";
 import { logUsage } from "@/lib/ai/usage-utils";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { minimaxM27Long } from "@/lib/ai/providers";
+import { retryWithLogging } from "@/lib/ai/retry-with-logging";
 import { FILTER_MODEL, MAX_FILTER_CANDIDATES } from "./briefing-config";
 import type { RawContent } from "./source-fetchers/types";
 
@@ -69,15 +70,20 @@ export async function filterContent(
   const warnings: string[] = [];
   const errors: string[] = [];
 
-  // Prepare articles for the prompt
+  // Prepare articles for the prompt (truncate content to keep prompt manageable)
+  const MAX_CONTENT_PER_ITEM = 2000; // chars — filter needs title+summary, not full text
   const articlesText = items
     .map(
-      (item) =>
-        `[${item.itemId}] ${item.sourceName} (${item.sourceLanguage})
+      (item) => {
+        const truncated = item.content.length > MAX_CONTENT_PER_ITEM
+          ? item.content.slice(0, MAX_CONTENT_PER_ITEM) + "..."
+          : item.content;
+        return `[${item.itemId}] ${item.sourceName} (${item.sourceLanguage})
 Title: ${item.title}
 URL: ${item.url}
 Published: ${item.publishedAt?.toISOString() || "unknown"}
-Content: ${item.content}`,
+Content: ${truncated}`;
+      },
     )
     .join("\n\n---\n\n");
 
@@ -100,25 +106,28 @@ Rules:
 
 Output JSON with "candidates" array.` + FILTER_JSON_INSTRUCTION;
 
-  // ТЗ-Briefing-1: streamText + JSON.parse + Zod (MiniMax M2.7)
-  // Using streamText instead of generateText — keeps connection alive for thinking model
-  const res = streamText({
-    model: minimaxM27Long,
-    system: systemPrompt,
-    prompt: userPrompt,
-    temperature: 0.1,
-    maxRetries: 0,
-  });
+  // ТЗ-MapReduce: streamText + JSON.parse + Zod with retry (MiniMax M2.7)
+  const { result: { candidates: parsedCandidates, usage: filterUsage }, attempts, totalDurationMs: retryDurationMs } = await retryWithLogging(
+    async () => {
+      const res = streamText({
+        model: minimaxM27Long,
+        system: systemPrompt,
+        prompt: userPrompt,
+        temperature: 0.1,
+        maxRetries: 0,
+      });
+      const text = await res.text;
+      const usage = await res.usage;
 
-  // Consume stream to get full text
-  const text = await res.text;
-  const usage = await res.usage;
+      const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
+      const object = filterResultSchema.parse(JSON.parse(cleaned));
+      return { result: { candidates: object.candidates.slice(0, MAX_FILTER_CANDIDATES), usage }, usage };
+    },
+    { maxAttempts: 3, userId, modelId: FILTER_MODEL, chatMode: "briefing:filter" },
+  );
 
-  // Clean markdown wrapper and parse JSON
-  const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
-  const object = filterResultSchema.parse(JSON.parse(cleaned));
-
-  const candidates = object.candidates.slice(0, MAX_FILTER_CANDIDATES);
+  const candidates = parsedCandidates;
+  const usage = filterUsage;
 
   // ТЗ-DEV2: Post-generation validation
   const inputItemIds = new Set(items.map((it) => it.itemId).filter(Boolean));

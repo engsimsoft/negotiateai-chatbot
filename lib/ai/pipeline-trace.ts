@@ -106,7 +106,7 @@ export interface UrlVerificationTrace {
 // ---------------------------------------------------------------------------
 
 export interface PipelineStageTrace {
-  stage: "fetch" | "filter" | "author" | "script" | "tts" | "research" | "section-refresh";
+  stage: "fetch" | "filter" | "author" | "intro-outro" | "script" | "tts" | "research" | "section-refresh";
   startedAt: string; // ISO timestamp
   durationMs: number;
   ai?: AiCallTrace;

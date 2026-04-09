@@ -95,6 +95,10 @@ export async function generateScript(
   let lastFinishReason = "unknown";
 
   for (let attempt = 0; attempt <= MAX_SCRIPT_RETRIES; attempt++) {
+    // Delay between retries to avoid MiniMax API throttling
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, 3000 * attempt));
+    }
     const prompt =
       attempt >= 2 ? baseMessage + RETRY_REINFORCEMENT : baseMessage;
 

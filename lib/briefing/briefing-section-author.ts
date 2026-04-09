@@ -55,7 +55,7 @@ const PROMPT_PATH = path.join(
 );
 const BASE_SYSTEM_PROMPT = fs.readFileSync(PROMPT_PATH, "utf-8");
 
-const SECTION_SYSTEM_PROMPT = `${BASE_SYSTEM_PROMPT}
+const REFRESH_SECTION_PROMPT = `${BASE_SYSTEM_PROMPT}
 
 ---
 
@@ -68,6 +68,23 @@ const SECTION_SYSTEM_PROMPT = `${BASE_SYSTEM_PROMPT}
 2. Сохраняй тот же стиль и тон, что и в остальных секциях
 3. Не пиши intro, outro или meta — только секцию
 4. topicId, topicName и emoji должны совпадать с запрошенными
+`;
+
+const MAP_REDUCE_SECTION_PROMPT = `${BASE_SYSTEM_PROMPT}
+
+---
+
+## РЕЖИМ: НАПИСАНИЕ СЕКЦИИ ДЛЯ НОВОГО БРИФИНГА
+
+Ты пишешь ПОЛНОЦЕННУЮ секцию для нового утреннего брифинга. Это не обновление — это первичное написание.
+
+Правила:
+1. Пиши ТОЛЬКО одну секцию для указанной темы
+2. Используй ВСЕ предоставленные кандидаты — каждый должен быть отражён в тексте
+3. Не пиши intro, outro или meta — только секцию
+4. topicId, topicName и emoji должны совпадать с запрошенными
+5. Пиши полноценную журналистскую мини-статью: контекст, цифры, аналитика
+6. НЕ пропускай кандидаты. Если их 7 — все 7 должны быть упомянуты в тексте
 `;
 
 // --- JSON schema description for prompt injection ---
@@ -101,6 +118,8 @@ interface SectionAuthorInput {
   topic: BriefingTopic;
   otherTopicNames: string[];
   volume?: string;
+  /** "refresh" = per-section refresh (default), "initial" = Map-Reduce new briefing */
+  mode?: "refresh" | "initial";
   /** ТЗ-BF5: Headlines from previous briefing for this topic (formatted string) */
   previousTopicHeadlines?: string | null;
   /** ТЗ-BF5: URLs from previous briefing section sources (for candidate marking) */
@@ -118,7 +137,8 @@ interface SectionAuthorInput {
 export async function generateSection(
   input: SectionAuthorInput,
 ): Promise<{ section: BriefingArticleSection; tokensUsed: number; trace?: PipelineStageTrace }> {
-  const { candidates, fullTexts, tierMap, topic, otherTopicNames, volume, previousTopicHeadlines, previousUrls, userId, catalog } = input;
+  const { candidates, fullTexts, tierMap, topic, otherTopicNames, volume, mode = "refresh", previousTopicHeadlines, previousUrls, userId, catalog } = input;
+  const systemPrompt = mode === "initial" ? MAP_REDUCE_SECTION_PROMPT : REFRESH_SECTION_PROMPT;
 
   if (candidates.length === 0) {
     return {
@@ -154,7 +174,7 @@ export async function generateSection(
     async () => {
       const res = streamText({
         model: minimaxM27Long,
-        system: SECTION_SYSTEM_PROMPT + SECTION_JSON_INSTRUCTION,
+        system: systemPrompt + SECTION_JSON_INSTRUCTION,
         prompt: userMessage,
         maxOutputTokens: 8192,
         temperature: 0.7,

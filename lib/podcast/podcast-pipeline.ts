@@ -123,13 +123,19 @@ export async function runPodcastPipeline({
     year: "numeric",
   });
 
-  // 5. Process sections with p-limit(2)
-  const limit = pLimit(2);
+  // 5. Process sections sequentially (pLimit(1) + delay to avoid MiniMax API throttling)
+  const limit = pLimit(1);
   let readyCount = 0;
   let failedCount = 0;
+  let sectionIdx = 0;
 
   const tasks = sections.map((section) => {
     return limit(async () => {
+      // Delay between sections to let MiniMax API recover
+      if (sectionIdx > 0) {
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      sectionIdx++;
       const originalIndex = article.sections.findIndex(
         (s) => s.topicId === section.topicId,
       );

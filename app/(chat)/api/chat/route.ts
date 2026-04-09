@@ -17,7 +17,7 @@ import { getModelForChatMode } from "@/lib/ai/chat-mode-config";
 import { buildChatPrompt, buildExpertisePrompt, buildCreatePrompt } from "@/lib/prompts/server";
 import type { BuildContext } from "@/lib/prompts";
 import { buildProjectContext } from "@/lib/prompts/contexts";
-import { myProvider } from "@/lib/ai/providers";
+import { myProvider, claudeHaiku } from "@/lib/ai/providers";
 import { createMinimaxOpenAI } from "vercel-minimax-ai-provider";
 
 // MiniMax OpenAI provider with includeUsage enabled for streaming usage data
@@ -28,7 +28,6 @@ function minimaxModel(modelId: string) {
   model.config = { ...model.config, includeUsage: true };
   return model;
 }
-import { google } from "@ai-sdk/google";
 import {
   getProjectModel,
   isValidModelTier,
@@ -256,7 +255,7 @@ function stripMediaPartsForTextModel(messages: ChatMessage[]): ChatMessage[] {
   return messages.map((msg) => {
     if (!msg.parts || !Array.isArray(msg.parts)) return msg;
     const hasMedia = msg.parts.some((p: any) =>
-      p.type === "image" || (p.type === "file" && p.mediaType !== "text/plain")
+      p.type === "image" || p.type === "file"
     );
     if (!hasMedia) return msg;
 
@@ -265,14 +264,44 @@ function stripMediaPartsForTextModel(messages: ChatMessage[]): ChatMessage[] {
         if (p.type === "image") {
           return { type: "text" as const, text: "[изображение]" };
         }
-        if (p.type === "file" && p.mediaType !== "text/plain") {
+        if (p.type === "file") {
+          // MiniMax doesn't support any file parts — convert to text placeholder
           const name = p.name || "файл";
+          // For text files, include the content inline
+          if (p.mediaType === "text/plain" && typeof p.text === "string") {
+            return { type: "text" as const, text: `--- Файл: ${name} ---\n${p.text}\n--- Конец файла ---` };
+          }
           return { type: "text" as const, text: `[${name}]` };
         }
         return p;
       });
 
     return { ...msg, parts: filteredParts } as ChatMessage;
+  });
+}
+
+/**
+ * Strip MiniMax-style tool-call parts from message history before sending to Anthropic.
+ * MiniMax stores tool calls as inline parts (e.g. type "tool-createSnapshot" with toolCallId
+ * "call_function_*") without a separate tool_result message. Anthropic requires each tool_use
+ * to have a matching tool_result — orphan tool_use blocks cause 400 errors.
+ */
+function stripMiniMaxToolParts(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((msg) => {
+    if (!msg.parts || !Array.isArray(msg.parts)) return msg;
+    const filtered = msg.parts.filter((p: any) => {
+      // MiniMax tool calls have toolCallId starting with "call_function_"
+      if (p.toolCallId && typeof p.toolCallId === 'string' && p.toolCallId.startsWith('call_function_')) {
+        return false;
+      }
+      return true;
+    });
+    if (filtered.length === msg.parts.length) return msg;
+    if (filtered.length === 0) {
+      // Keep at least a placeholder so the message isn't empty
+      return { ...msg, parts: [{ type: 'text' as const, text: '[инструмент выполнен]' }] } as ChatMessage;
+    }
+    return { ...msg, parts: filtered } as ChatMessage;
   });
 }
 
@@ -557,14 +586,14 @@ export async function POST(request: Request) {
               : buildChatPrompt(promptContext);
           systemPromptText = builtPrompt.systemPrompt;
           // ТЗ-MinimaxCleanup: Model routing for Simply Chat
-          // Priority: think → Sonnet, attachments → Gemini 3 Flash, default → MiniMax M2.7
+          // Priority: think → Sonnet, attachments → Haiku 4.5 (vision), default → MiniMax M2.7
           if (chatMode === "simply") {
             if (think) {
               modelToUse = myProvider.languageModel("claude-sonnet");
               console.log(`[Chat API] Model selection: chatMode=simply, think=true, model=claude-sonnet`);
             } else if (hasAttachments(message.parts)) {
-              modelToUse = google("gemini-3-flash-preview");
-              console.log(`[Chat API] Model selection: chatMode=simply, attachments=true, model=gemini-3-flash-preview`);
+              modelToUse = claudeHaiku;
+              console.log(`[Chat API] Model selection: chatMode=simply, attachments=true, model=claude-haiku-4-5`);
             } else {
               modelToUse = minimaxModel("MiniMax-M2.7");
               console.log(`[Chat API] Model selection: chatMode=simply, model=MiniMax-M2.7`);
@@ -860,9 +889,11 @@ export async function POST(request: Request) {
         }
 
         // ТЗ-RAG3: Compaction only for Anthropic models that support it (Sonnet/Opus, NOT Haiku)
-        // ТЗ-MinimaxCleanup: Simply uses MiniMax/Gemini — no compaction
-        const isAnthropicModel = chatMode !== "simply" || think;
-        const supportsCompaction = isAnthropicModel && (!isHaikuChat || isProjectChat);
+        // ТЗ-MinimaxCleanup: Simply uses MiniMax — no compaction
+        // Simply with attachments uses Haiku which also doesn't support compaction
+        const isAnthropicModel = chatMode !== "simply" || think || hasAttachments(message.parts);
+        const isHaikuModel = isHaikuChat || (chatMode === "simply" && hasAttachments(message.parts) && !think);
+        const supportsCompaction = isAnthropicModel && (!isHaikuModel || isProjectChat);
         const compactionOptions = supportsCompaction ? {
           anthropic: {
             contextManagement: {
@@ -877,7 +908,7 @@ export async function POST(request: Request) {
         } : undefined;
 
         // ТЗ-MinimaxCleanup: Simply with MiniMax/Gemini — no tools, no Anthropic cacheControl
-        const isSimplyNonAnthropicModel = chatMode === "simply" && !think;
+        const isSimplyNonAnthropicModel = chatMode === "simply" && !think && !hasAttachments(message.parts);
 
         // Standard streaming mode (non-professor)
         const result = streamText({
@@ -892,8 +923,13 @@ export async function POST(request: Request) {
             // ТЗ-KITT/CACHE: MIND retrieved facts (dynamic per query) — NOT cached
             ...(mindDynamicBlock ? [{ role: 'system' as const, content: mindDynamicBlock }] : []),
             // ТЗ-SimplyToolsMinimax: strip images/files from history for text-only MiniMax
+            // When Simply switches to Anthropic (think/attachments), strip MiniMax tool parts from history
             ...sanitizeCoreMessages(await convertToModelMessages(
-              isSimplyNonAnthropicModel ? stripMediaPartsForTextModel(uiMessages) : uiMessages
+              isSimplyNonAnthropicModel
+                ? stripMediaPartsForTextModel(uiMessages)
+                : chatMode === "simply"
+                  ? stripMiniMaxToolParts(uiMessages)
+                  : uiMessages
             )),
           ],
           providerOptions: compactionOptions,
@@ -961,7 +997,7 @@ export async function POST(request: Request) {
                 if (think) {
                   resolvedModelId = myProvider.languageModel("claude-sonnet").modelId;
                 } else if (hasAttachments(message.parts)) {
-                  resolvedModelId = "gemini-3-flash-preview";
+                  resolvedModelId = "claude-haiku-4-5-20251001";
                 } else {
                   resolvedModelId = "MiniMax-M2.7";
                 }

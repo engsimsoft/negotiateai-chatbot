@@ -13,7 +13,7 @@ import { minimaxM27Long } from "@/lib/ai/providers";
 import { AUTHOR_MODEL } from "./briefing-config";
 import type { FilteredItem } from "./briefing-filter";
 import type { RawContent } from "./source-fetchers/types";
-import type { BriefingArticle } from "./briefing-types";
+import type { BriefingArticle, BriefingArticleSection } from "./briefing-types";
 import type { BriefingTopic } from "@/lib/db/schema";
 
 // Load prompt template from .md file (once at module init)
@@ -410,4 +410,348 @@ function formatDateRussian(isoDate: string): string {
     day: "numeric",
     month: "long",
   });
+}
+
+// =============================================================================
+// ТЗ-MapReduce: Map-Reduce Briefing Author
+// =============================================================================
+
+import { generateSection } from "./briefing-section-author";
+import pLimit from "p-limit";
+
+// --- Intro/Outro JSON schema ---
+
+const introOutroSchema = z.object({
+  title: z.string(),
+  intro: z.string(),
+  outro: z.string(),
+});
+
+const INTRO_OUTRO_SYSTEM_PROMPT = `${SYSTEM_PROMPT}
+
+---
+
+## РЕЖИМ: INTRO И OUTRO
+
+Ты пишешь ТОЛЬКО title, intro и outro для брифинга. Секции УЖЕ написаны другими авторами.
+
+На основе сводки секций ниже — создай:
+- **title**: заголовок брифинга в формате "Утренний брифинг · [дата на русском]"
+- **intro**: вступление (2-3 предложения). Свяжи все темы, задай тон дня. Не перечисляй темы списком — напиши как журналист.
+- **outro**: заключение (1-2 предложения, лёгкий тон). Пожелание хорошего дня.
+
+НЕ пиши секции. НЕ пиши meta. ТОЛЬКО title, intro, outro.`;
+
+const INTRO_OUTRO_JSON_INSTRUCTION = `
+
+Ответь строго в формате JSON. Без markdown-обёртки.
+
+{"title": "string", "intro": "string", "outro": "string"}`;
+
+/**
+ * Group candidates by topicId for per-topic section generation.
+ */
+function groupCandidatesByTopic(
+  candidates: FilteredItem[],
+  userTopics: BriefingTopic[],
+): Map<string, FilteredItem[]> {
+  const groups = new Map<string, FilteredItem[]>();
+  for (const topic of userTopics) {
+    groups.set(topic.topicId, []);
+  }
+  for (const c of candidates) {
+    const group = groups.get(c.topicId);
+    if (group) {
+      group.push(c);
+    } else {
+      // Unknown topicId — assign to first topic
+      const firstId = userTopics[0]?.topicId;
+      if (firstId) groups.get(firstId)!.push(c);
+    }
+  }
+  return groups;
+}
+
+/**
+ * Extract per-topic headlines from previous briefing for dedup context.
+ */
+function getTopicHeadlines(
+  previousBriefing: PreviousBriefing | null | undefined,
+  topicId: string,
+): string | null {
+  if (!previousBriefing) return null;
+  const section = previousBriefing.article.sections.find(
+    (s) => s.topicId === topicId,
+  );
+  if (!section || section.sources.length === 0) return null;
+  return section.sources.map((src) => `«${src.title}»`).join(", ");
+}
+
+/**
+ * Collect all URLs from previous briefing for repeat candidate marking.
+ */
+function getPreviousUrls(
+  previousBriefing: PreviousBriefing | null | undefined,
+): Set<string> {
+  const urls = new Set<string>();
+  if (!previousBriefing) return urls;
+  for (const section of previousBriefing.article.sections) {
+    for (const src of section.sources) {
+      if (src.url) urls.add(src.url);
+    }
+  }
+  return urls;
+}
+
+/**
+ * Generate intro/outro via a lightweight M2.7 call.
+ * Input: section summaries (~2K tokens). Output: title + intro + outro.
+ */
+async function generateIntroOutro(
+  sections: BriefingArticleSection[],
+  volume: string,
+  date: string,
+  language: string,
+  userId?: string,
+  catalog?: ModelCatalog,
+): Promise<{ title: string; intro: string; outro: string; tokensUsed: number; trace?: PipelineStageTrace }> {
+  const sectionSummaries = sections
+    .map(
+      (s) =>
+        `- ${s.emoji} ${s.topicName}: ${s.newsCount} новостей. ${s.content.slice(0, 150)}...`,
+    )
+    .join("\n");
+
+  const dateFormatted = formatDateRussian(date);
+  const userMessage = `Дата: ${dateFormatted}
+Язык: ${language}
+Объём: ${volume}
+Количество тем: ${sections.length}
+
+Секции брифинга:
+${sectionSummaries}`;
+
+  const startTime = Date.now();
+
+  const { result, usage, attempts, totalDurationMs } = await retryWithLogging(
+    async () => {
+      const res = streamText({
+        model: minimaxM27Long,
+        system: INTRO_OUTRO_SYSTEM_PROMPT + INTRO_OUTRO_JSON_INSTRUCTION,
+        prompt: userMessage,
+        maxOutputTokens: 2048,
+        temperature: 0.7,
+        maxRetries: 0,
+      });
+      const text = await res.text;
+      const usage = await res.usage;
+      console.log(`[Briefing Intro/Outro] usage:`, JSON.stringify(usage));
+
+      const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
+      const parsed = introOutroSchema.parse(JSON.parse(cleaned));
+      return { result: parsed, usage };
+    },
+    { maxAttempts: 3, userId, modelId: AUTHOR_MODEL, chatMode: "briefing:intro-outro" },
+  );
+
+  const ai = buildAiCallTrace(
+    {
+      modelId: AUTHOR_MODEL,
+      usage,
+      finishReason: "stop",
+      promptPreview: userMessage.slice(0, 300),
+      retryCount: attempts.length - 1,
+      durationMs: totalDurationMs,
+    },
+    catalog,
+  );
+
+  const trace: PipelineStageTrace = {
+    stage: "intro-outro",
+    startedAt: new Date(startTime).toISOString(),
+    durationMs: totalDurationMs,
+    ai,
+    errors: [],
+    warnings: [],
+  };
+
+  return {
+    title: result.title,
+    intro: result.intro,
+    outro: result.outro,
+    tokensUsed: ai.totalTokens,
+    trace,
+  };
+}
+
+/**
+ * Assemble BriefingArticle from sections + intro/outro. Pure function.
+ */
+function assembleBriefingArticle(
+  title: string,
+  intro: string,
+  sections: BriefingArticleSection[],
+  outro: string,
+): BriefingArticle {
+  const totalNews = sections.reduce((sum, s) => sum + s.newsCount, 0);
+  const totalWords = sections.reduce(
+    (sum, s) => sum + s.content.split(/\s+/).length,
+    0,
+  );
+  return {
+    title,
+    intro,
+    sections,
+    outro,
+    meta: {
+      totalNews,
+      topicsCount: sections.length,
+      readingTimeMinutes: Math.max(1, Math.round(totalWords / 200)),
+    },
+  };
+}
+
+/**
+ * Map-Reduce Briefing Author.
+ * Map: generateSection() per topic (sequential, pLimit(1))
+ * Reduce: generateIntroOutro() from section summaries
+ * Assemble: pure function
+ */
+export async function generateArticleMapReduce(
+  input: AuthorInput,
+  onSectionProgress?: (topicIdx: number, totalTopics: number, topicName: string) => void,
+): Promise<{ article: BriefingArticle; tokensUsed: number; trace?: PipelineStageTrace }> {
+  const { candidates, fullTexts, tierMap, userTopics, language, volume, date, previousBriefing, userId, catalog } = input;
+
+  if (candidates.length === 0) {
+    return {
+      article: {
+        title: `Утренний брифинг · ${formatDateRussian(date)}`,
+        intro: "Сегодня без новостей — все источники молчат.",
+        sections: [],
+        outro: "Хорошего дня!",
+        meta: { totalNews: 0, topicsCount: 0, readingTimeMinutes: 0 },
+      },
+      tokensUsed: 0,
+    };
+  }
+
+  const startTime = Date.now();
+  const groups = groupCandidatesByTopic(candidates, userTopics);
+  const previousUrls = getPreviousUrls(previousBriefing);
+  const allWarnings: string[] = [];
+  const sectionTraces: PipelineStageTrace[] = [];
+
+  // --- MAP: generate sections sequentially (pLimit(1) for API stability) ---
+  const limit = pLimit(1);
+  const topicsWithCandidates = userTopics.filter(
+    (t) => (groups.get(t.topicId)?.length ?? 0) > 0,
+  );
+
+  console.log(
+    `[Briefing Map-Reduce] ${topicsWithCandidates.length} topics with candidates, ${candidates.length} total candidates`,
+  );
+
+  const sectionResults = await Promise.allSettled(
+    topicsWithCandidates.map((topic, idx) =>
+      limit(async () => {
+        // Delay between sections to avoid MiniMax API throttling
+        if (idx > 0) {
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+        onSectionProgress?.(idx + 1, topicsWithCandidates.length, `${topic.emoji} ${topic.topicName}`);
+
+        const otherTopicNames = userTopics
+          .filter((t) => t.topicId !== topic.topicId)
+          .map((t) => t.topicName);
+
+        const topicHeadlines = getTopicHeadlines(previousBriefing, topic.topicId);
+
+        const result = await generateSection({
+          candidates: groups.get(topic.topicId)!,
+          fullTexts,
+          tierMap,
+          topic,
+          otherTopicNames,
+          volume,
+          mode: "initial",
+          previousTopicHeadlines: topicHeadlines,
+          previousUrls,
+          userId,
+          catalog,
+        });
+
+        console.log(
+          `[Briefing Map-Reduce] Section "${topic.topicName}": ${result.section.newsCount} news, ${result.tokensUsed} tokens`,
+        );
+
+        return result;
+      }),
+    ),
+  );
+
+  // Collect successful sections, log failures
+  const sections: BriefingArticleSection[] = [];
+  let mapTokens = 0;
+
+  for (let i = 0; i < sectionResults.length; i++) {
+    const result = sectionResults[i];
+    const topic = topicsWithCandidates[i];
+    if (result.status === "fulfilled") {
+      sections.push(result.value.section);
+      mapTokens += result.value.tokensUsed;
+      if (result.value.trace) sectionTraces.push(result.value.trace);
+    } else {
+      const errorMsg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      console.error(`[Briefing Map-Reduce] Section "${topic.topicName}" failed: ${errorMsg}`);
+      allWarnings.push(`Section "${topic.topicName}" failed: ${errorMsg}`);
+    }
+  }
+
+  if (sections.length === 0) {
+    throw new Error("All sections failed to generate");
+  }
+
+  // --- REDUCE: generate intro/outro ---
+  const { title, intro, outro, tokensUsed: reduceTokens, trace: introOutroTrace } = await generateIntroOutro(
+    sections,
+    volume ?? "standard",
+    date,
+    language,
+    userId,
+    catalog,
+  );
+
+  // --- ASSEMBLE ---
+  const article = assembleBriefingArticle(title, intro, sections, outro);
+  const totalTokens = mapTokens + reduceTokens;
+  const totalDurationMs = Date.now() - startTime;
+
+  console.log(
+    `[Briefing Map-Reduce] Done: ${sections.length} sections, ${totalTokens} tokens, ${Math.round(totalDurationMs / 1000)}s`,
+  );
+
+  // Build composite trace
+  const trace: PipelineStageTrace = {
+    stage: "author",
+    startedAt: new Date(startTime).toISOString(),
+    durationMs: totalDurationMs,
+    ai: introOutroTrace?.ai ?? {
+      modelId: AUTHOR_MODEL,
+      promptPreview: "(map-reduce)",
+      noCacheInputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      outputTokens: 0,
+      reasoningTokens: 0,
+      totalTokens,
+      costRub: 0,
+      finishReason: "stop",
+      retryCount: 0,
+    },
+    errors: [],
+    warnings: allWarnings,
+  };
+
+  return { article, tokensUsed: totalTokens, trace };
 }
