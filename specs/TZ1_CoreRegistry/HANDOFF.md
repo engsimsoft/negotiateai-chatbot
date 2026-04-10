@@ -1,85 +1,98 @@
 # Передача сессии ТЗ-1: Core Registry
 
 **Дата:** 2026-04-10
-**Сессия:** 2 (Этап 1 завершён кодом, ждём мануальный тест)
+**Сессия:** 2 (Этап 1 + hotfix + Этап 2 завершены)
 
 ---
 
 ## Статус этапов
 
-- [x] Фаза Анализ — ANALYSIS.md + 12 вопросов + ответы архитектора
-- [x] Фаза Планирование — ROADMAP.md (6 этапов)
-- [x] **Этап 1: Core Registry + Catalog + Task-assignments + миграция БД** — код готов, валидация пройдена. Ждём мануальный тест пользователя.
-- [ ] Этап 2: Миграция chat routes + service-chat + utils ← **СЛЕДУЮЩИЙ**
-- [ ] Этап 3: Миграция projects (tasks + plan + clerks + professors)
+- [x] Фаза Анализ
+- [x] Фаза Планирование
+- [x] **Этап 1: Core Registry + Catalog + Task-assignments + миграция БД** — commit `836842a`
+- [x] **HOTFIX: sanitizer + scrollbar** — commit `b4bce63`
+- [x] **Этап 2: Миграция chat routes + service-chat + utils** — готов к коммиту
+- [ ] Этап 3: Миграция projects (tasks + plan + clerks + professors) ← **СЛЕДУЮЩИЙ**
 - [ ] Этап 4: Миграция pipelines (briefing, podcast, memory, meeting)
 - [ ] Этап 5: Очистка legacy wrappers + удаление TokenLens
 - [ ] Этап 6: Финализация
 
 ---
 
-## Ключевое решение Этапа 1
+## Что сделано в Этапе 2
 
-**TokenLens удаление перенесено в Этап 5.** Причина: 8+ файлов (podcast, briefing, memory, professor-pipeline, pipeline-trace) импортируют `calcCostUsd` / `calcStepCostRub` / `ModelCatalog` type. Эти файлы мигрируют в Этапах 3-4 на `getModel`, и только после этого имеет смысл полностью выкинуть `tokenlens-catalog.ts` и пакет. Окончательная очистка — в Этапе 5. ROADMAP и CHANGELOG отражают решение.
+### Мигрированные call-sites на getModel(taskId) — 7 файлов
 
----
+- [app/(chat)/actions.ts](../../app/(chat)/actions.ts) — `util:title`
+- [app/(chat)/api/chat/[id]/generate-title/route.ts](../../app/(chat)/api/chat/[id]/generate-title/route.ts) — `util:title`
+- [lib/ai/tools/request-suggestions.ts](../../lib/ai/tools/request-suggestions.ts) — `util:artifact-suggestions`
+- [app/(chat)/api/assistant/ben/route.ts](../../app/(chat)/api/assistant/ben/route.ts) — `service-chat:ben` (Бен deprecated, но мигрирован)
+- [app/(chat)/api/service-chat/route.ts](../../app/(chat)/api/service-chat/route.ts) — 4 контекста через `getTaskIdForContext()` → `getModel(taskId)`. Локальный `getModelId()` удалён
+- [lib/ai/chat-mode-config.ts](../../lib/ai/chat-mode-config.ts) — превратился в тонкую обёртку: `CHAT_MODE_CONFIG` без `modelId`, добавлен `getTaskIdForChatMode()`, `getModelForChatMode()` перевеошён через catalog
+- [app/(chat)/api/chat/route.ts](../../app/(chat)/api/chat/route.ts) — **главное:** 3 места:
+  - L128 auto-naming → `getModel("util:title")`
+  - L584-598 simply branch → `simply-chat-think` / `simply-chat-vision` / `simply-chat` (вместо захардкоженных имён моделей)
+  - L998-1010 resolvedModelId для DevPanel → `getModelIdForTask(getTaskIdForChatMode(chatMode))`
+  - Локальный `minimaxModel()` helper + `createMinimaxOpenAI` import удалены
 
-## Что сделано в Этапе 1
+### Бонус — инфраструктурный фикс
 
-### Новые файлы
-- `lib/ai/model-catalog.ts` — SSOT всех моделей, pricing USD/1M, 28 записей
-- `lib/ai/registry.ts` — `createProviderRegistry`, 5 namespaces (anthropic, minimax, minimaxLong, xai, openrouter)
-- `lib/ai/task-assignments.ts` — 34 taskId → catalog id
-- `lib/ai/getModel.ts` — единая точка входа + overrides stub + test mocks
-- `lib/db/migrations/0053_ai_usage_log_provider.sql` — +колонка `provider` + SQL backfill
-
-### Изменённые
-- `lib/ai/providers.ts` — legacy wrappers над registry; pricing читается из catalog; public API калькуляций сохранён
-- `lib/ai/usage-utils.ts` — +`provider` поле + `inferProviderFromModelId()` fallback
-- `lib/db/schema.ts` + `lib/db/queries.ts` — `provider` колонка в `aiUsageLog`
-- `lib/db/migrations/meta/_journal.json` — запись о 0053
-- `.env.example` — +`XAI_API_KEY` секция
-- `package.json` — +`@ai-sdk/xai@3.0.82`
+- [lib/ai/getModel.ts](../../lib/ai/getModel.ts) — `getModel()` теперь мутирует `config.includeUsage = true` для всех `minimax:*` / `minimaxLong:*` моделей. Нужно для эмита usage events при streaming — иначе DevPanel показывает пустую стоимость. Раньше эта мутация была в локальном `minimaxModel()` хелпере chat/route.ts — теперь централизована
+- [lib/ai/task-assignments.ts](../../lib/ai/task-assignments.ts) — `service-chat:project-manager` исправлен на `claude-haiku-4-5-20251001` (было Sonnet — ошибка, в реальном коде всегда был Haiku)
 
 ### Валидация
+
 - `npx tsc --noEmit` → 0 ошибок
-- `npm run build` → успешен, миграция применена
-- SQL проверка БД: колонка `provider varchar(32)` есть
-- SQL backfill: 288 записей получили provider (107 anthropic, 64 minimax, 55 voyage, 25 deepgram, 14 perplexity, 10 google, 13 NULL legacy)
+- `npm run build` → успешен
+- `grep -rn "myProvider|claudeHaiku|claudeSonnet|claudeOpus|minimaxM27" <7 мигрированных файлов>` → **0 матчей**
+- **Логи dev-сервера подтверждают все taskId:**
+  - `task=simply-chat-think, model=claude-sonnet-4-6` ✅
+  - `task=simply-chat-vision, model=claude-haiku-4-5-20251001` ✅
+  - `task=simply-chat, model=MiniMax-M2.7` ✅
+  - `POST /api/service-chat 200` (project-creation) ✅
+- Мануальный тест пользователем: Simply text/think/vision + Экспертиза + Создание + создание проекта через service-chat — все прошли
+
+### Что НЕ удалено (будет в Этапе 5)
+
+Legacy exports в [lib/ai/providers.ts](../../lib/ai/providers.ts):
+- `myProvider` (customProvider)
+- `claudeHaiku`, `claudeSonnet`, `claudeOpus`
+- `minimaxM27`, `minimaxM27Long`
+- `getClaudeModel()`
+
+Они нужны Этапам 3-4 (projects, clerks, professors, pipelines). Grep по проекту:
+```
+grep -rn "myProvider\|claudeHaiku\|claudeSonnet\|claudeOpus\|minimaxM27" lib/ app/
+```
+Оставшиеся матчи — кандидаты для Этапов 3-4.
 
 ---
 
 ## Следующая сессия: начни с
 
-1. **Дождаться подтверждения мануального теста** от пользователя по Этапу 1
-2. Git commit Этапа 1 (ждёт)
-3. **Перейти к Этапу 2: Миграция chat routes + service-chat + utils**
-   - `app/(chat)/api/chat/route.ts` — основная маршрутизация simply / chat / expertise / create
-   - `chat-mode-config.ts` — тонкая обёртка
-   - `generate-title/route.ts`, `actions.ts`
-   - `service-chat/route.ts`, `assistant/ben/route.ts`
-   - `request-suggestions.ts`
+1. **Прочитать ROADMAP.md** → Этап 3
+2. **Migrate projects:**
+   - [app/(chat)/api/projects/[id]/plan/route.ts](../../app/(chat)/api/projects/[id]/plan/route.ts) → `professor:planning`, удалить env `PROFESSOR_MODEL`
+   - [lib/ai/professors/task-reviewer.ts](../../lib/ai/professors/task-reviewer.ts) → `professor:review`, удалить env
+   - [lib/ai/clerks/task-summarizer.ts](../../lib/ai/clerks/task-summarizer.ts) → `clerk:task-summary`, удалить env `SUMMARIZER_MODEL`
+   - [lib/ai/clerks/snapshot-creator.ts](../../lib/ai/clerks/snapshot-creator.ts) → `clerk:snapshot`, удалить env `SNAPSHOT_CLERK_MODEL`
+   - [app/(chat)/api/projects/[id]/analyze-file/route.ts](../../app/(chat)/api/projects/[id]/analyze-file/route.ts) → `clerk:file-analyzer`
+   - [app/(chat)/api/projects/[id]/generate-summary/route.ts](../../app/(chat)/api/projects/[id]/generate-summary/route.ts) → `util:project-summary`
+   - [app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts](../../app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts) — через обёртку `model-tiers.ts`
+   - [lib/ai/model-tiers.ts](../../lib/ai/model-tiers.ts) — тонкая обёртка (аналог chat-mode-config)
+   - [lib/ai/professor-pipeline.ts](../../lib/ai/professor-pipeline.ts) → `professor:pipeline-analyze` + `pipeline-execute` + `pipeline-synthesize`
+3. tsc/build, мануальный тест пользователем, commit
+4. СТОП → ждём подтверждения перед Этапом 4
 
 ---
 
 ## Блокеры / Вопросы
 
-Нет. Код готов, ждём мануальный тест.
+Нет. Всё валидировано.
 
 ---
 
-## Следующий git commit
+## Known issues (не относятся к ТЗ-1, из логов)
 
-Этап 1 commit готов к выполнению после мануального теста:
-
-```bash
-git add lib/ai/model-catalog.ts lib/ai/registry.ts lib/ai/task-assignments.ts \
-        lib/ai/getModel.ts lib/ai/providers.ts lib/ai/usage-utils.ts \
-        lib/db/schema.ts lib/db/queries.ts \
-        lib/db/migrations/0053_ai_usage_log_provider.sql \
-        lib/db/migrations/meta/_journal.json \
-        .env.example package.json pnpm-lock.yaml \
-        specs/TZ1_CoreRegistry/
-
-git commit -m "feat(tz-1): core registry, model catalog, task assignments, getModel + ai_usage_log provider column"
-```
+- `[MemoryRetrieve] Failed (graceful degradation): Voyage AI API error (403)` — Voyage API ключ возвращает 403, RAG retrieval падает с graceful degradation. Не связан с ТЗ-1, существующий background issue. Нужно проверить VOYAGE_API_KEY в .env.local.
+- DevPanel не показывает модель для service-chat (Бен, project-creation). В route.ts есть emit debug events при `isSimplyDevMode`, но клиентский ServiceChatCore не подписан на DevPanelProvider. Отдельный таск вне ТЗ-1.

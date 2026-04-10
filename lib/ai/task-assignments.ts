@@ -120,10 +120,10 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   // Meeting
   "meeting:summary":          "claude-sonnet-4-6",
 
-  // Service chats (пока Haiku по дефолту — аналог текущей логики buildBenPrompt)
+  // Service chats — defaults mirror service-chat/route.ts getModelId() + ben/route.ts
   "service-chat:ben":                 "claude-haiku-4-5-20251001",
   "service-chat:project-creation":    "claude-sonnet-4-6",
-  "service-chat:project-manager":     "claude-sonnet-4-6",
+  "service-chat:project-manager":     "claude-haiku-4-5-20251001",
   "service-chat:briefing-onboarding": "claude-sonnet-4-6",
 
   // Утилиты

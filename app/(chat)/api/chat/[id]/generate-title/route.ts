@@ -2,7 +2,11 @@ import { generateObject } from "ai";
 import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
-import { myProvider } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import { logUsage } from "@/lib/ai/usage-utils";
 import {
   getChatById,
@@ -76,11 +80,12 @@ export async function POST(
       })
       .join("\n");
 
-    const resolvedModelId = myProvider.languageModel("title-model").modelId;
+    // ТЗ-1 CoreRegistry: model now resolved via getModel(taskId)
+    const resolvedModelId = getModelIdForTask("util:title");
 
     // Generate title and summary using Claude Haiku (fast and cheap)
     const { object, usage } = await generateObject({
-      model: myProvider.languageModel("title-model"),
+      model: getModel("util:title"),
       schema: z.object({
         title: z.string().describe("Короткое название чата (2-4 слова)"),
         summary: z.string().describe("Краткое описание темы разговора (1-2 предложения)"),
@@ -111,6 +116,7 @@ export async function POST(
       userId: session.user.id!,
       usage,
       modelId: resolvedModelId,
+      provider: getProviderForTask("util:title"),
       chatMode: "util:auto-naming",
       chatId,
     });

@@ -161,7 +161,7 @@ getModel(taskId: string, context?: { userId?: string; requestCookies?: ReadonlyR
 
 ### Этап 2: Миграция chat routes + service-chat + utils
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (2026-04-10)
 
 **Цель:** Перевести самые горячие call-sites (основной чат, service chat, генерация заголовков) на `getModel(taskId)`. Удалить legacy wrappers `myProvider`/`claudeHaiku`/`claudeSonnet`/`claudeOpus` там, где они становятся не нужны (но оставить экспорт из providers.ts если ещё где-то используются).
 

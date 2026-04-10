@@ -3,7 +3,11 @@
 import { generateText, type UIMessage } from "ai";
 import { cookies } from "next/headers";
 import type { VisibilityType } from "@/components/visibility-selector";
-import { myProvider } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import { logUsage } from "@/lib/ai/usage-utils";
 import {
   deleteMessagesByChatIdAfterTimestamp,
@@ -23,10 +27,11 @@ export async function generateTitleFromUserMessage({
   message: UIMessage;
   userId?: string;
 }) {
-  const resolvedModelId = myProvider.languageModel("title-model").modelId;
+  // ТЗ-1 CoreRegistry: model now resolved via getModel(taskId)
+  const resolvedModelId = getModelIdForTask("util:title");
 
   const { text: title, usage } = await generateText({
-    model: myProvider.languageModel("title-model"),
+    model: getModel("util:title"),
     system: `\n
     - you will generate a short title based on the first message a user begins a conversation with
     - ensure it is not more than 80 characters long
@@ -41,6 +46,7 @@ export async function generateTitleFromUserMessage({
       userId,
       usage,
       modelId: resolvedModelId,
+      provider: getProviderForTask("util:title"),
       chatMode: "util:generate-title",
     });
   }

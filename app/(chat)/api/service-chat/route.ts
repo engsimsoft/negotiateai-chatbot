@@ -15,7 +15,12 @@ import path from "path";
 import { streamText, tool, stepCountIs, createUIMessageStream, JsonToSseTransformStream } from "ai";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
-import { myProvider } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
+import type { TaskId } from "@/lib/ai/task-assignments";
 import { buildBenPrompt } from "@/lib/prompts/server";
 import {
   getUserById,
@@ -119,19 +124,20 @@ function extractMessageContent(message: {
 }
 
 /**
- * Get model ID based on context
+ * ТЗ-1 CoreRegistry: map service-chat context → task-assignments TaskId.
+ * Actual model is resolved via getModel() from lib/ai/getModel.ts.
  */
-function getModelId(context: ServiceChatContext): string {
+function getTaskIdForContext(context: ServiceChatContext): TaskId {
   switch (context) {
     case "project-creation":
-      return "claude-sonnet";
+      return "service-chat:project-creation";
     case "briefing-onboarding":
-      return "claude-sonnet-4-6";
-    case "ben":
+      return "service-chat:briefing-onboarding";
     case "project-manager":
-      return "claude-haiku";
+      return "service-chat:project-manager";
+    case "ben":
     default:
-      return "claude-haiku";
+      return "service-chat:ben";
   }
 }
 
@@ -616,8 +622,9 @@ export async function POST(request: Request) {
       userId,
     });
 
-    // Get model
-    const modelId = getModelId(context);
+    // ТЗ-1 CoreRegistry: resolve model via task-assignments
+    const taskId = getTaskIdForContext(context);
+    const modelId = getModelIdForTask(taskId);
 
     // Build tools based on context
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -772,7 +779,7 @@ export async function POST(request: Request) {
         }
 
         const result = streamText({
-          model: myProvider.languageModel(modelId),
+          model: getModel(taskId),
           // ТЗ-CACHE1: system as message with per-message cacheControl (top-level providerOptions doesn't mark messages)
           messages: [
             { role: 'system' as const, content: systemPrompt, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },
@@ -832,11 +839,12 @@ export async function POST(request: Request) {
             if (firstTokenTime === null) firstTokenTime = totalTime;
 
             // ТЗ-PIPELINE1: Use totalUsage (sum of all steps), not per-step usage
-            const resolvedModelId = myProvider.languageModel(modelId).modelId;
+            // ТЗ-1 CoreRegistry: modelId already resolved via getModelIdForTask
             logUsage({
               userId,
               usage: totalUsage,
-              modelId: resolvedModelId,
+              modelId,
+              provider: getProviderForTask(taskId),
               chatMode: `service:${context}`,
               chatId: managerChatId ?? null,
               durationMs: totalTime,

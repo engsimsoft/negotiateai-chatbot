@@ -9,7 +9,11 @@
 
 import { convertToModelMessages, streamText } from "ai";
 import { auth } from "@/app/(auth)/auth";
-import { myProvider } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import { buildBenPrompt } from "@/lib/prompts/server";
 import { logUsage } from "@/lib/ai/usage-utils";
 import { stripIncompleteToolParts } from "@/lib/utils";
@@ -24,12 +28,13 @@ export async function POST(request: Request) {
     const session = await auth();
     const userId = session?.user?.id;
 
-    // Build prompt using new builder
+    // Build prompt using new builder. Ben model is resolved via ТЗ-1 task-assignments
+    // (`service-chat:ben`) — prompt.model field from buildBenPrompt is no longer used.
     const prompt = buildBenPrompt({}, isFirstTime === true);
-    const resolvedModelId = myProvider.languageModel(prompt.model).modelId;
+    const resolvedModelId = getModelIdForTask("service-chat:ben");
 
     const result = streamText({
-      model: myProvider.languageModel(prompt.model),
+      model: getModel("service-chat:ben"),
       system: prompt.systemPrompt,
       // ТЗ-1 hotfix: strip failed/in-flight tool parts before conversion
       messages: await convertToModelMessages(stripIncompleteToolParts(messages)),
@@ -41,6 +46,7 @@ export async function POST(request: Request) {
             userId,
             usage: totalUsage,
             modelId: resolvedModelId,
+            provider: getProviderForTask("service-chat:ben"),
             chatMode: "legacy:ben",
           });
         }

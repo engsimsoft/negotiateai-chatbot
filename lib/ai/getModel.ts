@@ -157,10 +157,22 @@ export function getModel(
     );
   }
 
-  return registry.languageModel(
+  const model = registry.languageModel(
     // cast: registry type expects literal union; тут taskId динамический
     registryId as Parameters<typeof registry.languageModel>[0],
   );
+
+  // ТЗ-1: MiniMax needs includeUsage=true to emit usage events during streaming
+  // (reasoning tokens, cache tokens). Default provider doesn't set this.
+  // Must mutate instance config after creation (matches legacy minimaxM27 path).
+  if (registryId.startsWith("minimax:") || registryId.startsWith("minimaxLong:")) {
+    const mutableModel = model as unknown as { config?: Record<string, unknown> };
+    if (mutableModel.config) {
+      mutableModel.config = { ...mutableModel.config, includeUsage: true };
+    }
+  }
+
+  return model;
 }
 
 /**

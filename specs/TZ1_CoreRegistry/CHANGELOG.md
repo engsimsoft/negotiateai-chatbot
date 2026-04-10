@@ -4,6 +4,67 @@
 
 ---
 
+## Сессия 3 — 2026-04-10 — Этап 2: Миграция chat routes + service-chat + utils
+
+### Changed — 7 call-sites мигрированы на getModel(taskId)
+
+- **app/(chat)/actions.ts** — `generateTitleFromUserMessage()` → `getModel("util:title")` + `getProviderForTask` в logUsage
+- **app/(chat)/api/chat/[id]/generate-title/route.ts** — `getModel("util:title")` + provider logging
+- **lib/ai/tools/request-suggestions.ts** — `getModel("util:artifact-suggestions")`
+- **app/(chat)/api/assistant/ben/route.ts** — `getModel("service-chat:ben")` (deprecated Ben продолжает работать)
+- **app/(chat)/api/service-chat/route.ts** — Локальный `getModelId()` удалён, заменён на `getTaskIdForContext()` → `getModel(taskId)`. Все 4 контекста (ben/project-creation/project-manager/briefing-onboarding) идут через task-assignments
+- **lib/ai/chat-mode-config.ts** — Превратился в тонкую обёртку. `CHAT_MODE_CONFIG` теперь содержит только `displayName` и `tools` (без `modelId`). Добавлен `getTaskIdForChatMode()`. `getModelForChatMode()` переписан через catalog
+- **app/(chat)/api/chat/route.ts** — Главный файл, 3 точки:
+  - Auto-naming (L128) → `getModel("util:title")`
+  - Simply branch (L584-598) → 3 taskId вместо захардкоженных имён: `simply-chat-think`, `simply-chat-vision`, `simply-chat`
+  - resolvedModelId в onFinish (L998-1010) → `getModelIdForTask(getTaskIdForChatMode(chatMode))`
+  - Локальный `minimaxModel()` helper и `createMinimaxOpenAI` import удалены
+
+### Fixed
+
+- **lib/ai/getModel.ts** — Добавлена мутация `config.includeUsage = true` для `minimax:*` / `minimaxLong:*` моделей. Без этого MiniMax не эмитит usage events при streaming, и DevPanel показывает пустую стоимость. Раньше была в локальном `minimaxModel()` хелпере chat/route.ts — теперь централизована в getModel
+- **lib/ai/task-assignments.ts** — `service-chat:project-manager` исправлен с `claude-sonnet-4-6` на `claude-haiku-4-5-20251001` (реальный код в `getModelId()` всегда возвращал Haiku для project-manager)
+
+### Validation
+
+- `npx tsc --noEmit` → 0 ошибок
+- `npm run build` → успешен
+- `grep -rn "myProvider|claudeHaiku|claudeSonnet|claudeOpus|minimaxM27" <мигрированные файлы>` → 0 матчей
+- **Логи dev-сервера подтверждают все 3 taskId для Simply:**
+  - `task=simply-chat-think, model=claude-sonnet-4-6` ✅
+  - `task=simply-chat-vision, model=claude-haiku-4-5-20251001` ✅
+  - `task=simply-chat, model=MiniMax-M2.7` ✅
+  - `POST /api/service-chat 200 in 3905ms` (project-creation) ✅
+- **Мануальный тест пользователем** (2026-04-10): Simply text/think/vision + Экспертиза + Создание + service-chat project-creation — все прошли
+
+### Files
+
+- `app/(chat)/actions.ts` (+3, -3)
+- `app/(chat)/api/chat/[id]/generate-title/route.ts` (+10, -2)
+- `app/(chat)/api/chat/route.ts` (+24, -22)
+- `app/(chat)/api/assistant/ben/route.ts` (+13, -4)
+- `app/(chat)/api/service-chat/route.ts` (+16, -13)
+- `lib/ai/chat-mode-config.ts` (+43, -16)
+- `lib/ai/getModel.ts` (+12, -1)
+- `lib/ai/task-assignments.ts` (+1, -1)
+- `lib/ai/tools/request-suggestions.ts` (+2, -1)
+
+---
+
+## Сессия 2b — 2026-04-10 — HOTFIX commit b4bce63
+
+### Added
+- **lib/utils.ts::stripIncompleteToolParts** — UI-level pre-sanitization для AI SDK v6 tool parts. Фильтрует все `tool-*` parts с `state !== "output-available"` (output-error, input-streaming, input-available) до `convertToModelMessages`. Если message остаётся без meaningful content — вставляется placeholder `[инструмент не завершён]`. Defense-in-depth вместе с существующим `sanitizeCoreMessages`. Применён в 4 call-sites: chat/route.ts (pipeline + main), task-chat/route.ts, ben/route.ts
+
+### Fixed
+- **components/messages.tsx** — Canonical single-scroll conversation. Убран outer `<div flex-col-reverse overflow-y-scroll>` (из commit bfb07f1 ТЗ-SlidingWindow), который создавал **двойной scroll-контейнер** поверх `<Conversation>` (StickToBottom). Scrollbar из-за этого "жил своей жизнью" — смещался влево на коротких сообщениях. Теперь используется только `<Conversation>` + родной `<ConversationScrollButton>` (читает `useStickToBottomContext`). Scroll-on-submit реализован через внутренний sub-component `<ScrollToBottomOnSubmit>`. `hasSentMessage` state переместился внутрь `PureMessages`. `useMessages` hook удалён из messages.tsx (остался в artifact-messages.tsx)
+
+### Validation
+- Мануальный тест пользователем в отравленном чате (c3bca966) **БЕЗ SQL DELETE** — sanitizer разблокировал чат на лету. MiniMax 7.491 tok, Haiku vision 16.8k tok с attachment, все 200 OK
+- Скроллбар больше не гуляет, стрелка вниз работает корректно
+
+---
+
 ## Сессия 2 — 2026-04-10 — Этап 1: Core инфраструктура
 
 ### Added

@@ -13,21 +13,15 @@ import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
 import { extractUsageFields, extractUsageForPricing, logUsage } from "@/lib/ai/usage-utils";
 import { auth } from "@/app/(auth)/auth";
 import { userEntitlements } from "@/lib/ai/entitlements";
-import { getModelForChatMode } from "@/lib/ai/chat-mode-config";
+import { getTaskIdForChatMode } from "@/lib/ai/chat-mode-config";
 import { buildChatPrompt, buildExpertisePrompt, buildCreatePrompt } from "@/lib/prompts/server";
 import type { BuildContext } from "@/lib/prompts";
 import { buildProjectContext } from "@/lib/prompts/contexts";
-import { myProvider, claudeHaiku } from "@/lib/ai/providers";
-import { createMinimaxOpenAI } from "vercel-minimax-ai-provider";
-
-// MiniMax OpenAI provider with includeUsage enabled for streaming usage data
-// (reasoning tokens, cache tokens). Default provider doesn't set this.
-const minimaxProvider = createMinimaxOpenAI();
-function minimaxModel(modelId: string) {
-  const model = minimaxProvider(modelId) as any;
-  model.config = { ...model.config, includeUsage: true };
-  return model;
-}
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import {
   getProjectModel,
   isValidModelTier,
@@ -125,10 +119,11 @@ async function autoNameChat(chatId: string, userId: string): Promise<void> {
     })
     .join("\n");
 
-  const resolvedModelId = myProvider.languageModel("title-model").modelId;
+  // ТЗ-1 CoreRegistry: auto-naming via task-assignments
+  const resolvedModelId = getModelIdForTask("util:title");
 
   const { object, usage } = await generateObject({
-    model: myProvider.languageModel("title-model"),
+    model: getModel("util:title"),
     schema: z.object({
       title: z.string().describe("Короткое название чата (2-4 слова)"),
       summary: z.string().describe("Краткое описание темы разговора (1-2 предложения)"),
@@ -169,6 +164,7 @@ async function autoNameChat(chatId: string, userId: string): Promise<void> {
     userId,
     usage,
     modelId: resolvedModelId,
+    provider: getProviderForTask("util:title"),
     chatMode: "util:auto-naming",
     chatId,
   });
@@ -585,23 +581,23 @@ export async function POST(request: Request) {
               ? buildCreatePrompt(promptContext)
               : buildChatPrompt(promptContext);
           systemPromptText = builtPrompt.systemPrompt;
-          // ТЗ-MinimaxCleanup: Model routing for Simply Chat
+          // ТЗ-MinimaxCleanup + ТЗ-1 CoreRegistry: Model routing for Simply Chat
           // Priority: think → Sonnet, attachments → Haiku 4.5 (vision), default → MiniMax M2.7
           if (chatMode === "simply") {
             if (think) {
-              modelToUse = myProvider.languageModel("claude-sonnet");
-              console.log(`[Chat API] Model selection: chatMode=simply, think=true, model=claude-sonnet`);
+              modelToUse = getModel("simply-chat-think");
+              console.log(`[Chat API] Model selection: chatMode=simply, think=true, task=simply-chat-think, model=${getModelIdForTask("simply-chat-think")}`);
             } else if (hasAttachments(message.parts)) {
-              modelToUse = claudeHaiku;
-              console.log(`[Chat API] Model selection: chatMode=simply, attachments=true, model=claude-haiku-4-5`);
+              modelToUse = getModel("simply-chat-vision");
+              console.log(`[Chat API] Model selection: chatMode=simply, attachments=true, task=simply-chat-vision, model=${getModelIdForTask("simply-chat-vision")}`);
             } else {
-              modelToUse = minimaxModel("MiniMax-M2.7");
-              console.log(`[Chat API] Model selection: chatMode=simply, model=MiniMax-M2.7`);
+              modelToUse = getModel("simply-chat");
+              console.log(`[Chat API] Model selection: chatMode=simply, task=simply-chat, model=${getModelIdForTask("simply-chat")}`);
             }
           } else {
-            const chatModelId = getModelForChatMode(chatMode);
-            console.log(`[Chat API] Model selection: chatMode=${chatMode}, model=${chatModelId}`);
-            modelToUse = myProvider.languageModel(chatModelId);
+            const chatTaskId = getTaskIdForChatMode(chatMode);
+            console.log(`[Chat API] Model selection: chatMode=${chatMode}, task=${chatTaskId}, model=${getModelIdForTask(chatTaskId)}`);
+            modelToUse = getModel(chatTaskId);
           }
         }
 
@@ -1002,18 +998,17 @@ export async function POST(request: Request) {
             let resolvedModelId: string | undefined;
             let costUsd: number | null = null;
             try {
-              // ТЗ-MinimaxCleanup: Resolve model ID matching selection logic above
+              // ТЗ-MinimaxCleanup + ТЗ-1 CoreRegistry: Resolve model ID matching selection logic above
               if (chatMode === "simply") {
                 if (think) {
-                  resolvedModelId = myProvider.languageModel("claude-sonnet").modelId;
+                  resolvedModelId = getModelIdForTask("simply-chat-think");
                 } else if (hasAttachments(message.parts)) {
-                  resolvedModelId = "claude-haiku-4-5-20251001";
+                  resolvedModelId = getModelIdForTask("simply-chat-vision");
                 } else {
-                  resolvedModelId = "MiniMax-M2.7";
+                  resolvedModelId = getModelIdForTask("simply-chat");
                 }
               } else {
-                const chatModelId = getModelForChatMode(chatMode);
-                resolvedModelId = myProvider.languageModel(chatModelId).modelId;
+                resolvedModelId = getModelIdForTask(getTaskIdForChatMode(chatMode));
               }
               const effectiveModelId =
                 resolvedModelId ?? (isProjectChat ? `project:${tier}` : chatMode);
