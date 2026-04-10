@@ -201,3 +201,18 @@ export function getProviderForTask(
   const resolved = resolveModelEntry(catalogId);
   return resolved?.provider ?? "unknown";
 }
+
+/**
+ * Поддерживает ли модель для задачи extended thinking (Anthropic adaptive/enabled).
+ * Используется callers чтобы условно добавлять providerOptions.anthropic.thinking.
+ * Если модель Haiku / не-Anthropic → false.
+ */
+export function taskSupportsThinking(
+  taskId: TaskId,
+  context?: GetModelContext,
+): boolean {
+  const overrideId = lookupOverride(taskId, context);
+  const catalogId = overrideId ?? DEFAULT_TASK_MODELS[taskId];
+  const resolved = resolveModelEntry(catalogId);
+  return resolved?.capabilities.thinking ?? false;
+}

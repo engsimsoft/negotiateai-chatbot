@@ -4,7 +4,7 @@
  * Creates a snapshot when the model ignores the system signal
  * after FALLBACK_MESSAGE_PAIRS exchanges.
  *
- * Model: SNAPSHOT_CLERK_MODEL env || claude-haiku
+ * ТЗ-1 CoreRegistry: model resolved via getModel('clerk:snapshot')
  * Prompt: lib/prompts/clerks/snapshot-creator.md
  */
 
@@ -13,7 +13,11 @@ import path from "path";
 import { generateText } from "ai";
 import { z } from "zod";
 
-import { myProvider } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import type { DBMessage } from "@/lib/db/schema";
 import { logUsage } from "@/lib/ai/usage-utils";
 
@@ -161,7 +165,8 @@ interface CreateFallbackSnapshotInput {
 export async function createFallbackSnapshot(
   input: CreateFallbackSnapshotInput
 ): Promise<(SnapshotOutput & { fullMarkdown: string }) | null> {
-  const modelId = process.env.SNAPSHOT_CLERK_MODEL || "claude-haiku";
+  // ТЗ-1 CoreRegistry: model resolved via task-assignments
+  const resolvedModelId = getModelIdForTask("clerk:snapshot");
 
   try {
     const userMessage = buildUserMessage(input.chatMessages, {
@@ -170,10 +175,8 @@ export async function createFallbackSnapshot(
       chatTitle: input.chatTitle,
     });
 
-    const resolvedModelId = myProvider.languageModel(modelId).modelId;
-
     const result = await generateText({
-      model: myProvider.languageModel(modelId),
+      model: getModel("clerk:snapshot"),
       system: SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.1,
@@ -185,6 +188,7 @@ export async function createFallbackSnapshot(
         userId: input.userId,
         usage: result.usage,
         modelId: resolvedModelId,
+        provider: getProviderForTask("clerk:snapshot"),
         chatMode: "clerk:snapshot",
       });
     }

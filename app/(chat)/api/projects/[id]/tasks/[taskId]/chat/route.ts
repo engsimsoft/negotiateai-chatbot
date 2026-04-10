@@ -10,7 +10,8 @@ import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { buildTaskExpertPrompt } from "@/lib/prompts/build-task-expert-prompt";
 import { getProjectModel, isValidModelTier, DEFAULT_PROJECT_MODEL } from "@/lib/ai/model-tiers";
-import { myProvider } from "@/lib/ai/providers";
+import { getProjectTierModelId, getTaskIdForTier } from "@/lib/ai/model-tiers";
+import { getProviderForTask } from "@/lib/ai/getModel";
 import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment, isSimplyDevMode } from "@/lib/constants";
 import { calculateCostRub } from "@/lib/ai/providers";
@@ -322,15 +323,16 @@ export async function POST(
               `[TaskExpert] Task ${taskId}: TTFT = ${firstTokenTime}ms, Total = ${totalTime}ms, Usage = ${JSON.stringify(totalUsage)}`
             );
 
-            // ТЗ-OPT1+CACHE2: Usage logging (fire-and-forget)
-            const TIER_ALIAS: Record<string, string> = { executor: "claude-haiku", expert: "claude-sonnet", professor: "claude-opus" };
-            const resolvedModelId = myProvider.languageModel(TIER_ALIAS[tier] || "claude-sonnet").modelId;
+            // ТЗ-OPT1+CACHE2+ТЗ-1: Usage logging (fire-and-forget)
+            const tierTaskId = getTaskIdForTier(tier);
+            const resolvedModelId = getProjectTierModelId(tier);
             const costUsd = await calcCostUsd(resolvedModelId, totalUsage);
             const usageFields = extractUsageFields(totalUsage);
             saveAiUsageLog({
               chatId,
               userId: session.user.id,
               modelId: resolvedModelId,
+              provider: getProviderForTask(tierTaskId),
               ...usageFields,
               costUsd,
               chatMode: `project:${tier}`,
@@ -436,12 +438,12 @@ export async function POST(
                     })),
                   });
                   // Save guardian flags to usage log (fire-and-forget)
-                  const TIER_ALIAS: Record<string, string> = { executor: "claude-haiku", expert: "claude-sonnet", professor: "claude-opus" };
-                  const resolvedModelId = myProvider.languageModel(TIER_ALIAS[tier] || "claude-sonnet").modelId;
+                  const guardianResolvedModelId = getProjectTierModelId(tier);
                   saveAiUsageLog({
                     chatId,
                     userId: session.user.id,
-                    modelId: resolvedModelId,
+                    modelId: guardianResolvedModelId,
+                    provider: getProviderForTask(getTaskIdForTier(tier)),
                     inputTokens: 0,
                     outputTokens: 0,
                     costUsd: 0,

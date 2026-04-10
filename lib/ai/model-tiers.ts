@@ -1,16 +1,22 @@
 /**
  * Project Model Tiers Configuration (ТЗ-03)
+ * ТЗ-1 CoreRegistry: thin wrapper over task-assignments.ts
  *
  * Три уровня моделей для проектов:
  * 1. Исполнитель — Claude Haiku, быстрый, дешёвый, для простых задач
  * 2. Эксперт — Claude Sonnet, баланс, по умолчанию
  * 3. Профессор — Claude Opus, сложные задачи
  *
- * Источник правды: docs/ai-chats-map.md
+ * Фактический выбор модели делегирован в task-assignments.ts через getModel().
+ * Этот модуль предоставляет доменную метаинформацию (name/description/icon).
+ *
+ * Источник правды для моделей: lib/ai/task-assignments.ts
+ * Источник правды для отображения: docs/ai-chats-map.md
  */
 
 import type { LanguageModel } from "ai";
-import { myProvider } from "./providers";
+import { getModel, getModelIdForTask } from "./getModel";
+import type { TaskId } from "./task-assignments";
 
 /**
  * Project model tier identifiers
@@ -18,7 +24,7 @@ import { myProvider } from "./providers";
 export type ProjectModelTier = "executor" | "expert" | "professor";
 
 /**
- * Model tier configuration
+ * Model tier configuration (metadata only — actual model resolved via getModel)
  */
 export interface ModelTierConfig {
   id: ProjectModelTier;
@@ -32,42 +38,45 @@ export interface ModelTierConfig {
   };
 }
 
+interface ModelTierMetadata {
+  name: string;
+  description: string;
+  icon: string;
+  pricing: { input: number; output: number };
+}
+
 /**
- * Project models configuration
+ * ТЗ-1 CoreRegistry: map project tier → TaskId for getModel().
  */
-export const PROJECT_MODELS: Record<ProjectModelTier, ModelTierConfig> = {
+export function getTaskIdForTier(tier: ProjectModelTier): TaskId {
+  switch (tier) {
+    case "executor":
+      return "project:expert:haiku";
+    case "expert":
+      return "project:expert:sonnet";
+    case "professor":
+      return "project:expert:opus";
+  }
+}
+
+const TIER_METADATA: Record<ProjectModelTier, ModelTierMetadata> = {
   executor: {
-    id: "executor",
     name: "Исполнитель",
     description: "Быстрый и экономичный для простых задач",
-    model: myProvider.languageModel("claude-haiku"),
     icon: "⚡",
-    pricing: {
-      input: 1.0,
-      output: 5.0,
-    },
+    pricing: { input: 1.0, output: 5.0 },
   },
   expert: {
-    id: "expert",
     name: "Эксперт",
     description: "Баланс скорости и качества",
-    model: myProvider.languageModel("claude-sonnet"),
     icon: "🎯",
-    pricing: {
-      input: 3.0,
-      output: 15.0,
-    },
+    pricing: { input: 3.0, output: 15.0 },
   },
   professor: {
-    id: "professor",
     name: "Профессор",
     description: "Максимальное качество, сложные задачи",
-    model: myProvider.languageModel("claude-opus"),
     icon: "🎓",
-    pricing: {
-      input: 5.0,
-      output: 25.0,
-    },
+    pricing: { input: 5.0, output: 25.0 },
   },
 };
 
@@ -77,22 +86,42 @@ export const PROJECT_MODELS: Record<ProjectModelTier, ModelTierConfig> = {
 export const DEFAULT_PROJECT_MODEL: ProjectModelTier = "expert";
 
 /**
- * Get model configuration by tier
+ * Get model configuration by tier.
+ * Model is lazily resolved via getModel(taskId) to support ТЗ-2 overrides.
  */
 export function getProjectModel(tier: ProjectModelTier): ModelTierConfig {
-  return PROJECT_MODELS[tier] || PROJECT_MODELS[DEFAULT_PROJECT_MODEL];
+  const effectiveTier = TIER_METADATA[tier] ? tier : DEFAULT_PROJECT_MODEL;
+  const meta = TIER_METADATA[effectiveTier];
+  return {
+    id: effectiveTier,
+    name: meta.name,
+    description: meta.description,
+    model: getModel(getTaskIdForTier(effectiveTier)),
+    icon: meta.icon,
+    pricing: meta.pricing,
+  };
+}
+
+/**
+ * Get the physical modelId for a project tier (without resolving LanguageModel).
+ * Useful for usage logging and DevPanel display.
+ */
+export function getProjectTierModelId(tier: ProjectModelTier): string {
+  return getModelIdForTask(getTaskIdForTier(tier));
 }
 
 /**
  * Get all model tiers as array (for UI dropdowns)
  */
 export function getProjectModelTiers(): ModelTierConfig[] {
-  return Object.values(PROJECT_MODELS);
+  return (Object.keys(TIER_METADATA) as ProjectModelTier[]).map((tier) =>
+    getProjectModel(tier),
+  );
 }
 
 /**
  * Validate if a string is a valid model tier
  */
 export function isValidModelTier(tier: string): tier is ProjectModelTier {
-  return tier in PROJECT_MODELS;
+  return tier in TIER_METADATA;
 }

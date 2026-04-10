@@ -4,6 +4,74 @@
 
 ---
 
+## Сессия 4 — 2026-04-11 — Этап 3: Миграция projects + clerks + professors
+
+### Changed — 9 файлов мигрированы на getModel(taskId)
+
+- **lib/ai/model-tiers.ts** — Превратился в тонкую обёртку. Добавлены `getTaskIdForTier()` и `getProjectTierModelId()`. `PROJECT_MODELS` больше не хардкодит `myProvider.languageModel(…)` — модели резолвятся лениво через `getModel()`. Metadata (name/description/icon/pricing) остаются в модуле.
+- **lib/ai/clerks/task-summarizer.ts** — `getModel("clerk:task-summary")`. Удалён `process.env.SUMMARIZER_MODEL`.
+- **lib/ai/clerks/snapshot-creator.ts** — `getModel("clerk:snapshot")`. Удалён `process.env.SNAPSHOT_CLERK_MODEL`.
+- **app/(chat)/api/projects/[id]/analyze-file/route.ts** — `getModel("clerk:file-analyzer")`.
+- **app/(chat)/api/projects/[id]/plan/route.ts** — `getModel("professor:planning")`. Удалён `process.env.PROFESSOR_MODEL`.
+- **lib/ai/professors/task-reviewer.ts** — `getModel("professor:review")`. Удалён `process.env.PROFESSOR_MODEL`.
+- **lib/ai/professor-pipeline.ts** — 3 фазы: `professor:pipeline-analyze` / `pipeline-execute` / `pipeline-synthesize`. Все `saveAiUsageLog` теперь пишут `provider`.
+- **app/(chat)/api/projects/[id]/generate-summary/route.ts** — `getModel("util:project-summary")`.
+- **app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts** — Удалены дубли `TIER_ALIAS`. Использует `getProjectTierModelId(tier)` + `getTaskIdForTier(tier)`. Два места: main onFinish + guardian error handler.
+
+### Added — Architectural improvements
+
+- **lib/ai/getModel.ts::taskSupportsThinking(taskId)** — Новый capability helper. Читает `capabilities.thinking` из model-catalog. Используется callers чтобы **условно** передавать `providerOptions.anthropic.thinking: adaptive` — только если resolved модель его поддерживает. Решает реальную проблему: при смене defaults в task-assignments (например с Opus на Haiku) hardcoded thinking options ломали API запрос с 400 "adaptive thinking is not supported on this model". Теперь system самоадаптируется под любую модель. Применено в 3 call-sites:
+  - `app/(chat)/api/projects/[id]/plan/route.ts`
+  - `lib/ai/professors/task-reviewer.ts`
+  - `app/(chat)/api/service-chat/route.ts` (briefing-onboarding)
+
+- **components/projects/task-chat.tsx** — Обёрнут в `<DevPanelProvider>`. `DevPanelFooter` внутри `PreviewMessage` теперь получает контекст в task-chat и показывает модель/токены/стоимость для каждого ответа эксперта. Серверная сторона (`emitDebugPrompt/Step/Finish`) уже всё эмитит — требовалось только клиентское оборачивание. `DataStreamProvider` уже доступен в `app/(task)/layout.tsx`.
+
+### Removed — env variables
+
+- `PROFESSOR_MODEL` — удалена из `plan/route.ts` и `task-reviewer.ts`
+- `SUMMARIZER_MODEL` — удалена из `task-summarizer.ts`
+- `SNAPSHOT_CLERK_MODEL` — удалена из `snapshot-creator.ts`
+
+### Validation
+
+- `npx tsc --noEmit` → 0 ошибок
+- `npm run build` → успешен
+- `grep` по 9 файлам: 0 legacy refs (только комментарии "was process.env.X")
+- **Логи dev-сервера подтверждают работу архитектуры:**
+  - `POST /api/service-chat 200` — project-creation → Sonnet ✅
+  - `POST /api/projects/.../analyze-file 200 in 4557ms` — file-analyzer → Haiku ✅
+  - `POST /api/projects/.../plan` — модель резолвится из task-assignments (в теле запроса видно `model: 'claude-opus-4-6'` в запросе к Anthropic API)
+
+### Architecture validation — главное достижение
+
+Во время мануального теста **одной строкой в `task-assignments.ts`** были переключены 8 taskId (chat:sonnet/opus, project:expert:haiku/sonnet/opus, professor:planning/review/pipeline-analyze/synthesize) с Opus/Sonnet на Haiku. Все call-sites автоматически подхватили новую модель через `getModel()` + HMR. **Это ровно тот use case, ради которого делается Core Registry** — возможность переключать модели без касания call-sites.
+
+При этом вскрылась реальная архитектурная дыра (`providerOptions.anthropic.thinking` был hardcoded, ломался на Haiku) — и была решена **правильно**: через catalog-driven capability check `taskSupportsThinking()`, а не через заплатку. После fix `providerOptions` автоматически адаптируется под любую resolved модель без ручного вмешательства.
+
+### Known issues (не относятся к Этапу 3)
+
+- **Planning promt не совместим с Haiku output format.** Когда `professor:planning` был временно переключён на Haiku для теста, API запрос прошёл успешно (200 OK, 49 секунд), модель сгенерировала валидный `<plan_report>`, но обернула ответ в markdown fence `\`\`\`xml ... \`\`\`` и, возможно, усекла `<plan_json>` тег. Парсер в `extractTag()` рассчитан на чистый Opus output. Это **не infrastructure проблема** — это domain-specific prompt engineering, будет решено при переписывании промптов под cross-model support (будущий этап после ТЗ-1).
+
+- **DevPanel полный e2e тест в TaskChat** не пройден — требует реальной задачи, открытой через planner. Planning с Opus дорого, планинг с Haiku упал на parser (см. выше). Компонент обёрнут корректно, сервер эмитит debug events — тест будет выполнен автоматически при первом использовании проектов в production после коммита ТЗ-1.
+
+### Files (12 changed)
+
+- `lib/ai/model-tiers.ts` (rewrite — thin wrapper)
+- `lib/ai/clerks/task-summarizer.ts` (+8, -5)
+- `lib/ai/clerks/snapshot-creator.ts` (+8, -5)
+- `lib/ai/professors/task-reviewer.ts` (+18, -9)
+- `lib/ai/professor-pipeline.ts` (+18, -9)
+- `lib/ai/getModel.ts` (+14) — `taskSupportsThinking()`
+- `app/(chat)/api/projects/[id]/analyze-file/route.ts` (+10, -4)
+- `app/(chat)/api/projects/[id]/plan/route.ts` (+19, -12)
+- `app/(chat)/api/projects/[id]/generate-summary/route.ts` (+10, -3)
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` (+10, -8)
+- `app/(chat)/api/service-chat/route.ts` (+2, -1) — thinking guard
+- `components/projects/task-chat.tsx` (+5, -2) — DevPanelProvider wrap
+
+---
+
 ## Сессия 3 — 2026-04-10 — Этап 2: Миграция chat routes + service-chat + utils
 
 ### Changed — 7 call-sites мигрированы на getModel(taskId)

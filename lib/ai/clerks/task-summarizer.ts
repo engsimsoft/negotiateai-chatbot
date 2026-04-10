@@ -4,7 +4,7 @@
  * Summarizes a completed task's chat into structured output.
  * Called internally by POST .../complete endpoint.
  *
- * Model: SUMMARIZER_MODEL env || claude-haiku
+ * ТЗ-1 CoreRegistry: model resolved via getModel('clerk:task-summary')
  * Prompt: lib/prompts/clerks/task-summarizer.md
  */
 
@@ -12,7 +12,11 @@ import fs from "fs";
 import path from "path";
 import { generateText } from "ai";
 
-import { myProvider } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import {
   taskSummarySchema,
   createFallbackSummary,
@@ -141,15 +145,14 @@ function stripCodeBlocks(text: string): string {
 export async function summarizeTask(
   input: SummarizeTaskInput
 ): Promise<TaskSummary> {
-  const modelId = process.env.SUMMARIZER_MODEL || "claude-haiku";
+  // ТЗ-1 CoreRegistry: model resolved via task-assignments
+  const resolvedModelId = getModelIdForTask("clerk:task-summary");
 
   try {
     const userMessage = buildUserMessage(input);
 
-    const resolvedModelId = myProvider.languageModel(modelId).modelId;
-
     const result = await generateText({
-      model: myProvider.languageModel(modelId),
+      model: getModel("clerk:task-summary"),
       system: SUMMARIZER_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.1,
@@ -161,6 +164,7 @@ export async function summarizeTask(
         userId: input.userId,
         usage: result.usage,
         modelId: resolvedModelId,
+        provider: getProviderForTask("clerk:task-summary"),
         chatMode: "clerk:summarizer",
       });
     }

@@ -19,6 +19,7 @@ import {
   getModel,
   getModelIdForTask,
   getProviderForTask,
+  taskSupportsThinking,
 } from "@/lib/ai/getModel";
 import type { TaskId } from "@/lib/ai/task-assignments";
 import { buildBenPrompt } from "@/lib/prompts/server";
@@ -789,8 +790,9 @@ export async function POST(request: Request) {
           stopWhen: stepCountIs(maxSteps),
           // ТЗ-FIX3: 0.5 for structured flows (manager, briefing). Note: ignored when adaptive thinking is enabled
           temperature: (context === "project-manager" || context === "briefing-onboarding") ? 0.5 : 1.0,
-          // Adaptive thinking for briefing-onboarding (Sonnet 4.6)
-          ...(context === "briefing-onboarding" ? {
+          // Adaptive thinking for briefing-onboarding (Sonnet 4.6) —
+          // ТЗ-1: only if resolved model supports thinking (catalog.capabilities)
+          ...(context === "briefing-onboarding" && taskSupportsThinking(taskId) ? {
             providerOptions: {
               anthropic: {
                 thinking: { type: "adaptive" as const },

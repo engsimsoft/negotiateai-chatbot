@@ -6,7 +6,11 @@ import {
   getChatsByProjectId,
   updateProjectSummary,
 } from "@/lib/db/queries";
-import { myProvider } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import { logUsage } from "@/lib/ai/usage-utils";
 import { ChatSDKError } from "@/lib/errors";
 
@@ -69,10 +73,11 @@ export async function POST(
       })
       .join("\n");
 
-    const resolvedModelId = myProvider.languageModel("claude-haiku").modelId;
+    // ТЗ-1 CoreRegistry: model resolved via task-assignments
+    const resolvedModelId = getModelIdForTask("util:project-summary");
 
     const { text, usage } = await generateText({
-      model: myProvider.languageModel("claude-haiku"),
+      model: getModel("util:project-summary"),
       prompt: `Ты — менеджер проекта. На основе итогов задач напиши краткий статус проекта.
 
 Проект: ${project.name}
@@ -94,6 +99,7 @@ ${taskList}
       userId: session.user.id!,
       usage,
       modelId: resolvedModelId,
+      provider: getProviderForTask("util:project-summary"),
       chatMode: "clerk:project-summary",
     });
 

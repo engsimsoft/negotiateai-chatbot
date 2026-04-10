@@ -4,7 +4,7 @@
  * Reviews a completed task's output against expected goals.
  * Called internally by POST .../complete endpoint (only if needsReview).
  *
- * Model: PROFESSOR_MODEL env || claude-opus
+ * ТЗ-1 CoreRegistry: model resolved via getModel('professor:review')
  * Prompt: lib/prompts/professors/task-review.md
  * Output: <review_analysis> (markdown) + <review_json> (structured verdict)
  */
@@ -13,7 +13,12 @@ import fs from "fs";
 import path from "path";
 import { generateText } from "ai";
 
-import { myProvider } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+  taskSupportsThinking,
+} from "@/lib/ai/getModel";
 import {
   professorVerdictSchema,
   type ProfessorVerdict,
@@ -121,32 +126,37 @@ ${artifactsBlock}
 export async function reviewTask(
   input: ReviewTaskInput
 ): Promise<ProfessorVerdict> {
-  const modelId = process.env.PROFESSOR_MODEL || "claude-opus";
-
+  // ТЗ-1 CoreRegistry: model resolved via task-assignments (was process.env.PROFESSOR_MODEL)
   try {
     const userMessage = buildUserMessage(input);
 
+    // ТЗ-1: adaptive thinking only if the resolved model supports it
+    const supportsThinking = taskSupportsThinking("professor:review");
+
     const result = await generateText({
-      model: myProvider.languageModel(modelId),
+      model: getModel("professor:review"),
       system: REVIEWER_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.2,
-      // Adaptive thinking for Opus 4.6: critical analysis of completed work
-      providerOptions: {
-        anthropic: {
-          thinking: { type: "adaptive" as const },
-          effort: "high" as const,
-        },
-      },
+      ...(supportsThinking
+        ? {
+            providerOptions: {
+              anthropic: {
+                thinking: { type: "adaptive" as const },
+                effort: "high" as const,
+              },
+            },
+          }
+        : {}),
     });
 
     // ТЗ-CACHE2: Usage logging
     if (input.userId) {
-      const resolvedModelId = myProvider.languageModel(modelId).modelId;
       logUsage({
         userId: input.userId,
         usage: result.usage,
-        modelId: resolvedModelId,
+        modelId: getModelIdForTask("professor:review"),
+        provider: getProviderForTask("professor:review"),
         chatMode: "professor:reviewer",
       });
     }

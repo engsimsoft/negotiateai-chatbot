@@ -14,7 +14,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
-import { myProvider } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import { logUsage } from "@/lib/ai/usage-utils";
 import {
   getProjectById,
@@ -120,10 +124,11 @@ ${preview}
 ${folderNames.length > 0 ? JSON.stringify(folderNames) : "[]"}
 </existing_folders>`;
 
-    const resolvedModelId = myProvider.languageModel("claude-haiku").modelId;
+    // ТЗ-1 CoreRegistry: model resolved via task-assignments
+    const resolvedModelId = getModelIdForTask("clerk:file-analyzer");
 
     const result = await generateText({
-      model: myProvider.languageModel("claude-haiku"),
+      model: getModel("clerk:file-analyzer"),
       system: CLERK_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.1,
@@ -134,6 +139,7 @@ ${folderNames.length > 0 ? JSON.stringify(folderNames) : "[]"}
       userId: session.user.id!,
       usage: result.usage,
       modelId: resolvedModelId,
+      provider: getProviderForTask("clerk:file-analyzer"),
       chatMode: "clerk:file-analyzer",
     });
 

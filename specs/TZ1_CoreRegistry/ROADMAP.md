@@ -206,7 +206,7 @@ getModel(taskId: string, context?: { userId?: string; requestCookies?: ReadonlyR
 
 ### Этап 3: Миграция projects (tasks + plan + clerks + professors)
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (2026-04-11)
 
 **Цель:** Перевести проектный пайплайн (план → задачи → экспертный чат → завершение → ревью) на `getModel`. Удалить env-переменные `PROFESSOR_MODEL`, `SUMMARIZER_MODEL`, `SNAPSHOT_CLERK_MODEL`.
 

@@ -10,6 +10,7 @@ import type { Attachment, ChatMessage } from "@/lib/types";
 import { fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
 import { Artifact } from "@/components/artifact";
 import { useDataStream } from "@/components/data-stream-provider";
+import { DevPanelProvider } from "@/components/dev-panel/dev-panel-provider";
 import { Messages } from "@/components/messages";
 import { MultimodalInput } from "@/components/multimodal-input";
 import { Button } from "@/components/ui/button";
@@ -216,7 +217,9 @@ export function TaskChat({
   }
 
   return (
-    <>
+    // ТЗ-1: DevPanelProvider enables DevPanel footer under each assistant message
+    // (data-stream events uже эмитятся сервером через emitDebugPrompt/Step/Finish).
+    <DevPanelProvider chatId={chatId} messages={messages} status={status}>
       <div className="flex h-dvh min-w-0 flex-col bg-background">
         {/* Task header */}
         <div className="flex items-center gap-3 border-b px-4 py-3">
@@ -353,6 +356,6 @@ export function TaskChat({
         stop={stop}
         votes={undefined}
       />
-    </>
+    </DevPanelProvider>
   );
 }

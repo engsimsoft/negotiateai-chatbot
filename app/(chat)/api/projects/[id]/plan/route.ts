@@ -14,7 +14,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
-import { myProvider } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+  taskSupportsThinking,
+} from "@/lib/ai/getModel";
 import { getProjectById, updateProjectPlan } from "@/lib/db/queries";
 import { logUsage } from "@/lib/ai/usage-utils";
 import {
@@ -156,30 +161,38 @@ export async function POST(
       userAnswers
     );
 
-    // Resolve model: env variable with fallback
-    const modelId = process.env.PROFESSOR_MODEL || "claude-opus";
+    // ТЗ-1 CoreRegistry: model resolved via task-assignments (was process.env.PROFESSOR_MODEL)
+    const resolvedModelId = getModelIdForTask("professor:planning");
+    // ТЗ-1: adaptive thinking works only on models that support it (Opus/Sonnet).
+    // When task-assignments routes this task to Haiku (e.g. cheap test mode),
+    // thinking must be disabled — catalog.capabilities.thinking is the source of truth.
+    const supportsThinking = taskSupportsThinking("professor:planning");
 
     // Call Professor
     const result = await generateText({
-      model: myProvider.languageModel(modelId),
+      model: getModel("professor:planning"),
       system: PROFESSOR_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.2,
-      // Adaptive thinking for Opus 4.6: document analysis, task decomposition, risk identification
-      providerOptions: {
-        anthropic: {
-          thinking: { type: "adaptive" as const },
-          effort: "high" as const,
-        },
-      },
+      // Adaptive thinking only if the resolved model supports it
+      ...(supportsThinking
+        ? {
+            providerOptions: {
+              anthropic: {
+                thinking: { type: "adaptive" as const },
+                effort: "high" as const,
+              },
+            },
+          }
+        : {}),
     });
 
     // ТЗ-CACHE2: Usage logging (fire-and-forget)
-    const resolvedModelId = myProvider.languageModel(modelId).modelId;
     logUsage({
       userId: session.user.id!,
       usage: result.usage,
       modelId: resolvedModelId,
+      provider: getProviderForTask("professor:planning"),
       chatMode: "professor:planner",
     });
 

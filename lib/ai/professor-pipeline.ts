@@ -16,14 +16,23 @@
  */
 
 import { generateText, streamText, type ModelMessage } from "ai";
-import { myProvider } from "./providers";
+import { getModel, getModelIdForTask, getProviderForTask } from "./getModel";
 import { saveAiUsageLog } from "@/lib/db/queries";
 import { calcCostUsd } from "./tokenlens-catalog";
 import { extractUsageFields } from "./usage-utils";
 
-const analyzeModel = myProvider.languageModel("claude-opus");
-const executeModel = myProvider.languageModel("claude-haiku");
-const synthesizeModel = myProvider.languageModel("claude-opus");
+// ТЗ-1 CoreRegistry: 3-phase pipeline models via task-assignments
+const analyzeModel = getModel("professor:pipeline-analyze");
+const analyzeModelId = getModelIdForTask("professor:pipeline-analyze");
+const analyzeProvider = getProviderForTask("professor:pipeline-analyze");
+
+const executeModel = getModel("professor:pipeline-execute");
+const executeModelId = getModelIdForTask("professor:pipeline-execute");
+const executeProvider = getProviderForTask("professor:pipeline-execute");
+
+const synthesizeModel = getModel("professor:pipeline-synthesize");
+const synthesizeModelId = getModelIdForTask("professor:pipeline-synthesize");
+const synthesizeProvider = getProviderForTask("professor:pipeline-synthesize");
 
 /**
  * Pipeline phases
@@ -215,13 +224,14 @@ export async function executeProfessorPipeline(
       abortSignal: signal,
     });
 
-    // ТЗ-OPT1+CACHE2: Log analyze phase usage
+    // ТЗ-OPT1+CACHE2+ТЗ-1: Log analyze phase usage
     if (userId && analyzeResult.usage) {
-      const costUsd = await calcCostUsd(analyzeModel.modelId, analyzeResult.usage);
+      const costUsd = await calcCostUsd(analyzeModelId, analyzeResult.usage);
       saveAiUsageLog({
         chatId,
         userId,
-        modelId: analyzeModel.modelId,
+        modelId: analyzeModelId,
+        provider: analyzeProvider,
         ...extractUsageFields(analyzeResult.usage),
         costUsd,
         chatMode: "project:professor",
@@ -304,13 +314,14 @@ export async function executeProfessorPipeline(
           abortSignal: signal,
         });
 
-        // ТЗ-OPT1+CACHE2: Log execute phase usage
+        // ТЗ-OPT1+CACHE2+ТЗ-1: Log execute phase usage
         if (userId && executeResult.usage) {
-          const costUsd = await calcCostUsd(executeModel.modelId, executeResult.usage);
+          const costUsd = await calcCostUsd(executeModelId, executeResult.usage);
           saveAiUsageLog({
             chatId,
             userId,
-            modelId: executeModel.modelId,
+            modelId: executeModelId,
+            provider: executeProvider,
             ...extractUsageFields(executeResult.usage),
             costUsd,
             chatMode: "project:professor",
@@ -372,15 +383,16 @@ export async function executeProfessorPipeline(
       onEvent({ type: "professor-content", content: chunk });
     }
 
-    // ТЗ-OPT1+CACHE2: Log synthesize phase usage
+    // ТЗ-OPT1+CACHE2+ТЗ-1: Log synthesize phase usage
     if (userId) {
       const synthUsage = await synthesizeStream.usage;
       if (synthUsage) {
-        const costUsd = await calcCostUsd(synthesizeModel.modelId, synthUsage);
+        const costUsd = await calcCostUsd(synthesizeModelId, synthUsage);
         saveAiUsageLog({
           chatId,
           userId,
-          modelId: synthesizeModel.modelId,
+          modelId: synthesizeModelId,
+          provider: synthesizeProvider,
           ...extractUsageFields(synthUsage),
           costUsd,
           chatMode: "project:professor",
