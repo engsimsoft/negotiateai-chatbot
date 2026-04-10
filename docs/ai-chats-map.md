@@ -40,10 +40,10 @@
 | **Клерк-анализатор** | Claude Haiku | ✅ Работает | Автоматический анализ файлов проекта |
 | **Snapshot Creator** | Claude Haiku | ✅ Работает | Fallback-клерк создания snapshot при заполнении контекста (v3.18) |
 | **Briefing: Онбординг** | Claude Sonnet 4.6 | ✅ Работает | AI-интервью для настройки брифинга (v3.30, v3.53 — save via UI) |
-| **Briefing: Фильтр** | Gemini 2.0 Flash | ✅ Работает | Фильтрация и дедупликация новостей (v3.26) |
-| **Briefing: Автор** | Claude Sonnet 4.6 | ✅ Работает | Генерация статьи из отфильтрованных новостей (v3.31→v3.38) |
-| **Podcast: Скрипт** | Gemini 2.5 Flash | ✅ Работает | Генерация диалогового сценария из секции брифинга (v3.43) |
-| **Podcast: TTS** | Gemini 2.5 Flash TTS | ✅ Работает | Озвучка сценария (multi-speaker: Host + Expert) (v3.43) |
+| **Briefing: Фильтр** | MiniMax M2.7 | ✅ Работает | Фильтрация и дедупликация новостей (v3.26→v3.80) |
+| **Briefing: Автор** | MiniMax M2.7 | ✅ Работает | Генерация статьи из отфильтрованных новостей (v3.31→v3.80, монолит) |
+| **Podcast: Скрипт** | MiniMax M2.7 | ✅ Работает | Генерация диалогового сценария из секции брифинга (v3.43→v3.81) |
+| **Podcast: TTS** | Gemini 2.5 Flash TTS | ✅ Работает | Озвучка сценария (multi-speaker: Host + Expert) (v3.43, revert v3.82) |
 | **Meeting: Транскрипция** | Deepgram Nova-3 | ✅ Работает | Batch transcription аудио встреч (русский, diarize) (v3.61) |
 | **Meeting: Суммаризация** | Claude Sonnet 4.6 | ✅ Работает | Генерация структурированного резюме встречи (3 уровня) (v3.61) |
 | **Artifact handlers** | Claude Sonnet 4.6 | ✅ Работает | Генерация/обновление артефактов (text, markdown, excel, reveal, pptx), chatMode: `artifact:*` (v3.69) |
@@ -341,25 +341,28 @@ lib/briefing/save-briefing-profile.ts                       # Логика со�
 #### Briefing: AI-пайплайн (v3.26)
 **Где:** `POST /api/briefing/generate` (backend-only, без интерактивного UI)
 
-> **v3.38.0:** Автор статей переведён на Claude Sonnet 4.6 (из Gemini 3 Pro). Фильтр остаётся на Gemini 2.0 Flash (batch-обработка ~200 статей, экономия). [ADR 016](decisions/016-briefing-backend-architecture.md)
+> **v3.80.0 (ТЗ-Briefing-1):** Filter и Author переведены на MiniMax M2.7 (с Gemini 2.0 Flash и Claude Sonnet 4.6). Цена: $0.074 → $0.011 за брифинг (6.6×).
+> **v3.82.0 (ТЗ-MapReduce):** Map-Reduce подход для Author отклонён — sequential streamText вызывает socket reuse bug в MiniMax. Монолит стабилен на 26K+ input tokens. См. [ADR 046](decisions/046-podcast-tts-revert-and-briefing-stability.md).
 
 **Этап 1 — Фильтр:**
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 2.0 Flash (`gemini-2.0-flash`) |
+| **Модель** | MiniMax M2.7 (`MiniMax-M2.7` через `minimaxM27Long`) |
 | **Тип** | Backend (внутренний вызов в generate/route.ts) |
-| **Вход** | ~200 RawContent[] из 3 фетчеров (RSS, Telegram, Web) |
+| **Вход** | ~200 RawContent[] из 3 фетчеров (RSS, Telegram, Web), content truncation 2K chars |
 | **Выход** | ~30 FilteredItem[] (дедуплицированные, с оценкой релевантности) |
+| **Retry** | retryWithLogging (3 попытки) |
 
-**Этап 2 — Автор (v3.31.0 → v3.38.0 Claude):**
+**Этап 2 — Автор (монолитный):**
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Claude Sonnet 4.6 (`claude-sonnet-4-6`), retryWithLogging (v3.69.0, no fallback model) |
-| **Тип** | Backend (внутренний вызов в generate/route.ts) |
-| **Вход** | ~30 FilteredItem[] + userTopics + settings |
-| **Выход** | BriefingArticle (связная статья с markdown-секциями, inline-ссылками, источниками) |
+| **Модель** | MiniMax M2.7 (`MiniMax-M2.7` через `minimaxM27Long`) |
+| **Тип** | Backend (монолитный вызов — все секции за один streamText) |
+| **Вход** | ~30 FilteredItem[] + userTopics + settings + previousBriefing (для дедупа) |
+| **Выход** | BriefingArticle (intro + sections[] + outro + meta), Zod validation + topicId dedup safety net |
+| **Retry** | retryWithLogging (3 попытки) |
 
 **Полный flow:**
 1. Endpoint получает POST с auth
@@ -382,17 +385,20 @@ lib/briefing/source-fetchers/telegram-fetcher.ts # Telegram через cheerio
 lib/briefing/source-fetchers/web-fetcher.ts  # Web через Readability + jsdom
 ```
 
-#### Podcast Engine (ТЗ-Б1, v3.43)
+#### Podcast Engine (ТЗ-Б1, v3.43; финальная архитектура v3.82)
 **Где:** `POST /api/briefing/podcast/generate` (backend-only, streaming)
 
-**Этап 1 — Скрипт (Gemini 2.5 Flash):**
+> **v3.81.0 → v3.82.0:** TTS попытались мигрировать на MiniMax Speech 2.8 HD — откат из-за худшего качества русского и цены $1+ за подкаст (vs $0.014 у Gemini). Script остался на M2.7 (диалоги интереснее). См. [ADR 046](decisions/046-podcast-tts-revert-and-briefing-stability.md).
+
+**Этап 1 — Скрипт (MiniMax M2.7):**
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Gemini 2.5 Flash (`gemini-2.5-flash`) |
-| **SDK** | `@ai-sdk/google` (`generateText`) |
+| **Модель** | MiniMax M2.7 (`MiniMax-M2.7` через `minimaxM27`) |
+| **SDK** | `vercel-minimax-ai-provider` (`generateText`) |
 | **Вход** | BriefingArticleSection + ScriptContext |
-| **Выход** | Диалоговый сценарий (Host: / Expert:) |
+| **Выход** | ScriptLine[] (universal parser: JSON или plain text `Host: / Expert:`) |
+| **Retry** | Внутренний цикл (4 попытки) |
 
 **Этап 2 — TTS (Gemini 2.5 Flash TTS):**
 
@@ -400,8 +406,10 @@ lib/briefing/source-fetchers/web-fetcher.ts  # Web через Readability + jsdo
 |----------|----------|
 | **Модель** | Gemini 2.5 Flash TTS (`gemini-2.5-flash-preview-tts`) |
 | **SDK** | `@google/genai` (native multi-speaker) |
-| **Голоса** | Host → Kore, Expert → Puck |
+| **Голоса** | Host → Kore, Expert → Iapetus |
 | **Выход** | PCM 24kHz mono → MP3 (lamejs) → Vercel Blob |
+
+**Стоимость:** ~$0.019 за подкаст (Script $0.005 + TTS $0.014)
 
 **Полный flow:**
 1. Загружает последний готовый брифинг из БД
@@ -413,8 +421,8 @@ lib/briefing/source-fetchers/web-fetcher.ts  # Web через Readability + jsdo
 ```
 app/(chat)/api/briefing/podcast/generate/route.ts  # Streaming POST endpoint
 lib/podcast/index.ts                                # Public API (generatePodcastSegment)
-lib/podcast/script-generator.ts                     # Gemini Flash: generateScript()
-lib/podcast/tts-gemini.ts                           # Gemini TTS: synthesizeSpeech()
+lib/podcast/script-generator.ts                     # MiniMax M2.7: generateScript()
+lib/podcast/tts-gemini.ts                           # Gemini TTS: generateSpeechWithRetry()
 lib/podcast/audio-converter.ts                      # PCM → MP3 (lamejs)
 lib/podcast/types.ts                                # TypeScript типы
 lib/prompts/briefing/briefing-scriptwriter.md       # Промпт скриптрайтера

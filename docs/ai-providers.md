@@ -41,16 +41,28 @@
 
 > **SDK версии (v3.65.0+):** `ai@6.x` + `@ai-sdk/anthropic@3.x` + `@ai-sdk/google@3.x` + `@ai-sdk/react@3.x`. v6 предоставляет нативные `inputTokenDetails`/`outputTokenDetails` (включая `cacheWriteTokens`).
 
-### Google AI (vision-ocr + Briefing фильтр + Podcast)
+### Google AI (vision-ocr + Podcast TTS)
 
 | Параметр | Значение |
 |----------|----------|
-| SDK (text) | `@ai-sdk/google` |
-| SDK (TTS) | `@google/genai` |
+| SDK (text) | `@ai-sdk/google` (vision-ocr) |
+| SDK (TTS) | `@google/genai` (podcast TTS) |
 | API Key | `GOOGLE_GENERATIVE_AI_API_KEY` |
 | Документация | https://ai.google.dev/ |
 
-> Google AI используется для vision-ocr, Briefing фильтр (Stage 1), Podcast скрипт (Gemini Flash) и Podcast TTS (Gemini TTS). Все остальные AI-запросы — Anthropic.
+> Google AI используется для vision-ocr и Podcast TTS (Gemini Flash TTS — multi-speaker). Briefing Filter/Author и Podcast Script переведены на MiniMax M2.7 (v3.80, v3.81). Попытка перевода TTS на MiniMax Speech 2.8 HD откачена в v3.82 — см. [ADR 046](decisions/046-podcast-tts-revert-and-briefing-stability.md).
+
+### MiniMax (Simply Chat + Briefing + Podcast Script)
+
+| Параметр | Значение |
+|----------|----------|
+| SDK | `vercel-minimax-ai-provider` (OpenAI-compatible) |
+| API Key | `MINIMAX_API_KEY` |
+| Endpoint | `https://api.minimax.io/v1` |
+| Документация | https://platform.minimax.io/docs/ |
+| Детали | [docs/ai-minimax.md](ai-minimax.md) |
+
+> MiniMax M2.7 — текстовая модель, $0.30/$1.20 за 1M tokens, автоматическое кэширование. Используется в Simply Chat (text only), Briefing Filter/Author (монолит), Podcast Script. **НЕ используется** для vision и TTS.
 
 ### Perplexity (Deep Research)
 
@@ -96,9 +108,13 @@
 | Модель | Реальный ID | Использование | Конфиг |
 |--------|-------------|---------------|--------|
 | **Gemini 2.5 Flash** | `gemini-2.5-flash` | Vision OCR (image, PDF) | `lib/ai/vision-ocr.ts` |
-| **Gemini 2.0 Flash** | `gemini-2.0-flash` | Briefing: фильтр (Stage 1) | `lib/briefing/briefing-config.ts` |
-| **Gemini 2.5 Flash** | `gemini-2.5-flash` | Podcast: генерация сценария | `lib/podcast/script-generator.ts` |
-| **Gemini 2.5 Flash TTS** | `gemini-2.5-flash-preview-tts` | Podcast: озвучка (multi-speaker) | `lib/podcast/tts-gemini.ts` |
+| **Gemini 2.5 Flash TTS** | `gemini-2.5-flash-preview-tts` | Podcast: озвучка (multi-speaker Kore + Iapetus) | `lib/podcast/tts-gemini.ts` |
+
+### MiniMax
+
+| Модель | Реальный ID | Использование | Конфиг |
+|--------|-------------|---------------|--------|
+| **MiniMax M2.7** | `MiniMax-M2.7` | Simply Chat (text), Briefing Filter, Briefing Author, Podcast Script | `lib/ai/providers.ts` (`minimaxM27`, `minimaxM27Long`) |
 
 ### Perplexity Sonar
 
@@ -164,9 +180,19 @@
 | Snapshot Creator | `lib/ai/clerks/snapshot-creator.ts` | `claude-haiku` | 0.1 | — | env: `SNAPSHOT_CLERK_MODEL` |
 | Клерк-анализатор файлов | `api/projects/[id]/analyze-file/route.ts` | `claude-haiku` | 0.1 | — | Hardcoded |
 | Project Summary | `api/projects/[id]/generate-summary/route.ts` | `claude-haiku` | — | — | Hardcoded |
-| **Briefing: Автор** | `lib/briefing/briefing-author.ts` | **`claude-sonnet-4-6`** | — | — | generateObject, maxOutputTokens по volume, retryWithLogging (v3.69.0) |
 | **Meeting: Суммаризатор** | `lib/meeting/meeting-pipeline.ts` | **`claude-sonnet-4-6`** | 0.3 | 8192 | generateText, 3 уровня (compact/standard/detailed) |
 | **MIND: Извлечение фактов** | `lib/ai/memory/extract.ts` | **`claude-sonnet-4-6`** | 0.1 | — | generateObject, fire-and-forget в onFinish, chatMode: `memory:extract` |
+
+### MiniMax M2.7 — Backend (Briefing + Podcast Script)
+
+| Функция | Файл | Модель | temperature | maxOutputTokens | Примечание |
+|---------|------|--------|-------------|-----------------|------------|
+| **Briefing: Фильтр** | `lib/briefing/briefing-filter.ts` | `MiniMax-M2.7` (`minimaxM27Long`) | 0.1 | — | streamText + JSON.parse + Zod, retryWithLogging (3 attempts), content truncation 2K chars per item |
+| **Briefing: Автор** | `lib/briefing/briefing-author.ts` | `MiniMax-M2.7` (`minimaxM27Long`) | 0.7 | 8192/16384/32768 (volume) | streamText + JSON.parse + Zod, монолит (Map-Reduce отклонён v3.82), topicId dedup safety net, retryWithLogging |
+| **Briefing: Section Refresh** | `lib/briefing/briefing-section-author.ts` | `MiniMax-M2.7` (`minimaxM27Long`) | 0.7 | 8192 | streamText, mode `refresh` или `initial`, для per-section refresh API |
+| **Simply Chat (text)** | `app/(chat)/api/chat/route.ts` | `MiniMax-M2.7` (`minimaxM27`) | 0.7 | — | streamText, includeUsage, sliding window 20 messages, MIND retrieve |
+| **Podcast: Скрипт** | `lib/podcast/script-generator.ts` | `MiniMax-M2.7` (`minimaxM27`) | 0.7 | 4096 | generateText, JSON+plain text universal parser, internal retry loop |
+| **MIND: extract/consolidate/profile** | `lib/ai/memory/*` | `MiniMax-M2.7` (`minimaxM27`) | 0.1-0.5 | — | streamText + JSON.parse, для batch фактов
 
 ### Voyage AI — Embeddings
 
@@ -179,11 +205,9 @@
 
 | Функция | Файл | Модель | providerOptions | maxOutputTokens | Примечание |
 |---------|------|--------|-----------------|-----------------|------------|
-| Briefing: Фильтр | `lib/briefing/briefing-filter.ts` | `gemini-2.0-flash` | — | — | generateObject |
 | Vision OCR (Image) | `lib/ai/vision-ocr.ts` | `gemini-2.5-flash` | `thinkingBudget: 0` | — | Thinking выключен |
 | Vision OCR (PDF) | `lib/ai/vision-ocr.ts` | `gemini-2.5-flash` | `thinkingBudget: 0` | — | Thinking выключен |
-| **Podcast: Скрипт** | `lib/podcast/script-generator.ts` | `gemini-2.5-flash` | — | 2048 | `@ai-sdk/google` generateText |
-| **Podcast: TTS** | `lib/podcast/tts-gemini.ts` | `gemini-2.5-flash-preview-tts` | — | — | `@google/genai` SDK, multi-speaker (Kore + Puck) |
+| **Podcast: TTS** | `lib/podcast/tts-gemini.ts` | `gemini-2.5-flash-preview-tts` | — | — | `@google/genai` SDK, multi-speaker (Host: Kore + Expert: Iapetus). $0.014 за подкаст. Возвращён в v3.82 после неудачной миграции на MiniMax Speech 2.8 HD |
 
 ### Env-переменные для override моделей
 
