@@ -9,7 +9,46 @@
 
 ### Planned (Next Steps)
 - RAG-4: Библиотека MVP (загрузка документов + search)
-- Briefing Map-Reduce: Chunking по темам для стабильности M2.7 на больших промптах
+
+---
+
+## [3.82.0] — 2026-04-10 — Podcast TTS Revert + Briefing Stability (ТЗ-MapReduce)
+
+### Reverted
+- **Podcast TTS:** MiniMax Speech 2.8 HD → Gemini Flash TTS (откат v3.81.0)
+  - Причина: качество русского хуже Gemini (несмотря на маркетинг "натив")
+  - Цена: $1+ vs $0.014 за подкаст (в **53 раза дороже** при худшем качестве)
+  - **Что оставлено:** Script всё ещё на MiniMax M2.7 (лучшие диалоги чем Gemini Flash)
+- **Briefing Author Map-Reduce:** откат к монолитному `generateArticle()`
+  - Причина: sequential `streamText()` вызовы вызывали socket disconnect MiniMax API
+  - Технически: между `await res.text` и `await res.usage` сокет закрывался, retry переиспользовал мёртвый сокет
+  - Монолит стабилен на 26K+ input tokens (проверено на аккаунте с 5+ темами)
+
+### Fixed
+- **Briefing Filter:** добавлен `retryWithLogging` (3 попытки) + content truncation 2K chars
+- **Briefing Author:** safety net для дедупликации topicId (M2.7 мог создавать дубли)
+- **Briefing Author prompt:** правило "один topicId = одна секция" (предотвращает дубли)
+- **Briefing UI:** null-guard для `article?.sections?.filter()` в briefing-page-client
+- **Briefing Sidebar:** уникальные React keys для дублирующихся topicId
+- **Simply Chat (text/plain files):** `stripMediaPartsForTextModel` корректно обрабатывает text/plain — раньше пропускал их и MiniMax падал на каждом сообщении из-за file part в истории
+
+### Architecture (final podcast)
+- Script: MiniMax M2.7 (~$0.005)
+- TTS: Gemini Flash TTS (~$0.014)
+- **Итого подкаст:** ~$0.019 (vs $1+ с MiniMax Speech HD)
+
+### Files Restored
+- `lib/podcast/tts-gemini.ts`, `lib/podcast/audio-converter.ts`, `lib/podcast/lamejs.d.ts`
+- `@google/genai`, `lamejs` в package.json
+- `next.config.ts`: lamejs в serverExternalPackages + outputFileTracingIncludes
+
+### Files Removed
+- `lib/podcast/tts-minimax.ts` — не используется (TTS вернулся на Gemini)
+
+### Lessons Learned
+- **Map-Reduce и MiniMax streaming несовместимы.** Sequential `streamText()` вызовы создают socket reuse баги. Монолит стабилен.
+- **Маркетинг "natural Russian" ≠ качество.** MiniMax Speech 2.8 HD позиционируется как лучший русский TTS, но в production хуже Gemini Flash.
+- **Не бросать рабочее ради дешевизны.** Gemini TTS работал отлично — миграция на MiniMax была преждевременной.
 
 ---
 
