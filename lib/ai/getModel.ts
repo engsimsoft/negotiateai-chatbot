@@ -1,0 +1,191 @@
+/**
+ * getModel — единая точка получения LanguageModel для задачи (ТЗ-1 CoreRegistry)
+ *
+ * Единственная функция, через которую вся 31 AI-точка приложения получает
+ * модель. Всё остальное — внутренние детали (registry, catalog, task assignments).
+ *
+ * Порядок разрешения:
+ *   1. Overrides — stub в ТЗ-1, реализация в ТЗ-2 (localStorage + cookie)
+ *   2. Test mocks — isTestEnvironment → возвращает mock модель
+ *   3. Task assignment → catalog entry → registry lookup
+ *
+ * Сигнатура с `context?` подготовлена под ТЗ-2: в future overrides будут
+ * читаться из user-specific cookies/localStorage через этот параметр.
+ */
+
+import type { LanguageModel } from "ai";
+
+import { isTestEnvironment } from "../constants";
+import { getModelEntry, resolveModelEntry } from "./model-catalog";
+import { registry, type RegistryProviderId } from "./registry";
+import {
+  DEFAULT_TASK_MODELS,
+  type TaskId,
+} from "./task-assignments";
+
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
+
+/**
+ * Optional context for overrides lookup. Принимается уже в ТЗ-1 (сигнатура
+ * стабильна), активная реализация — в ТЗ-2.
+ */
+export interface GetModelContext {
+  /** Для user-level overrides (из БД). ТЗ-2. */
+  userId?: string;
+  /**
+   * Request cookies для `x-model-overrides` cookie (dev-only). ТЗ-2.
+   * В production этот источник игнорируется.
+   */
+  requestCookies?: { get(name: string): { value: string } | undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Overrides stub — будет реализован в ТЗ-2
+// ---------------------------------------------------------------------------
+
+/**
+ * Lookup override для taskId. Сейчас всегда null.
+ *
+ * ТЗ-2 реализует:
+ *  - User-level overrides из БД (context.userId)
+ *  - Dev cookie `x-model-overrides` (context.requestCookies) — игнорируется в prod
+ *  - localStorage на клиенте (применяется клиентским кодом до вызова API)
+ */
+function lookupOverride(
+  _taskId: TaskId,
+  _context?: GetModelContext,
+): string | null {
+  // TODO ТЗ-2: implement overrides lookup
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Mock models (для тестов)
+// ---------------------------------------------------------------------------
+
+let cachedMock: LanguageModel | null = null;
+
+function getMockModel(): LanguageModel {
+  if (cachedMock) return cachedMock;
+  // Lazy require — чтобы prod bundle не тянул mock
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { chatModel } = require("./models.mock") as {
+    chatModel: LanguageModel;
+  };
+  cachedMock = chatModel;
+  return chatModel;
+}
+
+// ---------------------------------------------------------------------------
+// Catalog → registry id resolution
+// ---------------------------------------------------------------------------
+
+const PROVIDER_TO_REGISTRY: Record<string, RegistryProviderId | null> = {
+  anthropic: "anthropic",
+  minimax: "minimax", // дефолтный minimax; briefing использует minimaxLong (см. ниже)
+  xai: "xai",
+  openrouter: "openrouter",
+  // Non-LLM провайдеры не в registry — возвращаем null
+  voyage: null,
+  deepgram: null,
+  perplexity: null,
+  google: null,
+};
+
+/**
+ * Сборка строки `provider:modelId` для registry.languageModel().
+ * Специальный случай: алиас `MiniMax-M2.7-long` → registry namespace `minimaxLong`.
+ */
+function buildRegistryId(catalogId: string): string | null {
+  const entry = getModelEntry(catalogId);
+  if (!entry) return null;
+
+  // Специальный случай — briefing использует MiniMax с extended timeout (180s).
+  // В каталоге это алиас `MiniMax-M2.7-long` → physical `MiniMax-M2.7`, но зарегистрирован
+  // под отдельным provider namespace `minimaxLong`.
+  if (catalogId === "MiniMax-M2.7-long") {
+    return "minimaxLong:MiniMax-M2.7";
+  }
+
+  const resolved = resolveModelEntry(catalogId);
+  if (!resolved) return null;
+
+  const registryProvider = PROVIDER_TO_REGISTRY[resolved.provider];
+  if (!registryProvider) return null;
+
+  return `${registryProvider}:${resolved.modelId}`;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Получить LanguageModel для задачи.
+ *
+ * Проходит через: overrides → test mocks → task-assignment → catalog → registry.
+ *
+ * @throws Error если taskId неизвестен или catalog не содержит назначенную модель
+ *   (намеренно громкая ошибка — это bug в task-assignments, а не runtime-условие).
+ */
+export function getModel(
+  taskId: TaskId,
+  context?: GetModelContext,
+): LanguageModel {
+  // 1. Test environment → mock
+  if (isTestEnvironment) {
+    return getMockModel();
+  }
+
+  // 2. Overrides lookup (stub в ТЗ-1)
+  const overrideId = lookupOverride(taskId, context);
+  const catalogId = overrideId ?? DEFAULT_TASK_MODELS[taskId];
+
+  if (!catalogId) {
+    throw new Error(
+      `[getModel] Unknown taskId "${taskId}" — not in DEFAULT_TASK_MODELS`,
+    );
+  }
+
+  const registryId = buildRegistryId(catalogId);
+  if (!registryId) {
+    throw new Error(
+      `[getModel] Cannot resolve catalog id "${catalogId}" for task "${taskId}" — ` +
+        `entry missing or provider not in registry`,
+    );
+  }
+
+  return registry.languageModel(
+    // cast: registry type expects literal union; тут taskId динамический
+    registryId as Parameters<typeof registry.languageModel>[0],
+  );
+}
+
+/**
+ * Получить физический modelId для задачи (без резолва в LanguageModel).
+ * Полезно для usage-logging и DevPanel.
+ */
+export function getModelIdForTask(
+  taskId: TaskId,
+  context?: GetModelContext,
+): string {
+  const overrideId = lookupOverride(taskId, context);
+  const catalogId = overrideId ?? DEFAULT_TASK_MODELS[taskId];
+  const resolved = resolveModelEntry(catalogId);
+  return resolved?.modelId ?? catalogId;
+}
+
+/**
+ * Получить провайдера (для записи в ai_usage_log.provider).
+ */
+export function getProviderForTask(
+  taskId: TaskId,
+  context?: GetModelContext,
+): string {
+  const overrideId = lookupOverride(taskId, context);
+  const catalogId = overrideId ?? DEFAULT_TASK_MODELS[taskId];
+  const resolved = resolveModelEntry(catalogId);
+  return resolved?.provider ?? "unknown";
+}

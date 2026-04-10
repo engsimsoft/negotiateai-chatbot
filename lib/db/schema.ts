@@ -542,6 +542,10 @@ export const aiUsageLog = pgTable(
       .notNull()
       .references(() => user.id),
     modelId: varchar("modelId", { length: 100 }).notNull(),
+    // ТЗ-1 CoreRegistry: provider id (anthropic, minimax, xai, openrouter,
+    // voyage, deepgram, perplexity, google). Nullable для обратной совместимости
+    // со старыми записями — backfill выполнен миграцией 0053.
+    provider: varchar("provider", { length: 32 }),
     inputTokens: integer("inputTokens").notNull().default(0),
     outputTokens: integer("outputTokens").notNull().default(0),
     thinkingTokens: integer("thinkingTokens").notNull().default(0),

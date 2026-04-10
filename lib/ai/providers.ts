@@ -1,21 +1,78 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createMinimaxOpenAI } from "vercel-minimax-ai-provider";
-import type { LanguageModelUsage } from "ai";
-import { customProvider } from "ai";
-import { isTestEnvironment } from "../constants";
-
 /**
- * AI Provider Configuration
+ * AI Providers — legacy compatibility layer (ТЗ-1 CoreRegistry)
  *
- * Primary provider: Anthropic Claude (via @ai-sdk/anthropic)
- * Model map: claude-haiku (fast), claude-sonnet (balanced), claude-opus (best quality)
+ * ⚠️ DEPRECATED exports — используйте `getModel(taskId)` из `./getModel.ts`.
  *
- * MiniMax: M2.7 (chat/memory), M2-Her (podcast scripts). Speech 2.8 HD (podcast TTS).
+ * Этот модуль остаётся временно, пока миграция 31 AI-точки не завершена (Этапы
+ * 2-4 ТЗ-1). Все экспорты ниже — тонкие обёртки над `registry` + `model-catalog`.
+ * Будут удалены в Этапе 5.
+ *
+ * Что ОСТАЁТСЯ после Этапа 5:
+ *  - `calculateCostRub` / `calculateCostBreakdownRub` / `getStepCostRub`
+ *    (расчёт стоимости из catalog, публичный API для DevPanel и cost-audit)
+ *  - `extractUsageForPricing`
+ *  - Non-LLM cost helpers (`calculateDeepgramCostUsd`, `calculateGeminiTtsCostUsd`, `calculateTtsCostRub`)
+ *  - `RUB_PER_USD`, `getContextWindow`, `MODEL_CONTEXT_WINDOW`
  */
 
-const anthropic = createAnthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+import type { LanguageModelUsage } from "ai";
+import { customProvider } from "ai";
+
+import { isTestEnvironment } from "../constants";
+import {
+  getContextWindow as getContextWindowFromCatalog,
+  getModelEntry,
+  resolveModelEntry,
+} from "./model-catalog";
+import { registry } from "./registry";
+import type { DebugStepData } from "./debug-events";
+
+// Registry-returned language model type (LanguageModelV3 под капотом).
+type RegistryLanguageModel = ReturnType<typeof registry.languageModel>;
+
+// ---------------------------------------------------------------------------
+// LEGACY — myProvider (customProvider с алиасами)
+// ---------------------------------------------------------------------------
+// Сохраняется для совместимости с ~20 call-sites `myProvider.languageModel(id)`.
+// Алиасы резолвятся через каталог, физические модели — через registry.
+// Будет удалено в Этапе 5 после миграции call-sites.
+
+function langModelFromCatalog(catalogId: string): RegistryLanguageModel {
+  const entry = getModelEntry(catalogId);
+  if (!entry) {
+    throw new Error(`[providers] Unknown catalog id: ${catalogId}`);
+  }
+  if (catalogId === "MiniMax-M2.7-long") {
+    return registry.languageModel("minimaxLong:MiniMax-M2.7");
+  }
+  const resolved = resolveModelEntry(catalogId);
+  if (!resolved) {
+    throw new Error(`[providers] Cannot resolve catalog id: ${catalogId}`);
+  }
+  if (resolved.provider === "anthropic") {
+    return registry.languageModel(
+      `anthropic:${resolved.modelId}` as "anthropic:claude-sonnet-4-6",
+    );
+  }
+  if (resolved.provider === "minimax") {
+    return registry.languageModel(
+      `minimax:${resolved.modelId}` as "minimax:MiniMax-M2.7",
+    );
+  }
+  if (resolved.provider === "xai") {
+    return registry.languageModel(
+      `xai:${resolved.modelId}` as "xai:grok-4",
+    );
+  }
+  if (resolved.provider === "openrouter") {
+    return registry.languageModel(
+      `openrouter:${resolved.modelId}` as "openrouter:z-ai/glm-4.6",
+    );
+  }
+  throw new Error(
+    `[providers] Provider "${resolved.provider}" not in registry for ${catalogId}`,
+  );
+}
 
 export const myProvider = isTestEnvironment
   ? (() => {
@@ -36,42 +93,51 @@ export const myProvider = isTestEnvironment
     })()
   : customProvider({
       languageModels: {
-        "claude-sonnet": anthropic("claude-sonnet-4-6"),
-        "claude-haiku": anthropic("claude-haiku-4-5-20251001"),
-        "claude-opus": anthropic("claude-opus-4-6"),
-        "claude-sonnet-4-6": anthropic("claude-sonnet-4-6"),
-        "title-model": anthropic("claude-haiku-4-5-20251001"),
-        "artifact-model": anthropic("claude-sonnet-4-6"),
+        "claude-sonnet": langModelFromCatalog("claude-sonnet"),
+        "claude-haiku": langModelFromCatalog("claude-haiku"),
+        "claude-opus": langModelFromCatalog("claude-opus"),
+        "claude-sonnet-4-6": langModelFromCatalog("claude-sonnet-4-6"),
+        "title-model": langModelFromCatalog("title-model"),
+        "artifact-model": langModelFromCatalog("artifact-model"),
       },
     });
 
-// Direct model exports for pipelines and clerks
-export const claudeHaiku = anthropic("claude-haiku-4-5-20251001");
-export const claudeSonnet = anthropic("claude-sonnet-4-6");
-export const claudeOpus = anthropic("claude-opus-4-6");
+// Direct model exports — оставлены для совместимости с pipelines/clerks.
+// Внутри резолвятся через registry (та же физическая модель, что и в customProvider выше).
+export const claudeHaiku: RegistryLanguageModel = langModelFromCatalog(
+  "claude-haiku-4-5-20251001",
+);
+export const claudeSonnet: RegistryLanguageModel = langModelFromCatalog(
+  "claude-sonnet-4-6",
+);
+export const claudeOpus: RegistryLanguageModel = langModelFromCatalog(
+  "claude-opus-4-6",
+);
 
-// MiniMax M2.7 — shared export for memory pipelines (extract, consolidate, profile)
-const minimaxProvider = createMinimaxOpenAI();
-export const minimaxM27 = (() => {
-  const model = minimaxProvider("MiniMax-M2.7") as any;
-  model.config = { ...model.config, includeUsage: true };
-  return model;
-})();
+// MiniMax M2.7 — shared export для memory pipelines (extract, consolidate, profile).
+// `includeUsage` конфигурация сохраняется для обратной совместимости.
+const minimaxBase = langModelFromCatalog("MiniMax-M2.7") as unknown as {
+  config?: Record<string, unknown>;
+};
+if (minimaxBase.config) {
+  minimaxBase.config = { ...minimaxBase.config, includeUsage: true };
+}
+export const minimaxM27 = minimaxBase as unknown as RegistryLanguageModel;
 
-// MiniMax M2.7 with extended timeout — for briefing pipeline (large prompts, thinking model)
-// Default fetch timeout ~60s is not enough for MiniMax reasoning on 30K+ token prompts
-const minimaxLongProvider = createMinimaxOpenAI({
-  fetch: async (url, init) => {
-    return fetch(url, { ...init, signal: AbortSignal.timeout(180_000) });
-  },
-});
-export const minimaxM27Long = (() => {
-  const model = minimaxLongProvider("MiniMax-M2.7") as any;
-  model.config = { ...model.config, includeUsage: true };
-  return model;
-})();
+// MiniMax M2.7 с extended timeout — для briefing pipeline.
+const minimaxLongBase = langModelFromCatalog(
+  "MiniMax-M2.7-long",
+) as unknown as {
+  config?: Record<string, unknown>;
+};
+if (minimaxLongBase.config) {
+  minimaxLongBase.config = { ...minimaxLongBase.config, includeUsage: true };
+}
+export const minimaxM27Long = minimaxLongBase as unknown as RegistryLanguageModel;
 
-export function getClaudeModel(name: "haiku" | "sonnet" | "opus") {
+export function getClaudeModel(
+  name: "haiku" | "sonnet" | "opus",
+): RegistryLanguageModel {
   switch (name) {
     case "haiku":
       return claudeHaiku;
@@ -83,87 +149,39 @@ export function getClaudeModel(name: "haiku" | "sonnet" | "opus") {
 }
 
 // ---------------------------------------------------------------------------
-// Exchange rate — re-exported from shared constant
+// Exchange rate
 // ---------------------------------------------------------------------------
 
 export { RUB_PER_USD } from "@/lib/constants/pricing";
+import { RUB_PER_USD } from "@/lib/constants/pricing";
 
 // ---------------------------------------------------------------------------
-// Model context windows (tokens)
-// Source: Anthropic official docs — claude.com/docs/en/about-claude/models/overview
-// (verified April 2026). SSOT for context-usage UI indicators.
+// Context windows — re-exports из catalog для совместимости
 // ---------------------------------------------------------------------------
 
 /**
- * Context window size per model, in tokens.
- *
- * Claude 4.6 family (Sonnet/Opus): 1M native — no beta flag, flat pricing
- * across the full window (a 900k-token request is billed at the same
- * per-token rate as a 9k-token request).
- *
- * Haiku 4.5: 200K.
+ * Context window size per model, in tokens. Legacy constant — SSOT теперь в
+ * model-catalog.ts. Оставлено для совместимости со старыми импортами.
  */
 export const MODEL_CONTEXT_WINDOW: Record<string, number> = {
-  // Claude 4.6 — 1M native
   "claude-sonnet-4-6":           1_000_000,
   "claude-sonnet":               1_000_000,
   "claude-opus-4-6":             1_000_000,
   "claude-opus":                 1_000_000,
-  // Haiku 4.5 — 200K
   "claude-haiku-4-5-20251001":   200_000,
   "claude-haiku":                200_000,
-  // Legacy (fallback)
   "claude-sonnet-4-5-20250929":  200_000,
-  // MiniMax M2.7
   "MiniMax-M2.7":                204_800,
 };
 
-/** Returns context window size for a model. Defaults to 200K if unknown. */
+/** Returns context window size for a model. Читает из catalog. */
 export function getContextWindow(modelId: string): number {
-  return MODEL_CONTEXT_WINDOW[modelId] ?? 200_000;
+  return getContextWindowFromCatalog(modelId);
 }
 
 // ---------------------------------------------------------------------------
-// Model Pricing (RUB per 1K tokens — fallback when TokenLens unavailable)
-// Primary source of truth: TokenLens (fetches live prices from API).
-// This hardcoded table is used as fallback and for pipeline traces.
+// Pricing — все функции теперь читают из model-catalog.ts (SSOT)
 // ---------------------------------------------------------------------------
-
-interface ModelPricing {
-  input: number;      // RUB per 1K input tokens (fresh)
-  output: number;     // RUB per 1K output tokens
-  cached: number;     // RUB per 1K cache-read tokens (0.1× input)
-  cacheWrite: number; // RUB per 1K cache-write tokens (1.25× input)
-}
-
-const MODEL_PRICING_RUB: Record<string, ModelPricing> = {
-  // Anthropic Claude (USD prices × 100 RUB/USD)
-  // Haiku 4.5:  $1/1M in, $5/1M out, cache_read 0.1× = $0.10/1M, cache_write 1.25× = $1.25/1M
-  // Sonnet 4.6: $3/1M in, $15/1M out, cache_read = $0.30/1M, cache_write = $3.75/1M
-  // Opus 4.6:   $5/1M in, $25/1M out, cache_read = $0.50/1M, cache_write = $6.25/1M
-  "claude-sonnet-4-6":           { input: 0.30,  output: 1.50,  cached: 0.030, cacheWrite: 0.375 },
-  "claude-sonnet-4-5-20250929":  { input: 0.30,  output: 1.50,  cached: 0.030, cacheWrite: 0.375 },
-  "claude-haiku-4-5-20251001":   { input: 0.10,  output: 0.50,  cached: 0.010, cacheWrite: 0.125 },
-  "claude-opus-4-6":             { input: 0.50,  output: 2.50,  cached: 0.050, cacheWrite: 0.625 },
-  // Aliases (myProvider keys → same pricing)
-  "claude-sonnet":               { input: 0.30,  output: 1.50,  cached: 0.030, cacheWrite: 0.375 },
-  "claude-haiku":                { input: 0.10,  output: 0.50,  cached: 0.010, cacheWrite: 0.125 },
-  "claude-opus":                 { input: 0.50,  output: 2.50,  cached: 0.050, cacheWrite: 0.625 },
-
-
-  // Perplexity (no prompt caching)
-  "sonar-pro":                   { input: 0.30,  output: 1.50,  cached: 0, cacheWrite: 0 },
-  "sonar-deep-research":         { input: 0.20,  output: 0.80,  cached: 0, cacheWrite: 0 },
-
-  // MiniMax M2.7 (ТЗ-MinimaxCleanup)
-  // $0.30/1M in, $1.20/1M out, cache_read $0.06/1M, cache_write $0.375/1M
-  "MiniMax-M2.7":                  { input: 0.03,  output: 0.12,  cached: 0.006, cacheWrite: 0.0375 },
-
-  // Voyage AI embeddings (ТЗ-RAG0) — input only, no output tokens
-  // voyage-4: $0.06/1M tokens, voyage-4-lite: $0.02/1M tokens
-  "voyage-4":                    { input: 0.006, output: 0,     cached: 0, cacheWrite: 0 },
-  "voyage-4-lite":               { input: 0.002, output: 0,     cached: 0, cacheWrite: 0 },
-};
 
 /**
  * Token usage contract for pricing — all fields are DISJOINT (no overlap).
@@ -174,8 +192,6 @@ const MODEL_PRICING_RUB: Record<string, ModelPricing> = {
  * - cacheWriteTokens   ← usage.inputTokenDetails.cacheWriteTokens
  * - outputTokens       ← usage.outputTokens
  * - reasoningTokens    ← usage.outputTokenDetails.reasoningTokens (optional)
- *
- * Use extractUsageForPricing() from usage-utils.ts to build this object.
  */
 export interface TokenUsageForPricing {
   noCacheInputTokens: number;
@@ -187,16 +203,7 @@ export interface TokenUsageForPricing {
 
 /**
  * Extract a disjoint TokenUsageForPricing from an AI SDK v6 usage object.
- *
- * Reads native `inputTokenDetails.{noCacheTokens,cacheReadTokens,cacheWriteTokens}`
- * and `outputTokenDetails.reasoningTokens`. All fields are disjoint — pass the
- * result directly to `calculateCostRub` / `calculateCostBreakdownRub`.
- *
- * Fallback for `noCacheInputTokens` when `noCacheTokens` is missing:
- * derive from `inputTokens - cacheReadTokens - cacheWriteTokens`.
- *
- * Client-safe (pure function) — usable in both server routes and client
- * components.
+ * Client-safe (pure function).
  */
 export function extractUsageForPricing(
   usage: LanguageModelUsage | undefined | null,
@@ -233,20 +240,44 @@ export function extractUsageForPricing(
 }
 
 /**
+ * Получить pricing (RUB/1K) из catalog. Конвертирует USD/1M → RUB/1K через
+ * RUB_PER_USD. Возвращает null если модели нет в каталоге.
+ */
+interface PricingRubPer1K {
+  input: number;
+  output: number;
+  cached: number;
+  cacheWrite: number;
+}
+
+function getPricingRubPer1K(modelId: string): PricingRubPer1K | null {
+  const entry = getModelEntry(modelId);
+  if (!entry) return null;
+  // USD/1M → RUB/1K = (usd_per_million / 1000) * RUB_PER_USD
+  const factor = RUB_PER_USD / 1000;
+  return {
+    input:      entry.pricing.input       * factor,
+    output:     entry.pricing.output      * factor,
+    cached:     entry.pricing.cachedInput * factor,
+    cacheWrite: entry.pricing.cacheWrite  * factor,
+  };
+}
+
+/**
  * Calculate cost in RUB using Anthropic billing model:
- * - fresh input tokens:   billed at input rate (1×)
- * - cache_read tokens:    billed at cached rate (0.1× input)
- * - cache_write tokens:   billed at cacheWrite rate (1.25× input)
- * - output tokens:        billed at output rate
- * - reasoning tokens:     billed at output rate (Anthropic treats extended thinking as output)
+ * - fresh input tokens:   input rate (1×)
+ * - cache_read tokens:    cached rate (0.1× input для Anthropic)
+ * - cache_write tokens:   cacheWrite rate (1.25× input для Anthropic)
+ * - output tokens:        output rate
+ * - reasoning tokens:     output rate (Anthropic extended thinking)
  *
- * All input fields are disjoint — no subtraction needed.
+ * All input fields are disjoint — no subtraction.
  */
 export function calculateCostRub(
   modelId: string,
   usage: TokenUsageForPricing,
 ): number {
-  const pricing = MODEL_PRICING_RUB[modelId];
+  const pricing = getPricingRubPer1K(modelId);
   if (!pricing) return 0;
 
   const effectiveOutput = usage.outputTokens + (usage.reasoningTokens ?? 0);
@@ -259,14 +290,7 @@ export function calculateCostRub(
   return Math.round((inputCost + cacheReadCost + cacheWriteCost + outputCost) * 100) / 100;
 }
 
-/**
- * Per-component cost breakdown in RUB. Same formula as `calculateCostRub`,
- * but returns each component separately instead of the sum — used by the
- * user-facing Context popover to show where cost comes from.
- *
- * All values are RUB (rounded to 2 decimals).
- * `totalRub` === `calculateCostRub(modelId, usage)`.
- */
+/** Per-component cost breakdown in RUB — для user-facing Context popover. */
 export interface CostBreakdownRub {
   freshInputRub: number;
   cacheReadRub: number;
@@ -280,7 +304,7 @@ export function calculateCostBreakdownRub(
   modelId: string,
   usage: TokenUsageForPricing,
 ): CostBreakdownRub {
-  const pricing = MODEL_PRICING_RUB[modelId];
+  const pricing = getPricingRubPer1K(modelId);
   if (!pricing) {
     return {
       freshInputRub: 0,
@@ -298,7 +322,6 @@ export function calculateCostBreakdownRub(
   const cacheReadRub   = round2((usage.cacheReadTokens    / 1000) * pricing.cached);
   const cacheWriteRub  = round2((usage.cacheWriteTokens   / 1000) * pricing.cacheWrite);
   const outputRub      = round2((usage.outputTokens       / 1000) * pricing.output);
-  // Anthropic treats extended thinking tokens as output (same rate)
   const reasoningRub   = round2((reasoningTokens          / 1000) * pricing.output);
 
   const totalRub = round2(
@@ -323,10 +346,10 @@ function round2(value: number): number {
 // Client helper: use server-calculated stepCostRub, fallback to local calc
 // ---------------------------------------------------------------------------
 
-import type { DebugStepData } from "./debug-events";
-
-/** Get cost for a debug step. Prefers server-calculated value (TokenLens SSOT),
- *  falls back to local hardcoded pricing using disjoint token fields. */
+/**
+ * Get cost for a debug step. Prefers server-calculated value (catalog SSOT),
+ * falls back to local calculation via catalog lookup.
+ */
 export function getStepCostRub(step: DebugStepData): number {
   if (step.stepCostRub != null) return step.stepCostRub;
   return calculateCostRub(step.modelId, {
@@ -339,8 +362,8 @@ export function getStepCostRub(step: DebugStepData): number {
 }
 
 // ---------------------------------------------------------------------------
-// Non-token provider cost helpers (Deepgram, MiniMax TTS)
-// These providers use per-minute / per-character pricing, not tokens.
+// Non-token provider cost helpers (Deepgram, Gemini TTS)
+// Per-minute / per-character pricing, not tokens — остаётся в этом файле.
 // ---------------------------------------------------------------------------
 
 /** Deepgram Nova-3: $0.0043/min batch pricing */
@@ -356,7 +379,7 @@ export function calculateGeminiTtsCostUsd(charCount: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// TTS Pricing (Google Gemini TTS — RUB helper for pipeline traces)
+// TTS Pricing (Gemini TTS — RUB helper для pipeline traces)
 // ---------------------------------------------------------------------------
 
 const TTS_COST_RUB_PER_SECOND = 0.006;

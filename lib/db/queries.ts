@@ -3742,6 +3742,7 @@ export async function saveAiUsageLog({
   chatId,
   userId,
   modelId,
+  provider,
   inputTokens,
   outputTokens,
   thinkingTokens = 0,
@@ -3755,6 +3756,7 @@ export async function saveAiUsageLog({
   chatId?: string | null;
   userId: string;
   modelId: string;
+  provider?: string | null;
   inputTokens: number;
   outputTokens: number;
   thinkingTokens?: number;
@@ -3770,6 +3772,7 @@ export async function saveAiUsageLog({
       chatId: chatId ?? null,
       userId,
       modelId,
+      provider: provider ?? null,
       inputTokens,
       outputTokens,
       thinkingTokens,

@@ -36,6 +36,8 @@ export interface LogUsageInput {
   usage: LanguageModelUsage;
   modelId: string;
   chatMode: string;
+  /** Provider id (anthropic, minimax, xai, openrouter, voyage, deepgram, ...). ТЗ-1. */
+  provider?: string | null;
   chatId?: string | null;
   durationMs?: number | null;
   guardianFlags?: Record<string, unknown> | null;
@@ -88,6 +90,7 @@ export async function logUsage({
   usage,
   modelId,
   chatMode,
+  provider,
   chatId,
   durationMs,
   guardianFlags,
@@ -104,6 +107,7 @@ export async function logUsage({
       chatId: chatId ?? null,
       userId,
       modelId,
+      provider: provider ?? inferProviderFromModelId(modelId),
       ...fields,
       costUsd,
       chatMode,
@@ -113,4 +117,19 @@ export async function logUsage({
   } catch {
     // Never block the caller
   }
+}
+
+/**
+ * Infer provider from modelId prefix as a fallback when caller doesn't pass
+ * `provider` explicitly. Same rules as SQL backfill in migration 0053.
+ */
+function inferProviderFromModelId(modelId: string): string | null {
+  if (modelId.startsWith("claude")) return "anthropic";
+  if (modelId.startsWith("MiniMax")) return "minimax";
+  if (modelId.startsWith("grok")) return "xai";
+  if (modelId.startsWith("voyage")) return "voyage";
+  if (modelId.startsWith("sonar")) return "perplexity";
+  if (modelId.startsWith("deepgram") || modelId === "nova-3") return "deepgram";
+  if (modelId.startsWith("gemini")) return "google";
+  return null;
 }
