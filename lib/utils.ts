@@ -138,6 +138,71 @@ export function convertToUIMessages(messages: DBMessage[]): ChatMessage[] {
 }
 
 /**
+ * ТЗ-1 hotfix — UI-level pre-sanitization of AI SDK v6 tool parts.
+ *
+ * AI SDK v6 persists tool invocations as typed parts (`tool-<name>`) with a
+ * `state` field: `input-streaming` | `input-available` | `output-available`
+ * | `output-error`. Only `output-available` is safe to send to a provider —
+ * it represents a tool call that completed successfully and has structured
+ * input and output. All other states mean the call is either in-flight or
+ * failed, and the persisted data is incomplete:
+ *
+ *   - `output-error` carries `rawInput` (a raw JSON string that failed to
+ *     parse against the tool's Zod schema) and an `errorText`. When
+ *     `convertToModelMessages()` processes this, the downstream provider
+ *     (MiniMax, Anthropic, etc.) gets a tool_call with unparseable
+ *     arguments → 400 "invalid function arguments json string".
+ *   - `input-streaming` / `input-available` represent an interrupted
+ *     invocation — same problem.
+ *
+ * This function strips such parts at the UI-message level, BEFORE conversion
+ * to core messages. Parts with `state === 'output-available'` (success) and
+ * parts without a `state` field (legacy data, conservative) are preserved.
+ * If stripping leaves a message with no meaningful content, a text
+ * placeholder `[инструмент не завершён]` is inserted so the assistant
+ * message stays valid for the provider.
+ *
+ * Defense-in-depth: this is the first of two layers. The second layer is
+ * `sanitizeCoreMessages()` below, which handles orphan tool-call/tool-result
+ * pairs at the ModelMessage level. If something slips through one layer,
+ * the other catches it.
+ *
+ * Apply this to ALL `convertToModelMessages()` call sites.
+ */
+export function stripIncompleteToolParts(
+  messages: ChatMessage[],
+): ChatMessage[] {
+  return messages.map((msg) => {
+    if (!msg.parts || !Array.isArray(msg.parts)) return msg;
+
+    const filtered = msg.parts.filter((part: any) => {
+      if (typeof part.type !== 'string' || !part.type.startsWith('tool-')) {
+        return true; // Not a tool part — keep untouched
+      }
+      // Tool part: keep only successful completion, or legacy (no state)
+      if (part.state === undefined) return true;
+      return part.state === 'output-available';
+    });
+
+    if (filtered.length === msg.parts.length) return msg;
+
+    // If all meaningful content was removed (or only step-start markers
+    // remain), insert a placeholder so the assistant message is valid.
+    const hasMeaningfulContent = filtered.some(
+      (part: any) => part.type !== 'step-start',
+    );
+    if (!hasMeaningfulContent) {
+      return {
+        ...msg,
+        parts: [{ type: 'text' as const, text: '[инструмент не завершён]' }],
+      } as ChatMessage;
+    }
+
+    return { ...msg, parts: filtered } as ChatMessage;
+  });
+}
+
+/**
  * Sanitize CoreMessage[] for Anthropic API compatibility.
  * - Removes empty assistant/tool messages
  * - Removes orphan tool-call parts (tool_use without matching tool_result)

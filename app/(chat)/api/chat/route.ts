@@ -86,7 +86,7 @@ import {
 import { ChatSDKError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
 import { buildAppUsage, mergeAppUsage, normalizeStoredAppUsage, type AppUsage } from "@/lib/usage";
-import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages } from "@/lib/utils";
+import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages, stripIncompleteToolParts } from "@/lib/utils";
 // ТЗ-07A: generateTitleFromUserMessage больше не используется здесь
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
@@ -841,7 +841,14 @@ export async function POST(request: Request) {
             .join("\n");
 
           // Convert UI messages to CoreMessage format for pipeline
-          const coreMessages = sanitizeCoreMessages(await convertToModelMessages(uiMessages.slice(0, -1))); // Exclude current message
+          // ТЗ-1 hotfix: stripIncompleteToolParts removes failed/in-flight tool parts
+          // (state: output-error | input-streaming | input-available) before conversion
+          // so downstream providers don't receive unparseable tool arguments.
+          const coreMessages = sanitizeCoreMessages(
+            await convertToModelMessages(
+              stripIncompleteToolParts(uiMessages.slice(0, -1)),
+            ),
+          ); // Exclude current message
 
           try {
             let accumulatedContent = "";
@@ -922,14 +929,17 @@ export async function POST(request: Request) {
             },
             // ТЗ-KITT/CACHE: MIND retrieved facts (dynamic per query) — NOT cached
             ...(mindDynamicBlock ? [{ role: 'system' as const, content: mindDynamicBlock }] : []),
-            // ТЗ-SimplyToolsMinimax: strip images/files from history for text-only MiniMax
-            // When Simply switches to Anthropic (think/attachments), strip MiniMax tool parts from history
+            // ТЗ-1 hotfix: stripIncompleteToolParts (universal) removes failed/in-flight
+            // tool parts before any provider-specific stripping. Applied to ALL branches.
+            // ТЗ-SimplyToolsMinimax: then strip images/files for MiniMax (text-only)
+            // or MiniMax tool parts for Anthropic switchover.
             ...sanitizeCoreMessages(await convertToModelMessages(
-              isSimplyNonAnthropicModel
-                ? stripMediaPartsForTextModel(uiMessages)
-                : chatMode === "simply"
-                  ? stripMiniMaxToolParts(uiMessages)
-                  : uiMessages
+              (() => {
+                const cleaned = stripIncompleteToolParts(uiMessages);
+                if (isSimplyNonAnthropicModel) return stripMediaPartsForTextModel(cleaned);
+                if (chatMode === "simply") return stripMiniMaxToolParts(cleaned);
+                return cleaned;
+              })()
             )),
           ],
           providerOptions: compactionOptions,

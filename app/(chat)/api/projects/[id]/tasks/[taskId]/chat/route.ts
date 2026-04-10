@@ -37,7 +37,7 @@ import { calcCostUsd, getTokenlensCatalog, calcStepCostRub } from "@/lib/ai/toke
 import { extractUsageFields, extractUsageForPricing } from "@/lib/ai/usage-utils";
 import { createStepTracker } from "@/lib/ai/tool-call-guardian";
 import { ChatSDKError } from "@/lib/errors";
-import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages } from "@/lib/utils";
+import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages, stripIncompleteToolParts } from "@/lib/utils";
 import { retrieveMemoryContext } from "@/lib/ai/memory/retrieve";
 import { extractAndStoreFacts } from "@/lib/ai/memory/extract";
 
@@ -253,7 +253,8 @@ export async function POST(
           // ТЗ-CACHE1: system as message with per-message cacheControl (top-level providerOptions doesn't mark messages)
           messages: [
             { role: 'system' as const, content: finalSystemPrompt, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },
-            ...sanitizeCoreMessages(await convertToModelMessages(uiMessages)),
+            // ТЗ-1 hotfix: strip failed/in-flight tool parts before conversion
+            ...sanitizeCoreMessages(await convertToModelMessages(stripIncompleteToolParts(uiMessages))),
           ],
           // ТЗ-RAG3: Anthropic Compaction API — automatic context management
           providerOptions: {

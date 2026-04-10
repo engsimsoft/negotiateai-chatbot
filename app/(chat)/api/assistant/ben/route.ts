@@ -12,6 +12,7 @@ import { auth } from "@/app/(auth)/auth";
 import { myProvider } from "@/lib/ai/providers";
 import { buildBenPrompt } from "@/lib/prompts/server";
 import { logUsage } from "@/lib/ai/usage-utils";
+import { stripIncompleteToolParts } from "@/lib/utils";
 
 export const maxDuration = 60;
 
@@ -30,7 +31,8 @@ export async function POST(request: Request) {
     const result = streamText({
       model: myProvider.languageModel(prompt.model),
       system: prompt.systemPrompt,
-      messages: await convertToModelMessages(messages),
+      // ТЗ-1 hotfix: strip failed/in-flight tool parts before conversion
+      messages: await convertToModelMessages(stripIncompleteToolParts(messages)),
       temperature: 1.0,
       // ТЗ-PIPELINE1: Use totalUsage (sum of all steps)
       onFinish: async ({ totalUsage }) => {

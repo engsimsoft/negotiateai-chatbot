@@ -1,13 +1,16 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { AnimatePresence } from "framer-motion";
-import { ArrowDownIcon } from "lucide-react";
-import { memo, useEffect, useMemo } from "react";
-import { useMessages } from "@/hooks/use-messages";
+import { memo, useEffect, useMemo, useState } from "react";
+import { useStickToBottomContext } from "use-stick-to-bottom";
 import type { SnapshotMeta, Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { useDataStream } from "./data-stream-provider";
-import { Conversation, ConversationContent } from "./elements/conversation";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "./elements/conversation";
 import { Greeting } from "./greeting";
 import { PreviewMessage, ThinkingMessage } from "./message";
 import { SnapshotDivider } from "./projects/snapshot-card";
@@ -35,6 +38,26 @@ type MessagesProps = {
   snapshots?: SnapshotMeta[];
 };
 
+/**
+ * ТЗ-1 hotfix: Internal sub-component that lives inside <Conversation> and
+ * triggers scroll-to-bottom via `useStickToBottomContext()` when the chat
+ * status becomes "submitted". Must be a child of <Conversation> because the
+ * context hook only works inside <StickToBottom>.
+ */
+function ScrollToBottomOnSubmit({
+  status,
+}: {
+  status: UseChatHelpers<ChatMessage>["status"];
+}) {
+  const { scrollToBottom } = useStickToBottomContext();
+  useEffect(() => {
+    if (status === "submitted") {
+      scrollToBottom();
+    }
+  }, [status, scrollToBottom]);
+  return null;
+}
+
 function PureMessages({
   chatId,
   status,
@@ -47,23 +70,16 @@ function PureMessages({
   onActionButton,
   snapshots,
 }: MessagesProps) {
-  const {
-    containerRef: messagesContainerRef,
-    endRef: messagesEndRef,
-    isAtBottom,
-    scrollToBottom,
-    hasSentMessage,
-  } = useMessages({
-    status,
-  });
-
   const { dataStream } = useDataStream();
 
+  // Track whether user has sent a message in this session — used to add
+  // bottom padding to the last assistant message while streaming.
+  const [hasSentMessage, setHasSentMessage] = useState(false);
   useEffect(() => {
     if (status === "submitted") {
-      scrollToBottom("smooth");
+      setHasSentMessage(true);
     }
-  }, [status, scrollToBottom]);
+  }, [status]);
 
   // ТЗ-C1.5: Find the last snapshot boundary for dimming old messages
   // Priority 1: tool-created snapshot (visible in message parts)
@@ -107,79 +123,68 @@ function PureMessages({
   const dimBoundary = lastSnapshotIndex >= 0 ? lastSnapshotIndex : fallbackSnapshotInsertIndex;
 
   return (
-    <div
-      className="overscroll-behavior-contain -webkit-overflow-scrolling-touch flex flex-1 flex-col-reverse touch-pan-y overflow-y-scroll"
-      ref={messagesContainerRef}
-    >
-      <Conversation className="mx-auto flex min-w-0 max-w-4xl flex-col gap-4 md:gap-6">
-        <ConversationContent className="flex flex-col gap-4 px-2 py-4 md:gap-6 md:px-4">
-          {messages.length === 0 && <Greeting />}
+    // ТЗ-1 hotfix: canonical single-scroll layout via <Conversation> (StickToBottom).
+    // Previous version wrapped <Conversation> in an outer flex-col-reverse overflow-y-scroll
+    // div, which created a DOUBLE-SCROLL container (outer manual + inner StickToBottom) —
+    // causing a scrollbar that drifted/jittered on short messages. Removed entirely.
+    // Scroll-to-bottom on submit: handled by <ScrollToBottomOnSubmit/> sub-component.
+    // Scroll button: <ConversationScrollButton/> uses useStickToBottomContext natively.
+    <Conversation className="mx-auto flex min-w-0 max-w-4xl flex-1 flex-col gap-4 md:gap-6">
+      <ScrollToBottomOnSubmit status={status} />
+      <ConversationContent className="flex flex-col gap-4 px-2 py-4 md:gap-6 md:px-4">
+        {messages.length === 0 && <Greeting />}
 
-          {messages.map((message, index) => {
-            const isStreamingMessage =
-              status === "streaming" && messages.length - 1 === index;
-            const isDimmed = dimBoundary >= 0 && index < dimBoundary;
+        {messages.map((message, index) => {
+          const isStreamingMessage =
+            status === "streaming" && messages.length - 1 === index;
+          const isDimmed = dimBoundary >= 0 && index < dimBoundary;
 
-            return (
-              <div key={message.id}>
-                {/* ТЗ-C1.5: Fallback snapshot divider (no card, just divider) */}
-                {fallbackSnapshotInsertIndex === index && lastSnapshotIndex < 0 && (
-                  <SnapshotDivider label="Контекст сжат" />
-                )}
+          return (
+            <div key={message.id}>
+              {/* ТЗ-C1.5: Fallback snapshot divider (no card, just divider) */}
+              {fallbackSnapshotInsertIndex === index && lastSnapshotIndex < 0 && (
+                <SnapshotDivider label="Контекст сжат" />
+              )}
 
-                <div className={isDimmed ? "opacity-50 transition-opacity" : undefined}>
-                  <PreviewMessage
-                    chatId={chatId}
-                    isLoading={isStreamingMessage}
-                    isReadonly={isReadonly}
-                    message={message}
-                    onActionButton={onActionButton}
-                    regenerate={regenerate}
-                    requiresScrollPadding={
-                      hasSentMessage && index === messages.length - 1
-                    }
-                    setMessages={setMessages}
-                    vote={
-                      votes
-                        ? votes.find((vote) => vote.messageId === message.id)
-                        : undefined
-                    }
-                  />
-                </div>
+              <div className={isDimmed ? "opacity-50 transition-opacity" : undefined}>
+                <PreviewMessage
+                  chatId={chatId}
+                  isLoading={isStreamingMessage}
+                  isReadonly={isReadonly}
+                  message={message}
+                  onActionButton={onActionButton}
+                  regenerate={regenerate}
+                  requiresScrollPadding={
+                    hasSentMessage && index === messages.length - 1
+                  }
+                  setMessages={setMessages}
+                  vote={
+                    votes
+                      ? votes.find((vote) => vote.messageId === message.id)
+                      : undefined
+                  }
+                />
               </div>
-            );
-          })}
+            </div>
+          );
+        })}
 
-          <AnimatePresence mode="wait">
-            {(status === "submitted" ||
-              (status === "streaming" &&
-               messages.length > 0 &&
-               messages[messages.length - 1].role === "assistant" &&
-               messages[messages.length - 1].parts.every(p => p.type !== "text" || !p.text?.trim()) &&
-               // ТЗ-07: Don't show ThinkingMessage when tool activity indicator is already visible
-               !dataStream.some(p => p.type === "data-tool-activity")
-              )
-            ) && <ThinkingMessage key="thinking" />}
-          </AnimatePresence>
+        <AnimatePresence mode="wait">
+          {(status === "submitted" ||
+            (status === "streaming" &&
+             messages.length > 0 &&
+             messages[messages.length - 1].role === "assistant" &&
+             messages[messages.length - 1].parts.every(p => p.type !== "text" || !p.text?.trim()) &&
+             // ТЗ-07: Don't show ThinkingMessage when tool activity indicator is already visible
+             !dataStream.some(p => p.type === "data-tool-activity")
+            )
+          ) && <ThinkingMessage key="thinking" />}
+        </AnimatePresence>
 
-          <div
-            className="min-h-[24px] min-w-[24px] shrink-0"
-            ref={messagesEndRef}
-          />
-        </ConversationContent>
-      </Conversation>
-
-      {!isAtBottom && (
-        <button
-          aria-label="Scroll to bottom"
-          className="-translate-x-1/2 absolute bottom-40 left-1/2 z-10 rounded-full border bg-background p-2 shadow-lg transition-colors hover:bg-muted"
-          onClick={() => scrollToBottom("smooth")}
-          type="button"
-        >
-          <ArrowDownIcon className="size-4" />
-        </button>
-      )}
-    </div>
+        <div className="min-h-6 min-w-6 shrink-0" />
+      </ConversationContent>
+      <ConversationScrollButton />
+    </Conversation>
   );
 }
 
