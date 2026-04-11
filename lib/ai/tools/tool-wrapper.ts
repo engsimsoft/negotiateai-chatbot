@@ -105,7 +105,11 @@ export function wrapToolExecution<TInput, TOutput>(
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
       if (enableLogging) {
-        console.error(`[Tool:${name}] Failed after ${executionTimeMs}ms:`, errorMessage);
+        // Log the full Error object — Node prints nested Error.cause chains
+        // with stack traces, which is how real driver errors surface through
+        // ChatSDKError (see lib/errors.ts). Logging only .message hides the
+        // actual cause (e.g. invalid UUID, driver ECONNRESET).
+        console.error(`[Tool:${name}] Failed after ${executionTimeMs}ms:`, error);
       }
 
       // Return standardized error result
