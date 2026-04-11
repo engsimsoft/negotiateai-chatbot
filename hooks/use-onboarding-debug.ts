@@ -113,6 +113,8 @@ export function useOnboardingDebug() {
             prompt: d as unknown as DebugPromptData,
             steps: [],
             guardians: [],
+            errors: [],
+            warnings: [],
           };
           break;
         }

@@ -15,7 +15,7 @@ import { isSimplyDevMode } from "@/lib/constants";
 // wipe their localStorage cache when the stored version is older.
 // ---------------------------------------------------------------------------
 
-export const DEBUG_EVENT_SCHEMA_VERSION = 2;
+export const DEBUG_EVENT_SCHEMA_VERSION = 3;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -102,6 +102,41 @@ export interface DebugCompactionData {
     inputTokens: number;
     outputTokens: number;
   }>;
+}
+
+/**
+ * ТЗ-DevPanelErrors: Error captured during a request (server or client side).
+ * Represents a critical problem — something actually broke and was caught by try/catch
+ * or by React Error Boundary. Shown with red accent in DevPanel.
+ */
+export interface DebugErrorData {
+  /** Source identifier, e.g. "server:chat-route", "server:professor-pipeline", "client:useChat", "client:window", "client:error-boundary". */
+  source: string;
+  /** Human-readable error message. */
+  message: string;
+  /** Error stack trace if available (truncated to ~2000 chars upstream). */
+  stack?: string;
+  /** Optional arbitrary context — e.g. chatId, taskId, tool name. Kept small (<500 chars after JSON.stringify). */
+  context?: Record<string, unknown>;
+  /** Unix ms timestamp when the error was captured. */
+  timestamp: number;
+}
+
+/**
+ * ТЗ-DevPanelErrors: Warning captured during a request.
+ * Represents a non-fatal problem — something degraded gracefully but is worth knowing about.
+ * Examples: Voyage AI down (memory retrieval skipped), Guardian detected hallucination, profile block failed.
+ * Shown with yellow accent in DevPanel.
+ */
+export interface DebugWarningData {
+  /** Source identifier. See DebugErrorData.source for examples. */
+  source: string;
+  /** Human-readable warning message. */
+  message: string;
+  /** Optional context, same rules as DebugErrorData.context. */
+  context?: Record<string, unknown>;
+  /** Unix ms timestamp. */
+  timestamp: number;
 }
 
 /** ТЗ-RAG1: MIND memory debug data */
@@ -207,6 +242,53 @@ export function emitDebugRag(
     type: "data-debug-rag",
     data,
   });
+}
+
+/**
+ * ТЗ-DevPanelErrors: Emit a critical error captured in a try/catch on the server.
+ * The event reaches the client DevPanel and is attached to the currently streaming
+ * assistant message (via parseBatches position-based assignment). Safe to call from
+ * catch blocks — the emit itself is wrapped in try/catch so a logging failure never
+ * masks the original error.
+ */
+export function emitDebugError(
+  dataStream: DataStreamWriter,
+  data: Omit<DebugErrorData, "timestamp"> & { timestamp?: number },
+): void {
+  if (!isSimplyDevMode) return;
+  try {
+    dataStream.write({
+      type: "data-debug-error",
+      data: {
+        ...data,
+        timestamp: data.timestamp ?? Date.now(),
+      } satisfies DebugErrorData,
+    });
+  } catch {
+    // Never let debug logging fail the request — swallow silently.
+  }
+}
+
+/**
+ * ТЗ-DevPanelErrors: Emit a non-fatal warning (graceful degradation notice).
+ * Same semantics as emitDebugError but rendered with yellow accent in DevPanel.
+ */
+export function emitDebugWarning(
+  dataStream: DataStreamWriter,
+  data: Omit<DebugWarningData, "timestamp"> & { timestamp?: number },
+): void {
+  if (!isSimplyDevMode) return;
+  try {
+    dataStream.write({
+      type: "data-debug-warning",
+      data: {
+        ...data,
+        timestamp: data.timestamp ?? Date.now(),
+      } satisfies DebugWarningData,
+    });
+  } catch {
+    // Swallow — logging must never fail the request.
+  }
 }
 
 // ---------------------------------------------------------------------------

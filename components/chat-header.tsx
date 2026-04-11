@@ -13,6 +13,7 @@ import {
   BenIntroBubble,
   BEN_CONFIG,
 } from "@/components/service-chat";
+import { SessionErrorsIndicator } from "@/components/dev-panel/session-errors-indicator";
 
 // SWR fetcher for JSON endpoints
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -122,6 +123,9 @@ function PureChatHeader({
 
       {/* Right-aligned actions */}
       <div className="ml-auto flex items-center gap-1">
+        {/* ТЗ-DevPanelErrors: global client errors indicator (dev mode only) */}
+        <SessionErrorsIndicator />
+
         {/* ТЗ-08: Chat sidebar toggle */}
         {onToggleSidebar && (
           <Button

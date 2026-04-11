@@ -12,6 +12,7 @@ const MODEL_DISPLAY: Record<string, string> = {
   "claude-haiku": "Haiku",
   "claude-sonnet": "Sonnet",
   "claude-opus": "Opus",
+  "MiniMax-M2.7": "MiniMax M2.7",
 };
 
 function formatTokens(n: number): string {
@@ -85,6 +86,10 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
   // ТЗ-DEV3: Total tool call count across all steps
   const toolCount = data.steps.reduce((sum, s) => sum + s.toolCalls.length, 0);
 
+  // ТЗ-DevPanelErrors: counts for the errors/warnings badge
+  const errorCount = data.errors?.length ?? 0;
+  const warningCount = data.warnings?.length ?? 0;
+
   return (
     <>
       <button
@@ -122,6 +127,23 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
           <>
             <span className={isError ? "text-destructive/30" : "text-muted-foreground/30"}>&middot;</span>
             <span className="text-amber-600 dark:text-amber-400">Compaction</span>
+          </>
+        )}
+        {/* ТЗ-DevPanelErrors: errors/warnings badge — distinct colors, click opens drawer */}
+        {errorCount > 0 && (
+          <>
+            <span className={isError ? "text-destructive/30" : "text-muted-foreground/30"}>&middot;</span>
+            <span className="text-destructive">
+              &#9679; {errorCount} {errorCount === 1 ? "error" : "errors"}
+            </span>
+          </>
+        )}
+        {warningCount > 0 && (
+          <>
+            <span className={isError ? "text-destructive/30" : "text-muted-foreground/30"}>&middot;</span>
+            <span className="text-yellow-600 dark:text-yellow-400">
+              &#9888; {warningCount} {warningCount === 1 ? "warning" : "warnings"}
+            </span>
           </>
         )}
         {isStreaming && (

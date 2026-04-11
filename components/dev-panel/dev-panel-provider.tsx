@@ -18,7 +18,13 @@ import {
   type DebugPromptData,
   type DebugRagData,
   type DebugCompactionData,
+  type DebugErrorData,
+  type DebugWarningData,
 } from "@/lib/ai/debug-events";
+import {
+  reportClientError,
+  subscribeToClientErrors,
+} from "@/lib/client/error-bus";
 import type { ChatMessage } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -31,6 +37,9 @@ export interface DevPanelMessageData {
   compaction?: DebugCompactionData;
   steps: DebugStepData[];
   guardians: DebugGuardianData[];
+  /** ТЗ-DevPanelErrors: errors and warnings captured for this assistant message. */
+  errors: DebugErrorData[];
+  warnings: DebugWarningData[];
   finish?: DebugFinishData;
 }
 
@@ -38,9 +47,21 @@ export interface DevPanelMessageData {
 // Context
 // ---------------------------------------------------------------------------
 
-export const DevPanelContext = createContext<Map<string, DevPanelMessageData>>(
-  new Map(),
-);
+/**
+ * ТЗ-DevPanelErrors: context value has two buckets:
+ *  - `byMessage`: debug data attached to specific assistant messages (existing)
+ *  - `globalErrors`: client-captured errors not tied to a message
+ *    (render crashes, pre-stream window errors, useChat errors)
+ */
+export interface DevPanelContextValue {
+  byMessage: Map<string, DevPanelMessageData>;
+  globalErrors: DebugErrorData[];
+}
+
+export const DevPanelContext = createContext<DevPanelContextValue>({
+  byMessage: new Map(),
+  globalErrors: [],
+});
 
 // ---------------------------------------------------------------------------
 // Client-side gate: mirrors server-side isSimplyDevMode.
@@ -146,6 +167,8 @@ function parseBatches(dataStream: DataStreamEvent[]): DevPanelMessageData[] {
           prompt: d as unknown as DebugPromptData,
           steps: [],
           guardians: [],
+          errors: [],
+          warnings: [],
         };
         break;
       case "data-debug-rag":
@@ -160,6 +183,13 @@ function parseBatches(dataStream: DataStreamEvent[]): DevPanelMessageData[] {
         break;
       case "data-debug-compaction":
         if (current) current.compaction = d as unknown as DebugCompactionData;
+        break;
+      // ТЗ-DevPanelErrors: collect server-emitted errors and warnings into current batch
+      case "data-debug-error":
+        if (current) current.errors.push(d as unknown as DebugErrorData);
+        break;
+      case "data-debug-warning":
+        if (current) current.warnings.push(d as unknown as DebugWarningData);
         break;
       case "data-debug-finish":
         if (current) {
@@ -199,6 +229,12 @@ export function DevPanelProvider({
   const [lockedMap, setLockedMap] = useState<Map<string, DevPanelMessageData>>(
     () => (IS_DEV_MODE ? loadFromStorage(chatId) : new Map()),
   );
+
+  // ТЗ-DevPanelErrors: global (not message-bound) client errors.
+  // Captured from window.onerror, unhandledrejection, useChat.onError,
+  // and React Error Boundaries via the shared error bus.
+  const [globalErrors, setGlobalErrors] = useState<DebugErrorData[]>([]);
+  const MAX_GLOBAL_ERRORS = 50;
 
   // Number of assistant messages present at mount.
   // New streamed batches correspond to messages starting from this index.
@@ -262,6 +298,64 @@ export function DevPanelProvider({
     saveToStorage(chatId, lockedMap);
   }, [lockedMap, chatId]);
 
+  // ТЗ-DevPanelErrors: subscribe to the client error bus.
+  // Error Boundaries and useChat.onError publish here. We also install
+  // window.onerror and unhandledrejection listeners to catch top-level
+  // crashes. All captures funnel into globalErrors state, capped at
+  // MAX_GLOBAL_ERRORS (circular buffer).
+  useEffect(() => {
+    if (!IS_DEV_MODE) return;
+
+    const pushGlobal = (error: DebugErrorData) => {
+      setGlobalErrors((prev) => {
+        const next = [...prev, error];
+        return next.length > MAX_GLOBAL_ERRORS
+          ? next.slice(next.length - MAX_GLOBAL_ERRORS)
+          : next;
+      });
+    };
+
+    const unsubscribe = subscribeToClientErrors(pushGlobal);
+
+    const handleWindowError = (event: ErrorEvent) => {
+      reportClientError({
+        source: "client:window",
+        message: event.message || "Uncaught error",
+        stack: event.error instanceof Error
+          ? event.error.stack?.slice(0, 2000)
+          : undefined,
+        context: {
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+        },
+      });
+    };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      reportClientError({
+        source: "client:unhandled-rejection",
+        message:
+          reason instanceof Error
+            ? reason.message
+            : typeof reason === "string"
+              ? reason
+              : "Unhandled promise rejection",
+        stack: reason instanceof Error ? reason.stack?.slice(0, 2000) : undefined,
+      });
+    };
+
+    window.addEventListener("error", handleWindowError);
+    window.addEventListener("unhandledrejection", handleRejection);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("error", handleWindowError);
+      window.removeEventListener("unhandledrejection", handleRejection);
+    };
+  }, []);
+
   // Build the final context value.
   // During streaming: add a tentative entry for the unfinished (streaming) batch
   // mapped to the last assistant message (the one currently being generated).
@@ -285,20 +379,36 @@ export function DevPanelProvider({
     return next;
   }, [status, lockedMap, batches, messages]);
 
+  // Combine message-bound map and global errors into the context value.
+  const contextValue = useMemo<DevPanelContextValue>(
+    () => ({ byMessage: debugDataMap, globalErrors }),
+    [debugDataMap, globalErrors],
+  );
+
   return (
-    <DevPanelContext.Provider value={debugDataMap}>
+    <DevPanelContext.Provider value={contextValue}>
       {children}
     </DevPanelContext.Provider>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Hook
+// Hooks
 // ---------------------------------------------------------------------------
 
 export function useDevPanel(
   messageId: string,
 ): DevPanelMessageData | undefined {
-  const map = useContext(DevPanelContext);
-  return map.get(messageId);
+  const { byMessage } = useContext(DevPanelContext);
+  return byMessage.get(messageId);
+}
+
+/**
+ * ТЗ-DevPanelErrors: access client errors not tied to any specific message
+ * (render crashes, pre-stream window errors, useChat.onError before any
+ * assistant message exists). Used by a global indicator in chat header.
+ */
+export function useDevPanelGlobalErrors(): DebugErrorData[] {
+  const { globalErrors } = useContext(DevPanelContext);
+  return globalErrors;
 }

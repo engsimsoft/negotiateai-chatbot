@@ -16,6 +16,7 @@ import { PromptSection } from "./sections/prompt-section";
 import { RagSection } from "./sections/rag-section";
 import { ToolsSection } from "./sections/tools-section";
 import { CostBreakdownSection } from "./sections/cost-breakdown-section";
+import { ErrorsSection } from "./sections/errors-section";
 import { RawSection } from "./sections/raw-section";
 
 export function DevPanelDrawer({
@@ -29,7 +30,7 @@ export function DevPanelDrawer({
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:w-[440px]">
+      <SheetContent side="right" className="w-full overflow-y-auto sm:w-110">
         <SheetHeader>
           <SheetTitle className="font-mono text-sm">DevPanel</SheetTitle>
           <SheetDescription className="sr-only">
@@ -38,6 +39,8 @@ export function DevPanelDrawer({
         </SheetHeader>
 
         <div className="flex flex-col gap-5 py-4">
+          {/* ТЗ-DevPanelErrors: errors/warnings first so users see them immediately */}
+          <ErrorsSection data={data} />
           <ModelSection data={data} />
           <TokensSection data={data} />
           <CostBreakdownSection data={data} />

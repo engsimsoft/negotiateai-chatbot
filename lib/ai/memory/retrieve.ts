@@ -54,6 +54,12 @@ export interface RetrievalResult {
   voyageTokens: number;
   /** Total retrieval duration in ms */
   durationMs: number;
+  /**
+   * ТЗ-DevPanelErrors: error message if graceful degradation happened.
+   * Callers can surface this to DevPanel as a warning. The function itself
+   * NEVER throws — this field is the only way to know that retrieval failed.
+   */
+  error?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,18 +126,23 @@ export async function retrieveMemoryContext(
     };
   } catch (error) {
     const durationMs = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
 
     console.warn(
       "[MemoryRetrieve] Failed (graceful degradation):",
-      error instanceof Error ? error.message : error,
+      errorMessage,
     );
 
-    // Graceful degradation: return empty block, chat works without memory
+    // Graceful degradation: return empty block, chat works without memory.
+    // ТЗ-DevPanelErrors: expose the error via result.error so DevPanel can
+    // surface it as a warning. Previously this was invisible to the UI —
+    // a silent failure that kept piling up without anyone noticing.
     return {
       promptBlock: "",
       facts: [],
       voyageTokens: 0,
       durationMs,
+      error: errorMessage,
     };
   }
 }

@@ -21,6 +21,7 @@ import {
   emitDebugFinish,
   emitDebugPrompt,
   emitDebugCompaction,
+  emitDebugWarning,
   truncateForDebug,
   DEBUG_EVENT_SCHEMA_VERSION,
   type DebugStepData,
@@ -159,6 +160,9 @@ export async function POST(
     // Gate: check user's memoryEnabled setting
     let finalSystemPrompt = systemPromptText;
     let isMemoryEnabled = true;
+    // ТЗ-DevPanelErrors: buffer warnings captured before createUIMessageStream
+    // starts — flushed inside execute{} right after emitDebugPrompt creates a batch.
+    const prePromptWarnings: Array<Parameters<typeof emitDebugWarning>[1]> = [];
     {
       try {
         const { getMemorySettings } = await import("@/lib/db/queries");
@@ -185,9 +189,30 @@ export async function POST(
             if (memoryResult.promptBlock) {
               finalSystemPrompt += `\n\n${memoryResult.promptBlock}`;
             }
+
+            // ТЗ-DevPanelErrors: retrieveMemoryContext uses graceful degradation
+            // — failures come through `error` field, not thrown. Surface them.
+            if (memoryResult.error) {
+              prePromptWarnings.push({
+                source: "server:memory-retrieve",
+                message: `Memory retrieval failed (graceful degradation): ${memoryResult.error}`,
+                context: {
+                  userId: session.user.id,
+                  chatId,
+                  durationMs: memoryResult.durationMs,
+                },
+              });
+            }
           }
         } catch (error) {
-          console.warn("[MIND] Retrieve failed in task chat (non-blocking):", error instanceof Error ? error.message : error);
+          // Defensive — retrieveMemoryContext currently never throws.
+          const msg = error instanceof Error ? error.message : String(error);
+          console.warn("[MIND] Retrieve failed in task chat (non-blocking):", msg);
+          prePromptWarnings.push({
+            source: "server:memory-retrieve",
+            message: `Memory retrieval threw (unexpected): ${msg}`,
+            context: { userId: session.user.id, chatId },
+          });
         }
       }
     }
@@ -241,6 +266,10 @@ export async function POST(
             hasSnapshotContext: false,
             contextInjections: injections,
           });
+          // ТЗ-DevPanelErrors: flush buffered pre-prompt warnings into the batch
+          for (const w of prePromptWarnings) {
+            emitDebugWarning(dataStream, w);
+          }
         }
 
         // ТЗ-DEV1: Debug step tracking state

@@ -22,6 +22,7 @@ import {
   getModelIdForTask,
   getProviderForTask,
 } from "@/lib/ai/getModel";
+import type { TaskId } from "@/lib/ai/task-assignments";
 import {
   getProjectModel,
   isValidModelTier,
@@ -50,6 +51,8 @@ import {
   emitDebugPrompt,
   emitDebugRag,
   emitDebugCompaction,
+  emitDebugError,
+  emitDebugWarning,
   truncateForDebug,
   DEBUG_EVENT_SCHEMA_VERSION,
   type DebugStepData,
@@ -520,6 +523,8 @@ export async function POST(request: Request) {
     let guardianFlags: GuardianFlags | null = null;
     let usageLogMeta: {
       modelId: string;
+      /** ТЗ-DevPanelErrors Phase 5: provider from SSOT (anthropic | minimax | xai | ...) */
+      provider: string | null;
       inputTokens: number;
       outputTokens: number;
       cacheReadTokens: number;
@@ -619,6 +624,11 @@ export async function POST(request: Request) {
           }
         }
         let memoryDebugData: Parameters<typeof emitDebugRag>[1] | null = null;
+        // ТЗ-DevPanelErrors: buffer warnings captured BEFORE emitDebugPrompt runs.
+        // parseBatches on the client only attaches errors/warnings to the current batch,
+        // which is created by data-debug-prompt. Pre-prompt warnings would be dropped,
+        // so we collect them here and flush right after prompt emission.
+        const prePromptWarnings: Array<Parameters<typeof emitDebugWarning>[1]> = [];
         // ТЗ-KITT/CACHE: MIND memory split into stable (profile → system prompt, cached)
         // and dynamic (retrieved facts → separate message, NOT cached) to preserve prompt caching
         let mindDynamicBlock = "";
@@ -631,7 +641,13 @@ export async function POST(request: Request) {
               systemPromptText += `\n\n${profileBlock}`;
             }
           } catch (error) {
-            console.warn("[MIND] Profile load failed (non-blocking):", error instanceof Error ? error.message : error);
+            const msg = error instanceof Error ? error.message : String(error);
+            console.warn("[MIND] Profile load failed (non-blocking):", msg);
+            prePromptWarnings.push({
+              source: "server:memory-profile",
+              message: `Profile load failed (graceful degradation): ${msg}`,
+              context: { userId: session.user.id },
+            });
           }
 
           // ТЗ-RAG1: Retrieve relevant facts for current query
@@ -653,6 +669,22 @@ export async function POST(request: Request) {
                 mindDynamicBlock = memoryResult.promptBlock;
               }
 
+              // ТЗ-DevPanelErrors: retrieveMemoryContext never throws (graceful
+              // degradation) — failures are signalled via `error` field on the
+              // result. Surface them to DevPanel so silent Voyage outages stop
+              // going unnoticed.
+              if (memoryResult.error) {
+                prePromptWarnings.push({
+                  source: "server:memory-retrieve",
+                  message: `Memory retrieval failed (graceful degradation): ${memoryResult.error}`,
+                  context: {
+                    userId: session.user.id,
+                    chatId: id,
+                    durationMs: memoryResult.durationMs,
+                  },
+                });
+              }
+
               // Save for debug emit (after emitDebugPrompt creates the batch)
               memoryDebugData = {
                 query: userQueryText.slice(0, 200),
@@ -668,8 +700,16 @@ export async function POST(request: Request) {
               };
             }
           } catch (error) {
-            // Graceful degradation: memory unavailable — chat continues without it
-            console.warn("[MIND] Retrieve failed (non-blocking):", error instanceof Error ? error.message : error);
+            // Defensive: if retrieveMemoryContext is ever changed to throw,
+            // we still want to surface it. Currently unreachable because of
+            // graceful degradation inside retrieveMemoryContext.
+            const msg = error instanceof Error ? error.message : String(error);
+            console.warn("[MIND] Retrieve failed (non-blocking):", msg);
+            prePromptWarnings.push({
+              source: "server:memory-retrieve",
+              message: `Memory retrieval threw (unexpected): ${msg}`,
+              context: { userId: session.user.id, chatId: id },
+            });
           }
         }
 
@@ -808,6 +848,10 @@ export async function POST(request: Request) {
             hasSnapshotContext: !!snapshotContext,
             contextInjections: injections,
           });
+          // ТЗ-DevPanelErrors: flush buffered pre-prompt warnings now that a batch exists
+          for (const w of prePromptWarnings) {
+            emitDebugWarning(dataStream, w);
+          }
         }
 
         // ТЗ-RAG1: Emit debug rag AFTER prompt (so parseBatches has an active batch)
@@ -882,6 +926,12 @@ export async function POST(request: Request) {
             });
           } catch (error) {
             console.error("[Professor] Pipeline error:", error);
+            emitDebugError(dataStream, {
+              source: "server:professor-pipeline",
+              message: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack?.slice(0, 2000) : undefined,
+              context: { chatId: id, userId: session.user.id },
+            });
             dataStream.write({
               type: "error",
               errorText: error instanceof Error ? error.message : "Pipeline error",
@@ -996,20 +1046,28 @@ export async function POST(request: Request) {
             // ТЗ-TOKENS1 Этап 7.5: build AppUsage via SSOT (calculateCostBreakdownRub),
             // no more tokenlens additive-formula cost (was overcounting cache tokens 5×).
             let resolvedModelId: string | undefined;
+            // ТЗ-DevPanelErrors Phase 5: resolve taskId once so we can pull both
+            // modelId AND provider from it (previously provider was missing →
+            // ai_usage_log.provider was null for fresh records — SSOT regression
+            // from Этап 2 TZ-1).
+            let resolvedTaskId: TaskId | null = null;
             let costUsd: number | null = null;
             try {
               // ТЗ-MinimaxCleanup + ТЗ-1 CoreRegistry: Resolve model ID matching selection logic above
-              if (chatMode === "simply") {
+              if (isProjectChat) {
+                resolvedTaskId = `project:expert:${tier}` as TaskId;
+              } else if (chatMode === "simply") {
                 if (think) {
-                  resolvedModelId = getModelIdForTask("simply-chat-think");
+                  resolvedTaskId = "simply-chat-think";
                 } else if (hasAttachments(message.parts)) {
-                  resolvedModelId = getModelIdForTask("simply-chat-vision");
+                  resolvedTaskId = "simply-chat-vision";
                 } else {
-                  resolvedModelId = getModelIdForTask("simply-chat");
+                  resolvedTaskId = "simply-chat";
                 }
               } else {
-                resolvedModelId = getModelIdForTask(getTaskIdForChatMode(chatMode));
+                resolvedTaskId = getTaskIdForChatMode(chatMode);
               }
+              resolvedModelId = getModelIdForTask(resolvedTaskId);
               const effectiveModelId =
                 resolvedModelId ?? (isProjectChat ? `project:${tier}` : chatMode);
 
@@ -1036,8 +1094,14 @@ export async function POST(request: Request) {
             const logModelId = resolvedModelId || (isProjectChat ? `project:${tier}` : chatMode);
             const logChatMode = isProjectChat ? `project:${tier}` : chatMode;
             const usageFields = extractUsageFields(totalUsage);
+            // ТЗ-DevPanelErrors Phase 5: resolve provider via taskId (SSOT Этап 1)
+            // Previously missing → ai_usage_log.provider was null for all fresh records.
+            const logProvider = resolvedTaskId
+              ? getProviderForTask(resolvedTaskId)
+              : null;
             usageLogMeta = {
               modelId: logModelId,
+              provider: logProvider,
               ...usageFields,
               costUsd,
               chatMode: logChatMode,
@@ -1174,11 +1238,27 @@ export async function POST(request: Request) {
                   if (guardianResult.detected) {
                     // ТЗ-FIX1.2: Block — do NOT flush text buffer
                     console.warn(`[Guardian:${guardianContext}] Blocked hallucinated step (${stepTextBuffer.length} chunks suppressed)`);
+                    // ТЗ-DevPanelErrors: surface guardian blocks in DevPanel errors section
+                    emitDebugWarning(dataStream, {
+                      source: "server:guardian",
+                      message: `Guardian blocked hallucinated step (${stepTextBuffer.length} chunks suppressed)`,
+                      context: {
+                        guardianContext,
+                        stepIndex: debugStreamStepIndex,
+                        confidence: guardianResult.confidence,
+                        details: guardianResult.details?.slice(0, 3),
+                      },
+                    });
                     stepTextBuffer = [];
                     consecutiveHallucinations++;
 
                     if (consecutiveHallucinations >= 2) {
                       console.warn(`[Guardian:${guardianContext}] Max retries exceeded, showing error to user`);
+                      emitDebugError(dataStream, {
+                        source: "server:guardian",
+                        message: `Guardian max retries exceeded (${consecutiveHallucinations}), showing fallback error to user`,
+                        context: { guardianContext, stepIndex: debugStreamStepIndex },
+                      });
                       controller.enqueue({
                         type: "text-delta",
                         textDelta: "Не удалось выполнить эту операцию автоматически. Попробуйте переформулировать запрос или разбить задачу на части.",
@@ -1269,6 +1349,12 @@ export async function POST(request: Request) {
             }
             } catch (err) {
               console.error(`[Guardian:${guardianContext}] Stream error in instrumentedStream:`, err);
+              emitDebugError(dataStream, {
+                source: "server:chat-stream",
+                message: err instanceof Error ? err.message : String(err),
+                stack: err instanceof Error ? err.stack?.slice(0, 2000) : undefined,
+                context: { guardianContext, chatId: id },
+              });
               // Flush any remaining buffer so user sees partial text
               for (const buffered of stepTextBuffer) {
                 try { controller.enqueue(buffered); } catch { /* controller may be closed */ }

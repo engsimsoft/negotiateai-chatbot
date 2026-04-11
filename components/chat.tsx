@@ -32,6 +32,8 @@ import { mergeAppUsage, normalizeStoredAppUsage, type AppUsage } from "@/lib/usa
 import { cn, fetcher, fetchWithErrorHandlers, generateUUID, getChatUrl } from "@/lib/utils";
 import { Artifact } from "./artifact";
 import { DevPanelProvider } from "./dev-panel/dev-panel-provider";
+import { DevPanelErrorBoundary } from "./dev-panel/dev-panel-error-boundary";
+import { reportClientError } from "@/lib/client/error-bus";
 import { ChatSidebar } from "./chat-sidebar";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
@@ -87,7 +89,9 @@ export function Chat({
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   const currentModelIdRef = useRef(currentModelId);
-  const [currentChatMode, setCurrentChatMode] = useState(initialChatMode);
+  // ТЗ-DevPanelErrors: chat mode is immutable after mount — removed unused setState.
+  // If dynamic switching becomes a requirement, convert back to useState here.
+  const currentChatMode = initialChatMode;
   const currentChatModeRef = useRef(currentChatMode);
   const [currentProjectTier, setCurrentProjectTier] = useState(projectModelTier || "expert");
   const currentProjectTierRef = useRef(currentProjectTier);
@@ -314,6 +318,20 @@ export function Chat({
       // Sidebar обновится через mutate выше (line 270)
     },
     onError: (error) => {
+      // ТЗ-DevPanelErrors: pipe every useChat stream error into DevPanel bus.
+      // Catches AI API 4xx/5xx, network failures, retry exhaustion, abort errors.
+      // Runs unconditionally — reportClientError is a no-op without subscribers (prod).
+      reportClientError({
+        source: "client:useChat",
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack?.slice(0, 2000) : undefined,
+        context: {
+          chatId: id,
+          chatMode: currentChatModeRef.current,
+          errorName: error instanceof Error ? error.name : undefined,
+        },
+      });
+
       if (error instanceof ChatSDKError) {
         // Check if it's a credit card error
         if (
@@ -436,10 +454,12 @@ export function Chat({
 
   return (
     <DevPanelProvider chatId={id} messages={messages} status={status}>
+      {/* ТЗ-DevPanelErrors: catch render crashes in the chat subtree and pipe them into DevPanel */}
+      <DevPanelErrorBoundary>
       <div className={cn(
         "overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-background",
         "transition-[margin] duration-200 ease-linear",
-        isChatSidebarOpen && "md:mr-[380px]"
+        isChatSidebarOpen && "md:mr-95"
       )}>
         <ChatHeader
           chatMode={currentChatMode}
@@ -507,6 +527,7 @@ export function Chat({
             )}
         </div>
       </div>
+      </DevPanelErrorBoundary>
 
       <Artifact
         attachments={attachments}

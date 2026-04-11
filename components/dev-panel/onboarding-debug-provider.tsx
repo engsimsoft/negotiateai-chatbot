@@ -10,8 +10,12 @@
  * ТЗ-DEV3: Onboarding DevPanel
  */
 
-import type { ReactNode } from "react";
-import { DevPanelContext, type DevPanelMessageData } from "./dev-panel-provider";
+import { useMemo, type ReactNode } from "react";
+import {
+  DevPanelContext,
+  type DevPanelContextValue,
+  type DevPanelMessageData,
+} from "./dev-panel-provider";
 
 export function OnboardingDebugProvider({
   debugMap,
@@ -20,8 +24,16 @@ export function OnboardingDebugProvider({
   debugMap: Map<string, DevPanelMessageData>;
   children: ReactNode;
 }) {
+  // ТЗ-DevPanelErrors: DevPanelContextValue now exposes both message-bound
+  // and global error buckets. Onboarding flow has no global errors pipeline,
+  // so we supply an empty array. Memoised to keep the value stable.
+  const value = useMemo<DevPanelContextValue>(
+    () => ({ byMessage: debugMap, globalErrors: [] }),
+    [debugMap],
+  );
+
   return (
-    <DevPanelContext.Provider value={debugMap}>
+    <DevPanelContext.Provider value={value}>
       {children}
     </DevPanelContext.Provider>
   );
