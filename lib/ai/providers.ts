@@ -1,152 +1,26 @@
 /**
- * AI Providers — legacy compatibility layer (ТЗ-1 CoreRegistry)
+ * Cost & pricing utilities (ТЗ-1 CoreRegistry, Stage 5)
  *
- * ⚠️ DEPRECATED exports — используйте `getModel(taskId)` из `./getModel.ts`.
+ * Model resolution moved to `./getModel.ts` (SSOT). This file keeps only
+ * cost-calculation helpers and context-window lookup — the minimal surface
+ * consumed by chat routes, DevPanel, usage logging, and non-LLM providers
+ * (Deepgram, Gemini TTS).
  *
- * Этот модуль остаётся временно, пока миграция 31 AI-точки не завершена (Этапы
- * 2-4 ТЗ-1). Все экспорты ниже — тонкие обёртки над `registry` + `model-catalog`.
- * Будут удалены в Этапе 5.
- *
- * Что ОСТАЁТСЯ после Этапа 5:
- *  - `calculateCostRub` / `calculateCostBreakdownRub` / `getStepCostRub`
- *    (расчёт стоимости из catalog, публичный API для DevPanel и cost-audit)
- *  - `extractUsageForPricing`
- *  - Non-LLM cost helpers (`calculateDeepgramCostUsd`, `calculateGeminiTtsCostUsd`, `calculateTtsCostRub`)
- *  - `RUB_PER_USD`, `getContextWindow`, `MODEL_CONTEXT_WINDOW`
+ * Exports:
+ *  - RUB_PER_USD re-export from `@/lib/constants/pricing`
+ *  - getContextWindow — re-export from model-catalog
+ *  - TokenUsageForPricing / extractUsageForPricing — disjoint usage extraction
+ *  - calculateCostRub / calculateCostBreakdownRub — RUB pricing via catalog
+ *  - CostBreakdownRub type
+ *  - getStepCostRub — server-calculated value with local fallback
+ *  - calculateDeepgramCostUsd / calculateGeminiTtsCostUsd / calculateTtsCostRub —
+ *    per-minute / per-character pricing for non-token providers
  */
 
 import type { LanguageModelUsage } from "ai";
-import { customProvider } from "ai";
 
-import { isTestEnvironment } from "../constants";
-import {
-  getContextWindow as getContextWindowFromCatalog,
-  getModelEntry,
-  resolveModelEntry,
-} from "./model-catalog";
-import { registry } from "./registry";
+import { getContextWindow as getContextWindowFromCatalog, getModelEntry } from "./model-catalog";
 import type { DebugStepData } from "./debug-events";
-
-// Registry-returned language model type (LanguageModelV3 под капотом).
-type RegistryLanguageModel = ReturnType<typeof registry.languageModel>;
-
-// ---------------------------------------------------------------------------
-// LEGACY — myProvider (customProvider с алиасами)
-// ---------------------------------------------------------------------------
-// Сохраняется для совместимости с ~20 call-sites `myProvider.languageModel(id)`.
-// Алиасы резолвятся через каталог, физические модели — через registry.
-// Будет удалено в Этапе 5 после миграции call-sites.
-
-function langModelFromCatalog(catalogId: string): RegistryLanguageModel {
-  const entry = getModelEntry(catalogId);
-  if (!entry) {
-    throw new Error(`[providers] Unknown catalog id: ${catalogId}`);
-  }
-  if (catalogId === "MiniMax-M2.7-long") {
-    return registry.languageModel("minimaxLong:MiniMax-M2.7");
-  }
-  const resolved = resolveModelEntry(catalogId);
-  if (!resolved) {
-    throw new Error(`[providers] Cannot resolve catalog id: ${catalogId}`);
-  }
-  if (resolved.provider === "anthropic") {
-    return registry.languageModel(
-      `anthropic:${resolved.modelId}` as "anthropic:claude-sonnet-4-6",
-    );
-  }
-  if (resolved.provider === "minimax") {
-    return registry.languageModel(
-      `minimax:${resolved.modelId}` as "minimax:MiniMax-M2.7",
-    );
-  }
-  if (resolved.provider === "xai") {
-    return registry.languageModel(
-      `xai:${resolved.modelId}` as "xai:grok-4",
-    );
-  }
-  if (resolved.provider === "openrouter") {
-    return registry.languageModel(
-      `openrouter:${resolved.modelId}` as "openrouter:z-ai/glm-4.6",
-    );
-  }
-  throw new Error(
-    `[providers] Provider "${resolved.provider}" not in registry for ${catalogId}`,
-  );
-}
-
-export const myProvider = isTestEnvironment
-  ? (() => {
-      const {
-        artifactModel,
-        chatModel,
-        titleModel,
-      } = require("./models.mock");
-      return customProvider({
-        languageModels: {
-          "claude-sonnet": chatModel,
-          "claude-haiku": chatModel,
-          "claude-opus": chatModel,
-          "title-model": titleModel,
-          "artifact-model": artifactModel,
-        },
-      });
-    })()
-  : customProvider({
-      languageModels: {
-        "claude-sonnet": langModelFromCatalog("claude-sonnet"),
-        "claude-haiku": langModelFromCatalog("claude-haiku"),
-        "claude-opus": langModelFromCatalog("claude-opus"),
-        "claude-sonnet-4-6": langModelFromCatalog("claude-sonnet-4-6"),
-        "title-model": langModelFromCatalog("title-model"),
-        "artifact-model": langModelFromCatalog("artifact-model"),
-      },
-    });
-
-// Direct model exports — оставлены для совместимости с pipelines/clerks.
-// Внутри резолвятся через registry (та же физическая модель, что и в customProvider выше).
-export const claudeHaiku: RegistryLanguageModel = langModelFromCatalog(
-  "claude-haiku-4-5-20251001",
-);
-export const claudeSonnet: RegistryLanguageModel = langModelFromCatalog(
-  "claude-sonnet-4-6",
-);
-export const claudeOpus: RegistryLanguageModel = langModelFromCatalog(
-  "claude-opus-4-6",
-);
-
-// MiniMax M2.7 — shared export для memory pipelines (extract, consolidate, profile).
-// `includeUsage` конфигурация сохраняется для обратной совместимости.
-const minimaxBase = langModelFromCatalog("MiniMax-M2.7") as unknown as {
-  config?: Record<string, unknown>;
-};
-if (minimaxBase.config) {
-  minimaxBase.config = { ...minimaxBase.config, includeUsage: true };
-}
-export const minimaxM27 = minimaxBase as unknown as RegistryLanguageModel;
-
-// MiniMax M2.7 с extended timeout — для briefing pipeline.
-const minimaxLongBase = langModelFromCatalog(
-  "MiniMax-M2.7-long",
-) as unknown as {
-  config?: Record<string, unknown>;
-};
-if (minimaxLongBase.config) {
-  minimaxLongBase.config = { ...minimaxLongBase.config, includeUsage: true };
-}
-export const minimaxM27Long = minimaxLongBase as unknown as RegistryLanguageModel;
-
-export function getClaudeModel(
-  name: "haiku" | "sonnet" | "opus",
-): RegistryLanguageModel {
-  switch (name) {
-    case "haiku":
-      return claudeHaiku;
-    case "opus":
-      return claudeOpus;
-    default:
-      return claudeSonnet;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Exchange rate
@@ -156,31 +30,15 @@ export { RUB_PER_USD } from "@/lib/constants/pricing";
 import { RUB_PER_USD } from "@/lib/constants/pricing";
 
 // ---------------------------------------------------------------------------
-// Context windows — re-exports из catalog для совместимости
+// Context window lookup — delegated to model-catalog (SSOT)
 // ---------------------------------------------------------------------------
 
-/**
- * Context window size per model, in tokens. Legacy constant — SSOT теперь в
- * model-catalog.ts. Оставлено для совместимости со старыми импортами.
- */
-export const MODEL_CONTEXT_WINDOW: Record<string, number> = {
-  "claude-sonnet-4-6":           1_000_000,
-  "claude-sonnet":               1_000_000,
-  "claude-opus-4-6":             1_000_000,
-  "claude-opus":                 1_000_000,
-  "claude-haiku-4-5-20251001":   200_000,
-  "claude-haiku":                200_000,
-  "claude-sonnet-4-5-20250929":  200_000,
-  "MiniMax-M2.7":                204_800,
-};
-
-/** Returns context window size for a model. Читает из catalog. */
 export function getContextWindow(modelId: string): number {
   return getContextWindowFromCatalog(modelId);
 }
 
 // ---------------------------------------------------------------------------
-// Pricing — все функции теперь читают из model-catalog.ts (SSOT)
+// Pricing — reads from model-catalog.ts (SSOT)
 // ---------------------------------------------------------------------------
 
 /**

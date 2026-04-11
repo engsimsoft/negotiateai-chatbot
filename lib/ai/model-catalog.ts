@@ -158,7 +158,8 @@ const ENTRIES: ModelEntry[] = [
   },
 
   // =========================================================================
-  // Anthropic — legacy алиасы (совместимость с myProvider.languageModel())
+  // Anthropic — alias entries (short names that resolve to physical models,
+  // used by task-assignments.ts and cost lookups)
   // =========================================================================
   {
     id: "claude-sonnet",

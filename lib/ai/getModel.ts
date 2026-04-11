@@ -163,8 +163,8 @@ export function getModel(
   );
 
   // ТЗ-1: MiniMax needs includeUsage=true to emit usage events during streaming
-  // (reasoning tokens, cache tokens). Default provider doesn't set this.
-  // Must mutate instance config after creation (matches legacy minimaxM27 path).
+  // (reasoning tokens, cache tokens). Default provider doesn't set this —
+  // mutate instance config after creation.
   if (registryId.startsWith("minimax:") || registryId.startsWith("minimaxLong:")) {
     const mutableModel = model as unknown as { config?: Record<string, unknown> };
     if (mutableModel.config) {

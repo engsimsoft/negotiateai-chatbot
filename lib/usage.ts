@@ -43,7 +43,7 @@ export interface AppUsage {
   /**
    * Context window fill snapshot.
    * - `used` = input tokens of the latest request (NOT cumulative)
-   * - `max` = full context window of the model (from MODEL_CONTEXT_WINDOW)
+   * - `max` = full context window of the model (from model-catalog.ts)
    * Circle indicator shows used/max for the LAST message only, because the
    * model's context resets every turn (prior messages are replayed as input).
    */
