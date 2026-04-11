@@ -1,8 +1,10 @@
 import { smoothStream, streamText } from "ai";
 import { updateDocumentPrompt } from "@/lib/ai/prompts";
-import { myProvider } from "@/lib/ai/providers";
+import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { logUsage } from "@/lib/ai/usage-utils";
+
+const ARTIFACT_TASK = "artifact:text" as const;
 
 export const textDocumentHandler = createDocumentHandler<"text">({
   kind: "text",
@@ -10,7 +12,7 @@ export const textDocumentHandler = createDocumentHandler<"text">({
     let draftContent = "";
 
     const result = streamText({
-      model: myProvider.languageModel("artifact-model"),
+      model: getModel(ARTIFACT_TASK),
       system: `Write about the given topic in PLAIN TEXT format.
 
 IMPORTANT RULES:
@@ -58,7 +60,7 @@ Example format:
     // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
     if (session?.user?.id) {
       const usage = await result.totalUsage;
-      logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:text" });
+      logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:text" });
     }
 
     return draftContent;
@@ -67,7 +69,7 @@ Example format:
     let draftContent = "";
 
     const result = streamText({
-      model: myProvider.languageModel("artifact-model"),
+      model: getModel(ARTIFACT_TASK),
       system: updateDocumentPrompt(document.content, "text"),
       experimental_transform: smoothStream({ chunking: "word" }),
       prompt: description,
@@ -100,7 +102,7 @@ Example format:
     // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
     if (session?.user?.id) {
       const usage = await result.totalUsage;
-      logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:text" });
+      logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:text" });
     }
 
     return draftContent;

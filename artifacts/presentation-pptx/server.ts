@@ -1,5 +1,7 @@
 import { smoothStream, streamText } from "ai";
-import { myProvider } from "@/lib/ai/providers";
+import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
+
+const ARTIFACT_TASK = "artifact:pptx" as const;
 import { logUsage } from "@/lib/ai/usage-utils";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { put } from "@vercel/blob";
@@ -127,7 +129,7 @@ export const presentationPptxDocumentHandler =
 
       // Generate slides using AI
       const result = streamText({
-        model: myProvider.languageModel("artifact-model"),
+        model: getModel(ARTIFACT_TASK),
         system: PPTX_SYSTEM_PROMPT,
         experimental_transform: smoothStream({ chunking: "word" }),
         prompt: `Create a presentation about: ${title}`,
@@ -142,7 +144,7 @@ export const presentationPptxDocumentHandler =
       // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
       if (session?.user?.id) {
         const usage = await result.totalUsage;
-        logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:pptx" });
+        logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:pptx" });
       }
 
       const slides = parseSlides(fullContent);
@@ -251,7 +253,7 @@ export const presentationPptxDocumentHandler =
       });
 
       const result = streamText({
-        model: myProvider.languageModel("artifact-model"),
+        model: getModel(ARTIFACT_TASK),
         system: `${PPTX_SYSTEM_PROMPT}
 
 Current slides:
@@ -273,7 +275,7 @@ Generate the COMPLETE updated slides array (not just changes).`,
       // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
       if (session?.user?.id) {
         const usage = await result.totalUsage;
-        logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:pptx" });
+        logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:pptx" });
       }
 
       const slides = parseSlides(fullContent);

@@ -66,6 +66,12 @@ export type TaskId =
   | "util:title"                 // автонейминг чата
   | "util:project-summary"       // суммаризация проекта
   | "util:artifact-suggestions"  // request-suggestions tool
+  // Artifact generation (document handlers)
+  | "artifact:text"
+  | "artifact:markdown"
+  | "artifact:excel"
+  | "artifact:pptx"
+  | "artifact:reveal"
   // Vision
   | "vision:ocr";
 
@@ -130,6 +136,13 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "util:title":                 "claude-haiku-4-5-20251001",
   "util:project-summary":       "claude-haiku-4-5-20251001",
   "util:artifact-suggestions":  "claude-sonnet-4-6",
+
+  // Artifact generation — все 5 типов используют Sonnet (совпадает с прежним "artifact-model" алиасом)
+  "artifact:text":              "claude-sonnet-4-6",
+  "artifact:markdown":          "claude-sonnet-4-6",
+  "artifact:excel":             "claude-sonnet-4-6",
+  "artifact:pptx":              "claude-sonnet-4-6",
+  "artifact:reveal":            "claude-sonnet-4-6",
 
   // Vision
   "vision:ocr":               "claude-haiku-4-5-20251001",

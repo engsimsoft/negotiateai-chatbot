@@ -1,8 +1,10 @@
 import { smoothStream, streamText } from "ai";
 import { updateDocumentPrompt } from "@/lib/ai/prompts";
-import { myProvider } from "@/lib/ai/providers";
+import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { logUsage } from "@/lib/ai/usage-utils";
+
+const ARTIFACT_TASK = "artifact:markdown" as const;
 
 export const markdownDocumentHandler = createDocumentHandler<"markdown">({
   kind: "markdown",
@@ -10,7 +12,7 @@ export const markdownDocumentHandler = createDocumentHandler<"markdown">({
     let draftContent = "";
 
     const result = streamText({
-      model: myProvider.languageModel("artifact-model"),
+      model: getModel(ARTIFACT_TASK),
       system: `Напиши документ на тему, используя Markdown форматирование.
 
 ПРАВИЛА ОФОРМЛЕНИЯ:
@@ -57,7 +59,7 @@ export const markdownDocumentHandler = createDocumentHandler<"markdown">({
     // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
     if (session?.user?.id) {
       const usage = await result.totalUsage;
-      logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:markdown" });
+      logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:markdown" });
     }
 
     return draftContent;
@@ -66,7 +68,7 @@ export const markdownDocumentHandler = createDocumentHandler<"markdown">({
     let draftContent = "";
 
     const result = streamText({
-      model: myProvider.languageModel("artifact-model"),
+      model: getModel(ARTIFACT_TASK),
       system: updateDocumentPrompt(document.content, "markdown"),
       experimental_transform: smoothStream({ chunking: "word" }),
       prompt: description,
@@ -99,7 +101,7 @@ export const markdownDocumentHandler = createDocumentHandler<"markdown">({
     // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
     if (session?.user?.id) {
       const usage = await result.totalUsage;
-      logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:markdown" });
+      logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:markdown" });
     }
 
     return draftContent;

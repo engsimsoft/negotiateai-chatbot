@@ -4,7 +4,9 @@
 
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { streamText } from "ai";
-import { myProvider } from "@/lib/ai/providers";
+import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
+
+const ARTIFACT_TASK = "artifact:excel" as const;
 import { logUsage } from "@/lib/ai/usage-utils";
 import { put } from "@vercel/blob";
 import ExcelJS from "exceljs";
@@ -172,7 +174,7 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
     } else {
       // Generate with AI
       const result = streamText({
-        model: myProvider.languageModel("artifact-model"),
+        model: getModel(ARTIFACT_TASK),
         system: EXCEL_SYSTEM_PROMPT,
         prompt: title,
       });
@@ -189,7 +191,7 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
       // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
       if (session?.user?.id) {
         const usage = await result.totalUsage;
-        logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:excel" });
+        logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:excel" });
       }
 
       // Parse JSON response
@@ -263,7 +265,7 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
 
     // Generate update with AI
     const result = streamText({
-      model: myProvider.languageModel("artifact-model"),
+      model: getModel(ARTIFACT_TASK),
       system: `${EXCEL_SYSTEM_PROMPT}
 
 ТЕКУЩАЯ ТАБЛИЦА:
@@ -285,7 +287,7 @@ ${JSON.stringify(excelData, null, 2)}
     // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
     if (session?.user?.id) {
       const usage = await result.totalUsage;
-      logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:excel" });
+      logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:excel" });
     }
 
     // Parse updated JSON

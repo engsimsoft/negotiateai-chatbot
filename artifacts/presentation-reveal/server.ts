@@ -1,6 +1,8 @@
 import { smoothStream, streamText } from "ai";
 import { updateDocumentPrompt } from "@/lib/ai/prompts";
-import { myProvider } from "@/lib/ai/providers";
+import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
+
+const ARTIFACT_TASK = "artifact:reveal" as const;
 import { logUsage } from "@/lib/ai/usage-utils";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import {
@@ -109,7 +111,7 @@ export const presentationRevealDocumentHandler =
       const theme = getThemeById(themeId);
 
       const result = streamText({
-        model: myProvider.languageModel("artifact-model"),
+        model: getModel(ARTIFACT_TASK),
         system: PRESENTATION_SYSTEM_PROMPT,
         experimental_transform: smoothStream({ chunking: "word" }),
         prompt: `Create a presentation about: ${title}`,
@@ -134,7 +136,7 @@ export const presentationRevealDocumentHandler =
       // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
       if (session?.user?.id) {
         const usage = await result.totalUsage;
-        logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:reveal" });
+        logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:reveal" });
       }
 
       // Parse slides and generate final HTML
@@ -179,7 +181,7 @@ export const presentationRevealDocumentHandler =
       const theme = getThemeById(existingData.themeId);
 
       const result = streamText({
-        model: myProvider.languageModel("artifact-model"),
+        model: getModel(ARTIFACT_TASK),
         system: `${PRESENTATION_SYSTEM_PROMPT}
 
 Current slides:
@@ -210,7 +212,7 @@ Generate the COMPLETE updated slides array (not just changes).`,
       // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
       if (session?.user?.id) {
         const usage = await result.totalUsage;
-        logUsage({ userId: session.user.id, usage, modelId: myProvider.languageModel("artifact-model").modelId, chatMode: "artifact:reveal" });
+        logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:reveal" });
       }
 
       const slides = parseSlides(fullContent);
