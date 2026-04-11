@@ -94,11 +94,8 @@ const db = drizzle(sql_client);
 export async function getUser(email: string): Promise<User[]> {
   try {
     return await db.select().from(user).where(eq(user.email, email.toLowerCase()));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get user by email"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -107,8 +104,8 @@ export async function createUser(email: string, password: string) {
 
   try {
     return await db.insert(user).values({ email: email.toLowerCase(), password: hashedPassword });
-  } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to create user");
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -116,11 +113,8 @@ export async function getUserById(id: string): Promise<User | null> {
   try {
     const [result] = await db.select().from(user).where(eq(user.id, id));
     return result || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get user by id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -152,11 +146,8 @@ export async function updateUserProfile({
       .set(updateData)
       .where(eq(user.id, id))
       .returning();
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update user profile"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -174,11 +165,8 @@ export async function updateUserBenIntro({
       .set({ hasSeenBenIntro })
       .where(eq(user.id, id))
       .returning();
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update Ben intro flag"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -196,11 +184,8 @@ export async function updateLastSeenSimplyVersion({
       .set({ lastSeenSimplyVersion: version })
       .where(eq(user.id, userId))
       .returning();
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update last seen Simply version"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -351,11 +336,8 @@ export async function deleteChatById({ id }: { id: string }) {
       .where(eq(chat.id, id))
       .returning();
     return chatsDeleted;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete chat by id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -384,11 +366,8 @@ export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
       .returning();
 
     return { deletedCount: deletedChats.length };
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete all chats by user id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -488,11 +467,8 @@ export async function getChatsByUserId({
       chats: hasMore ? filteredChats.slice(0, limit) : filteredChats,
       hasMore,
     };
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get chats by user id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -500,16 +476,16 @@ export async function getChatById({ id }: { id: string }) {
   try {
     const [selectedChat] = await db.select().from(chat).where(eq(chat.id, id));
     return selectedChat || null;
-  } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to get chat by id");
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
 export async function saveMessages({ messages }: { messages: DBMessage[] }) {
   try {
     return await db.insert(message).values(messages);
-  } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to save messages");
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -635,19 +611,16 @@ export async function voteMessage({
       messageId,
       isUpvoted: type === "up",
     });
-  } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to vote message");
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
 export async function getVotesByChatId({ id }: { id: string }) {
   try {
     return await db.select().from(vote).where(eq(vote.chatId, id));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get votes by chat id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -683,11 +656,8 @@ export async function getVotesByChatIdWithAuth({
     const votes = await db.select().from(vote).where(eq(vote.chatId, chatId));
 
     return { error: null, votes };
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get votes by chat id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -716,8 +686,8 @@ export async function saveDocument({
         createdAt: new Date(),
       })
       .returning();
-  } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to save document");
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -730,11 +700,8 @@ export async function getDocumentsById({ id }: { id: string }) {
       .orderBy(asc(document.createdAt));
 
     return documents;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get documents by id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -747,11 +714,8 @@ export async function getDocumentById({ id }: { id: string }) {
       .orderBy(desc(document.createdAt));
 
     return selectedDocument;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get document by id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -776,11 +740,8 @@ export async function deleteDocumentsByIdAfterTimestamp({
       .delete(document)
       .where(and(eq(document.id, id), gt(document.createdAt, timestamp)))
       .returning();
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete documents by id after timestamp"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -791,11 +752,8 @@ export async function saveSuggestions({
 }) {
   try {
     return await db.insert(suggestion).values(suggestions);
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to save suggestions"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -809,22 +767,16 @@ export async function getSuggestionsByDocumentId({
       .select()
       .from(suggestion)
       .where(and(eq(suggestion.documentId, documentId)));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get suggestions by document id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
 export async function getMessageById({ id }: { id: string }) {
   try {
     return await db.select().from(message).where(eq(message.id, id));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get message by id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -860,11 +812,8 @@ export async function deleteMessagesByChatIdAfterTimestamp({
           and(eq(message.chatId, chatId), inArray(message.id, messageIds))
         );
     }
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete messages by chat id after timestamp"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -877,11 +826,8 @@ export async function updateChatVisiblityById({
 }) {
   try {
     return await db.update(chat).set({ visibility }).where(eq(chat.id, chatId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update chat visibility by id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -945,11 +891,8 @@ export async function getMessageCountByUserId({
       .execute();
 
     return stats?.count ?? 0;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get message count by user id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -964,11 +907,8 @@ export async function createStreamId({
     await db
       .insert(stream)
       .values({ id: streamId, chatId, createdAt: new Date() });
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to create stream id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -982,11 +922,8 @@ export async function getStreamIdsByChatId({ chatId }: { chatId: string }) {
       .execute();
 
     return streamIds.map(({ id }) => id);
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get stream ids by chat id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1152,11 +1089,8 @@ export async function getPublicDocument({ token }: { token: string }) {
       createdAt: sharedDoc.createdAt,
       sharedAt: sharedDoc.sharedAt,
     };
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get public document"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1176,11 +1110,8 @@ export async function getProjectsByUserId({ userId }: { userId: string }) {
       .orderBy(desc(project.updatedAt));
 
     return projects;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get projects by user id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1195,11 +1126,8 @@ export async function getProjectById({ id }: { id: string }) {
       .where(eq(project.id, id));
 
     return selectedProject || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get project by id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1238,8 +1166,8 @@ export async function saveProject({
       .returning();
 
     return newProject;
-  } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to save project");
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1273,8 +1201,8 @@ export async function updateProject({
       .returning();
 
     return updated;
-  } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to update project");
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1299,11 +1227,8 @@ export async function updateProjectPhase({
       .returning();
 
     return updated;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update project phase"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1331,11 +1256,8 @@ export async function updateProjectPlan({
       .returning();
 
     return updated;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update project plan"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1361,11 +1283,8 @@ export async function updateProjectSummary({
       .returning();
 
     return updated;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update project summary"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1438,11 +1357,8 @@ export async function getFilesByProjectId({ projectId }: { projectId: string }) 
       .orderBy(desc(projectFile.createdAt));
 
     return files;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get files by project id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1491,11 +1407,8 @@ export async function saveProjectFile({
       .where(eq(project.id, projectId));
 
     return newFile;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to save project file"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1518,11 +1431,8 @@ export async function deleteProjectFile({ id }: { id: string }) {
     }
 
     return deleted || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete project file"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1551,11 +1461,8 @@ export async function updateProjectFileFolder({
     }
 
     return updated || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update project file folder"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1575,11 +1482,8 @@ export async function getProjectFolders({ projectId }: { projectId: string }) {
       .orderBy(asc(projectFolder.sortOrder), asc(projectFolder.createdAt));
 
     return folders;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get project folders"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1620,11 +1524,8 @@ export async function createProjectFolder({
       .where(eq(project.id, projectId));
 
     return newFolder;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to create project folder"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1659,11 +1560,8 @@ export async function updateProjectFolder({
     }
 
     return updated || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update project folder"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1692,11 +1590,8 @@ export async function deleteProjectFolder({ id }: { id: string }) {
     }
 
     return deleted || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete project folder"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1719,11 +1614,8 @@ export async function getProjectFolderWithFileCount({ id }: { id: string }) {
       .groupBy(projectFolder.id);
 
     return result || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get project folder with file count"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1738,11 +1630,8 @@ export async function getProjectFileById({ id }: { id: string }) {
       .where(eq(projectFile.id, id));
 
     return file || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get project file by id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1765,11 +1654,8 @@ export async function getProjectFileByName({
       );
 
     return file || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get project file by name"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1791,11 +1677,8 @@ export async function updateProjectFileMetadata({
       .returning();
 
     return updated || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update project file metadata"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1853,11 +1736,8 @@ export async function rebuildProjectManifest({ projectId }: { projectId: string 
       .returning();
 
     return updated;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to rebuild project manifest"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -1927,11 +1807,8 @@ export async function getProjectsWithStats({ userId }: { userId: string }) {
       .orderBy(desc(project.updatedAt));
 
     return result;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get projects with stats"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2030,11 +1907,8 @@ export async function updateChatIsRenamed({
       .update(chat)
       .set({ isRenamed })
       .where(eq(chat.id, chatId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update chat isRenamed flag"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2055,11 +1929,8 @@ export async function updateChatTitleWithRenamedFlag({
       .update(chat)
       .set({ title, isRenamed })
       .where(eq(chat.id, chatId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update chat title with renamed flag"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2084,11 +1955,8 @@ export async function updateChatTitleAndSummary({
       .update(chat)
       .set({ title, summary, isRenamed: false })
       .where(eq(chat.id, chatId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update chat title and summary"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2107,11 +1975,8 @@ export async function updateChatIsStarred({
       .update(chat)
       .set({ isStarred })
       .where(eq(chat.id, chatId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update chat isStarred"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2131,11 +1996,8 @@ export async function updateChatTaskStatus({
       .update(chat)
       .set({ taskStatus })
       .where(eq(chat.id, chatId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update chat taskStatus"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2157,11 +2019,8 @@ export async function getGeneralChatsCount({ userId }: { userId: string }) {
       );
 
     return result?.count ?? 0;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get general chats count"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2202,11 +2061,8 @@ export async function getGeneralChatsWithStats({
       .limit(limit);
 
     return result;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get general chats with stats"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2249,11 +2105,8 @@ export async function getChatsByModeWithStats({
       .limit(limit);
 
     return result;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get chats by mode with stats"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2291,11 +2144,8 @@ export async function getProjectChatsWithStats({
       .limit(limit);
 
     return result;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get project chats with stats"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2314,11 +2164,8 @@ export async function getProjectChatsCount({ projectId }: { projectId: string })
       ));
 
     return result?.count ?? 0;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get project chats count"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2370,11 +2217,8 @@ export async function getOrCreateManagerChat({
       .returning();
 
     return newChat;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get or create manager chat"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2396,11 +2240,8 @@ export async function findManagerChat({ projectId }: { projectId: string }) {
       .limit(1);
 
     return existing || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to find manager chat"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2427,11 +2268,8 @@ export async function getProjectTaskById({
       );
 
     return task || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get project task by id"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2466,11 +2304,8 @@ export async function getCompletedTaskSummaries({
       title: string;
       outputSummary: string;
     }>;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get completed task summaries"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2492,11 +2327,8 @@ export async function unlockTask({ taskId }: { taskId: string }) {
       .returning();
 
     return updated || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to unlock task"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2540,11 +2372,8 @@ export async function startTask({
       .where(eq(projectTask.id, taskId));
 
     return chatId;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to start task"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2695,8 +2524,8 @@ export async function reopenTask({ taskId }: { taskId: string }) {
       .returning();
 
     return updated || null;
-  } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to reopen task");
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2736,8 +2565,8 @@ export async function acceptTask({
       unlockedTasks: result.unlockedTasks,
       projectCompleted: result.projectCompleted,
     };
-  } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to accept task");
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2761,11 +2590,8 @@ export async function getChatWithSnapshotState({ chatId }: { chatId: string }) {
       .where(eq(chat.id, chatId));
 
     return result || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get chat snapshot state"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2797,11 +2623,8 @@ export async function addChatSnapshot({
         snapshots: sql`COALESCE(${chat.snapshots}, '[]'::jsonb) || ${JSON.stringify(newEntry)}::jsonb`,
       })
       .where(eq(chat.id, chatId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to add chat snapshot"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2820,11 +2643,8 @@ export async function updateChatContextState({
       .update(chat)
       .set({ contextState })
       .where(eq(chat.id, chatId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update chat context state"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2837,11 +2657,8 @@ export async function resetChatContextState({ chatId }: { chatId: string }) {
       .update(chat)
       .set({ contextState: null })
       .where(eq(chat.id, chatId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to reset chat context state"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2860,11 +2677,8 @@ export async function getBriefingSettings({ userId }: { userId: string }) {
       .where(eq(briefingSettings.userId, userId));
 
     return settings || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get briefing settings"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2934,11 +2748,8 @@ export async function upsertBriefingSettings({
       .returning();
 
     return created;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to upsert briefing settings"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -2960,11 +2771,8 @@ export async function updateBriefingDeliveryStatus({
       .returning();
 
     return updated;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update briefing delivery status"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3055,11 +2863,8 @@ export async function getBriefingSources({ userId }: { userId: string }) {
         and(eq(briefingSources.userId, userId), eq(briefingSources.isActive, true))
       )
       .orderBy(asc(briefingSources.priority));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get briefing sources"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3105,11 +2910,8 @@ export async function addBriefingSource({
       .returning();
 
     return created;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to add briefing source"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3124,11 +2926,8 @@ export async function deleteBriefingSource({ id }: { id: string }) {
       .returning();
 
     return deleted || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete briefing source"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3173,11 +2972,8 @@ export async function saveBriefingHistory({
       .returning();
 
     return created;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to save briefing history"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3230,11 +3026,8 @@ export async function getBriefingTopics({ userId }: { userId: string }) {
       .from(briefingTopics)
       .where(eq(briefingTopics.userId, userId))
       .orderBy(asc(briefingTopics.orderIndex));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get briefing topics"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3271,11 +3064,8 @@ export async function addBriefingTopic({
       .returning();
 
     return created;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to add briefing topic"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3291,11 +3081,8 @@ export async function deleteAllBriefingTopicsByUser({
     await db
       .delete(briefingTopics)
       .where(eq(briefingTopics.userId, userId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete briefing topics"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3311,11 +3098,8 @@ export async function deleteAllBriefingSourcesByUser({
     await db
       .delete(briefingSources)
       .where(eq(briefingSources.userId, userId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete briefing sources"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3362,11 +3146,8 @@ export async function saveBriefingTopic({
       .returning();
 
     return created;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to save briefing topic"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3384,11 +3165,8 @@ export async function getSavedBriefingTopics({
       .from(savedBriefingTopics)
       .where(eq(savedBriefingTopics.userId, userId))
       .orderBy(desc(savedBriefingTopics.savedAt));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get saved briefing topics"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3414,11 +3192,8 @@ export async function deleteSavedBriefingTopic({
       .returning();
 
     return deleted ?? null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete saved briefing topic"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3518,11 +3293,8 @@ export async function updateBriefingSection({
       .where(eq(briefingHistory.id, latest.id));
 
     return newSection;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update briefing section",
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3581,11 +3353,8 @@ export async function updateBriefingAudio({
       .where(eq(briefingHistory.id, record.id));
 
     return { ...record, ...updateFields };
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update briefing audio",
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3617,11 +3386,8 @@ export async function updateBriefingMetadata({
       .where(eq(briefingHistory.id, briefingId));
 
     return merged;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update briefing metadata",
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3696,11 +3462,8 @@ export async function deleteOldBriefingHistory({
         );
       }
     }
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete old briefing history"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3808,11 +3571,8 @@ export async function getTelegramConnection({
       .where(eq(telegramConnection.userId, userId));
 
     return connection || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get Telegram connection"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3831,11 +3591,8 @@ export async function getTelegramConnectionByTelegramId({
       .where(eq(telegramConnection.telegramUserId, telegramUserId));
 
     return connection || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get Telegram connection by Telegram ID"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3866,11 +3623,8 @@ export async function createTelegramConnection({
       .returning();
 
     return created;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to create Telegram connection"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3886,11 +3640,8 @@ export async function deleteTelegramConnection({
     await db
       .delete(telegramConnection)
       .where(eq(telegramConnection.userId, userId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete Telegram connection"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3912,11 +3663,8 @@ export async function setTelegramConnectionActive({
       .returning();
 
     return updated || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to update Telegram connection active status"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3943,11 +3691,8 @@ export async function createTelegramLinkToken({
       .returning();
 
     return created;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to create Telegram link token"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3966,11 +3711,8 @@ export async function getTelegramLinkToken({
       .where(eq(telegramLinkToken.token, token));
 
     return linkToken || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get Telegram link token"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -3986,11 +3728,8 @@ export async function deleteTelegramLinkToken({
     await db
       .delete(telegramLinkToken)
       .where(eq(telegramLinkToken.token, token));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete Telegram link token"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4057,11 +3796,8 @@ export async function upsertTelegramGroup({
       })
       .returning();
     return created;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to upsert Telegram group"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4079,11 +3815,8 @@ export async function getTelegramGroupByChatId({
       .from(telegramGroup)
       .where(eq(telegramGroup.telegramChatId, telegramChatId));
     return group || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get Telegram group by chat ID"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4100,11 +3833,8 @@ export async function deactivateTelegramGroup({
       .update(telegramGroup)
       .set({ isActive: false, updatedAt: new Date() })
       .where(eq(telegramGroup.telegramChatId, telegramChatId));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to deactivate Telegram group"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4128,11 +3858,8 @@ export async function deactivateTelegramGroupById({
           eq(telegramGroup.ownerUserId, ownerUserId)
         )
       );
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to deactivate Telegram group by ID"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4175,11 +3902,8 @@ export async function getTelegramGroupsByOwner({
       ...g,
       messageCount: Number(g.messageCount),
     }));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get Telegram groups by owner"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4204,11 +3928,8 @@ export async function getTelegramGroupById({
         )
       );
     return group || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get Telegram group by ID"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4257,11 +3978,8 @@ export async function upsertTelegramGroupTopic({
       })
       .returning();
     return created;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to upsert Telegram group topic"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4296,11 +4014,8 @@ export async function getTelegramGroupTopics({
       ...t,
       messageCount: Number(t.messageCount),
     }));
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get Telegram group topics"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4325,11 +4040,8 @@ export async function getTelegramTopicByTelegramId({
         )
       );
     return topic || null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get Telegram topic by Telegram ID"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4386,11 +4098,8 @@ export async function createTelegramMessage({
       })
       .returning();
     return created;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to create Telegram message"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4433,11 +4142,8 @@ export async function getTelegramMessages({
       : null;
 
     return { messages: result, nextCursor };
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get Telegram messages"
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4461,11 +4167,8 @@ export async function deleteTelegramMessage({
         ),
       );
     return (result.rowCount ?? 0) > 0;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete Telegram message",
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4517,11 +4220,8 @@ export async function saveMeetingRecord({
       })
       .returning();
     return created;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to save meeting record",
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4542,11 +4242,8 @@ export async function getMeetingRecords({
       .where(eq(meetingRecord.userId, userId))
       .orderBy(desc(meetingRecord.createdAt))
       .limit(limit);
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get meeting records",
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4569,11 +4266,8 @@ export async function getMeetingRecordById({
       )
       .limit(1);
     return record ?? null;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get meeting record",
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4594,11 +4288,8 @@ export async function deleteMeetingRecord({
         and(eq(meetingRecord.id, id), eq(meetingRecord.userId, userId)),
       );
     return (result.rowCount ?? 0) > 0;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to delete meeting record",
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 
@@ -4616,11 +4307,8 @@ export async function getMeetingRecordsCount({
       .from(meetingRecord)
       .where(eq(meetingRecord.userId, userId));
     return result?.count ?? 0;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get meeting records count",
-    );
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
   }
 }
 

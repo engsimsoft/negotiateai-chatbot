@@ -35,34 +35,60 @@ export const visibilityBySurface: Record<Surface, ErrorVisibility> = {
   activate_gateway: "response",
 };
 
+/**
+ * Serialize a cause of `unknown` into a string payload safe for JSON responses.
+ * Errors expose their message; primitives are coerced; objects are JSON-dumped
+ * with a fallback. Returned value is always a string or undefined.
+ */
+function serializeCause(cause: unknown): string | undefined {
+  if (cause == null) return undefined;
+  if (cause instanceof Error) return cause.message;
+  if (typeof cause === "string") return cause;
+  if (typeof cause === "number" || typeof cause === "boolean") return String(cause);
+  try {
+    return JSON.stringify(cause);
+  } catch {
+    return "[unserializable cause]";
+  }
+}
+
 export class ChatSDKError extends Error {
   type: ErrorType;
   surface: Surface;
   statusCode: number;
 
-  constructor(errorCode: ErrorCode, cause?: string) {
-    super();
+  /**
+   * Accepts `unknown` so database catches can forward the original driver
+   * error directly — `catch (error) { throw new ChatSDKError("bad_request:database", error) }`.
+   * The native `Error.cause` chain preserves the full stack for server logs,
+   * while `serializeCause` gives us a safe string for client responses.
+   */
+  constructor(errorCode: ErrorCode, cause?: unknown) {
+    super(getMessageByErrorCode(errorCode), cause !== undefined ? { cause } : undefined);
 
     const [type, surface] = errorCode.split(":");
 
     this.type = type as ErrorType;
-    this.cause = cause;
     this.surface = surface as Surface;
-    this.message = getMessageByErrorCode(errorCode);
     this.statusCode = getStatusCodeByType(this.type);
   }
 
   toResponse() {
     const code: ErrorCode = `${this.type}:${this.surface}`;
     const visibility = visibilityBySurface[this.surface];
+    const causeMessage = serializeCause(this.cause);
 
-    const { message, cause, statusCode } = this;
+    const { message, statusCode } = this;
 
     if (visibility === "log") {
+      // Database and other log-only surfaces — dump the full cause chain to
+      // the server console. Node prints nested Error.cause with stack traces,
+      // so the real driver error (e.g. "Connection terminated unexpectedly")
+      // is visible here even though the client only sees a generic message.
       console.error({
         code,
         message,
-        cause,
+        cause: this.cause,
       });
 
       return Response.json(
@@ -71,7 +97,7 @@ export class ChatSDKError extends Error {
       );
     }
 
-    return Response.json({ code, message, cause }, { status: statusCode });
+    return Response.json({ code, message, cause: causeMessage }, { status: statusCode });
   }
 }
 
