@@ -9,6 +9,79 @@
 
 ### Planned (Next Steps)
 - RAG-4: Библиотека MVP (загрузка документов + search)
+- ТЗ-2: User-level overrides моделей (БД + cookies) — активация `context?` в `getModel()`
+
+---
+
+## [3.83.0] — 2026-04-11 — Core Model Registry (ТЗ-1)
+
+### Added
+
+- **`lib/ai/getModel.ts`** — SSOT резолва моделей. Функция `getModel(taskId, context?)` — единая точка, через которую все 39 AI-точек приложения получают `LanguageModel`. Порядок разрешения: test mocks → overrides (stub под ТЗ-2) → task-assignments → catalog → registry. Публичные helpers: `getModelIdForTask`, `getProviderForTask`, `taskSupportsThinking`.
+- **`lib/ai/task-assignments.ts`** — `DEFAULT_TASK_MODELS: Record<TaskId, string>` — 39 taskId, покрывающих все AI-точки. Иерархическая конвенция с `:` (`simply-chat`, `chat:haiku`, `project:expert:sonnet`, `briefing:filter`, `memory:extract`, `artifact:excel`, `service-chat:ben`, `util:title`, `vision:ocr`). `TaskId` union type — компилятор ловит опечатки.
+- **`lib/ai/model-catalog.ts`** — SSOT физических моделей. `ModelEntry`: `id`, `provider`, `modelId`, `displayName`, `pricing` (USD/1M: input/output/cachedInput/cacheWrite), `capabilities` (vision/tools/thinking/documents/streaming), `contextWindow`, `maxOutput`, `aliasOf?`. 28 записей: Claude (3 физ + 5 алиасов + 1 legacy), MiniMax (2), Grok (5 зарезервировано), OpenRouter (2 зарезервировано), Voyage (2), Perplexity (2), Deepgram, Gemini TTS.
+- **`lib/ai/registry.ts`** — `createProviderRegistry` из AI SDK v6. Пять namespace: `anthropic`, `minimax` (default), `minimaxLong` (180s fetch timeout для briefing), `xai`, `openrouter`.
+- **`lib/ai/getModel.ts::taskSupportsThinking(taskId)`** — capability-driven helper. Читает `capabilities.thinking` из catalog. Решает real-world баг: hardcoded `providerOptions.anthropic.thinking: adaptive` в 3 местах ломался при переключении task-assignment на модель без thinking (Haiku). Теперь system самоадаптируется под любую resolved модель.
+- **`ai_usage_log.provider`** column (миграция `0053_ai_usage_log_provider.sql`). Backfill по префиксу `modelId`: anthropic=107, minimax=64, voyage=55, deepgram=25, perplexity=14, google=10. `saveAiUsageLog` + `logUsage` принимают и пишут `provider`.
+- **Новые taskIds** (Stage 5): 5 artifact handlers (`artifact:text`, `artifact:markdown`, `artifact:excel`, `artifact:pptx`, `artifact:reveal`) — ранее все шли через алиас `artifact-model`, теперь имеют свои taskId и могут быть переключены независимо.
+- **DevPanel: artifact sub-calls visible.** Новый helper `emitArtifactDebugStep` в `lib/ai/debug-events.ts`. Все 5 artifact handlers теперь emit `data-debug-step` с реальной моделью (Sonnet), токенами и cost. До этого fix'а: когда MiniMax (simply chat) вызывал `createDocument` tool, artifact Sonnet-вызов был **невидим** в DevPanel Timeline — footer показывал только MiniMax, хотя SQL `ai_usage_log` фиксировал обе модели. Теперь Timeline и Cost Breakdown корректно разбивают по моделям.
+- **XAI_API_KEY + OPENROUTER_API_KEY** в `.env.example` (registry namespaces зарезервированы, в task-assignments не активны).
+- **`@ai-sdk/xai@3.0.82`** dependency.
+- **Список багов для последующей работы** — инвентаризация техдолга, выявленная в ходе ТЗ-1 (UUID-галлюцинация MiniMax в tool calls, script-generator dead retry branch, `_error` в других файлах, Voyage pricing hardcode, retryWithLogging provider).
+
+### Changed
+
+- **`lib/ai/providers.ts` → pure cost/pricing utility module** (−141 строка). Удалены: `myProvider`, `customProvider` import, `claudeHaiku`/`claudeSonnet`/`claudeOpus` direct exports, `minimaxM27`/`minimaxM27Long` shared exports (с их `includeUsage` мутацией), `getClaudeModel()` helper, `langModelFromCatalog()` internal resolver, `RegistryLanguageModel` type alias, `MODEL_CONTEXT_WINDOW` constant, imports `registry`/`resolveModelEntry`/`isTestEnvironment`. Оставлено только: `RUB_PER_USD` re-export, `getContextWindow` (через catalog), `TokenUsageForPricing`/`extractUsageForPricing`, `calculateCostRub`/`calculateCostBreakdownRub`/`CostBreakdownRub`, `getStepCostRub`, non-LLM cost helpers.
+- **`lib/ai/chat-mode-config.ts`** → тонкая обёртка. `CHAT_MODE_CONFIG` содержит `displayName` и `tools` (без `modelId`). Добавлен `getTaskIdForChatMode()`. `getModelForChatMode()` резолвит через catalog.
+- **`lib/ai/model-tiers.ts`** → тонкая обёртка. `PROJECT_MODELS` больше не хардкодит `myProvider.languageModel(...)`. Добавлены `getTaskIdForTier()` и `getProjectTierModelId()`. Metadata (name/description/icon/pricing) остаются.
+- **`calculateCostRub`/`calculateCostBreakdownRub`/`getStepCostRub`** теперь читают pricing из `model-catalog.ts` с конвертацией USD/1M → RUB/1K через `RUB_PER_USD`. Удалён хардкод `MODEL_PRICING_RUB`. Публичный API не изменился — 10+ client импортов не затронуты.
+- **`lib/ai/usage-utils.ts`** — `LogUsageInput` + `logUsage()` принимают опциональное поле `provider`. Если не передан — fallback через `inferProviderFromModelId()` (те же правила что и SQL backfill).
+- **39 AI-точек мигрированы на `getModel(taskId)`** через 5 stage'ов:
+  - **Stage 1:** Core infrastructure (registry, catalog, task-assignments, getModel, schema, migration)
+  - **Stage 2:** chat routes + service-chat + utils (7 files) — Simply Chat, обычный chat, expertise/create, Бен, Секретарь, Менеджер, Briefing Onboarding, auto-naming
+  - **Stage 3:** projects + clerks + professors (9 files) — plan, task-reviewer, task-summarizer, snapshot-creator, file-analyzer, generate-summary, task chat route, model-tiers обёртка, professor-pipeline (3 phases)
+  - **Stage 4:** pipelines (9 files) — briefing filter/author/section, podcast script, memory extract/consolidate/profile, meeting summary, vision OCR
+  - **Stage 5:** artifacts (5 files) — text/markdown/excel/pptx/reveal handlers; полное удаление legacy wrappers из `providers.ts`
+
+### Fixed
+
+- **Neon driver: WebSocket Pool → HTTP driver** (`lib/db/queries.ts`, `lib/ai/memory/memory-queries.ts`). Root cause 60-секундных зависаний `getMessagesByChatId`/`getOrCreateSimplyChat`/`getBriefingHistory`/`getDocumentsById`: `@neondatabase/serverless` Pool держал WebSocket между запросами, а Neon serverless auto-suspend через ~5 минут делал эти коннекты мёртвыми. Запросы блокировались до TCP-таймаута. Переход на `neon()` + `drizzle-orm/neon-http` — stateless, один HTTP запрос на query. Канонический выбор для Vercel serverless. [ADR 047](docs/decisions/047-core-model-registry.md#связанные-adr).
+- **`drizzle-orm` 0.34.1 → 0.45.2** — блокирующий апгрейд. Версия 0.34 вызывала Neon клиент как `client(sql, params, config)`, но `@neondatabase/serverless@1.x` убрал эту сигнатуру. `drizzle-orm@0.45` делает `this.clientQuery = client.query ?? client` — идеальный fallback. Это upstream fix, не локальный shim.
+- **`ChatSDKError` → native `Error.cause` chain** (`lib/errors.ts`, −286 lines в queries.ts). Raw driver errors глотались 116 раз в `catch (_error)` в queries.ts и заменялись захардкоженной строкой `"Failed to get X by id"`. При ошибках приходилось точечно добавлять `console.error` в конкретную функцию. Фикс: сигнатура `ChatSDKError(code, cause?: unknown)` пробрасывает оригинал через ECMAScript `Error.cause`. Node автоматически печатает вложенный stack trace в `console.error`. Mass rewrite 113 catches в queries.ts через regex. Backwards-compatible — 305 существующих вызовов не затронуты.
+- **`tool-wrapper.ts`** логирует **полный** Error объект, не только `.message`. Это обнажает `Error.cause` chain в dev server log. Пара с фиксом ChatSDKError выше.
+- **`briefing-filter.ts`** — удалён дубль `logUsage`. `retryWithLogging` уже логирует успешные попытки; внешний waitUntil вызов с тем же `chatMode: "briefing:filter"` удваивал записи в `ai_usage_log` и стоимость. Комментарий в коде сам признавал: «pre-existing duplicate kept for wire compatibility».
+- **`sanitizeCoreMessages` Pass 5** — reorder `tool-call` parts в конец `assistant.content`. Claude 4.5/4.6 строго требует `tool_use` последним; AI SDK иногда генерирует `[tool_use, text]` → orphan tool-call error. Проверено через real Anthropic API в `scripts/debug-orphan-tool-use.ts`.
+- **`provider=null` регрессия** в `ai_usage_log` для chat/route.ts. `resolvedTaskId` теперь резолвит `getProviderForTask` и передаёт в `saveAiUsageLog`.
+- **env-переменные удалены:** `PROFESSOR_MODEL`, `SUMMARIZER_MODEL`, `SNAPSHOT_CLERK_MODEL`, `EXPERT_MODEL`. Их роль играет `task-assignments.ts`.
+- **Dead `_modelResolver` useMemo** в `components/multimodal-input.tsx` — импортировал `myProvider` на клиенте (layering issue) и никогда не читался.
+
+### Removed
+
+- `lib/ai/providers.ts`: `myProvider`, `claudeHaiku`, `claudeSonnet`, `claudeOpus`, `minimaxM27`, `minimaxM27Long`, `getClaudeModel`, `langModelFromCatalog`, `RegistryLanguageModel`, `MODEL_CONTEXT_WINDOW`, imports `customProvider`/`registry`/`resolveModelEntry`/`isTestEnvironment`.
+- env-variables: `PROFESSOR_MODEL`, `SUMMARIZER_MODEL`, `SNAPSHOT_CLERK_MODEL`, `EXPERT_MODEL`.
+- `specs/TZ_SlidingWindow/` (перенос старого ТЗ в `_archive`).
+
+### Files
+
+**Новые:**
+- `lib/ai/getModel.ts`, `lib/ai/task-assignments.ts`, `lib/ai/model-catalog.ts`, `lib/ai/registry.ts`
+- `lib/db/migrations/0053_ai_usage_log_provider.sql`
+- `docs/decisions/047-core-model-registry.md`
+
+**Изменённые:** 39 AI-точек (route.ts + pipelines + artifacts), `lib/ai/providers.ts` (−141 строка), `lib/ai/chat-mode-config.ts`, `lib/ai/model-tiers.ts`, `lib/ai/usage-utils.ts`, `lib/db/queries.ts` (−286 строк через catch refactor + neon-http), `lib/ai/memory/memory-queries.ts` (neon-http), `lib/errors.ts`, `lib/ai/debug-events.ts` (+emitArtifactDebugStep), `lib/ai/tools/tool-wrapper.ts` (full Error log), `lib/db/schema.ts` (+provider column), `package.json` (+@ai-sdk/xai, +drizzle-orm 0.45), `pnpm-lock.yaml`, `docs/ai-providers.md`, `docs/ai-chats-map.md`, `docs/architecture.md`, `CLAUDE.md`, `SIMPLY_STATUS.md`, `.env.example`.
+
+### Architecture validation — главное достижение
+
+Во время Stage 3 мануального теста **одной строкой в `task-assignments.ts`** переключили 8 taskId (chat:sonnet/opus, project:expert:haiku/sonnet/opus, professor:planning/review/pipeline-{analyze,synthesize}) с Opus/Sonnet на Haiku. Все call-sites автоматически подхватили новую модель через `getModel()` + HMR. **Это именно тот use case, ради которого делался Core Registry.**
+
+При этом вскрылась реальная архитектурная дыра (`providerOptions.anthropic.thinking` был hardcoded, ломался на Haiku) — и была решена правильно: через catalog-driven `taskSupportsThinking()`, а не через заплатку. После fix `providerOptions` автоматически адаптируется под любую resolved модель без ручного вмешательства.
+
+### Lessons Learned
+
+- **Диагностическое оборудование важнее разовой охоты за багом.** DevPanel artifact-observability fix вскрыл что MiniMax передаёт покалеченный UUID между createDocument и updateDocument. Это LLM галлюцинация на длинных идентификаторах — не наш код. Но без правильного логирования мы бы ещё раз час дебажили в слепую.
+- **Graceful degradation ≠ наблюдаемость.** Функции, глотающие ошибку в catch-блоке, невидимы для наблюдаемости. Применили системный фикс через native `Error.cause` chain.
+- **Regex mass refactoring работает для однотипных паттернов.** 116 catch-блоков в queries.ts переписаны двумя regex-проходами (single-line + multi-line), backwards-compatible за счёт `unknown` cause.
+- **Апгрейды пакетов — иногда root-cause fix.** Миграция Neon driver упиралась в несовместимость `drizzle-orm@0.34` с `@neondatabase/serverless@1.x`. Локальный proxy-wrapper был бы костылём, `drizzle-orm@0.45` исправил проблему в upstream (`client.query ?? client` fallback).
 
 ---
 

@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.80.0 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.83.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -174,7 +174,7 @@
 - `components/chats/chat-detail-panel.tsx` — Правая колонка (summary, actions)
 
 **ChatMode System (v3.24.0) + Route Groups (v3.25.0):**
-- `lib/ai/chat-mode-config.ts` — Конфигурация режимов (chatMode → модель, tools)
+- `lib/ai/chat-mode-config.ts` — Тонкая обёртка (v3.83+): `chatMode → taskId → getModel()`. `CHAT_MODE_CONFIG` хранит `displayName` и `tools`; модели берутся из task-assignments.
 - `app/(chat)/chat/[id]/page.tsx` — Маршрут обычного чата (redirect для expertise/create)
 - `app/(expertise)/expertise/[id]/page.tsx` — Маршрут экспертизы (chatMode=expertise)
 - `app/(create)/create/[id]/page.tsx` — Маршрут создания (chatMode=create)
@@ -205,14 +205,23 @@
 - `components/right-sidebar.tsx` — Унифицированный правый сайдбар-shell (bg-sidebar, Sheet на мобильных, push-layout). Переиспользуемый контейнер для chat/projects/helpers
 - `components/chat-sidebar.tsx` — Материалы чата (артефакты + вложения), scroll-to-message навигация, скачивание. Использует RightSidebar
 
+**Core Model Registry (v3.83.0 — ТЗ-1):**
+- `lib/ai/getModel.ts` — **SSOT резолва моделей**. `getModel(taskId)`, `getModelIdForTask`, `getProviderForTask`, `taskSupportsThinking`. Любая из 39 AI-точек получает модель **только** через эту функцию.
+- `lib/ai/task-assignments.ts` — `DEFAULT_TASK_MODELS: Record<TaskId, string>` — 39 taskId. Смена default-модели = одна строка.
+- `lib/ai/model-catalog.ts` — SSOT физических моделей: pricing (USD/1M), capabilities (vision/tools/thinking), contextWindow, алиасы.
+- `lib/ai/registry.ts` — `createProviderRegistry` (AI SDK v6): 5 namespace — `anthropic`, `minimax`, `minimaxLong` (180s timeout для briefing), `xai`, `openrouter`.
+- **Удалены в Stage 5:** `myProvider`, `claudeHaiku/Sonnet/Opus`, `minimaxM27/Long`, `getClaudeModel`, `MODEL_CONTEXT_WINDOW`, env-overrides (`PROFESSOR_MODEL`/`SUMMARIZER_MODEL`/`SNAPSHOT_CLERK_MODEL`/`EXPERT_MODEL`).
+- См. [docs/decisions/047-core-model-registry.md](docs/decisions/047-core-model-registry.md) + [docs/ai-providers.md](docs/ai-providers.md)
+
 **AI/Chat:**
 - `app/(chat)/api/chat/route.ts` — Chat endpoint (streaming, sanitizeCoreMessages, isStarred PATCH)
 - `app/(chat)/api/chat/[id]/route.ts` — Chat management (DELETE/PATCH)
 - `app/(chat)/api/chat/[id]/generate-title/route.ts` — Автонейминг + summary (v3.5.0)
-- `lib/ai/providers.ts` — Конфигурация AI-моделей (Anthropic Claude)
+- `lib/ai/providers.ts` — **Чистый pricing/cost utility module** (после Stage 5): `calculateCostRub`, `calculateCostBreakdownRub`, `extractUsageForPricing`, `getContextWindow`, `calculateDeepgramCostUsd`, `calculateGeminiTtsCostUsd`. Не содержит model resolution.
 - `lib/ai/usage-utils.ts` — Unified usage logging: `extractUsageFields()` + `logUsage()` (fire-and-forget). chatMode конвенция: `service:*|professor:*|clerk:*|briefing:*|podcast:*|tool:*|meeting:*|util:*|project:*|artifact:*` ← v3.69.0
 - `lib/ai/retry-with-logging.ts` — Retry-обёртка для pipeline: `retryWithLogging()` с per-attempt логированием. Заменяет скрытые SDK retry (maxRetries:0) ← v3.69.0
-- `lib/ai/model-tiers.ts` — Уровни моделей для проектов (Haiku/Sonnet/Opus)
+- `lib/ai/model-tiers.ts` — Тонкая обёртка: `tier → taskId → getModel()` (v3.83+)
+- `lib/ai/chat-mode-config.ts` — Тонкая обёртка: `chatMode → taskId → getModel()` (v3.83+)
 - `lib/ai/professor-pipeline.ts` — Pipeline для режима Профессор
 - `lib/ai/task-completion-types.ts` — Zod-схемы и типы для завершения задач
 - `lib/ai/clerks/task-summarizer.ts` — Суммаризатор задач (Claude Haiku)
@@ -437,7 +446,7 @@
 
 ## Текущий этап
 
-**Завершены:** ТЗ-MapReduce (v3.82.0 — PodcastTtsRevert+BriefingStability), ТЗ-Briefing-2 (v3.81.0 — PodcastMinimax), ТЗ-Briefing-1 (v3.80.0 — BriefingAuthorMinimax), ТЗ-SimplyToolsMinimax (v3.79.0 — SimplyToolsMinimax), ТЗ-ExtractCompression (v3.78.0 — ExtractOnCompression), ТЗ-MinimaxCleanup (v3.77.0 — MiniMaxM27+GeminiFlash+Cleanup), ТЗ-SlidingWindow (v3.76.0 — StableCostSlidingWindow), ТЗ-SaveFact (v3.75.0 — GuaranteedMINDWrite), ТЗ-KITT (v3.74.0 — SimplyChat+ContextDashboard), ТЗ-RAG3 (v3.73.0 — CompactionDualStrategy), ТЗ-RAG2 (v3.72.0 — MINDConsolidationProfileUI), ТЗ-RAG1 (v3.71.0 — MINDExtractRetrieve), ТЗ-RAG0 (v3.70.0 — SimplyRAG Infrastructure), ТЗ-PIPELINE1 (v3.69.0 — ReliablePipelineObservability), ТЗ-BILLING1 (v3.68.0 — FullCostCoverage), ТЗ-TOKENS1 (v3.67.0 — SdkNativeUsageTracking), ТЗ-COSTCTRL (v3.66.0 — BriefingCostControl), ТЗ-SDK6 (v3.65.0 — AiSdkV6Migration), ТЗ-CACHE3 (v3.64.0 — UnifiedCostUI), ТЗ-CACHE2 (v3.63.0 — UnifiedUsageLogging), ТЗ-MR2 (v3.62.0 — MeetingRegenerate+PDF), ТЗ-MR (v3.61.0 — MeetingRecorderMVP), ТЗ-CACHE1 (v3.60.0 — PromptCaching), ТЗ-DEV3 (v3.59.0 — OnboardingDevPanel), ТЗ-DEV2 (v3.58.0 — PipelineObservability), ТЗ-DEV1 (v3.57.0 — DeveloperPanel), ТЗ-TG5 (v3.56.0 — ClosedGroups), HOTFIX-PodcastFromCron (v3.55.1 — ADR 027), ТЗ-TG4b (v3.55.0 — TelegramDelivery), ТЗ-TG4a (v3.54.0 — BackgroundBriefing), ТЗ-FIX3 (v3.53.0 — OnboardingRestore), ТЗ-FIX2 (v3.52.0 — ResearchProgressMode), ТЗ-FIX1.2 (v3.51.0 — GuardianBlocking), ТЗ-FIX1 (v3.50.0 — ToolCallGuardian), ТЗ-TG3 (v3.49.0 — TelegramBotInfrastructure), ТЗ-TG2 (v3.48.0 — OnboardingTelegram), ТЗ-TG1 (v3.47.0 — TelegramPhase1), ТЗ-OPT1 (v3.46.0 — UsageLogging + SonnetMigration), PATCH-podcast (v3.45.1 — PodcastFixes), ТЗ-BF5 (v3.45.0 — BriefingDedup), ТЗ-Б2 (v3.44.0 — PodcastUI), ТЗ-Б1 (v3.43.0 — PodcastEngine), ТЗ-BF4 (v3.42.0 — PerSectionRefresh), ТЗ-BF3 (v3.41.0 — BriefingSidebarRedesign), ТЗ-BF2 (v3.40.0 — SimplyNews), ТЗ-BF1 (v3.39.0 — BriefingUIRefactor), ТЗ-BRIEFING-AUTHOR-CLAUDE (v3.38.0 — BriefingAuthorClaude), PATCH-volume (v3.37.1 — BriefingVolumePromptEnforcement), ТЗ-BF1-fix (v3.37.0 — BriefingItemIdFix), ТЗ-BRIEFING-VOLUME (v3.36.0 — BriefingVolume), ТЗ-WS2 (v3.35.0 — JinaReader), ТЗ-WS1 (v3.34.0 — CharsetUnification), ТЗ-HF1 (v3.33.1 — BriefingPEUpdate), ТЗ-А5 (v3.33.0 — BriefingProgress), ТЗ-А4 (v3.32.0 — BriefingIssuePage), ТЗ-А3 (v3.31.0 — BriefingAuthor), ТЗ-A2 (v3.30.0 — BriefingOnboarding), ТЗ-PX+FU (v3.29.0 — DeepResearch + FetchUrl), ТЗ-A1 (v3.28.0 — BriefingLanding), ТЗ-BR3 (v3.27.1 — PromptIntegration), ТЗ-BR2 (v3.27.0 — BriefingUI), ТЗ-BR1 (v3.26.0 — MorningBriefingBackend), ТЗ-RG (v3.25.0 — RouteGroups), ТЗ-DV2 (v3.24.0 — DashboardV2), ТЗ-C4 (v3.23.0 — AnthropicProviderSwitch), ТЗ-C3 (v3.22.0 — ChatContextManagement), ТЗ-08CS (v3.21.0 — ChatSidebar + RightSidebar), ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
+**Завершены:** ТЗ-1 (v3.83.0 — CoreRegistry: getModel(taskId) + catalog + task-assignments + Neon HTTP + DevPanel artifact observability + ChatSDKError cause chain), ТЗ-MapReduce (v3.82.0 — PodcastTtsRevert+BriefingStability), ТЗ-Briefing-2 (v3.81.0 — PodcastMinimax), ТЗ-Briefing-1 (v3.80.0 — BriefingAuthorMinimax), ТЗ-SimplyToolsMinimax (v3.79.0 — SimplyToolsMinimax), ТЗ-ExtractCompression (v3.78.0 — ExtractOnCompression), ТЗ-MinimaxCleanup (v3.77.0 — MiniMaxM27+GeminiFlash+Cleanup), ТЗ-SlidingWindow (v3.76.0 — StableCostSlidingWindow), ТЗ-SaveFact (v3.75.0 — GuaranteedMINDWrite), ТЗ-KITT (v3.74.0 — SimplyChat+ContextDashboard), ТЗ-RAG3 (v3.73.0 — CompactionDualStrategy), ТЗ-RAG2 (v3.72.0 — MINDConsolidationProfileUI), ТЗ-RAG1 (v3.71.0 — MINDExtractRetrieve), ТЗ-RAG0 (v3.70.0 — SimplyRAG Infrastructure), ТЗ-PIPELINE1 (v3.69.0 — ReliablePipelineObservability), ТЗ-BILLING1 (v3.68.0 — FullCostCoverage), ТЗ-TOKENS1 (v3.67.0 — SdkNativeUsageTracking), ТЗ-COSTCTRL (v3.66.0 — BriefingCostControl), ТЗ-SDK6 (v3.65.0 — AiSdkV6Migration), ТЗ-CACHE3 (v3.64.0 — UnifiedCostUI), ТЗ-CACHE2 (v3.63.0 — UnifiedUsageLogging), ТЗ-MR2 (v3.62.0 — MeetingRegenerate+PDF), ТЗ-MR (v3.61.0 — MeetingRecorderMVP), ТЗ-CACHE1 (v3.60.0 — PromptCaching), ТЗ-DEV3 (v3.59.0 — OnboardingDevPanel), ТЗ-DEV2 (v3.58.0 — PipelineObservability), ТЗ-DEV1 (v3.57.0 — DeveloperPanel), ТЗ-TG5 (v3.56.0 — ClosedGroups), HOTFIX-PodcastFromCron (v3.55.1 — ADR 027), ТЗ-TG4b (v3.55.0 — TelegramDelivery), ТЗ-TG4a (v3.54.0 — BackgroundBriefing), ТЗ-FIX3 (v3.53.0 — OnboardingRestore), ТЗ-FIX2 (v3.52.0 — ResearchProgressMode), ТЗ-FIX1.2 (v3.51.0 — GuardianBlocking), ТЗ-FIX1 (v3.50.0 — ToolCallGuardian), ТЗ-TG3 (v3.49.0 — TelegramBotInfrastructure), ТЗ-TG2 (v3.48.0 — OnboardingTelegram), ТЗ-TG1 (v3.47.0 — TelegramPhase1), ТЗ-OPT1 (v3.46.0 — UsageLogging + SonnetMigration), PATCH-podcast (v3.45.1 — PodcastFixes), ТЗ-BF5 (v3.45.0 — BriefingDedup), ТЗ-Б2 (v3.44.0 — PodcastUI), ТЗ-Б1 (v3.43.0 — PodcastEngine), ТЗ-BF4 (v3.42.0 — PerSectionRefresh), ТЗ-BF3 (v3.41.0 — BriefingSidebarRedesign), ТЗ-BF2 (v3.40.0 — SimplyNews), ТЗ-BF1 (v3.39.0 — BriefingUIRefactor), ТЗ-BRIEFING-AUTHOR-CLAUDE (v3.38.0 — BriefingAuthorClaude), PATCH-volume (v3.37.1 — BriefingVolumePromptEnforcement), ТЗ-BF1-fix (v3.37.0 — BriefingItemIdFix), ТЗ-BRIEFING-VOLUME (v3.36.0 — BriefingVolume), ТЗ-WS2 (v3.35.0 — JinaReader), ТЗ-WS1 (v3.34.0 — CharsetUnification), ТЗ-HF1 (v3.33.1 — BriefingPEUpdate), ТЗ-А5 (v3.33.0 — BriefingProgress), ТЗ-А4 (v3.32.0 — BriefingIssuePage), ТЗ-А3 (v3.31.0 — BriefingAuthor), ТЗ-A2 (v3.30.0 — BriefingOnboarding), ТЗ-PX+FU (v3.29.0 — DeepResearch + FetchUrl), ТЗ-A1 (v3.28.0 — BriefingLanding), ТЗ-BR3 (v3.27.1 — PromptIntegration), ТЗ-BR2 (v3.27.0 — BriefingUI), ТЗ-BR1 (v3.26.0 — MorningBriefingBackend), ТЗ-RG (v3.25.0 — RouteGroups), ТЗ-DV2 (v3.24.0 — DashboardV2), ТЗ-C4 (v3.23.0 — AnthropicProviderSwitch), ТЗ-C3 (v3.22.0 — ChatContextManagement), ТЗ-08CS (v3.21.0 — ChatSidebar + RightSidebar), ТЗ-07 (v3.20.0 — ToolActivity + SidebarIconMode), ТЗ-DS (v3.19.0 — DesignSystem), ТЗ-C1.5 (v3.18.0 — ContextManagement), ТЗ-C2 (v3.17.0 — TaskCompletion), ТЗ-C1 (v3.16.0 — ExpertTaskChat), ТЗ-B2 (v3.15.0 — Approval + ProjectTask), ТЗ-B1 (v3.14.0 — Professor Planning), ТЗ-A3 (v3.13.0 — Manager + Clerk + Manifest), ТЗ-A1 (v3.12.0 — Project Page Layout), ТЗ-12 (v3.11.0 — Secretary), ТЗ-09 (v3.8.0 — ServiceChat), ТЗ-08 (v3.7.0 — File Viewer), ТЗ-07B (v3.5.0 — Chat History), ТЗ-07A (v3.4.0 — Glavnaya + Navigation + Sidebar), ТЗ-04 (v3.3.0 — Skills + Agents), ТЗ-03 (v3.2.0 — Проекты + Claude), ТЗ-02 (v3.1.0 — Dashboard + Sidebar), ТЗ-NEW-01 (v3.0.0 — новая архитектура промптов)
 **Прогресс:** См. [SIMPLY_STATUS.md](SIMPLY_STATUS.md)
 
 **Следующие этапы (по приоритету):**
@@ -597,4 +606,4 @@ specs/
 
 ---
 
-**Обновлено:** 2026-04-09
+**Обновлено:** 2026-04-11

@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.80.0
-**Дата:** 2026-04-09
+**Версия:** 3.83.0
+**Дата:** 2026-04-11
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -32,7 +32,8 @@
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG extract+retrieve+consolidation+profile ✅ v3.72.0, Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity ✅, Plus AI, Ideogram, AssemblyAI | 🔄 Фаза 1 |
 | **Запись встречи** | Аудио → Deepgram транскрипция → Claude резюме (3 формата, инструкции, регенерация, PDF) | ✅ v3.62.0 |
-| **AI-провайдер** | Мультипровайдер: MiniMax (Simply + Briefing), Anthropic Claude (expertise/create/projects), Gemini (vision + podcast) | ✅ v3.80.0 |
+| **AI-провайдер** | Мультипровайдер через Core Registry (`getModel(taskId)`): Anthropic Claude, MiniMax M2.7, Gemini TTS, Voyage, Deepgram, Perplexity. xAI + OpenRouter — в catalog, зарезервированы | ✅ v3.83.0 |
+| **Core Model Registry** | SSOT для 39 AI-точек: task-assignments → catalog → registry. Смена модели = одна строка. `ai_usage_log.provider` column. Capability-driven thinking guard | ✅ v3.83.0 |
 | **Smart Routing** | Автовыбор модели для экономии без потери качества | 📋 |
 | **Оплата в рублях** | ЮKassa, Тинькофф, СБП | 📋 |
 
@@ -47,7 +48,7 @@
 ### Инфраструктура
 - ✅ Next.js 15.3 (App Router, RSC)
 - ✅ NextAuth 5.0-beta.25
-- ✅ PostgreSQL (Neon) + Drizzle ORM + `@neondatabase/serverless` (WebSocket)
+- ✅ PostgreSQL (Neon) + Drizzle ORM 0.45 + `@neondatabase/serverless` **HTTP driver** (v3.83, stateless — без stale-коннектов при auto-suspend)
 - ✅ Vercel AI SDK
 - ✅ Vercel Blob Storage
 

@@ -1,331 +1,244 @@
 # AI-провайдеры и модели
 
-**Версия:** 3.3.0
-**Последнее обновление:** 2026-04-06
-**Статус:** 4 провайдера, 4 модели Anthropic + 4 модели Gemini + 2 модели Perplexity + 2 модели Voyage AI
+**Версия:** 3.83.0
+**Последнее обновление:** 2026-04-11
+**Статус:** 7 провайдеров (Anthropic, MiniMax, Google, xAI, OpenRouter, Perplexity, Voyage, Deepgram) + Core Registry v1
 
 ---
 
 ## О документе
 
-Этот документ — **единственный источник правды** для:
-- AI-провайдеров (Anthropic, Google, Perplexity)
-- Моделей и их характеристик
-- **Реестра конфигураций** — какая модель где и с какими настройками
-- Цен на токены
-- API ключей и настроек
+Этот документ описывает:
+- AI-провайдеров и модели
+- Цены на токены
+- API ключи и переменные окружения
+- Лимиты и квоты
+
+**SSOT реестра моделей и task→model маппингов** теперь живёт **в коде**, не в docs. См. раздел «Core Registry» ниже.
 
 **Связанные документы:**
 - [ai-chats-map.md](ai-chats-map.md) — карта чатов и UI
 - [ai-agents.md](ai-agents.md) — агенты и промпты
 - [ai-tools.md](ai-tools.md) — инструменты
+- [ai-minimax.md](ai-minimax.md) — детали MiniMax M2.7
+- [decisions/047-core-model-registry.md](decisions/047-core-model-registry.md) — ADR архитектуры Core Registry
 
-**Ключевые файлы:**
-- [lib/ai/providers.ts](../lib/ai/providers.ts) — конфигурация провайдеров
-- [lib/ai/chat-mode-config.ts](../lib/ai/chat-mode-config.ts) — chatMode → модель
-- [lib/ai/model-tiers.ts](../lib/ai/model-tiers.ts) — уровни моделей для проектов
-- [lib/briefing/briefing-config.ts](../lib/briefing/briefing-config.ts) — модели для брифинга (фильтр Gemini + автор Claude)
-- [lib/ai/retry-with-logging.ts](../lib/ai/retry-with-logging.ts) — retry wrapper с per-attempt usage logging (v3.69.0)
+---
+
+## Core Registry (v3.83.0+, ТЗ-1)
+
+С версии 3.83.0 все 39 AI-точек приложения получают модель **только** через единую функцию `getModel(taskId)`. Три файла — источник правды:
+
+| Файл | Ответственность |
+|------|-----------------|
+| [lib/ai/registry.ts](../lib/ai/registry.ts) | `createProviderRegistry` (AI SDK v6): пять namespace'ов — `anthropic`, `minimax`, `minimaxLong`, `xai`, `openrouter` |
+| [lib/ai/model-catalog.ts](../lib/ai/model-catalog.ts) | SSOT физических моделей: pricing (USD/1M), capabilities (vision/tools/thinking), contextWindow, aliasOf |
+| [lib/ai/task-assignments.ts](../lib/ai/task-assignments.ts) | `DEFAULT_TASK_MODELS: Record<TaskId, string>` — 39 taskId → catalog id |
+| [lib/ai/getModel.ts](../lib/ai/getModel.ts) | Публичный API: `getModel(taskId)`, `getModelIdForTask`, `getProviderForTask`, `taskSupportsThinking` |
+
+**Смена default-модели = одна строка в `task-assignments.ts`.** HMR подхватывает автоматически, никакие call-sites не трогаются. Полное обоснование — в [ADR 047](decisions/047-core-model-registry.md).
+
+### Использование в коде
+
+```ts
+import { getModel, getModelIdForTask, getProviderForTask, taskSupportsThinking } from "@/lib/ai/getModel";
+
+const TASK = "briefing:author" as const;
+
+const result = await streamText({
+  model: getModel(TASK),
+  // providerOptions пишутся условно — catalog знает capabilities
+  providerOptions: taskSupportsThinking(TASK)
+    ? { anthropic: { thinking: { type: "adaptive", effort: "high" } } }
+    : undefined,
+  // ...
+});
+
+logUsage({
+  userId,
+  usage: result.usage,
+  modelId: getModelIdForTask(TASK),
+  provider: getProviderForTask(TASK),
+  chatMode: "briefing:author",
+});
+```
+
+### TaskId convention
+
+Иерархический, разделитель `:`. Префикс обозначает домен:
+
+| Префикс | Что |
+|---------|-----|
+| `simply-chat*` | Simply Chat (text / vision / think) |
+| `chat:*` | Обычный чат по tier (haiku / sonnet / opus) |
+| `project:expert:*` | Экспертный чат по задаче проекта (tier) |
+| `professor:*` | Профессорский pipeline (planning / review / pipeline-{analyze,execute,synthesize}) |
+| `clerk:*` | Вспомогательные клерки (task-summary / snapshot / file-analyzer) |
+| `memory:*` | MIND / RAG (extract / extract-batch / consolidate / profile / dedup-verify) |
+| `briefing:*` | Генерация брифинга (filter / author / section / podcast-script) |
+| `meeting:*` | Транскрипция и суммаризация встреч |
+| `service-chat:*` | Сервисные чаты (ben / project-creation / project-manager / briefing-onboarding) |
+| `util:*` | Утилиты (title / project-summary / artifact-suggestions) |
+| `artifact:*` | Artifact handlers (text / markdown / excel / pptx / reveal) |
+| `vision:ocr` | OCR через vision-модель |
+
+Полный список — константа `DEFAULT_TASK_MODELS` в `task-assignments.ts`. TypeScript `TaskId` union гарантирует, что опечатки ловятся компилятором.
+
+### Non-LLM провайдеры
+
+Voyage (embeddings), Deepgram (speech-to-text), Perplexity (deep research), Gemini TTS — **не** живут в registry. Каждый вызывается через свой клиент (`voyage-client.ts`, `deepgram-transcribe.ts`, `perplexity-client.ts`, `tts-gemini.ts`), расчёт стоимости через специальные helper-функции в `providers.ts` (`calculateDeepgramCostUsd`, `calculateGeminiTtsCostUsd`). Их учёт идёт через `logUsage({ costUsdOverride })` в обход `calcCostUsd()`.
 
 ---
 
 ## Провайдеры
 
-### Anthropic (основной — v3.23.0+)
+### Anthropic (основной)
 
 | Параметр | Значение |
 |----------|----------|
-| SDK | `@ai-sdk/anthropic@3.0.58` (обёртка над `ai@6.0.116`) |
+| SDK | `@ai-sdk/anthropic@3.x` (обёртка над `ai@6.x`) |
 | API Key | `ANTHROPIC_API_KEY` |
+| Registry namespace | `anthropic` |
 | Документация | https://docs.anthropic.com/ |
 
-> **SDK версии (v3.65.0+):** `ai@6.x` + `@ai-sdk/anthropic@3.x` + `@ai-sdk/google@3.x` + `@ai-sdk/react@3.x`. v6 предоставляет нативные `inputTokenDetails`/`outputTokenDetails` (включая `cacheWriteTokens`).
+> **SDK версии:** `ai@6.x` + `@ai-sdk/anthropic@3.x` + `@ai-sdk/google@3.x` + `@ai-sdk/react@3.x`. v6 предоставляет нативные `inputTokenDetails`/`outputTokenDetails` (включая `cacheWriteTokens`, `cacheReadTokens`, `reasoningTokens`).
 
-### Google AI (vision-ocr + Podcast TTS)
+Используется для: projects expert chat (все tier), professor pipeline, artifacts, memory:extract, meeting:summary, simply-chat-think, simply-chat-vision, clerk'ов, всех service chats, auto-naming, vision:ocr (fallback). Полный список — через `DEFAULT_TASK_MODELS`.
 
-| Параметр | Значение |
-|----------|----------|
-| SDK (text) | `@ai-sdk/google` (vision-ocr) |
-| SDK (TTS) | `@google/genai` (podcast TTS) |
-| API Key | `GOOGLE_GENERATIVE_AI_API_KEY` |
-| Документация | https://ai.google.dev/ |
-
-> Google AI используется для vision-ocr и Podcast TTS (Gemini Flash TTS — multi-speaker). Briefing Filter/Author и Podcast Script переведены на MiniMax M2.7 (v3.80, v3.81). Попытка перевода TTS на MiniMax Speech 2.8 HD откачена в v3.82 — см. [ADR 046](decisions/046-podcast-tts-revert-and-briefing-stability.md).
-
-### MiniMax (Simply Chat + Briefing + Podcast Script)
+### MiniMax
 
 | Параметр | Значение |
 |----------|----------|
 | SDK | `vercel-minimax-ai-provider` (OpenAI-compatible) |
 | API Key | `MINIMAX_API_KEY` |
 | Endpoint | `https://api.minimax.io/v1` |
+| Registry namespace | `minimax` (default) + `minimaxLong` (180s timeout для briefing) |
 | Документация | https://platform.minimax.io/docs/ |
-| Детали | [docs/ai-minimax.md](ai-minimax.md) |
+| Детали | [ai-minimax.md](ai-minimax.md) |
 
-> MiniMax M2.7 — текстовая модель, $0.30/$1.20 за 1M tokens, автоматическое кэширование. Используется в Simply Chat (text only), Briefing Filter/Author (монолит), Podcast Script. **НЕ используется** для vision и TTS.
+Используется для: `simply-chat`, `briefing:filter`, `briefing:author`, `briefing:section`, `briefing:podcast-script`, `memory:extract-batch`, `memory:consolidate`, `memory:profile`. **НЕ используется** для vision и TTS.
 
-### Perplexity (Deep Research)
+### Google AI
 
 | Параметр | Значение |
 |----------|----------|
-| SDK | REST API (fetch) |
+| SDK (vision) | `@ai-sdk/google` — используется через catalog entry для OCR |
+| SDK (TTS) | `@google/genai` — напрямую в `lib/podcast/tts-gemini.ts` |
+| API Key | `GOOGLE_GENERATIVE_AI_API_KEY` |
+| Registry namespace | **НЕ в registry** — подключается через catalog `provider: "google"` и обрабатывается отдельно (non-LLM paths) |
+| Документация | https://ai.google.dev/ |
+
+Используется для: Podcast TTS (Gemini 2.5 Flash TTS, multi-speaker Kore + Iapetus). Vision OCR сейчас на Claude Haiku (vision:ocr task), Gemini Vision зарезервирован в catalog но не активен.
+
+### xAI (Grok)
+
+| Параметр | Значение |
+|----------|----------|
+| SDK | `@ai-sdk/xai@3.0.82` |
+| API Key | `XAI_API_KEY` |
+| Registry namespace | `xai` |
+| Документация | https://docs.x.ai/ |
+
+В catalog добавлены 5 моделей (grok-4.20-reasoning, grok-4.20-non-reasoning, grok-4-1-fast-reasoning, grok-4-1-fast-non-reasoning, grok-4). **В task-assignments пока не подключены** — зарезервированы для будущих ТЗ. Готовность инфраструктуры проверена в Stage 1 ТЗ-1.
+
+### OpenRouter
+
+| Параметр | Значение |
+|----------|----------|
+| SDK | `@openrouter/ai-sdk-provider` |
+| API Key | `OPENROUTER_API_KEY` |
+| Registry namespace | `openrouter` |
+| Документация | https://openrouter.ai/docs |
+
+Зарезервирован под GLM 5.1 и Qwen 3.6 Plus. **В task-assignments пока не подключены.**
+
+### Perplexity
+
+| Параметр | Значение |
+|----------|----------|
+| SDK | REST API через `lib/ai/tools/perplexity-client.ts` |
 | API Key | `PERPLEXITY_API_KEY` |
 | Endpoint | `https://api.perplexity.ai/chat/completions` |
 | Документация | https://docs.perplexity.ai/ |
 
-> Perplexity используется для инструмента Deep Research (sonar-pro / sonar-deep-research). Доступен в режимах expertise, create и проектных чатах.
+Используется для `tool:deep-research` (sonar-pro / sonar-deep-research). Доступен в режимах expertise, create, project expert chat. **Не в registry** — это tool, не модель.
 
-### Voyage AI (Embeddings + RAG)
+### Voyage AI
 
 | Параметр | Значение |
 |----------|----------|
-| SDK | REST API (fetch) — паттерн perplexity-client.ts |
+| SDK | REST API через `lib/ai/memory/voyage-client.ts` |
 | API Key | `VOYAGE_API_KEY` |
 | Endpoint | `https://api.voyageai.com/v1/embeddings` |
 | Документация | https://docs.voyageai.com/ |
-| Клиент | `lib/ai/memory/voyage-client.ts` |
 
-> Voyage AI — единый провайдер для embeddings и reranking. Рекомендован Anthropic. Используется для MIND (память из чатов) и Библиотеки (база знаний). Shared embedding space: voyage-4 (indexing) + voyage-4-lite (queries).
+Используется для MIND / RAG: `voyage-4` (indexing, document embeddings) + `voyage-4-lite` (query embeddings, shared space). **Не в registry** — это embeddings, не language model.
+
+### Deepgram
+
+| Параметр | Значение |
+|----------|----------|
+| SDK | REST API |
+| API Key | `DEEPGRAM_API_KEY` |
+| Документация | https://developers.deepgram.com/ |
+
+Используется для: voice input (в чате, realtime API), meeting transcribe (Nova-3 batch, русский, diarize). **Не в registry** — это speech-to-text, не language model.
 
 ---
 
-## Модели
+## Модели (реестр цен)
+
+Физические ID, цены (USD/1M tokens), назначение. SSOT — [lib/ai/model-catalog.ts](../lib/ai/model-catalog.ts).
 
 ### Anthropic Claude
 
-| Модель | ID в проекте | Реальный ID | Input | Output | Контекст | Max Output |
-|--------|--------------|-------------|-------|--------|----------|------------|
-| **Claude Sonnet 4.6** | `claude-sonnet` | `claude-sonnet-4-6` | $3.00/1M | $15.00/1M | 200K (1M бета) | 64K |
-| **Claude Haiku 4.5** | `claude-haiku` | `claude-haiku-4-5-20251001` | $1.00/1M | $5.00/1M | 200K | 64K |
-| **Claude Opus 4.6** | `claude-opus` | `claude-opus-4-6` | $5.00/1M | $25.00/1M | 200K (1M бета) | 128K |
+| Модель | Catalog ID | Физический ID | Input | Output | Cache read | Cache write | Контекст | Max Output |
+|--------|------------|---------------|-------|--------|------------|-------------|----------|------------|
+| Claude Sonnet 4.6 | `claude-sonnet-4-6` | `claude-sonnet-4-6` | $3.00/1M | $15.00/1M | $0.30/1M | $3.75/1M | 1M | 64K |
+| Claude Haiku 4.5 | `claude-haiku-4-5-20251001` | `claude-haiku-4-5-20251001` | $1.00/1M | $5.00/1M | $0.10/1M | $1.25/1M | 200K | 64K |
+| Claude Opus 4.6 | `claude-opus-4-6` | `claude-opus-4-6` | $5.00/1M | $25.00/1M | $0.50/1M | $6.25/1M | 1M | 128K |
 
-**Алиасы:**
-- `title-model` → `claude-haiku-4-5-20251001`
+**Алиасы (сохранены для обратной совместимости):**
+- `claude-sonnet` → `claude-sonnet-4-6`
+- `claude-haiku` → `claude-haiku-4-5-20251001`
+- `claude-opus` → `claude-opus-4-6`
 - `artifact-model` → `claude-sonnet-4-6`
-
-### Google Gemini
-
-| Модель | Реальный ID | Использование | Конфиг |
-|--------|-------------|---------------|--------|
-| **Gemini 2.5 Flash** | `gemini-2.5-flash` | Vision OCR (image, PDF) | `lib/ai/vision-ocr.ts` |
-| **Gemini 2.5 Flash TTS** | `gemini-2.5-flash-preview-tts` | Podcast: озвучка (multi-speaker Kore + Iapetus) | `lib/podcast/tts-gemini.ts` |
+- `title-model` → `claude-haiku-4-5-20251001`
 
 ### MiniMax
 
-| Модель | Реальный ID | Использование | Конфиг |
-|--------|-------------|---------------|--------|
-| **MiniMax M2.7** | `MiniMax-M2.7` | Simply Chat (text), Briefing Filter, Briefing Author, Podcast Script | `lib/ai/providers.ts` (`minimaxM27`, `minimaxM27Long`) |
+| Модель | Catalog ID | Физический ID | Input | Output | Контекст | Примечание |
+|--------|------------|---------------|-------|--------|----------|------------|
+| MiniMax M2.7 | `MiniMax-M2.7` | `MiniMax-M2.7` | $0.30/1M | $1.20/1M | 204K | Автоматическое кэширование |
+| MiniMax M2.7 (long) | `MiniMax-M2.7-long` | `MiniMax-M2.7` | $0.30/1M | $1.20/1M | 204K | Алиас на ту же физическую модель, но через registry namespace `minimaxLong` с 180s fetch timeout (для briefing) |
 
-### Perplexity Sonar
+### Non-LLM (справочно — pricing only, в catalog для cost audit)
 
-| Модель | Реальный ID | Использование | Конфиг |
-|--------|-------------|---------------|--------|
-| **Sonar Pro** | `sonar-pro` | Deep Research: быстрый мультишаговый поиск (5-15 сек) | `lib/ai/tools/deep-research.ts` |
-| **Sonar Deep Research** | `sonar-deep-research` | Deep Research: исчерпывающее исследование (30-120 сек) | `lib/ai/tools/deep-research.ts` |
+| Модель | Физический ID | Цена | Использование |
+|--------|---------------|------|---------------|
+| Voyage 4 | `voyage-4` | $0.06/1M tok | MIND: embed фактов (document) |
+| Voyage 4 Lite | `voyage-4-lite` | $0.02/1M tok | MIND: embed запросов (query, shared space) |
+| Sonar Pro | `sonar-pro` | $3/$15 per 1M | Deep Research: быстрый мультишаговый |
+| Sonar Deep Research | `sonar-deep-research` | $5/$25 per 1M | Deep Research: исчерпывающий |
+| Deepgram Nova-3 | `deepgram-nova-3` | $0.0043/min batch | Voice input, meeting transcribe |
+| Gemini 2.5 Flash TTS | `gemini-2.5-flash-preview-tts` | $4/1M chars | Podcast TTS (multi-speaker) |
 
-### Voyage AI Embeddings
+### xAI Grok (зарезервировано в catalog, не активно в task-assignments)
 
-| Модель | Реальный ID | Цена / 1M tok | Размерность | Использование | Конфиг |
-|--------|-------------|---------------|-------------|---------------|--------|
-| **Voyage 4** | `voyage-4` | $0.06 | 1024 | Embedding фактов MIND (input_type: document) | `lib/ai/memory/voyage-client.ts` |
-| **Voyage 4 Lite** | `voyage-4-lite` | $0.02 | 1024 | Embedding запросов (input_type: query, shared space) | `lib/ai/memory/voyage-client.ts` |
+| Модель | Физический ID | Статус |
+|--------|---------------|--------|
+| Grok 4.20 Reasoning | `grok-4.20-reasoning` | В catalog, не назначен task |
+| Grok 4.20 Non-Reasoning | `grok-4.20-non-reasoning` | В catalog, не назначен task |
+| Grok 4-1 Fast Reasoning | `grok-4-1-fast-reasoning` | В catalog, не назначен task |
+| Grok 4-1 Fast Non-Reasoning | `grok-4-1-fast-non-reasoning` | В catalog, не назначен task |
+| Grok 4 | `grok-4` | В catalog, не назначен task |
 
-**Планируемые (RAG-4):**
-- `voyage-context-3` ($0.18/1M) — contextualized chunk embeddings для документов
-- `voyage-multimodal-3.5` ($0.12/1M text) — мультимодальные эмбеддинги (текст + изображения)
-- `rerank-2.5` ($0.05/1M) — instruction-following reranker
+### OpenRouter (зарезервировано в catalog, не активно в task-assignments)
 
----
-
-## Реестр конфигураций (SSOT)
-
-> **Назначение:** Единая таблица ВСЕХ точек использования моделей. При миграции на новую модель (напр. claude-sonnet-4-6) — пройди по таблице и обнови нужные строки.
-
-### Anthropic Claude — Streaming чаты
-
-| Функция | Файл | Модель | temperature | maxSteps | providerOptions | Примечание |
-|---------|------|--------|-------------|----------|-----------------|------------|
-| Чат (chatMode=chat) | `api/chat/route.ts` | `claude-haiku` | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Via `getModelForChatMode()` |
-| Экспертиза (chatMode=expertise) | `api/chat/route.ts` | `claude-sonnet` | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Via `getModelForChatMode()` |
-| Создание (chatMode=create) | `api/chat/route.ts` | `claude-sonnet` | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Via `getModelForChatMode()` |
-| Проект: Исполнитель | `api/chat/route.ts` | `claude-haiku` | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Via `getProjectModel("executor")` |
-| Проект: Эксперт | `api/chat/route.ts` | `claude-sonnet` | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Via `getProjectModel("expert")` |
-| Проект: Профессор | `api/chat/route.ts` | `claude-opus` | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Via `getProjectModel("professor")` |
-| Эксперт по задаче | `api/projects/[id]/tasks/[taskId]/chat/route.ts` | `claude-sonnet` (default) | 1.0 | 5 | `cacheControl: ephemeral` ¹ | Tier из ProjectTask, env: `EXPERT_MODEL` |
-| Professor Pipeline: Анализ | `lib/ai/professor-pipeline.ts` | `claude-opus` | 1.0 | — | — | Phase 1 (streamText), без кэша ² |
-| Professor Pipeline: Исполнение | `lib/ai/professor-pipeline.ts` | `claude-haiku` | 1.0 | — | — | Phase 2 (streamText), без кэша ² |
-| Professor Pipeline: Синтез | `lib/ai/professor-pipeline.ts` | `claude-opus` | 1.0 | — | — | Phase 3 (streamText), без кэша ² |
-
-> ¹ **cacheControl: ephemeral** (v3.60.0) — передаётся через `providerOptions` на system message (per-message, не top-level `streamText()`). 5-минутный TTL, cached read = 0.1× базовой цены.
-> ² Professor Pipeline исключён: одноразовые вызовы с уникальными промптами — cache write без read = 25% перерасход на Opus.
-
-### Anthropic Claude — Service чаты (streamText)
-
-| Функция | Файл | Модель | temperature | providerOptions | Примечание |
-|---------|------|--------|-------------|-----------------|------------|
-| Бен (❓) | `api/service-chat/route.ts` | `claude-haiku` | 1.0 | `cacheControl: ephemeral` ¹ | context: ben |
-| Секретарь (создание проекта) | `api/service-chat/route.ts` | `claude-sonnet` | 1.0 | `cacheControl: ephemeral` ¹ | context: project-creation |
-| Менеджер проекта | `api/service-chat/route.ts` | `claude-haiku` | 0.5 | `cacheControl: ephemeral` ¹ | context: project-manager |
-| **Briefing Онбординг** | `api/service-chat/route.ts` | **`claude-sonnet-4-6`** | 0.5 | `cacheControl: ephemeral` ¹ + `thinking adaptive, effort high` | context: briefing-onboarding |
-
-### Anthropic Claude — Backend (generateText / generateObject)
-
-| Функция | Файл | Модель | temperature | providerOptions | Примечание |
-|---------|------|--------|-------------|-----------------|------------|
-| Auto-naming чатов | `api/chat/route.ts` | `title-model` (haiku) | — | — | generateObject, Zod schema |
-| Generate title | `api/chat/[id]/generate-title/route.ts` | `title-model` (haiku) | — | — | generateObject |
-| Профессор планирования | `api/projects/[id]/plan/route.ts` | `claude-opus` | 0.2 | `thinking adaptive, effort high` | env: `PROFESSOR_MODEL` |
-| Ревьюер задач | `lib/ai/professors/task-reviewer.ts` | `claude-opus` | 0.2 | `thinking adaptive, effort high` | env: `PROFESSOR_MODEL` |
-| Суммаризатор задач | `lib/ai/clerks/task-summarizer.ts` | `claude-haiku` | 0.1 | — | env: `SUMMARIZER_MODEL` |
-| Snapshot Creator | `lib/ai/clerks/snapshot-creator.ts` | `claude-haiku` | 0.1 | — | env: `SNAPSHOT_CLERK_MODEL` |
-| Клерк-анализатор файлов | `api/projects/[id]/analyze-file/route.ts` | `claude-haiku` | 0.1 | — | Hardcoded |
-| Project Summary | `api/projects/[id]/generate-summary/route.ts` | `claude-haiku` | — | — | Hardcoded |
-| **Meeting: Суммаризатор** | `lib/meeting/meeting-pipeline.ts` | **`claude-sonnet-4-6`** | 0.3 | 8192 | generateText, 3 уровня (compact/standard/detailed) |
-| **MIND: Извлечение фактов** | `lib/ai/memory/extract.ts` | **`claude-sonnet-4-6`** | 0.1 | — | generateObject, fire-and-forget в onFinish, chatMode: `memory:extract` |
-
-### MiniMax M2.7 — Backend (Briefing + Podcast Script)
-
-| Функция | Файл | Модель | temperature | maxOutputTokens | Примечание |
-|---------|------|--------|-------------|-----------------|------------|
-| **Briefing: Фильтр** | `lib/briefing/briefing-filter.ts` | `MiniMax-M2.7` (`minimaxM27Long`) | 0.1 | — | streamText + JSON.parse + Zod, retryWithLogging (3 attempts), content truncation 2K chars per item |
-| **Briefing: Автор** | `lib/briefing/briefing-author.ts` | `MiniMax-M2.7` (`minimaxM27Long`) | 0.7 | 8192/16384/32768 (volume) | streamText + JSON.parse + Zod, монолит (Map-Reduce отклонён v3.82), topicId dedup safety net, retryWithLogging |
-| **Briefing: Section Refresh** | `lib/briefing/briefing-section-author.ts` | `MiniMax-M2.7` (`minimaxM27Long`) | 0.7 | 8192 | streamText, mode `refresh` или `initial`, для per-section refresh API |
-| **Simply Chat (text)** | `app/(chat)/api/chat/route.ts` | `MiniMax-M2.7` (`minimaxM27`) | 0.7 | — | streamText, includeUsage, sliding window 20 messages, MIND retrieve |
-| **Podcast: Скрипт** | `lib/podcast/script-generator.ts` | `MiniMax-M2.7` (`minimaxM27`) | 0.7 | 4096 | generateText, JSON+plain text universal parser, internal retry loop |
-| **MIND: extract/consolidate/profile** | `lib/ai/memory/*` | `MiniMax-M2.7` (`minimaxM27`) | 0.1-0.5 | — | streamText + JSON.parse, для batch фактов
-
-### Voyage AI — Embeddings
-
-| Функция | Файл | Модель | Цена / 1M tok | Примечание |
-|---------|------|--------|---------------|------------|
-| MIND: Embed фактов | `lib/ai/memory/extract.ts` | `voyage-4` | $0.06 | chatMode: `memory:embed`, costUsdOverride |
-| MIND: Search запрос | `lib/ai/memory/retrieve.ts` | `voyage-4-lite` | $0.02 | chatMode: `memory:search`, costUsdOverride |
-
-### Google Gemini — Backend
-
-| Функция | Файл | Модель | providerOptions | maxOutputTokens | Примечание |
-|---------|------|--------|-----------------|-----------------|------------|
-| Vision OCR (Image) | `lib/ai/vision-ocr.ts` | `gemini-2.5-flash` | `thinkingBudget: 0` | — | Thinking выключен |
-| Vision OCR (PDF) | `lib/ai/vision-ocr.ts` | `gemini-2.5-flash` | `thinkingBudget: 0` | — | Thinking выключен |
-| **Podcast: TTS** | `lib/podcast/tts-gemini.ts` | `gemini-2.5-flash-preview-tts` | — | — | `@google/genai` SDK, multi-speaker (Host: Kore + Expert: Iapetus). $0.014 за подкаст. Возвращён в v3.82 после неудачной миграции на MiniMax Speech 2.8 HD |
-
-### Env-переменные для override моделей
-
-| Переменная | Default | Где используется |
-|------------|---------|-----------------|
-| `PROFESSOR_MODEL` | `claude-opus` | Планирование, ревью задач |
-| `SUMMARIZER_MODEL` | `claude-haiku` | Суммаризатор задач |
-| `SNAPSHOT_CLERK_MODEL` | `claude-haiku` | Snapshot Creator |
-| `EXPERT_MODEL` | `claude-sonnet` | Эксперт по задаче |
-
----
-
-## Миграция на новую модель (чеклист)
-
-> При переходе на новую модель (напр. `claude-sonnet-4-5` → `claude-sonnet-4-6`):
-
-**1. Обнови `lib/ai/providers.ts`:**
-- Измени реальный ID в `customProvider.languageModels`
-- Обнови прямые экспорты (`claudeSonnet`, etc.)
-
-**2. Пройди Реестр конфигураций выше:**
-- Найди все строки с целевой моделью
-- Проверь, нужно ли добавить `providerOptions` (thinking/effort)
-- Проверь совместимость `temperature` с новой моделью
-
-**3. Если новая модель поддерживает thinking/effort:**
-```typescript
-// Пример: добавление thinking budget для Claude Sonnet 4.6
-const result = await streamText({
-  model: myProvider.languageModel('claude-sonnet-4-6'),
-  providerOptions: {
-    anthropic: {
-      thinking: { type: 'enabled', budgetTokens: 10000 },
-    },
-  },
-});
-```
-
-**4. Обнови эту таблицу** — заполни колонку `providerOptions` для каждой точки использования.
-
-**5. Обнови [ai-chats-map.md](ai-chats-map.md)** — модели в быстром обзоре.
-
----
-
-## Использование в коде
-
-### Через myProvider (рекомендуется)
-
-```typescript
-import { myProvider } from '@/lib/ai/providers';
-
-const model = myProvider.languageModel('claude-sonnet');
-```
-
-| ID | Реальный ID | Назначение |
-|----|-------------|------------|
-| `claude-sonnet` | `claude-sonnet-4-6` | Основной чат, Секретарь, Эксперт, артефакты |
-| `claude-haiku` | `claude-haiku-4-5-20251001` | Бен, Менеджер, Клерки, Исполнитель, заголовки |
-| `claude-opus` | `claude-opus-4-6` | Профессоры (планирование, ревью) |
-| `claude-sonnet-4-6` | `claude-sonnet-4-6` | Briefing: Онбординг, Автор статьи |
-| `title-model` | `claude-haiku-4-5-20251001` | Генерация заголовков чатов |
-| `artifact-model` | `claude-sonnet-4-6` | Генерация suggestions |
-
-### Прямые экспорты (для pipelines и clerks)
-
-```typescript
-import { claudeHaiku, claudeSonnet, claudeOpus, getClaudeModel } from '@/lib/ai/providers';
-
-const model = getClaudeModel('haiku');  // 'haiku' | 'sonnet' | 'opus'
-```
-
-### Pricing и Cost Calculation (v3.58.0)
-
-```typescript
-import { calculateCostRub, calculateTtsCostRub } from '@/lib/ai/providers';
-
-// Стоимость AI-вызова (в рублях, курс 100 ₽/$)
-const cost = calculateCostRub('claude-sonnet-4-6', { inputTokens: 1000, outputTokens: 500 });
-
-// Стоимость TTS (Gemini, по секундам аудио)
-const ttsCost = calculateTtsCostRub(30); // 30 секунд
-```
-
-`MODEL_PRICING_RUB` поддерживает: Claude (Haiku, Sonnet, Opus), Gemini (2.0 Flash, 2.5 Flash), Perplexity (Sonar Pro, Sonar Deep Research), Voyage AI (voyage-4, voyage-4-lite).
-
-Non-token провайдеры (v3.66.0):
-```typescript
-import { calculateDeepgramCostUsd, calculateGeminiTtsCostUsd } from '@/lib/ai/providers';
-
-// Deepgram Nova-3: $0.0043/min batch
-const dgCost = calculateDeepgramCostUsd(audioSeconds);
-
-// Gemini TTS: $4/1M chars
-const ttsCost = calculateGeminiTtsCostUsd(script.length);
-```
-Передаются через `costUsdOverride` в `logUsage()` — обходят `calcCostUsd()` для non-token pricing.
-
-Используется в Pipeline Observability (`lib/ai/pipeline-trace.ts`) для расчёта стоимости каждого этапа pipeline.
-
----
-
-## Лимиты и квоты
-
-### Anthropic
-
-| Лимит | Значение |
-|-------|----------|
-| RPM (requests/min) | Зависит от тарифа |
-| TPM (tokens/min) | Зависит от тарифа |
-| Concurrent requests | По тарифу аккаунта |
-
-### Google AI
-
-| Лимит | Free tier | Pay-as-you-go |
-|-------|-----------|---------------|
-| RPM (requests/min) | 15 | 1000+ |
-| TPM (tokens/min) | 1M | 4M+ |
-| RPD (requests/day) | 1500 | Unlimited |
+| Модель | Физический ID | Статус |
+|--------|---------------|--------|
+| GLM 5.1 | `z-ai/glm-4.6` | В catalog, не назначен task |
+| Qwen 3.6 Plus | `qwen/qwen3-max` (placeholder) | В catalog, не назначен task |
 
 ---
 
@@ -335,34 +248,111 @@ const ttsCost = calculateGeminiTtsCostUsd(script.length);
 # Anthropic (обязательно — основной провайдер)
 ANTHROPIC_API_KEY=your_anthropic_api_key
 
-# Google AI (для vision-ocr + briefing фильтр + podcast)
+# MiniMax (обязательно — Simply Chat, Briefing, Podcast Script)
+MINIMAX_API_KEY=your_minimax_api_key
+
+# Google AI (обязательно — Podcast TTS)
 GOOGLE_GENERATIVE_AI_API_KEY=your_google_api_key
 
-# Perplexity (для Deep Research)
+# xAI (зарезервировано — Grok через registry)
+XAI_API_KEY=your_xai_api_key
+
+# OpenRouter (зарезервировано — GLM, Qwen через registry)
+OPENROUTER_API_KEY=your_openrouter_api_key
+
+# Perplexity (Deep Research tool)
 PERPLEXITY_API_KEY=your_perplexity_api_key
 
-# Voyage AI (для embeddings + RAG)
+# Voyage AI (MIND / RAG embeddings)
 VOYAGE_API_KEY=your_voyage_api_key
+
+# Deepgram (voice input + meeting transcribe)
+DEEPGRAM_API_KEY=your_deepgram_api_key
 ```
+
+**Env-переменные для override моделей удалены в ТЗ-1 (v3.83.0):** `PROFESSOR_MODEL`, `SUMMARIZER_MODEL`, `SNAPSHOT_CLERK_MODEL`, `EXPERT_MODEL`. Их роль теперь играет `task-assignments.ts`. Для временного переключения модели в dev — правка одной строки в `DEFAULT_TASK_MODELS` + HMR.
 
 ### Где получить ключи
 
 | Провайдер | URL |
 |-----------|-----|
 | Anthropic | https://console.anthropic.com/settings/keys |
+| MiniMax | https://platform.minimax.io/user-center/basic-information/interface-key |
 | Google AI | https://aistudio.google.com/apikey |
+| xAI | https://console.x.ai/ |
+| OpenRouter | https://openrouter.ai/keys |
 | Perplexity | https://www.perplexity.ai/settings/api |
 | Voyage AI | https://dash.voyageai.com/ |
+| Deepgram | https://console.deepgram.com/ |
 
 ---
 
-## Расчёт стоимости
+## Cost Calculation API
 
-| Модель | 1K input + 1K output | 10K input + 2K output |
-|--------|---------------------|----------------------|
-| Claude Haiku 4.5 | $0.006 | $0.020 |
-| Claude Sonnet 4.6 | $0.018 | $0.060 |
-| Claude Opus 4.6 | $0.030 | $0.100 |
+### Token-based (для Anthropic / MiniMax / xAI / OpenRouter)
+
+```ts
+import { calculateCostRub, calculateCostBreakdownRub, extractUsageForPricing } from "@/lib/ai/providers";
+
+const usage = extractUsageForPricing(sdkUsage);
+const cost = calculateCostRub("claude-sonnet-4-6", usage);  // агрегат в рублях
+const breakdown = calculateCostBreakdownRub("claude-sonnet-4-6", usage);
+// { freshInputRub, cacheReadRub, cacheWriteRub, outputRub, reasoningRub, totalRub }
+```
+
+Под капотом читается `pricing` из model-catalog и конвертируется через `RUB_PER_USD` из `lib/constants/pricing`.
+
+### Non-token (для Deepgram / Gemini TTS)
+
+```ts
+import { calculateDeepgramCostUsd, calculateGeminiTtsCostUsd, calculateTtsCostRub } from "@/lib/ai/providers";
+
+// Deepgram Nova-3: $0.0043/min batch
+const dgCost = calculateDeepgramCostUsd(audioSeconds);
+
+// Gemini TTS: $4/1M chars
+const ttsCost = calculateGeminiTtsCostUsd(script.length);
+
+// TTS в рублях через флэт-тариф ($/секунда)
+const ttsRub = calculateTtsCostRub(durationSeconds);
+```
+
+Передаются через `costUsdOverride` в `logUsage()` — обходят `calcCostUsd()` для non-token pricing. Используется в Pipeline Observability (`lib/ai/pipeline-trace.ts`).
+
+### Voyage (hardcoded per-token)
+
+`memory:extract` логирует Voyage embeddings через `costUsdOverride` в `lib/ai/memory/extract.ts`. TODO: вынести в catalog как non-LLM provider.
+
+---
+
+## Context windows
+
+`getContextWindow(modelId)` из [lib/ai/providers.ts](../lib/ai/providers.ts) делегирует в `model-catalog.ts`. Используется для подсчёта percentage в Context popover UI.
+
+---
+
+## Лимиты и квоты
+
+### Anthropic
+
+| Лимит | Значение |
+|-------|----------|
+| RPM / TPM | Зависит от тарифа аккаунта |
+| Concurrent requests | По тарифу |
+
+### MiniMax
+
+| Лимит | Значение |
+|-------|----------|
+| Timeout на запрос | 180s (через registry namespace `minimaxLong`) для briefing pipelines |
+| Context window | 204 800 tokens |
+
+### Google AI (TTS)
+
+| Лимит | Free tier | Pay-as-you-go |
+|-------|-----------|---------------|
+| RPM | 15 | 1000+ |
+| RPD | 1500 | Unlimited |
 
 ---
 
@@ -370,7 +360,8 @@ VOYAGE_API_KEY=your_voyage_api_key
 
 | Дата | Версия | Изменения |
 |------|--------|-----------|
-| 2026-04-06 | 3.3.0 | ТЗ-PIPELINE1: Removed AUTHOR_MODEL_FALLBACK (claude-sonnet-4-5-20250929), added retryWithLogging for briefing-author/section-author, artifact handlers now log usage |
+| 2026-04-11 | 3.83.0 | **ТЗ-1 Core Registry:** `getModel(taskId)` как SSOT для 39 AI-точек. Удалены `myProvider`, `claudeHaiku/Sonnet/Opus`, `minimaxM27/Long`, env-overrides (PROFESSOR_MODEL/SUMMARIZER_MODEL/SNAPSHOT_CLERK_MODEL/EXPERT_MODEL). providers.ts стал чистым pricing/cost utility (−141 строка). Добавлены registry namespaces xAI + OpenRouter (зарезервированы). `ai_usage_log.provider` column + backfill. Capability-driven `taskSupportsThinking()`. ADR 047. |
+| 2026-04-06 | 3.3.0 | ТЗ-PIPELINE1: Removed AUTHOR_MODEL_FALLBACK, added retryWithLogging for briefing-author/section-author, artifact handlers now log usage |
 | 2026-03-01 | 3.2.0 | ТЗ-CACHE1: Prompt Caching (cacheControl: ephemeral) для всех streaming routes (per-message providerOptions на system message) |
 | 2026-02-22 | 3.1.1 | Добавлены Perplexity (sonar-pro, sonar-deep-research), Podcast модели (gemini-2.5-flash скрипт, gemini-2.5-flash-preview-tts TTS), `@google/genai` SDK для TTS |
 | 2026-02-21 | 3.1.0 | Briefing Author → Claude Sonnet 4.6 (из Gemini 3 Pro), effort для 3 точек (онбординг, профессор, ревьюер), Gemini остался только для фильтра + OCR |
@@ -383,4 +374,4 @@ VOYAGE_API_KEY=your_voyage_api_key
 
 ---
 
-**Обновлено:** 2026-04-06
+**Обновлено:** 2026-04-11

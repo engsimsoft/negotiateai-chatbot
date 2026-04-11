@@ -2,12 +2,14 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-04-06
+**Обновлено:** 2026-04-11
 
 ---
 
 ## Быстрый обзор
 
+> **v3.83.0 (ТЗ-1 Core Registry):** Все 39 AI-точек резолвят модель через единый `getModel(taskId)`. SSOT — [task-assignments.ts](../lib/ai/task-assignments.ts) (taskId → catalogId), [model-catalog.ts](../lib/ai/model-catalog.ts) (pricing + capabilities), [getModel.ts](../lib/ai/getModel.ts) (resolver). Смена модели для любой задачи = одна строка. Удалены `myProvider`, прямые экспорты `claudeHaiku/Sonnet/Opus`, `minimaxM27`, env-overrides (PROFESSOR_MODEL и т.д.). Добавлен `ai_usage_log.provider` column. См. [ADR 047](decisions/047-core-model-registry.md) и [ai-providers.md](ai-providers.md#core-registry-v3830-тз-1).
+>
 > **v3.43.0:** Podcast Engine — генерация подкастов из брифингов (Gemini 2.5 Flash скрипт + Gemini 2.5 Flash TTS озвучка, multi-speaker, MP3 → Vercel Blob).
 >
 > **v3.30.0:** Briefing Onboarding — AI-собеседование для настройки брифинга (Claude Sonnet 4.6, split layout, deepResearch, edit mode).
@@ -20,6 +22,8 @@
 > **v3.24.0:** Дашборд V2 — три режима чатов (chat/expertise/create), удалены помощники, ListDetailPage.
 >
 > **v3.23.0:** Все AI-модели переключены с Google Gemini на Anthropic Claude через `@ai-sdk/anthropic`.
+
+> **⚠️ Важно для разработчиков:** Этот документ описывает **чаты и UI**. Модели в таблицах ниже — **актуальный снимок на дату документа**, реальный источник правды — `task-assignments.ts`. Если эта таблица расходится с task-assignments.ts — правда в коде.
 
 | Чат | Модель | Статус | Назначение |
 |-----|--------|--------|-----------|
@@ -151,7 +155,7 @@ app/(chat)/api/service-chat/route.ts                # Manager с план-кон
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | `process.env.EXPERT_MODEL \|\| 'claude-sonnet'` |
+| **Модель** | `getModel("project:expert:${tier}")` (tier из ProjectTask, см. `task-assignments.ts`) |
 | **Оболочка** | Отдельная route group `app/(task)/` — полноэкранный layout без AppSidebar |
 | **Промпт** | `lib/prompts/experts/task-expert.md` + `buildTaskExpertPrompt()` |
 | **Инструменты** | Shared tools (search, deepResearch, fetchUrl, documents, excel, readProjectFile, createSnapshot) — `getStandardTools()` |
@@ -348,7 +352,7 @@ lib/briefing/save-briefing-profile.ts                       # Логика со�
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | MiniMax M2.7 (`MiniMax-M2.7` через `minimaxM27Long`) |
+| **Модель** | MiniMax M2.7 (task `briefing:filter` → registry `minimaxLong` namespace с 180s timeout) |
 | **Тип** | Backend (внутренний вызов в generate/route.ts) |
 | **Вход** | ~200 RawContent[] из 3 фетчеров (RSS, Telegram, Web), content truncation 2K chars |
 | **Выход** | ~30 FilteredItem[] (дедуплицированные, с оценкой релевантности) |
@@ -358,7 +362,7 @@ lib/briefing/save-briefing-profile.ts                       # Логика со�
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | MiniMax M2.7 (`MiniMax-M2.7` через `minimaxM27Long`) |
+| **Модель** | MiniMax M2.7 (task `briefing:author` → registry `minimaxLong` namespace с 180s timeout) |
 | **Тип** | Backend (монолитный вызов — все секции за один streamText) |
 | **Вход** | ~30 FilteredItem[] + userTopics + settings + previousBriefing (для дедупа) |
 | **Выход** | BriefingArticle (intro + sections[] + outro + meta), Zod validation + topicId dedup safety net |
@@ -394,7 +398,7 @@ lib/briefing/source-fetchers/web-fetcher.ts  # Web через Readability + jsdo
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | MiniMax M2.7 (`MiniMax-M2.7` через `minimaxM27`) |
+| **Модель** | MiniMax M2.7 (task `briefing:podcast-script` → registry `minimax` namespace) |
 | **SDK** | `vercel-minimax-ai-provider` (`generateText`) |
 | **Вход** | BriefingArticleSection + ScriptContext |
 | **Выход** | ScriptLine[] (universal parser: JSON или plain text `Host: / Expert:`) |
@@ -523,8 +527,9 @@ lib/prompts/builder/index.ts          # buildChatPrompt, buildExpertisePrompt, b
 
 **Файлы:**
 ```
-lib/ai/model-tiers.ts                 # Конфигурация уровней
-lib/ai/providers.ts                   # claudeHaiku, claudeSonnet, claudeOpus
+lib/ai/task-assignments.ts            # professor:pipeline-{analyze,execute,synthesize} — tier-to-taskId
+lib/ai/model-tiers.ts                 # Тонкая обёртка (tier → taskId → getModel)
+lib/ai/getModel.ts                    # Единая точка резолва моделей
 lib/ai/professor-pipeline.ts          # Multi-step pipeline
 ```
 
@@ -566,27 +571,45 @@ lib/prompts/agents/ben/AGENT.md                    # Промпт с frontmatter
 
 ## Конфигурация провайдеров
 
-### Anthropic Claude (основной — v3.23.0+)
+### Core Registry (v3.83.0+)
+
+С версии 3.83.0 модели резолвятся через единую функцию `getModel(taskId)`. Старая конфигурация (`myProvider`, `createAnthropic` напрямую) удалена из `providers.ts`.
 
 ```typescript
-// lib/ai/providers.ts
-import { createAnthropic } from "@ai-sdk/anthropic";
+// lib/ai/registry.ts
+import { createProviderRegistry } from "ai";
+import { anthropic } from "@ai-sdk/anthropic";
+import { minimax } from "vercel-minimax-ai-provider";
+import { xai } from "@ai-sdk/xai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
-const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-export const myProvider = customProvider({
-  languageModels: {
-    "claude-sonnet": anthropic("claude-sonnet-4-6"),
-    "claude-haiku": anthropic("claude-haiku-4-5-20251001"),
-    "claude-opus": anthropic("claude-opus-4-6"),
-    "claude-sonnet-4-6": anthropic("claude-sonnet-4-6"),
-    "title-model": anthropic("claude-haiku-4-5-20251001"),
-    "artifact-model": anthropic("claude-sonnet-4-6"),
-  },
+export const registry = createProviderRegistry({
+  anthropic,
+  minimax,         // default timeout
+  minimaxLong,     // 180s timeout для briefing pipelines
+  xai,
+  openrouter,
 });
 ```
 
-> **Полный реестр конфигураций** (какая модель, где, с какими настройками) — см. [ai-providers.md](ai-providers.md#реестр-конфигураций-ssot)
+```typescript
+// lib/ai/getModel.ts
+export function getModel(taskId: TaskId, context?: GetModelContext): LanguageModel {
+  // 1. test mocks → 2. overrides (stub, ТЗ-2) → 3. task-assignments → 4. catalog → 5. registry
+}
+```
+
+```typescript
+// call-site
+import { getModel, getModelIdForTask, getProviderForTask } from "@/lib/ai/getModel";
+
+const result = await streamText({
+  model: getModel("chat:sonnet"),  // ← SSOT в task-assignments.ts
+  // ...
+});
+```
+
+> **Детали и обоснование** — см. [ai-providers.md](ai-providers.md#core-registry-v3830-тз-1) и [ADR 047](decisions/047-core-model-registry.md).
 
 **API Key:** `ANTHROPIC_API_KEY`
 

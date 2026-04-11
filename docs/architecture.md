@@ -24,15 +24,19 @@
 │                            │                                │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  Business Logic (lib/)                               │  │
-│  │  ├── ai/providers.ts   - AI Provider config + pricing  │  │
+│  │  ├── ai/getModel.ts       - SSOT getModel(taskId) (v3.83, ТЗ-1)  │
+│  │  ├── ai/task-assignments.ts - taskId → catalog id (v3.83) │
+│  │  ├── ai/model-catalog.ts  - Pricing/capabilities SSOT (v3.83) │
+│  │  ├── ai/registry.ts       - createProviderRegistry (v3.83) │
+│  │  ├── ai/providers.ts      - Pure cost/pricing utilities │
 │  │  ├── ai/pipeline-trace.ts - Pipeline trace (v3.58)    │  │
 │  │  ├── ai/retry-with-logging.ts - Retry wrapper with per-attempt logging (v3.69) │
-│  │  ├── ai/tools/         - AI-инструменты              │  │
-│  │  ├── briefing/         - Briefing pipeline + types + research engine (v3.27, v3.52) │
-│  │  ├── podcast/          - Podcast Engine (v3.43)           │
-│  │  ├── prompts/          - Skills + Agents system      │  │
-│  │  ├── db/queries.ts     - Database queries            │  │
-│  │  └── db/schema.ts      - Database schema             │  │
+│  │  ├── ai/tools/            - AI-инструменты              │  │
+│  │  ├── briefing/            - Briefing pipeline + types + research engine (v3.27, v3.52) │
+│  │  ├── podcast/             - Podcast Engine (v3.43)           │
+│  │  ├── prompts/             - Skills + Agents system      │  │
+│  │  ├── db/queries.ts        - Database queries (Neon HTTP driver, v3.83) │
+│  │  └── db/schema.ts         - Database schema             │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                      │
@@ -92,10 +96,22 @@
 
 **Папка:** `lib/ai/`
 
-#### providers.ts
-- Конфигурация AI-моделей
-- Anthropic Claude: Haiku, Sonnet, Opus (через @ai-sdk/anthropic)
-- Google Gemini: vision-ocr + Briefing pipeline + Podcast Engine (Flash, TTS)
+#### Core Registry (v3.83.0+, ТЗ-1)
+
+Все 39 AI-точек приложения получают модель через единую функцию `getModel(taskId)`.
+
+- **`getModel.ts`** — публичный API (`getModel`, `getModelIdForTask`, `getProviderForTask`, `taskSupportsThinking`). Порядок резолва: test mocks → overrides (stub, ТЗ-2) → task-assignments → catalog → registry.
+- **`task-assignments.ts`** — SSOT маппинга `TaskId → catalogId`. 39 taskId. Изменение default-модели для задачи = одна строка.
+- **`model-catalog.ts`** — SSOT физических моделей: pricing (USD/1M), capabilities (vision/tools/thinking), contextWindow, алиасы.
+- **`registry.ts`** — `createProviderRegistry` (AI SDK v6) с 5 namespace: `anthropic`, `minimax`, `minimaxLong` (180s timeout), `xai`, `openrouter`.
+- **`providers.ts`** — остался как **чистый pricing/cost utility module**: `calculateCostRub`, `calculateCostBreakdownRub`, `extractUsageForPricing`, `getContextWindow`, non-LLM cost helpers (Deepgram, Gemini TTS). Больше не содержит model resolution logic.
+
+**Детали и обоснование:** [ADR 047](decisions/047-core-model-registry.md), [ai-providers.md](ai-providers.md#core-registry-v3830-тз-1).
+
+#### AI SDK version
+- `ai@6.x` + `@ai-sdk/anthropic@3.x` + `@ai-sdk/google@3.x` + `@ai-sdk/xai@3.x` + `@ai-sdk/react@3.x`
+- `vercel-minimax-ai-provider` (OpenAI-compatible для MiniMax)
+- `@openrouter/ai-sdk-provider` (GLM, Qwen — зарезервировано)
 
 #### Prompt System (v3.3 — Skills + Agents)
 - `lib/prompts/` — Файловая система промптов
