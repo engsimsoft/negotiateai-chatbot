@@ -8,9 +8,8 @@
 import "server-only";
 
 import { and, eq, inArray, isNull, sql, desc } from "drizzle-orm";
-import { Pool, neonConfig } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
-import ws from "ws";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 
 import { memoryEntry, message } from "@/lib/db/schema";
 import type {
@@ -22,13 +21,12 @@ import type {
 import { embedText } from "./voyage-client";
 
 // ---------------------------------------------------------------------------
-// DB connection (same pattern as lib/db/queries.ts)
+// DB connection (same pattern as lib/db/queries.ts — Neon HTTP driver).
 // ---------------------------------------------------------------------------
 
-neonConfig.webSocketConstructor = ws;
 // biome-ignore lint: Forbidden non-null assertion.
-const pool = new Pool({ connectionString: process.env.POSTGRES_URL! });
-const db = drizzle(pool);
+const sql_client = neon(process.env.POSTGRES_URL!);
+const db = drizzle(sql_client);
 
 // ---------------------------------------------------------------------------
 // Insert / Upsert

@@ -16,9 +16,8 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import { Pool, neonConfig } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
-import ws from "ws";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 import type { ArtifactKind } from "@/components/artifact";
 import type { VisibilityType } from "@/components/visibility-selector";
 import type { BriefingArticle } from "../briefing/briefing-types";
@@ -84,12 +83,13 @@ import { generateHashedPassword } from "./utils";
 // use the Drizzle adapter for Auth.js / NextAuth
 // https://authjs.dev/reference/adapter/drizzle
 
-// Neon serverless driver: WebSocket-based, no TCP ECONNRESET
-// Handles reconnection natively, serverless-compatible
-neonConfig.webSocketConstructor = ws;
+// Neon HTTP driver: stateless, one HTTP request per query. No pool to go stale
+// when Neon auto-suspends (the WebSocket Pool variant did, causing 60s hangs on
+// the first request after idle). Canonical choice for Vercel serverless per
+// Neon docs.
 // biome-ignore lint: Forbidden non-null assertion.
-const pool = new Pool({ connectionString: process.env.POSTGRES_URL! });
-const db = drizzle(pool);
+const sql_client = neon(process.env.POSTGRES_URL!);
+const db = drizzle(sql_client);
 
 export async function getUser(email: string): Promise<User[]> {
   try {
@@ -3206,10 +3206,11 @@ export async function getBriefingHistory({
       .where(and(...conditions))
       .orderBy(desc(briefingHistory.generatedAt))
       .limit(limit);
-  } catch (_error) {
+  } catch (error) {
+    console.error("[getBriefingHistory] DB query failed:", error);
     throw new ChatSDKError(
       "bad_request:database",
-      "Failed to get briefing history"
+      error instanceof Error ? error.message : "Failed to get briefing history"
     );
   }
 }
