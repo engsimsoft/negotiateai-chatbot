@@ -3,13 +3,16 @@ import { updateDocumentPrompt } from "@/lib/ai/prompts";
 import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { logUsage } from "@/lib/ai/usage-utils";
+import { emitArtifactDebugStep } from "@/lib/ai/debug-events";
 
 const ARTIFACT_TASK = "artifact:text" as const;
+const ARTIFACT_KIND = "text" as const;
 
 export const textDocumentHandler = createDocumentHandler<"text">({
   kind: "text",
   onCreateDocument: async ({ title, dataStream, session }) => {
     let draftContent = "";
+    const startTime = Date.now();
 
     const result = streamText({
       model: getModel(ARTIFACT_TASK),
@@ -58,15 +61,20 @@ Example format:
     }
 
     // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+    const modelId = getModelIdForTask(ARTIFACT_TASK);
+    const usage = await result.totalUsage;
+    const durationMs = Date.now() - startTime;
     if (session?.user?.id) {
-      const usage = await result.totalUsage;
-      logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:text" });
+      logUsage({ userId: session.user.id, usage, modelId, chatMode: "artifact:text" });
     }
+    // Surface the artifact sub-call in DevPanel (hidden before — side-stream).
+    emitArtifactDebugStep(dataStream, { taskId: ARTIFACT_TASK, modelId, usage, operation: "create", artifactKind: ARTIFACT_KIND, durationMs });
 
     return draftContent;
   },
   onUpdateDocument: async ({ document, description, dataStream, session }) => {
     let draftContent = "";
+    const startTime = Date.now();
 
     const result = streamText({
       model: getModel(ARTIFACT_TASK),
@@ -100,10 +108,13 @@ Example format:
     }
 
     // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+    const modelId = getModelIdForTask(ARTIFACT_TASK);
+    const usage = await result.totalUsage;
+    const durationMs = Date.now() - startTime;
     if (session?.user?.id) {
-      const usage = await result.totalUsage;
-      logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:text" });
+      logUsage({ userId: session.user.id, usage, modelId, chatMode: "artifact:text" });
     }
+    emitArtifactDebugStep(dataStream, { taskId: ARTIFACT_TASK, modelId, usage, operation: "update", artifactKind: ARTIFACT_KIND, durationMs });
 
     return draftContent;
   },

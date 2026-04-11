@@ -5,8 +5,10 @@
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { streamText } from "ai";
 import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
+import { emitArtifactDebugStep } from "@/lib/ai/debug-events";
 
 const ARTIFACT_TASK = "artifact:excel" as const;
+const ARTIFACT_KIND = "excel" as const;
 import { logUsage } from "@/lib/ai/usage-utils";
 import { put } from "@vercel/blob";
 import ExcelJS from "exceljs";
@@ -173,6 +175,7 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
       };
     } else {
       // Generate with AI
+      const startTime = Date.now();
       const result = streamText({
         model: getModel(ARTIFACT_TASK),
         system: EXCEL_SYSTEM_PROMPT,
@@ -189,10 +192,13 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
       const jsonContent = chunks.join("");
 
       // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+      const modelId = getModelIdForTask(ARTIFACT_TASK);
+      const usage = await result.totalUsage;
+      const durationMs = Date.now() - startTime;
       if (session?.user?.id) {
-        const usage = await result.totalUsage;
-        logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:excel" });
+        logUsage({ userId: session.user.id, usage, modelId, chatMode: "artifact:excel" });
       }
+      emitArtifactDebugStep(dataStream, { taskId: ARTIFACT_TASK, modelId, usage, operation: "create", artifactKind: ARTIFACT_KIND, durationMs });
 
       // Parse JSON response
       try {
@@ -264,6 +270,7 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
     }
 
     // Generate update with AI
+    const startTime = Date.now();
     const result = streamText({
       model: getModel(ARTIFACT_TASK),
       system: `${EXCEL_SYSTEM_PROMPT}
@@ -285,10 +292,13 @@ ${JSON.stringify(excelData, null, 2)}
     const jsonContent = chunks.join("");
 
     // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+    const modelId = getModelIdForTask(ARTIFACT_TASK);
+    const usage = await result.totalUsage;
+    const durationMs = Date.now() - startTime;
     if (session?.user?.id) {
-      const usage = await result.totalUsage;
-      logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:excel" });
+      logUsage({ userId: session.user.id, usage, modelId, chatMode: "artifact:excel" });
     }
+    emitArtifactDebugStep(dataStream, { taskId: ARTIFACT_TASK, modelId, usage, operation: "update", artifactKind: ARTIFACT_KIND, durationMs });
 
     // Parse updated JSON
     try {

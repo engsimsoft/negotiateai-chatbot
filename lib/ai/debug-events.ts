@@ -183,6 +183,68 @@ export function emitDebugStep(
   });
 }
 
+/**
+ * Emit a debug step for an artifact generation sub-call (text, markdown, excel,
+ * pptx, reveal). Artifacts run in a side-stream: the tool-call appears in the
+ * primary chain as e.g. `createDocument`, and the model that actually generates
+ * the content (Sonnet via `getModel("artifact:*")`) never shows up in the
+ * DevPanel timeline unless we emit it explicitly.
+ *
+ * Keeps the footer honest: tokens/cost sums include the artifact sub-call, and
+ * the Timeline/CostBreakdown sections render it as a distinct step with its
+ * real modelId. `toolCalls` is intentionally empty — the artifact LLM is the
+ * *result* of a tool call, not a new tool call.
+ */
+export function emitArtifactDebugStep(
+  dataStream: DataStreamWriter,
+  params: {
+    taskId: string;         // "artifact:text" | "artifact:markdown" | ...
+    modelId: string;
+    usage: import("ai").LanguageModelUsage | undefined;
+    operation: "create" | "update";
+    artifactKind: string;   // "text" | "markdown" | "excel" | "pptx" | "reveal"
+    durationMs: number;
+    finishReason?: string;
+  },
+): void {
+  if (!isSimplyDevMode) return;
+
+  // Lazy import to avoid circular dependency: debug-events is imported from
+  // many places, and providers.ts → getStepCostRub → debug-events.ts.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { extractUsageForPricing, calculateCostRub } =
+    require("./providers") as typeof import("./providers");
+
+  const u = extractUsageForPricing(params.usage);
+  const stepCostRub = calculateCostRub(params.modelId, u);
+
+  const data: DebugStepData = {
+    schemaVersion: DEBUG_EVENT_SCHEMA_VERSION,
+    // Monotonic timestamp — guarantees uniqueness and preserves arrival order
+    // in the DevPanel timeline (provider pushes in order, no sort by stepIndex).
+    stepIndex: Date.now(),
+    stepType: `artifact:${params.operation}`,
+    modelId: params.modelId,
+    noCacheInputTokens: u.noCacheInputTokens,
+    cacheReadTokens: u.cacheReadTokens,
+    cacheWriteTokens: u.cacheWriteTokens,
+    outputTokens: u.outputTokens,
+    reasoningTokens: u.reasoningTokens ?? 0,
+    finishReason: params.finishReason ?? "stop",
+    stepCostRub,
+    toolCalls: [],
+    toolResults: [
+      {
+        toolName: `${params.operation}Document`,
+        result: { kind: params.artifactKind, taskId: params.taskId },
+      },
+    ],
+    timestamp: Date.now(),
+  };
+
+  dataStream.write({ type: "data-debug-step", data });
+}
+
 export function emitDebugGuardian(
   dataStream: DataStreamWriter,
   data: DebugGuardianData,

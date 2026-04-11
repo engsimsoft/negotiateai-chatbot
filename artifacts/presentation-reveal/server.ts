@@ -1,8 +1,10 @@
 import { smoothStream, streamText } from "ai";
 import { updateDocumentPrompt } from "@/lib/ai/prompts";
 import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
+import { emitArtifactDebugStep } from "@/lib/ai/debug-events";
 
 const ARTIFACT_TASK = "artifact:reveal" as const;
+const ARTIFACT_KIND = "reveal" as const;
 import { logUsage } from "@/lib/ai/usage-utils";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import {
@@ -110,6 +112,7 @@ export const presentationRevealDocumentHandler =
       const themeId = extractThemeFromTitle(title);
       const theme = getThemeById(themeId);
 
+      const startTime = Date.now();
       const result = streamText({
         model: getModel(ARTIFACT_TASK),
         system: PRESENTATION_SYSTEM_PROMPT,
@@ -134,10 +137,13 @@ export const presentationRevealDocumentHandler =
       }
 
       // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+      const modelId = getModelIdForTask(ARTIFACT_TASK);
+      const usage = await result.totalUsage;
+      const durationMs = Date.now() - startTime;
       if (session?.user?.id) {
-        const usage = await result.totalUsage;
-        logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:reveal" });
+        logUsage({ userId: session.user.id, usage, modelId, chatMode: "artifact:reveal" });
       }
+      emitArtifactDebugStep(dataStream, { taskId: ARTIFACT_TASK, modelId, usage, operation: "create", artifactKind: ARTIFACT_KIND, durationMs });
 
       // Parse slides and generate final HTML
       const slides = parseSlides(fullContent);
@@ -180,6 +186,7 @@ export const presentationRevealDocumentHandler =
 
       const theme = getThemeById(existingData.themeId);
 
+      const startTime = Date.now();
       const result = streamText({
         model: getModel(ARTIFACT_TASK),
         system: `${PRESENTATION_SYSTEM_PROMPT}
@@ -210,10 +217,13 @@ Generate the COMPLETE updated slides array (not just changes).`,
       }
 
       // ТЗ-PIPELINE1: Log artifact usage (was completely missing)
+      const modelId = getModelIdForTask(ARTIFACT_TASK);
+      const usage = await result.totalUsage;
+      const durationMs = Date.now() - startTime;
       if (session?.user?.id) {
-        const usage = await result.totalUsage;
-        logUsage({ userId: session.user.id, usage, modelId: getModelIdForTask(ARTIFACT_TASK), chatMode: "artifact:reveal" });
+        logUsage({ userId: session.user.id, usage, modelId, chatMode: "artifact:reveal" });
       }
+      emitArtifactDebugStep(dataStream, { taskId: ARTIFACT_TASK, modelId, usage, operation: "update", artifactKind: ARTIFACT_KIND, durationMs });
 
       const slides = parseSlides(fullContent);
       const html = generateRevealHTML(slides, theme);
