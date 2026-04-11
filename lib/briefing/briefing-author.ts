@@ -9,8 +9,12 @@ import type { ModelCatalog } from "tokenlens/core";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { retryWithLogging } from "@/lib/ai/retry-with-logging";
 import type { LanguageModelUsage } from "ai";
-import { minimaxM27Long } from "@/lib/ai/providers";
-import { AUTHOR_MODEL } from "./briefing-config";
+import {
+  getModel,
+  getModelIdForTask,
+} from "@/lib/ai/getModel";
+
+const BRIEFING_AUTHOR_TASK = "briefing:author" as const;
 import type { FilteredItem } from "./briefing-filter";
 import type { RawContent } from "./source-fetchers/types";
 import type { BriefingArticle, BriefingArticleSection } from "./briefing-types";
@@ -192,13 +196,14 @@ export async function generateArticle(
   const maxTokens = MAX_TOKENS_BY_VOLUME[volume ?? "standard"] ?? MAX_TOKENS_BY_VOLUME.standard;
   const startTime = Date.now();
   const warnings: string[] = [];
+  const resolvedModelId = getModelIdForTask(BRIEFING_AUTHOR_TASK);
 
-  // ТЗ-Briefing-1: generateText + JSON.parse + Zod (MiniMax M2.7)
+  // ТЗ-Briefing-1: generateText + JSON.parse + Zod (briefing:author task)
   // JSON.parse and Zod.parse inside callback — errors trigger automatic retry via retryWithLogging
   const { result: article, usage, attempts, totalDurationMs } = await retryWithLogging(
     async () => {
       const res = streamText({
-        model: minimaxM27Long,
+        model: getModel(BRIEFING_AUTHOR_TASK),
         system: SYSTEM_PROMPT + JSON_INSTRUCTION,
         prompt: userMessage,
         maxOutputTokens: maxTokens,
@@ -208,7 +213,7 @@ export async function generateArticle(
       // Consume stream to get full text (keeps connection alive for thinking models)
       const text = await res.text;
       const usage = await res.usage;
-      console.log(`[Briefing Author] model=${AUTHOR_MODEL} maxOutputTokens=${maxTokens} usage:`, JSON.stringify(usage));
+      console.log(`[Briefing Author] model=${resolvedModelId} maxOutputTokens=${maxTokens} usage:`, JSON.stringify(usage));
 
       // Clean markdown wrapper and parse JSON
       const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
@@ -233,7 +238,7 @@ export async function generateArticle(
 
       return { result: parsed, usage };
     },
-    { maxAttempts: 3, userId, modelId: AUTHOR_MODEL, chatMode: "briefing:author" },
+    { maxAttempts: 3, userId, modelId: resolvedModelId, chatMode: "briefing:author" },
   );
 
   const retryCount = attempts.length - 1;
@@ -243,7 +248,7 @@ export async function generateArticle(
 
   const ai = buildAiCallTrace(
     {
-      modelId: AUTHOR_MODEL,
+      modelId: resolvedModelId,
       usage,
       finishReason: "stop",
       promptPreview: userMessage.slice(0, 500),
@@ -532,11 +537,12 @@ async function generateIntroOutro(
 ${sectionSummaries}`;
 
   const startTime = Date.now();
+  const resolvedModelId = getModelIdForTask(BRIEFING_AUTHOR_TASK);
 
   const { result, usage, attempts, totalDurationMs } = await retryWithLogging(
     async () => {
       const res = streamText({
-        model: minimaxM27Long,
+        model: getModel(BRIEFING_AUTHOR_TASK),
         system: INTRO_OUTRO_SYSTEM_PROMPT + INTRO_OUTRO_JSON_INSTRUCTION,
         prompt: userMessage,
         maxOutputTokens: 2048,
@@ -551,12 +557,12 @@ ${sectionSummaries}`;
       const parsed = introOutroSchema.parse(JSON.parse(cleaned));
       return { result: parsed, usage };
     },
-    { maxAttempts: 3, userId, modelId: AUTHOR_MODEL, chatMode: "briefing:intro-outro" },
+    { maxAttempts: 3, userId, modelId: resolvedModelId, chatMode: "briefing:intro-outro" },
   );
 
   const ai = buildAiCallTrace(
     {
-      modelId: AUTHOR_MODEL,
+      modelId: resolvedModelId,
       usage,
       finishReason: "stop",
       promptPreview: userMessage.slice(0, 300),
@@ -737,7 +743,7 @@ export async function generateArticleMapReduce(
     startedAt: new Date(startTime).toISOString(),
     durationMs: totalDurationMs,
     ai: introOutroTrace?.ai ?? {
-      modelId: AUTHOR_MODEL,
+      modelId: getModelIdForTask(BRIEFING_AUTHOR_TASK),
       promptPreview: "(map-reduce)",
       noCacheInputTokens: 0,
       cacheReadTokens: 0,

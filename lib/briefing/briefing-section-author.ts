@@ -9,8 +9,12 @@ import type { LanguageModelUsage } from "ai";
 import type { ModelCatalog } from "tokenlens/core";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { retryWithLogging } from "@/lib/ai/retry-with-logging";
-import { minimaxM27Long } from "@/lib/ai/providers";
-import { AUTHOR_MODEL } from "./briefing-config";
+import {
+  getModel,
+  getModelIdForTask,
+} from "@/lib/ai/getModel";
+
+const BRIEFING_SECTION_TASK = "briefing:section" as const;
 import type { FilteredItem } from "./briefing-filter";
 import type { RawContent } from "./source-fetchers/types";
 import type { BriefingArticleSection } from "./briefing-types";
@@ -170,10 +174,12 @@ export async function generateSection(
 
   // ТЗ-Briefing-1: generateText + JSON.parse + Zod (MiniMax M2.7)
   // JSON.parse and Zod.parse inside callback — errors trigger automatic retry
+  const resolvedModelId = getModelIdForTask(BRIEFING_SECTION_TASK);
+
   const { result: section, usage, attempts, totalDurationMs } = await retryWithLogging(
     async () => {
       const res = streamText({
-        model: minimaxM27Long,
+        model: getModel(BRIEFING_SECTION_TASK),
         system: systemPrompt + SECTION_JSON_INSTRUCTION,
         prompt: userMessage,
         maxOutputTokens: 8192,
@@ -183,7 +189,7 @@ export async function generateSection(
       // Consume stream to get full text (keeps connection alive for thinking models)
       const text = await res.text;
       const usage = await res.usage;
-      console.log(`[Section Author] model=${AUTHOR_MODEL} usage:`, JSON.stringify(usage));
+      console.log(`[Section Author] model=${resolvedModelId} usage:`, JSON.stringify(usage));
 
       // Clean markdown wrapper and parse JSON
       const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
@@ -191,7 +197,7 @@ export async function generateSection(
 
       return { result: parsed, usage };
     },
-    { maxAttempts: 3, userId, modelId: AUTHOR_MODEL, chatMode: "briefing:section-author" },
+    { maxAttempts: 3, userId, modelId: resolvedModelId, chatMode: "briefing:section-author" },
   );
 
   const retryCount = attempts.length - 1;
@@ -201,7 +207,7 @@ export async function generateSection(
 
   const ai = buildAiCallTrace(
     {
-      modelId: AUTHOR_MODEL,
+      modelId: resolvedModelId,
       usage,
       finishReason: "stop",
       promptPreview: userMessage.slice(0, 500),

@@ -16,9 +16,17 @@ import path from "path";
 import { generateObject, generateText } from "ai";
 import { z } from "zod";
 
-import { claudeSonnet, claudeHaiku, minimaxM27 } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import { logUsage } from "@/lib/ai/usage-utils";
 import { calcCostUsd } from "@/lib/ai/tokenlens-catalog";
+
+const MEMORY_EXTRACT_TASK = "memory:extract" as const;
+const MEMORY_EXTRACT_BATCH_TASK = "memory:extract-batch" as const;
+const MEMORY_DEDUP_VERIFY_TASK = "memory:dedup-verify" as const;
 import {
   embedText,
   VOYAGE_INDEX_MODEL,
@@ -123,7 +131,7 @@ export async function extractFactsFromMessages(
   const userPrompt = `<user_message>\n${userMessage}\n</user_message>\n\n<assistant_message>\n${assistantMessage}\n</assistant_message>`;
 
   const { object, usage } = await generateObject({
-    model: claudeSonnet,
+    model: getModel(MEMORY_EXTRACT_TASK),
     maxRetries: 0,
     schema: extractionResultSchema,
     system: EXTRACT_SYSTEM_PROMPT,
@@ -137,7 +145,8 @@ export async function extractFactsFromMessages(
   logUsage({
     userId,
     usage,
-    modelId: claudeSonnet.modelId,
+    modelId: getModelIdForTask(MEMORY_EXTRACT_TASK),
+    provider: getProviderForTask(MEMORY_EXTRACT_TASK),
     chatMode: "memory:extract",
     chatId: input.sourceChatId ?? null,
     durationMs,
@@ -297,9 +306,9 @@ export async function batchExtractFacts(
 
     const startTime = Date.now();
 
-    // Single MiniMax M2.7 call for the whole batch (generateText + JSON.parse + Zod)
+    // Single batch call for the whole conversation (generateText + JSON.parse + Zod)
     const { text, usage } = await generateText({
-      model: minimaxM27,
+      model: getModel(MEMORY_EXTRACT_BATCH_TASK),
       maxRetries: 0,
       system: EXTRACT_BATCH_SYSTEM_PROMPT,
       prompt: conversationBlock,
@@ -315,7 +324,7 @@ export async function batchExtractFacts(
       parsedResult = extractionResultSchema.parse(JSON.parse(cleaned));
     } catch (parseErr) {
       console.error(
-        `[MIND] Batch extract: failed to parse MiniMax response:`,
+        `[MIND] Batch extract: failed to parse response:`,
         parseErr instanceof Error ? parseErr.message : parseErr,
         `\nRaw text: ${text.slice(0, 500)}`,
       );
@@ -328,7 +337,8 @@ export async function batchExtractFacts(
     logUsage({
       userId,
       usage,
-      modelId: "MiniMax-M2.7",
+      modelId: getModelIdForTask(MEMORY_EXTRACT_BATCH_TASK),
+      provider: getProviderForTask(MEMORY_EXTRACT_BATCH_TASK),
       chatMode: "tool:batch-extract",
       chatId,
       durationMs,
@@ -447,7 +457,7 @@ async function verifyDuplicatesWithLLM(
 
   try {
     const { object } = await generateObject({
-      model: claudeHaiku,
+      model: getModel(MEMORY_DEDUP_VERIFY_TASK),
       maxRetries: 0,
       schema: deduplicationSchema,
       system: `Ты проверяешь дубликаты фактов в памяти пользователя.

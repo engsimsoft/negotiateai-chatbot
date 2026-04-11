@@ -7,8 +7,14 @@ import fs from "fs";
 import path from "path";
 import { generateText } from "ai";
 import { del } from "@vercel/blob";
-import { claudeSonnet } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import { logUsage } from "@/lib/ai/usage-utils";
+
+const MEETING_SUMMARY_TASK = "meeting:summary" as const;
 import { saveMeetingRecord } from "@/lib/db/queries";
 import { transcribeAudio } from "./deepgram-transcribe";
 import type {
@@ -84,7 +90,7 @@ export async function summarizeTranscript(
     : transcript;
 
   const { text: rawSummary, usage } = await generateText({
-    model: claudeSonnet,
+    model: getModel(MEETING_SUMMARY_TASK),
     system: systemPrompt,
     prompt: userMessage,
     temperature: 0.3,
@@ -98,7 +104,8 @@ export async function summarizeTranscript(
     logUsage({
       userId,
       usage,
-      modelId: "claude-sonnet-4-6",
+      modelId: getModelIdForTask(MEETING_SUMMARY_TASK),
+      provider: getProviderForTask(MEETING_SUMMARY_TASK),
       chatMode: "meeting:summarize",
     });
   }
@@ -185,7 +192,7 @@ export async function runMeetingPipeline(
       summary,
       userInstructions: input.userInstructions,
       metadata: {
-        modelId: "claude-sonnet-4-6",
+        modelId: getModelIdForTask(MEETING_SUMMARY_TASK),
         inputTokens: usage?.inputTokens,
         outputTokens: usage?.outputTokens,
         deepgramDurationMs: transcription.metadata.durationMs,

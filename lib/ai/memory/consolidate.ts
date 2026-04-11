@@ -15,8 +15,14 @@ import path from "path";
 import { generateText } from "ai";
 import { z } from "zod";
 
-import { minimaxM27 } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import { logUsage } from "@/lib/ai/usage-utils";
+
+const MEMORY_CONSOLIDATE_TASK = "memory:consolidate" as const;
 import {
   getMemoryEntriesByUser,
   insertMemoryEntry,
@@ -137,9 +143,9 @@ async function runConsolidation(
   const factsText = formatFactsForPrompt(facts);
   const userPrompt = `<facts>\n${factsText}\n</facts>`;
 
-  // Call MiniMax M2.7 (generateText + JSON.parse + Zod)
+  // Call resolved memory:consolidate model (generateText + JSON.parse + Zod)
   const { text, usage } = await generateText({
-    model: minimaxM27,
+    model: getModel(MEMORY_CONSOLIDATE_TASK),
     maxRetries: 0,
     system: CONSOLIDATE_SYSTEM_PROMPT,
     prompt: userPrompt,
@@ -155,7 +161,7 @@ async function runConsolidation(
     object = consolidationResultSchema.parse(JSON.parse(cleaned));
   } catch (parseErr) {
     console.error(
-      `[MemoryConsolidate] Failed to parse MiniMax response:`,
+      `[MemoryConsolidate] Failed to parse consolidation response:`,
       parseErr instanceof Error ? parseErr.message : parseErr,
       `\nRaw text: ${text.slice(0, 500)}`,
     );
@@ -167,7 +173,8 @@ async function runConsolidation(
   logUsage({
     userId,
     usage,
-    modelId: "MiniMax-M2.7",
+    modelId: getModelIdForTask(MEMORY_CONSOLIDATE_TASK),
+    provider: getProviderForTask(MEMORY_CONSOLIDATE_TASK),
     chatMode: "memory:consolidate",
     durationMs,
   });

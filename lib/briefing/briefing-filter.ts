@@ -7,9 +7,15 @@ import type { ModelCatalog } from "tokenlens/core";
 import { waitUntil } from "@vercel/functions";
 import { logUsage } from "@/lib/ai/usage-utils";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
-import { minimaxM27Long } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import { retryWithLogging } from "@/lib/ai/retry-with-logging";
-import { FILTER_MODEL, MAX_FILTER_CANDIDATES } from "./briefing-config";
+import { MAX_FILTER_CANDIDATES } from "./briefing-config";
+
+const BRIEFING_FILTER_TASK = "briefing:filter" as const;
 import type { RawContent } from "./source-fetchers/types";
 
 export const filteredItemSchema = z.object({
@@ -106,11 +112,13 @@ Rules:
 
 Output JSON with "candidates" array.` + FILTER_JSON_INSTRUCTION;
 
-  // ТЗ-MapReduce: streamText + JSON.parse + Zod with retry (MiniMax M2.7)
+  const resolvedModelId = getModelIdForTask(BRIEFING_FILTER_TASK);
+
+  // ТЗ-MapReduce: streamText + JSON.parse + Zod with retry (briefing:filter task)
   const { result: { candidates: parsedCandidates, usage: filterUsage }, attempts, totalDurationMs: retryDurationMs } = await retryWithLogging(
     async () => {
       const res = streamText({
-        model: minimaxM27Long,
+        model: getModel(BRIEFING_FILTER_TASK),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: 0.1,
@@ -123,7 +131,7 @@ Output JSON with "candidates" array.` + FILTER_JSON_INSTRUCTION;
       const object = filterResultSchema.parse(JSON.parse(cleaned));
       return { result: { candidates: object.candidates.slice(0, MAX_FILTER_CANDIDATES), usage }, usage };
     },
-    { maxAttempts: 3, userId, modelId: FILTER_MODEL, chatMode: "briefing:filter" },
+    { maxAttempts: 3, userId, modelId: resolvedModelId, chatMode: "briefing:filter" },
   );
 
   const candidates = parsedCandidates;
@@ -152,11 +160,14 @@ Output JSON with "candidates" array.` + FILTER_JSON_INSTRUCTION;
   const durationMs = Date.now() - startTime;
 
   // ТЗ-CACHE2: Usage logging — waitUntil ensures completion on Vercel serverless
+  // Note: retryWithLogging already logs successful attempts internally; this outer call
+  // is a pre-existing duplicate kept for wire compatibility. Not fixed in ТЗ-1 Этап 4.
   if (userId && usage) {
     waitUntil(logUsage({
       userId,
       usage,
-      modelId: FILTER_MODEL,
+      modelId: resolvedModelId,
+      provider: getProviderForTask(BRIEFING_FILTER_TASK),
       chatMode: "briefing:filter",
       durationMs,
     }));
@@ -164,7 +175,7 @@ Output JSON with "candidates" array.` + FILTER_JSON_INSTRUCTION;
 
   const ai = buildAiCallTrace(
     {
-      modelId: FILTER_MODEL,
+      modelId: resolvedModelId,
       usage,
       finishReason: "stop",
       promptPreview: userPrompt.slice(0, 500),

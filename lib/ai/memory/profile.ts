@@ -13,9 +13,15 @@ import fs from "fs";
 import path from "path";
 import { generateText } from "ai";
 
-import { minimaxM27 } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import { logUsage } from "@/lib/ai/usage-utils";
 import { calcCostUsd } from "@/lib/ai/tokenlens-catalog";
+
+const MEMORY_PROFILE_TASK = "memory:profile" as const;
 import { getMemoryEntriesByUser } from "./memory-queries";
 import {
   getProfileSummary,
@@ -104,9 +110,11 @@ export async function generateUserProfile(
   const factsText = formatFactsForProfile(facts);
   const userPrompt = `<facts count="${facts.length}">\n${factsText}\n</facts>`;
 
-  // Generate profile via Opus
+  const resolvedModelId = getModelIdForTask(MEMORY_PROFILE_TASK);
+
+  // Generate profile via resolved memory:profile model
   const { text, usage } = await generateText({
-    model: minimaxM27,
+    model: getModel(MEMORY_PROFILE_TASK),
     maxRetries: 0,
     system: PROFILE_SYSTEM_PROMPT,
     prompt: userPrompt,
@@ -116,7 +124,7 @@ export async function generateUserProfile(
   const durationMs = Date.now() - startTime;
 
   // Calculate cost
-  const costUsd = (await calcCostUsd("MiniMax-M2.7", usage)) ?? 0;
+  const costUsd = (await calcCostUsd(resolvedModelId, usage)) ?? 0;
 
   // Estimate token count of the profile text (~4 chars per token for Russian)
   const tokenCount = Math.ceil(text.length / 4);
@@ -125,7 +133,8 @@ export async function generateUserProfile(
   logUsage({
     userId,
     usage,
-    modelId: "MiniMax-M2.7",
+    modelId: resolvedModelId,
+    provider: getProviderForTask(MEMORY_PROFILE_TASK),
     chatMode: "memory:profile",
     durationMs,
   });
@@ -137,7 +146,7 @@ export async function generateUserProfile(
     factCount: facts.length,
     tokenCount,
     costUsd,
-    modelId: "MiniMax-M2.7",
+    modelId: resolvedModelId,
   });
 
   console.log(

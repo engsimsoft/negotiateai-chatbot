@@ -4,8 +4,14 @@
 import fs from "fs";
 import path from "path";
 import { generateText } from "ai";
-import { minimaxM27 } from "@/lib/ai/providers";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
+
+const PODCAST_SCRIPT_TASK = "briefing:podcast-script" as const;
 import type { ModelCatalog } from "tokenlens/core";
 import { waitUntil } from "@vercel/functions";
 import { logUsage } from "@/lib/ai/usage-utils";
@@ -22,7 +28,8 @@ const PROMPT_PATH = path.join(
 );
 const SYSTEM_PROMPT = fs.readFileSync(PROMPT_PATH, "utf-8");
 
-const SCRIPT_MODEL = "MiniMax-M2.7";
+// ТЗ-1 CoreRegistry: model resolved via getModel(taskId), constant kept for module-scope reference
+const SCRIPT_MODEL = getModelIdForTask(PODCAST_SCRIPT_TASK);
 
 // JSON instruction for M2.7 (204K context, up to 16K output — no truncation issues)
 const JSON_INSTRUCTION = `
@@ -103,7 +110,7 @@ export async function generateScript(
       attempt >= 2 ? baseMessage + RETRY_REINFORCEMENT : baseMessage;
 
     const result = await generateText({
-      model: minimaxM27,
+      model: getModel(PODCAST_SCRIPT_TASK),
       system: SYSTEM_PROMPT + JSON_INSTRUCTION,
       prompt,
       maxOutputTokens: 4096,
@@ -174,6 +181,7 @@ export async function generateScript(
           },
         } as any,
         modelId: SCRIPT_MODEL,
+        provider: getProviderForTask(PODCAST_SCRIPT_TASK),
         chatMode: "podcast:script",
         durationMs,
       }));

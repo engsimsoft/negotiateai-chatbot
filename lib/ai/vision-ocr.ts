@@ -1,19 +1,21 @@
 /**
- * Google Gemini Vision OCR Module
+ * Vision OCR Module
  *
- * Provides document OCR capabilities using Google Gemini Vision API.
+ * Provides document OCR capabilities using Claude Haiku 4.5 vision.
  * Supports: PDFs, images (JPG/PNG), scanned documents
  *
  * @module vision-ocr
  */
 
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
+import {
+  getModel,
+  getModelIdForTask,
+  getProviderForTask,
+} from "@/lib/ai/getModel";
 import { logUsage } from "@/lib/ai/usage-utils";
 
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-});
+const VISION_OCR_TASK = "vision:ocr" as const;
 
 /**
  * OCR prompt optimized for document extraction
@@ -34,7 +36,7 @@ export interface VisionOCRResult {
 }
 
 /**
- * Extract text from a single image using Google Gemini Vision API
+ * Extract text from a single image using Claude Haiku 4.5 vision
  *
  * @param imageBuffer - Image buffer (PNG or JPEG)
  * @param mediaType - MIME type ("image/png" or "image/jpeg")
@@ -43,7 +45,7 @@ export interface VisionOCRResult {
 export async function extractTextFromImage(
   imageBuffer: Buffer,
   mediaType: "image/png" | "image/jpeg",
-  /** ТЗ-BILLING1: userId required — Gemini cost must always be logged. */
+  /** ТЗ-BILLING1: userId required — cost must always be logged. */
   userId: string,
 ): Promise<string> {
   console.log(`[Vision OCR] Processing image (${Math.round(imageBuffer.length / 1024)}KB, ${mediaType})`);
@@ -55,7 +57,7 @@ export async function extractTextFromImage(
     const dataUrl = `data:${mediaType};base64,${base64Image}`;
 
     const { text, usage } = await generateText({
-      model: google("gemini-2.5-flash"),
+      model: getModel(VISION_OCR_TASK),
       messages: [
         {
           role: "user",
@@ -65,13 +67,6 @@ export async function extractTextFromImage(
           ],
         },
       ],
-      providerOptions: {
-        google: {
-          thinkingConfig: {
-            thinkingBudget: 0,
-          },
-        },
-      },
     });
 
     const processingTime = Date.now() - startTime;
@@ -79,11 +74,11 @@ export async function extractTextFromImage(
       `[Vision OCR] Image processed in ${processingTime}ms, extracted ${text.length} chars`
     );
 
-    // ТЗ-BILLING1: Always log Gemini Vision cost
     logUsage({
       userId,
       usage,
-      modelId: "gemini-2.5-flash",
+      modelId: getModelIdForTask(VISION_OCR_TASK),
+      provider: getProviderForTask(VISION_OCR_TASK),
       chatMode: "util:vision-ocr",
       durationMs: processingTime,
     });
@@ -100,14 +95,14 @@ export async function extractTextFromImage(
 }
 
 /**
- * Extract text from PDF using Google Gemini Vision API
+ * Extract text from PDF using Claude Haiku 4.5 vision
  *
  * @param pdfBuffer - PDF file buffer
  * @returns OCR result with text and metadata
  */
 export async function extractTextFromPDF(
   pdfBuffer: Buffer,
-  /** ТЗ-BILLING1: userId required — Gemini cost must always be logged. */
+  /** ТЗ-BILLING1: userId required — cost must always be logged. */
   userId: string,
 ): Promise<VisionOCRResult> {
   console.log(`[Vision OCR] Processing PDF (${Math.round(pdfBuffer.length / 1024)}KB)`);
@@ -115,7 +110,7 @@ export async function extractTextFromPDF(
 
   try {
     const { text, usage } = await generateText({
-      model: google("gemini-2.5-flash"),
+      model: getModel(VISION_OCR_TASK),
       messages: [
         {
           role: "user",
@@ -129,13 +124,6 @@ export async function extractTextFromPDF(
           ],
         },
       ],
-      providerOptions: {
-        google: {
-          thinkingConfig: {
-            thinkingBudget: 0,
-          },
-        },
-      },
     });
 
     const processingTime = Date.now() - startTime;
@@ -143,11 +131,11 @@ export async function extractTextFromPDF(
       `[Vision OCR] PDF processed in ${processingTime}ms, extracted ${text.length} chars`
     );
 
-    // ТЗ-BILLING1: Always log Gemini Vision cost
     logUsage({
       userId,
       usage,
-      modelId: "gemini-2.5-flash",
+      modelId: getModelIdForTask(VISION_OCR_TASK),
+      provider: getProviderForTask(VISION_OCR_TASK),
       chatMode: "util:vision-ocr",
       durationMs: processingTime,
     });
