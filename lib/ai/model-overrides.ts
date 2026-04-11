@@ -1,42 +1,29 @@
 /**
- * Model Overrides — cookie-based dev-only mechanism for runtime model switching
+ * Model Overrides — dev-only mechanism for runtime model switching
  * (ТЗ-2 Dev Switchboard UI)
  *
- * Overrides live in a single JSON cookie `x-model-overrides` and are ignored in
- * production (`SIMPLY_DEV_MODE !== "true"`). The cookie maps taskId → catalog id:
+ * Client-safe shared module. Holds the type, parser, dev gate, and a
+ * reader-registration hook. The actual storage backend (a JSON file at the
+ * project root) lives in `model-overrides-node.ts` — it depends on `node:fs`
+ * and must not be imported from client code.
  *
- *   { "simply-chat": "claude-opus-4-6", "util:title": "MiniMax-M2.7" }
+ * Architecture — why file + callback registration:
+ *   `getModel()` is called from 35+ sites across the app and must stay
+ *   synchronous. Next 15 turned `cookies()` into an async-only API, and
+ *   threading request state through every caller would require 35+ signature
+ *   changes for a dev-only feature. Instead we keep a dotfile on disk
+ *   (`.simply-dev-overrides.json`) that the server reads synchronously in
+ *   `getModel → lookupOverride`. A small dev endpoint mutates the file.
  *
- * This module contains pure functions only (parse/serialize/gate). The actual
- * cookie read (via `next/headers`) and write (via Server Actions) happen in
- * `getModel.ts` and `app/(dev)/dev/models/actions.ts` respectively.
+ *   This module registers a no-op reader by default. The Node-only companion
+ *   installs the real file-based reader at module-eval time via
+ *   `registerOverridesReader`. Client bundles never import that companion,
+ *   so `getActiveOverrides()` stays a no-op in the browser.
  *
- * Why cookie and not context threading:
- *   `getModel()` is called from 35+ sites across the app (routes, pipelines,
- *   artifact handlers, briefing, memory, meeting). Threading a `context.cookies`
- *   parameter through every caller would mean 35+ signature changes for a
- *   dev-only feature. `next/headers.cookies()` reads request-scoped cookies
- *   inside any server function with zero caller changes.
+ *   Zero changes to the 35+ getModel call-sites.
  */
 
 import { isSimplyDevMode } from "@/lib/constants";
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-export const OVERRIDES_COOKIE_NAME = "x-model-overrides";
-
-/** Cookie attributes used when Server Actions mutate the overrides cookie. */
-export const OVERRIDES_COOKIE_OPTIONS = {
-  path: "/",
-  sameSite: "lax" as const,
-  // httpOnly false on purpose — client code mirrors overrides to localStorage
-  // for instant UI feedback without waiting for a server round-trip.
-  httpOnly: false,
-  // No `secure` — dev runs over http://localhost. Production ignores overrides
-  // entirely via isOverridesAllowed(), so this flag is irrelevant there.
-} as const;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,8 +39,9 @@ export type OverridesMap = Record<string, string>;
 /**
  * SSOT for "are model overrides allowed right now?".
  *
- * Used by getModel (read path), Server Actions (write path), and the /dev/models
- * page (UI gate). Changing one env var disables all three atomically.
+ * Used by getModel (read path), the dev endpoint (write path), and the
+ * /dev/models page (UI gate in ТЗ-2 Stage 2). Changing one env var disables
+ * all three atomically.
  */
 export function isOverridesAllowed(): boolean {
   return isSimplyDevMode;
@@ -64,11 +52,11 @@ export function isOverridesAllowed(): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Safe JSON.parse for the overrides cookie value.
+ * Safe JSON.parse for the overrides file contents.
  *
- * Returns an empty object on any parse failure — malformed cookies must never
- * break getModel() resolution. Also validates shape: must be an object whose
- * values are all strings.
+ * Returns an empty object on any parse failure — a corrupt file must never
+ * break getModel() resolution. Also validates shape: must be a plain object
+ * whose values are all non-empty strings.
  */
 export function parseOverrides(raw: string | undefined | null): OverridesMap {
   if (!raw) return {};
@@ -89,7 +77,42 @@ export function parseOverrides(raw: string | undefined | null): OverridesMap {
   return result;
 }
 
-/** Inverse of parseOverrides — stable JSON (no pretty-print, used in cookie). */
+/** Stable JSON serializer — compact, no pretty-print. */
 export function serializeOverrides(overrides: OverridesMap): string {
   return JSON.stringify(overrides);
+}
+
+// ---------------------------------------------------------------------------
+// Client-safe reader + server-side registration hook
+// ---------------------------------------------------------------------------
+
+/**
+ * Default no-op reader. Used on the client (no overrides ever flow through
+ * a browser process) and as a fallback on the server before the Node module
+ * has installed the file-based reader.
+ */
+const NO_OVERRIDES_READER: () => OverridesMap = () => ({});
+
+let activeOverridesReader: () => OverridesMap = NO_OVERRIDES_READER;
+
+/**
+ * Install a real overrides reader. Called exactly once, at module-eval time,
+ * from `model-overrides-node.ts` — the Node-only companion that reads the
+ * overrides file. Because that file is imported only from server entry points
+ * (route handlers), it never reaches the client bundle and webpack therefore
+ * never tries to resolve `node:fs`.
+ */
+export function registerOverridesReader(reader: () => OverridesMap): void {
+  activeOverridesReader = reader;
+}
+
+/**
+ * Read the active overrides map or an empty object.
+ *
+ * Always returns an empty map when the dev gate is off, regardless of whether
+ * a reader is installed — so production behaviour is completely unaffected.
+ */
+export function getActiveOverrides(): OverridesMap {
+  if (!isOverridesAllowed()) return {};
+  return activeOverridesReader();
 }

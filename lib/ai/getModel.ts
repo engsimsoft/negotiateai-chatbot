@@ -17,11 +17,7 @@ import type { LanguageModel } from "ai";
 
 import { isTestEnvironment } from "../constants";
 import { getModelEntry, resolveModelEntry } from "./model-catalog";
-import {
-  isOverridesAllowed,
-  OVERRIDES_COOKIE_NAME,
-  parseOverrides,
-} from "./model-overrides";
+import { getActiveOverrides } from "./model-overrides";
 import { registry, type RegistryProviderId } from "./registry";
 import {
   DEFAULT_TASK_MODELS,
@@ -51,50 +47,23 @@ export interface GetModelContext {
 // ---------------------------------------------------------------------------
 
 /**
- * Read the overrides cookie inside a request scope.
+ * Lookup override catalog-id for a given task.
  *
- * `next/headers.cookies()` throws when called outside a Server Component /
- * Route Handler / Server Action — i.e. from background contexts like Vercel
- * cron handlers or `waitUntil` callbacks. That's **expected**: those paths
- * should always run on defaults, never on a developer's interactive overrides.
- * We silently return an empty map in that case.
- *
- * Also returns empty when the dev gate is off (production, staging, etc.) —
- * the cookie is completely ignored there regardless of whether it was set.
- */
-function readOverridesFromCookie(): Record<string, string> {
-  if (!isOverridesAllowed()) return {};
-  try {
-    // Lazy require — keeps `next/headers` out of any bundles that don't need it
-    // (e.g. mock module, tests) and avoids ESM/CJS interop surprises.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { cookies } = require("next/headers") as typeof import("next/headers");
-    // next/headers cookies() is async in Next 15 — but sync usage still works in
-    // synchronous server code by returning the store directly. Wrap in Promise
-    // unwrap with a fallback for the sync case.
-    const store = cookies() as unknown as {
-      get(name: string): { value: string } | undefined;
-    };
-    const raw = store.get?.(OVERRIDES_COOKIE_NAME)?.value;
-    return parseOverrides(raw);
-  } catch {
-    // Outside request scope (background worker, cron) — no overrides.
-    return {};
-  }
-}
-
-/**
- * Lookup override catalog-id for a given task. Returns null if:
+ * Reads from the AsyncLocalStorage context installed by
+ * `runWithOverridesFromRequest` (see `model-overrides-node.ts`). Returns null
+ * when:
  *  - dev gate is off (production), OR
  *  - no cookie / empty cookie / malformed JSON, OR
- *  - no entry for this taskId, OR
- *  - we're in a background (non-request) context
+ *  - the request handler wasn't wrapped with runWithOverridesFromRequest, OR
+ *  - we're in a background (non-request) context like cron or waitUntil.
+ *
+ * No throws, no next/headers dependency, no threading through call-sites.
  */
 function lookupOverride(
   taskId: TaskId,
   _context?: GetModelContext,
 ): string | null {
-  const overrides = readOverridesFromCookie();
+  const overrides = getActiveOverrides();
   return overrides[taskId] ?? null;
 }
 
@@ -274,5 +243,5 @@ export function isTaskOverridden(taskId: TaskId): boolean {
  * initial UI state. Returns empty object in prod / background contexts.
  */
 export function getCurrentOverrides(): Record<string, string> {
-  return readOverridesFromCookie();
+  return getActiveOverrides();
 }

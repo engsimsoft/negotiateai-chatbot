@@ -8,11 +8,20 @@
 ## Статус этапов
 
 - [x] Этап 0: Baseline — зелёный
-- [x] Этап 1: Backend overrides + Footer badge — **код готов, ждёт мануальный тест**
+- [x] Этап 1: Backend overrides + Footer badge — **✅ завершён, протестирован end-to-end, Haiku override виден в footer**
 - [ ] Этап 2: Страница `/dev/models` ← **следующий**
 - [ ] Этап 3: Per-message Switcher в DevPanel
 - [ ] Этап 4: Polish + edge cases
 - [ ] Этап 5: Финализация
+
+## Финальная архитектура Этапа 1 (rev 3, file-based)
+
+- `.simply-dev-overrides.json` в корне проекта — SSOT для dev-overrides
+- `lib/ai/model-overrides.ts` — client-safe shared (dev-gate, parse, serialize, reader callback)
+- `lib/ai/model-overrides-node.ts` — server-only (`import "server-only"`), `fs.readFileSync`/`writeFileSync`
+- `app/api/dev/set-override/route.ts` — GET endpoint (`?task=X&model=Y`, `?clear=1`)
+- middleware bypass для `/api/dev/*`
+- Отказались от cookies (Chrome DevTools ненадёжен) и AsyncLocalStorage (избыточен для dev-tool)
 
 ---
 

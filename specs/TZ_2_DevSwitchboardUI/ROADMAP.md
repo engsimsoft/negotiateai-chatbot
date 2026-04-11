@@ -57,7 +57,16 @@ UI слои:
 
 ## Этап 1: Backend overrides + Footer badge
 
-**Статус:** 🔄 В работе — код готов, ждёт мануальный тест
+**Статус:** ✅ Завершён (2026-04-12) — мануальный тест пройден, OVERRIDE видно в footer
+
+**Финальная архитектура (rev 3 — file-based):**
+После двух неудачных попыток (next/headers → AsyncLocalStorage → **file**) остановились на плоском JSON-файле `.simply-dev-overrides.json` в корне проекта.
+- `model-overrides.ts` — client-safe: dev-gate, parse, serialize, reader-callback
+- `model-overrides-node.ts` — server-only (import "server-only"): `fs.readFileSync` reader, `writeOverridesFile`
+- `/api/dev/set-override` — GET endpoint: `?task=<id>&model=<catalogId>` или `?clear=1`
+- middleware добавлено исключение для `/api/dev/*` (защита на уровне isSimplyDevMode внутри)
+
+Почему не cookies: Chrome devtools манипуляции ненадёжны (значения с `{}`/`"` стрипаются), Next 15 async cookies API, hot-reload путает path/domain. Файл — простое SSOT.
 
 **Цель:** Реализовать механику overrides на сервере + показать пользователю факт override в footer. Этап не требует UI — проверяем через ручную правку cookie в DevTools.
 

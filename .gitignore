@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ТЗ-2: dev-only model overrides (never commit — local to dev machine)
+.simply-dev-overrides.json

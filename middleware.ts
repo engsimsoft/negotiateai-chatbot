@@ -32,6 +32,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // ТЗ-2: dev-only endpoints have their own SIMPLY_DEV_MODE gate inside the
+  // route handlers and are never reachable in production.
+  if (pathname.startsWith("/api/dev/")) {
+    return NextResponse.next();
+  }
+
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,

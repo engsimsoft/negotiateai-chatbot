@@ -4,6 +4,29 @@
 
 ---
 
+## Сессия 1 rev 3 — 2026-04-12 — Этап 1 hotfix (file-based backend)
+
+### Changed
+- Переписан backend с cookies на file-based: `.simply-dev-overrides.json` в корне
+- `lib/ai/model-overrides.ts` — убраны cookie-helpers, оставлены только shared utilities + reader callback
+- `lib/ai/model-overrides-node.ts` — теперь использует `fs.readFileSync`/`fs.writeFileSync`, никакого AsyncLocalStorage / next/headers
+- `app/api/dev/set-override/route.ts` — новый endpoint для мутации файла через URL
+- `app/(chat)/api/chat/route.ts` — убрана обёртка `runWithOverridesFromRequest`, заменена на side-effect `import "@/lib/ai/model-overrides-node"`
+- `middleware.ts` — bypass для `/api/dev/*` (защита на уровне endpoint)
+- `.gitignore` — добавлен `.simply-dev-overrides.json`
+
+### Validated
+- Мануальный тест: `curl` → файл → Simply Chat → footer показывает **Haiku 4.5 + ⚙ OVERRIDE** (скриншот от пользователя)
+- `tsc --noEmit` — 0 ошибок
+- prod-гейт работает — `isSimplyDevMode=false` отключает читаемость файла
+
+### Why three attempts
+1. **next/headers.cookies()** — Next 15 превратил API в async-only, sync-доступ бросает в dev
+2. **AsyncLocalStorage + cookie header** — работало технически, но Chrome DevTools манипуляции с cookies ненадёжны (spec chars, hot-reload, path/domain)
+3. **File on disk** — финальное решение, работает из коробки, stable through hot-reloads
+
+---
+
 ## Сессия 1 — 2026-04-12 — Фаза 1 + 2 (Анализ + Планирование) + Этапы 0–1
 
 ### Added

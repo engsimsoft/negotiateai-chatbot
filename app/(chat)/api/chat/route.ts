@@ -23,6 +23,10 @@ import {
   getProviderForTask,
   isTaskOverridden,
 } from "@/lib/ai/getModel";
+// ТЗ-2: side-effect import installs the file-based overrides reader at
+// module-eval time. Without this import the client-safe stub (returns {})
+// stays active and getModel() never sees dev overrides.
+import "@/lib/ai/model-overrides-node";
 import type { TaskId } from "@/lib/ai/task-assignments";
 import { DEFAULT_TASK_MODELS } from "@/lib/ai/task-assignments";
 import {
