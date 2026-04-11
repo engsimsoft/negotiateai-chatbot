@@ -22,7 +22,6 @@ import { saveChatModelAsCookie } from "@/app/(chat)/actions";
 import { SelectItem } from "@/components/ui/select";
 import { chatModels } from "@/lib/ai/models";
 import { getProjectModelTiers, type ProjectModelTier } from "@/lib/ai/model-tiers";
-import { myProvider } from "@/lib/ai/providers";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { cn, getChatUrl } from "@/lib/utils";
@@ -255,10 +254,6 @@ function PureMultimodalInput({
       toast.error("Failed to upload file, please try again!");
     }
   }, []);
-
-  const _modelResolver = useMemo(() => {
-    return myProvider.languageModel(selectedModelId);
-  }, [selectedModelId]);
 
   const contextProps = useMemo(
     () => ({
