@@ -4,13 +4,10 @@
 import { streamText } from "ai";
 import { z } from "zod";
 import type { ModelCatalog } from "tokenlens/core";
-import { waitUntil } from "@vercel/functions";
-import { logUsage } from "@/lib/ai/usage-utils";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import {
   getModel,
   getModelIdForTask,
-  getProviderForTask,
 } from "@/lib/ai/getModel";
 import { retryWithLogging } from "@/lib/ai/retry-with-logging";
 import { MAX_FILTER_CANDIDATES } from "./briefing-config";
@@ -158,20 +155,6 @@ Output JSON with "candidates" array.` + FILTER_JSON_INSTRUCTION;
   }
 
   const durationMs = Date.now() - startTime;
-
-  // ТЗ-CACHE2: Usage logging — waitUntil ensures completion on Vercel serverless
-  // Note: retryWithLogging already logs successful attempts internally; this outer call
-  // is a pre-existing duplicate kept for wire compatibility. Not fixed in ТЗ-1 Этап 4.
-  if (userId && usage) {
-    waitUntil(logUsage({
-      userId,
-      usage,
-      modelId: resolvedModelId,
-      provider: getProviderForTask(BRIEFING_FILTER_TASK),
-      chatMode: "briefing:filter",
-      durationMs,
-    }));
-  }
 
   const ai = buildAiCallTrace(
     {
