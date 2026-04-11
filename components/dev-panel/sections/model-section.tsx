@@ -7,6 +7,7 @@ const MODEL_DISPLAY: Record<string, string> = {
   "claude-haiku": "Haiku",
   "claude-sonnet": "Sonnet",
   "claude-opus": "Opus",
+  "MiniMax-M2.7": "MiniMax M2.7",
 };
 
 const REASON_COLORS: Record<string, string> = {
@@ -76,6 +77,23 @@ export function ModelSection({ data }: { data: DevPanelMessageData }) {
                 {it.type}: {it.inputTokens.toLocaleString("ru-RU")} in / {it.outputTokens.toLocaleString("ru-RU")} out
               </div>
             ))}
+          </>
+        )}
+
+        {/* ТЗ-2: Dev override info */}
+        {data.prompt?.taskId && (
+          <>
+            <span className="text-muted-foreground">Task ID</span>
+            <span className="font-mono text-xs">{data.prompt.taskId}</span>
+          </>
+        )}
+
+        {data.prompt?.overrideActive && (
+          <>
+            <span className="text-muted-foreground">Override</span>
+            <span className="font-mono text-xs text-amber-600 dark:text-amber-400">
+              {data.prompt.defaultModelId ?? "?"} → {data.prompt.effectiveModelId ?? "?"}
+            </span>
           </>
         )}
       </div>

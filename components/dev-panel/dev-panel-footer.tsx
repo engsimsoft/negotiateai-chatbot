@@ -129,6 +129,22 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
             <span className="text-amber-600 dark:text-amber-400">Compaction</span>
           </>
         )}
+        {/* ТЗ-2: Dev override active for this task */}
+        {data.prompt?.overrideActive && (
+          <>
+            <span className={isError ? "text-destructive/30" : "text-muted-foreground/30"}>&middot;</span>
+            <span
+              className="rounded bg-amber-500/15 px-1 text-amber-700 dark:text-amber-400"
+              title={
+                data.prompt.defaultModelId && data.prompt.effectiveModelId
+                  ? `Override: ${data.prompt.defaultModelId} → ${data.prompt.effectiveModelId}`
+                  : "Override active"
+              }
+            >
+              &#9881; OVERRIDE
+            </span>
+          </>
+        )}
         {/* ТЗ-DevPanelErrors: errors/warnings badge — distinct colors, click opens drawer */}
         {errorCount > 0 && (
           <>

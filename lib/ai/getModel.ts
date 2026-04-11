@@ -1,22 +1,27 @@
 /**
  * getModel — единая точка получения LanguageModel для задачи (ТЗ-1 CoreRegistry)
  *
- * Единственная функция, через которую вся 31 AI-точка приложения получает
+ * Единственная функция, через которую вся 40+ AI-точка приложения получает
  * модель. Всё остальное — внутренние детали (registry, catalog, task assignments).
  *
  * Порядок разрешения:
- *   1. Overrides — stub в ТЗ-1, реализация в ТЗ-2 (localStorage + cookie)
+ *   1. Overrides — dev-only cookie `x-model-overrides` (ТЗ-2)
  *   2. Test mocks — isTestEnvironment → возвращает mock модель
  *   3. Task assignment → catalog entry → registry lookup
  *
- * Сигнатура с `context?` подготовлена под ТЗ-2: в future overrides будут
- * читаться из user-specific cookies/localStorage через этот параметр.
+ * Сигнатура с `context?` остаётся стабильной (зарезервирована под будущее,
+ * например per-user overrides из БД).
  */
 
 import type { LanguageModel } from "ai";
 
 import { isTestEnvironment } from "../constants";
 import { getModelEntry, resolveModelEntry } from "./model-catalog";
+import {
+  isOverridesAllowed,
+  OVERRIDES_COOKIE_NAME,
+  parseOverrides,
+} from "./model-overrides";
 import { registry, type RegistryProviderId } from "./registry";
 import {
   DEFAULT_TASK_MODELS,
@@ -42,23 +47,55 @@ export interface GetModelContext {
 }
 
 // ---------------------------------------------------------------------------
-// Overrides stub — будет реализован в ТЗ-2
+// Overrides lookup — dev-only cookie-based mechanism (ТЗ-2)
 // ---------------------------------------------------------------------------
 
 /**
- * Lookup override для taskId. Сейчас всегда null.
+ * Read the overrides cookie inside a request scope.
  *
- * ТЗ-2 реализует:
- *  - User-level overrides из БД (context.userId)
- *  - Dev cookie `x-model-overrides` (context.requestCookies) — игнорируется в prod
- *  - localStorage на клиенте (применяется клиентским кодом до вызова API)
+ * `next/headers.cookies()` throws when called outside a Server Component /
+ * Route Handler / Server Action — i.e. from background contexts like Vercel
+ * cron handlers or `waitUntil` callbacks. That's **expected**: those paths
+ * should always run on defaults, never on a developer's interactive overrides.
+ * We silently return an empty map in that case.
+ *
+ * Also returns empty when the dev gate is off (production, staging, etc.) —
+ * the cookie is completely ignored there regardless of whether it was set.
+ */
+function readOverridesFromCookie(): Record<string, string> {
+  if (!isOverridesAllowed()) return {};
+  try {
+    // Lazy require — keeps `next/headers` out of any bundles that don't need it
+    // (e.g. mock module, tests) and avoids ESM/CJS interop surprises.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { cookies } = require("next/headers") as typeof import("next/headers");
+    // next/headers cookies() is async in Next 15 — but sync usage still works in
+    // synchronous server code by returning the store directly. Wrap in Promise
+    // unwrap with a fallback for the sync case.
+    const store = cookies() as unknown as {
+      get(name: string): { value: string } | undefined;
+    };
+    const raw = store.get?.(OVERRIDES_COOKIE_NAME)?.value;
+    return parseOverrides(raw);
+  } catch {
+    // Outside request scope (background worker, cron) — no overrides.
+    return {};
+  }
+}
+
+/**
+ * Lookup override catalog-id for a given task. Returns null if:
+ *  - dev gate is off (production), OR
+ *  - no cookie / empty cookie / malformed JSON, OR
+ *  - no entry for this taskId, OR
+ *  - we're in a background (non-request) context
  */
 function lookupOverride(
-  _taskId: TaskId,
+  taskId: TaskId,
   _context?: GetModelContext,
 ): string | null {
-  // TODO ТЗ-2: implement overrides lookup
-  return null;
+  const overrides = readOverridesFromCookie();
+  return overrides[taskId] ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -215,4 +252,27 @@ export function taskSupportsThinking(
   const catalogId = overrideId ?? DEFAULT_TASK_MODELS[taskId];
   const resolved = resolveModelEntry(catalogId);
   return resolved?.capabilities.thinking ?? false;
+}
+
+// ---------------------------------------------------------------------------
+// Override introspection (ТЗ-2 — for DevPanel badges and /dev/models UI)
+// ---------------------------------------------------------------------------
+
+/**
+ * Is there a dev override active for this task right now?
+ *
+ * Returns false in production, in background contexts, and when no cookie is
+ * set. Consumers should use this only for UI affordances — getModel() already
+ * handles override resolution internally.
+ */
+export function isTaskOverridden(taskId: TaskId): boolean {
+  return lookupOverride(taskId) !== null;
+}
+
+/**
+ * Read all current overrides. Intended for /dev/models page to hydrate the
+ * initial UI state. Returns empty object in prod / background contexts.
+ */
+export function getCurrentOverrides(): Record<string, string> {
+  return readOverridesFromCookie();
 }

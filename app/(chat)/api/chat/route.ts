@@ -21,8 +21,10 @@ import {
   getModel,
   getModelIdForTask,
   getProviderForTask,
+  isTaskOverridden,
 } from "@/lib/ai/getModel";
 import type { TaskId } from "@/lib/ai/task-assignments";
+import { DEFAULT_TASK_MODELS } from "@/lib/ai/task-assignments";
 import {
   getProjectModel,
   isValidModelTier,
@@ -550,10 +552,16 @@ export async function POST(request: Request) {
           : DEFAULT_PROJECT_MODEL;
         const isProfessorMode = isProjectChat && tier === "professor";
 
+        // ТЗ-2 Dev Switchboard: track the TaskId used for this request so
+        // we can (a) emit it in debug events for the DevPanel switcher and
+        // (b) reuse it in usage logging instead of re-deriving the routing.
+        let activeTaskId: TaskId | null = null;
+
         if (isProjectChat && project) {
           // Project chat: use Claude model and project context
           const projectModelConfig = getProjectModel(tier);
           modelToUse = projectModelConfig.model;
+          activeTaskId = `project:expert:${tier}` as TaskId;
 
           // Diagnostic: log project files and their extractedContent status
           console.log(`[Project Chat] Files for project "${project.name}":`, {
@@ -590,20 +598,17 @@ export async function POST(request: Request) {
           // Priority: think → Sonnet, attachments → Haiku 4.5 (vision), default → MiniMax M2.7
           if (chatMode === "simply") {
             if (think) {
-              modelToUse = getModel("simply-chat-think");
-              console.log(`[Chat API] Model selection: chatMode=simply, think=true, task=simply-chat-think, model=${getModelIdForTask("simply-chat-think")}`);
+              activeTaskId = "simply-chat-think";
             } else if (hasAttachments(message.parts)) {
-              modelToUse = getModel("simply-chat-vision");
-              console.log(`[Chat API] Model selection: chatMode=simply, attachments=true, task=simply-chat-vision, model=${getModelIdForTask("simply-chat-vision")}`);
+              activeTaskId = "simply-chat-vision";
             } else {
-              modelToUse = getModel("simply-chat");
-              console.log(`[Chat API] Model selection: chatMode=simply, task=simply-chat, model=${getModelIdForTask("simply-chat")}`);
+              activeTaskId = "simply-chat";
             }
           } else {
-            const chatTaskId = getTaskIdForChatMode(chatMode);
-            console.log(`[Chat API] Model selection: chatMode=${chatMode}, task=${chatTaskId}, model=${getModelIdForTask(chatTaskId)}`);
-            modelToUse = getModel(chatTaskId);
+            activeTaskId = getTaskIdForChatMode(chatMode);
           }
+          modelToUse = getModel(activeTaskId);
+          console.log(`[Chat API] Model selection: chatMode=${chatMode}, task=${activeTaskId}, model=${getModelIdForTask(activeTaskId)}`);
         }
 
         // ТЗ-C3: Inject previous snapshot context into system prompt
@@ -838,6 +843,10 @@ export async function POST(request: Request) {
           if (snapshotContext) injections.push("snapshot-context");
           if (isProjectChat) injections.push("project-context");
           if (systemPromptText.includes("<memory>")) injections.push("mind-memory");
+          // ТЗ-2: include task + override info for DevPanel switcher and OVERRIDE badge
+          const overrideActive = activeTaskId ? isTaskOverridden(activeTaskId) : false;
+          const defaultModelId = activeTaskId ? DEFAULT_TASK_MODELS[activeTaskId] : undefined;
+          const effectiveModelId = activeTaskId ? getModelIdForTask(activeTaskId) : undefined;
           emitDebugPrompt(dataStream, {
             systemPromptPreview: systemPromptText.slice(0, 500),
             systemPromptLength: systemPromptText.length,
@@ -847,6 +856,10 @@ export async function POST(request: Request) {
             projectTier: isProjectChat ? tier : undefined,
             hasSnapshotContext: !!snapshotContext,
             contextInjections: injections,
+            taskId: activeTaskId ?? undefined,
+            overrideActive,
+            defaultModelId,
+            effectiveModelId,
           });
           // ТЗ-DevPanelErrors: flush buffered pre-prompt warnings now that a batch exists
           for (const w of prePromptWarnings) {
@@ -1050,24 +1063,12 @@ export async function POST(request: Request) {
             // modelId AND provider from it (previously provider was missing →
             // ai_usage_log.provider was null for fresh records — SSOT regression
             // from Этап 2 TZ-1).
-            let resolvedTaskId: TaskId | null = null;
+            // ТЗ-2: reuse activeTaskId resolved at routing time (SSOT).
+            // Kept `resolvedTaskId` as a local alias for minimal churn downstream.
+            let resolvedTaskId: TaskId | null = activeTaskId;
             let costUsd: number | null = null;
             try {
-              // ТЗ-MinimaxCleanup + ТЗ-1 CoreRegistry: Resolve model ID matching selection logic above
-              if (isProjectChat) {
-                resolvedTaskId = `project:expert:${tier}` as TaskId;
-              } else if (chatMode === "simply") {
-                if (think) {
-                  resolvedTaskId = "simply-chat-think";
-                } else if (hasAttachments(message.parts)) {
-                  resolvedTaskId = "simply-chat-vision";
-                } else {
-                  resolvedTaskId = "simply-chat";
-                }
-              } else {
-                resolvedTaskId = getTaskIdForChatMode(chatMode);
-              }
-              resolvedModelId = getModelIdForTask(resolvedTaskId);
+              resolvedModelId = resolvedTaskId ? getModelIdForTask(resolvedTaskId) : undefined;
               const effectiveModelId =
                 resolvedModelId ?? (isProjectChat ? `project:${tier}` : chatMode);
 

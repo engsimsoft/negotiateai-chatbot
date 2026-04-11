@@ -90,6 +90,14 @@ export interface DebugPromptData {
   projectTier?: string;
   hasSnapshotContext: boolean;
   contextInjections: string[];
+  /** ТЗ-2: Registry task id used for this call (e.g. "simply-chat", "chat:sonnet"). */
+  taskId?: string;
+  /** ТЗ-2: True if a dev override (cookie) was applied for this task. */
+  overrideActive?: boolean;
+  /** ТЗ-2: Catalog default for this task (what getModel would pick without override). */
+  defaultModelId?: string;
+  /** ТЗ-2: Catalog id actually used (equals defaultModelId unless overrideActive). */
+  effectiveModelId?: string;
 }
 
 /** ТЗ-RAG3: Compaction debug data */
