@@ -520,7 +520,7 @@ requestSuggestions({
 ```
 
 ### Модель
-Использует **`artifact-model`** → Claude Sonnet 4.6 (`claude-sonnet-4-6`) через `myProvider`.
+Резолвится через `getModel("util:artifact-suggestions")` → Claude Sonnet 4.6 (`claude-sonnet-4-6`) по умолчанию (см. [task-assignments.ts](../lib/ai/task-assignments.ts)).
 
 ### Файл
 [lib/ai/tools/request-suggestions.ts](../lib/ai/tools/request-suggestions.ts)

@@ -204,8 +204,11 @@ costRub = (freshInputTokens / 1000 × 0.03)
 
 | Файл | Что связано с MiniMax |
 |------|----------------------|
-| `lib/ai/providers.ts` | `minimaxM27`, `minimaxM27Long` экспорты, MODEL_PRICING_RUB, цены |
-| `app/(chat)/api/chat/route.ts` | Simply Chat — маршрутизация на MiniMax, sliding window, temperature |
+| `lib/ai/registry.ts` | `minimax` + `minimaxLong` namespace (180s timeout для briefing) (v3.83+) |
+| `lib/ai/model-catalog.ts` | `MiniMax-M2.7` и `MiniMax-M2.7-long` entries с pricing (v3.83+) |
+| `lib/ai/task-assignments.ts` | `simply-chat`, `briefing:filter`, `briefing:author`, `briefing:section`, `briefing:podcast-script`, `memory:extract-batch`, `memory:consolidate`, `memory:profile` → MiniMax (v3.83+) |
+| `lib/ai/providers.ts` | Pricing helpers только (после Stage 5 ТЗ-1) — модели живут в catalog |
+| `app/(chat)/api/chat/route.ts` | Simply Chat — маршрутизация на MiniMax через `getModel("simply-chat")`, sliding window, temperature |
 | `lib/briefing/briefing-filter.ts` | Briefing Filter — streamText + JSON.parse + Zod, retry, content truncation |
 | `lib/briefing/briefing-author.ts` | Briefing Author — монолит (Map-Reduce dead code оставлен на будущее) |
 | `lib/briefing/briefing-section-author.ts` | Per-section refresh + потенциал для Map-Reduce (`mode: "initial"`) |

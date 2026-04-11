@@ -253,7 +253,7 @@ AI-диалог по конкретной ProjectTask. Эксперт получ
 | Параметр | Значение |
 |----------|----------|
 | ID | `task-expert` |
-| Модель | `process.env.EXPERT_MODEL \|\| 'claude-sonnet'` (`claude-sonnet-4-6`) |
+| Модель | `getModel("project:expert:${tier}")` — tier из `ProjectTask.tier`, резолвится через `task-assignments.ts` (по умолчанию `claude-sonnet-4-6`) |
 | Промпт | `lib/prompts/experts/task-expert.md` |
 | Prompt builder | `lib/prompts/build-task-expert-prompt.ts` |
 | Endpoint | `POST /api/projects/[id]/tasks/[taskId]/chat` |
