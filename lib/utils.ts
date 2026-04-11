@@ -207,6 +207,12 @@ export function stripIncompleteToolParts(
  * - Removes empty assistant/tool messages
  * - Removes orphan tool-call parts (tool_use without matching tool_result)
  * - Removes orphan tool messages (tool_result without preceding tool_use)
+ * - Reorders assistant content so `tool-call` parts are LAST in content.
+ *   Claude 4.5/4.6 API rejects `[tool_use, text]` ordering with
+ *   "tool_use without tool_result" even when the tool_result is present
+ *   in the next message. Moving tool_use to the end of the assistant content
+ *   (while preserving relative order of other parts) makes the API accept
+ *   the pair. Verified with live Anthropic Haiku 4.5 tests.
  * Legacy data from Gemini may contain these inconsistencies.
  */
 export function sanitizeCoreMessages(messages: ModelMessage[]): ModelMessage[] {
@@ -249,7 +255,7 @@ export function sanitizeCoreMessages(messages: ModelMessage[]): ModelMessage[] {
   }
 
   // Pass 4: Filter out empty and orphan messages
-  return cleaned.filter((msg) => {
+  const filtered = cleaned.filter((msg) => {
     // Remove empty assistant messages (empty content array)
     if (msg.role === 'assistant') {
       if (typeof msg.content === 'string') return msg.content.trim().length > 0;
@@ -265,6 +271,25 @@ export function sanitizeCoreMessages(messages: ModelMessage[]): ModelMessage[] {
       (msg as any).content = filtered;
     }
     return true;
+  });
+
+  // Pass 5: Reorder assistant content so tool-call parts are LAST.
+  // Preserves relative order of text/other parts and relative order of tool-calls.
+  return filtered.map((msg) => {
+    if (msg.role !== 'assistant' || !Array.isArray(msg.content)) return msg;
+    const content = msg.content as any[];
+    const hasToolCall = content.some((p) => p.type === 'tool-call');
+    if (!hasToolCall) return msg;
+    const nonToolParts = content.filter((p) => p.type !== 'tool-call');
+    const toolCallParts = content.filter((p) => p.type === 'tool-call');
+    // If tool-calls are already at the end, no-op (optimization + stability)
+    const firstToolIdx = content.findIndex((p) => p.type === 'tool-call');
+    const lastNonToolIdx = content.reduce(
+      (max, p, i) => (p.type !== 'tool-call' ? i : max),
+      -1,
+    );
+    if (firstToolIdx > lastNonToolIdx) return msg;
+    return { ...msg, content: [...nonToolParts, ...toolCallParts] };
   });
 }
 
