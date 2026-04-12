@@ -15,7 +15,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createXai } from "@ai-sdk/xai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createProviderRegistry } from "ai";
-import { createMinimaxOpenAI } from "vercel-minimax-ai-provider";
+import { createMinimax } from "vercel-minimax-ai-provider";
 
 // ---------------------------------------------------------------------------
 // Provider factories
@@ -25,13 +25,21 @@ const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Default MiniMax — стандартный fetch timeout (~60s).
-const minimax = createMinimaxOpenAI();
+// MiniMax — официально рекомендованный Anthropic-совместимый режим
+// (`api.minimax.io/anthropic/v1`). Под капотом провайдер проксирует запросы
+// через AnthropicMessagesLanguageModel из @ai-sdk/anthropic/internal, что
+// даёт нативную поддержку streamText, tool calling, generateObject, reasoning
+// parts и explicit `providerOptions.anthropic.cacheControl` (до 4 breakpoints).
+// См. ADR 049.
+const minimax = createMinimax({
+  apiKey: process.env.MINIMAX_API_KEY,
+});
 
 // Long-timeout MiniMax — 180s для briefing/memory pipelines с большими промптами.
 // Зарегистрирован как отдельный provider-namespace (minimaxLong:*) чтобы getModel()
 // мог различать их через алиасы в model-catalog.
-const minimaxLong = createMinimaxOpenAI({
+const minimaxLong = createMinimax({
+  apiKey: process.env.MINIMAX_API_KEY,
   fetch: async (url, init) => {
     return fetch(url, { ...init, signal: AbortSignal.timeout(180_000) });
   },
