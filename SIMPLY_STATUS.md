@@ -338,6 +338,42 @@ components/projects/
 
 ## План развития
 
+### ТЗ-DevPanelErrors: DevPanel Errors & Warnings — ✅ ЗАВЕРШЁН (параллельно v3.83.0, коммит `83792b3`)
+
+**Проблема:** До этого ТЗ DevPanel показывал только успешные пути выполнения (steps, tools, tokens, cost). Когда что-то падало — ошибка оставалась только в server-side console или вообще «глоталась» graceful degradation внутри catch. Невозможно было быстро увидеть «что сейчас сломано» без копания в логах. Серверные warnings (Voyage 403, Guardian blocks, profile fetch failures) были невидимы для разработчика.
+
+**Решение:** Постоянное диагностическое оборудование внутри DevPanel. Двусторонний сбор:
+- **Сервер** — `emitDebugError` / `emitDebugWarning` через data stream events (schema bump 2 → 3), инструментированы все критические catch-блоки в `chat/route.ts` и `tasks/[taskId]/chat/route.ts`
+- **Клиент** — `error-bus.ts` (pub/sub) + `DevPanelErrorBoundary` (React class component) + `window.onerror` + `unhandledrejection` listeners в DevPanelProvider. Circular buffer 50 ошибок
+
+UI: footer badges (`⚠ N warnings` / `❌ N errors`), полноценная секция в drawer, отдельный session-level indicator в header для глобальных ошибок (не привязанных к message).
+
+**Выполнено (6 фаз):**
+
+- **Фаза 1 — Типы + emit функции:** `DebugErrorData` / `DebugWarningData` в `debug-events.ts`, `emitDebugError` / `emitDebugWarning` (обе с try/catch внутри — никогда не ломают request)
+- **Фаза 2 — Серверная инструментация:** инструментированы все критические catches в chat routes. Введён буфер `prePromptWarnings` для pre-prompt graceful degradations (parseBatches требует `data-debug-prompt` первым)
+- **Фаза 3 — Клиентский сбор:** `error-bus.ts` (pub/sub), `DevPanelErrorBoundary` (class component), window listeners, обновлена форма `DevPanelContext` → `{ byMessage, globalErrors }`
+- **Фаза 4 — UI:** `errors-section.tsx`, footer badges, `session-errors-drawer.tsx`, `session-errors-indicator.tsx` в header
+- **Фаза 5 — Cleanup:** удалены отладочные `console.log`, починена регрессия `provider=null` в `ai_usage_log` (введён `resolvedTaskId` → `getProviderForTask`)
+- **Фаза 6 — Live валидация:** Voyage AI 403 отобразился в footer badge `⚠ 1 warning` + карточка в drawer. Владимир локализовал проблему (финский VPN) и починил за минуту. **Первое живое использование инструмента — он окупил себя сразу.**
+
+**Архитектурный паттерн (важно для будущих ТЗ):** `retrieveMemoryContext` теперь возвращает `error?: string` вместо тихого graceful degradation. **Функция, которая «глотает» ошибку внутри catch, невидима для observability — это анти-паттерн.** Применять ко всем функциям, которые делают graceful degradation (возвращать `error` поле или emit через debug bus).
+
+**Ключевые файлы:**
+
+- `lib/ai/debug-events.ts` — `DebugErrorData`, `DebugWarningData`, emit функции, schema bump 2 → 3
+- `lib/client/error-bus.ts` — pub/sub для клиентских ошибок (новый)
+- `lib/ai/memory/retrieve.ts` — `error?: string` field вместо тихого degradation
+- `components/dev-panel/dev-panel-error-boundary.tsx` — React class component (новый)
+- `components/dev-panel/sections/errors-section.tsx` — секция в drawer (новый)
+- `components/dev-panel/session-errors-drawer.tsx` + `session-errors-indicator.tsx` — глобальные ошибки в header (новые)
+- `components/dev-panel/dev-panel-provider.tsx` — `{ byMessage, globalErrors }` shape, parseBatches, window listeners
+- `components/dev-panel/dev-panel-footer.tsx` — badges
+- `components/chat.tsx` — Error Boundary wrapper + `onError` → error bus
+- `app/(chat)/api/chat/route.ts` + task chat — emit + `prePromptWarnings` buffer
+
+---
+
 ### ТЗ-2: Dev Switchboard UI — ✅ ЗАВЕРШЁН (v3.84.0)
 
 **Проблема:** После ТЗ-1 (Core Model Registry) появилась единая точка `getModel(taskId)`, но не было способа быстро переключать модели для отдельных задач во время разработки. Чтобы протестировать другую модель, приходилось править `task-assignments.ts` и перезапускать. Это блокировало эксперименты с моделями и промптами — основной use case для разработчика и архитектора при подготовке ТЗ.

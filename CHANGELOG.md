@@ -47,6 +47,52 @@
 
 ---
 
+## [3.83.0-tz-devpanel-errors] — 2026-04-11 — DevPanel Errors & Warnings (параллельное ТЗ)
+
+> Параллельное ТЗ к v3.83.0, закоммичено в одну сессию (`83792b3`). Не bump-ает версию — фича вошла в v3.83.0 как побочный фикс.
+
+### Added
+
+- **Постоянная диагностика ошибок в DevPanel** — секция «Errors & Warnings» (errors-section.tsx) для серверных и клиентских ошибок. До этого графа DevPanel показывала только успешные пути; ошибки оставались в логах
+- **Server-side emit functions** — `emitDebugError`, `emitDebugWarning` в `lib/ai/debug-events.ts`. Schema bump 2 → 3. Все emit-функции с try/catch внутри — никогда не ломают request
+- **Client error bus** — `lib/client/error-bus.ts` (`reportClientError` + `subscribeToClientErrors`). Pub/sub паттерн вместо отдельного SessionErrorsProvider — проще для class-based Error Boundary
+- **DevPanel Error Boundary** — `dev-panel-error-boundary.tsx` оборачивает ядро чата, ловит React render crashes
+- **Window-level listeners** — `window.onerror` + `unhandledrejection` в `dev-panel-provider.tsx` ловят top-level ошибки. Circular buffer 50 ошибок
+- **Footer badges** — `⚠ N warnings` / `❌ N errors` в DevPanelFooter. Click → drawer
+- **Session indicator в header** — `session-errors-indicator.tsx` + `session-errors-drawer.tsx` для глобальных не-message-bound ошибок (Error Boundary, useChat.onError)
+- **Серверная инструментация catch-блоков** в `chat/route.ts` + `tasks/[taskId]/chat/route.ts`:
+  - `getProfileBlock` catch → buffered warning (flush после `emitDebugPrompt` так как parseBatches требует prompt первым)
+  - `retrieveMemoryContext` catch → buffered warning
+  - `executeProfessorPipeline` catch → emit error
+  - Guardian blocked → warning, max retries → error
+  - instrumentedStream top-level catch → error
+
+### Changed
+
+- **`retrieveMemoryContext` теперь возвращает `error?: string`** вместо тихого graceful degradation (lib/ai/memory/retrieve.ts). **Новый архитектурный паттерн:** функции, которые «глотают» ошибки внутри catch, невидимы для observability. Применять ко всем подобным функциям в будущем
+
+### Validated live
+
+**Voyage AI 403** отобразился в footer badge `⚠ 1 warning` + полная карточка в drawer. Владимир локализовал проблему за минуту: финский VPN блокирует Voyage, US Buffalo работает. **Это первое живое использование инструмента — он окупил себя сразу.**
+
+### Files
+
+- `lib/ai/debug-events.ts` (+типы +emit +schema)
+- `lib/client/error-bus.ts` (новый)
+- `lib/ai/memory/retrieve.ts` (+error field)
+- `components/dev-panel/dev-panel-provider.tsx` (context shape, parseBatches, global errors)
+- `components/dev-panel/dev-panel-error-boundary.tsx` (новый)
+- `components/dev-panel/sections/errors-section.tsx` (новый)
+- `components/dev-panel/session-errors-drawer.tsx` (новый)
+- `components/dev-panel/session-errors-indicator.tsx` (новый)
+- `components/dev-panel/dev-panel-footer.tsx` (badges)
+- `components/dev-panel/dev-panel-drawer.tsx` (ErrorsSection первой)
+- `components/chat.tsx` (Error Boundary + onError → bus)
+- `components/chat-header.tsx` (SessionErrorsIndicator)
+- `app/(chat)/api/chat/route.ts` + `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` (emit + prePromptWarnings buffer)
+
+---
+
 ## [3.83.0] — 2026-04-11 — Core Model Registry (ТЗ-1)
 
 ### Added
