@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { User } from "next-auth";
-import { Home, MessageCircle, MessageSquarePlus, History, Settings2 } from "lucide-react";
+import { Home, MessageCircle, MessageSquarePlus, History } from "lucide-react";
 import { generateUUID, getChatUrl } from "@/lib/utils";
 import { SidebarHistory } from "@/components/sidebar-history";
 import { SidebarUserNav } from "@/components/sidebar-user-nav";
@@ -181,17 +181,6 @@ export function AppSidebar({ user }: AppSidebarProps) {
                     <Link href={getAllChatsHref()} onClick={() => setOpenMobile(false)}>
                       <History className="size-4" />
                       <span>{getAllChatsLabel()}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              {/* ТЗ-2: Dev Switchboard link — only in dev mode */}
-              {process.env.NEXT_PUBLIC_SIMPLY_DEV_MODE === "true" && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Dev Models">
-                    <Link href="/dev/models" onClick={() => setOpenMobile(false)}>
-                      <Settings2 className="size-4" />
-                      <span>Dev Models</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
