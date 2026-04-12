@@ -32,7 +32,7 @@
 | **Три уровня персонализации** | Профиль + RAG + Chat Memory | Профиль ✅, RAG extract+retrieve+consolidation+profile ✅ v3.72.0, Memory 📋 |
 | **Best-in-Class инструменты** | Perplexity ✅, Plus AI, Ideogram, AssemblyAI | 🔄 Фаза 1 |
 | **Запись встречи** | Аудио → Deepgram транскрипция → Claude резюме (3 формата, инструкции, регенерация, PDF) | ✅ v3.62.0 |
-| **AI-провайдер** | Мультипровайдер через Core Registry (`getModel(taskId)`): Anthropic Claude, MiniMax M2.7, Gemini TTS, Voyage, Deepgram, Perplexity. xAI + OpenRouter — в catalog, зарезервированы | ✅ v3.83.0 |
+| **AI-провайдер** | Мультипровайдер через Core Registry (`getModel(taskId)`): Anthropic Claude, MiniMax M2.7, xAI Grok, OpenRouter (z.ai GLM, Qwen). Non-LLM: Gemini TTS, Voyage, Deepgram, Perplexity (raw fetch, не registry) | ✅ v3.83.0 |
 | **Core Model Registry** | SSOT для 39 AI-точек: task-assignments → catalog → registry. Смена модели = одна строка. `ai_usage_log.provider` column. Capability-driven thinking guard | ✅ v3.83.0 |
 | **Dev Switchboard** | `/dev/models` — переключение модели для любой задачи в dev. Per-message switcher в DevPanel. File-based overrides. Catalog audit workflow | ✅ v3.84.0 |
 | **Smart Routing** | Автовыбор модели для экономии без потери качества | 📋 |
@@ -324,6 +324,7 @@ components/projects/
 |------|------------|
 | Frontend | Next.js 15.3, React 18, TypeScript, Tailwind CSS |
 | AI Registry | **Core Model Registry** (v3.83): `lib/ai/getModel.ts` + `task-assignments.ts` + `model-catalog.ts` + `registry.ts` — единая точка для 39 AI-точек |
+| Dev Switchboard | **`/dev/models`** (v3.84, dev-only) — переключение модели для любой из 39 задач через UI. File-based overrides + DevPanel quick-switch. Catalog audit workflow в `docs/model-catalog-ops.md` |
 | AI SDK | `ai@6.x` + `@ai-sdk/anthropic@3.x` + `@ai-sdk/google@3.x` + `@ai-sdk/xai@3.x` + `@ai-sdk/react@3.x` + `vercel-minimax-ai-provider` + `@openrouter/ai-sdk-provider` + `@google/genai` (Podcast TTS) |
 | AI Providers (в registry) | Anthropic, MiniMax (default + long 180s), xAI, OpenRouter |
 | AI Providers (non-LLM) | Voyage (embeddings), Deepgram (STT), Perplexity (deep research), Gemini TTS |
@@ -336,6 +337,99 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-2: Dev Switchboard UI — ✅ ЗАВЕРШЁН (v3.84.0)
+
+**Проблема:** После ТЗ-1 (Core Model Registry) появилась единая точка `getModel(taskId)`, но не было способа быстро переключать модели для отдельных задач во время разработки. Чтобы протестировать другую модель, приходилось править `task-assignments.ts` и перезапускать. Это блокировало эксперименты с моделями и промптами — основной use case для разработчика и архитектора при подготовке ТЗ.
+
+**Решение:** Dev-only switchboard на трёх уровнях:
+1. Страница `/dev/models` — полная карта 39 задач с переключением через dropdown
+2. Switchboard секция в DevPanel drawer — quick-switch прямо в чате
+3. Footer badge OVERRIDE — визуальная индикация активного override
+
+Override хранится в `.simply-dev-overrides.json` (в `.gitignore`). Triple dev-gate (`SIMPLY_DEV_MODE`) гарантирует что в prod эта функциональность полностью изолирована — страница 404, Server Actions throw, lookupOverride возвращает silent null.
+
+**ВАЖНО:** Это **dev-инструмент только для разработчика и архитектора**. Конечный пользователь его никогда не видит. Ссылки в продуктовой навигации (sidebar, UserMenu) НЕТ — доступ только через прямой URL `/dev/models` или DevPanel.
+
+**Выполнено (5 этапов):**
+
+- **Stage 1 — Backend overrides + footer badge** (`07ba690`):
+  - `lib/ai/model-overrides.ts` — client-safe: dev-gate, parse, reader callback
+  - `lib/ai/model-overrides-node.ts` — server-only (`import "server-only"`): `fs.readFileSync/writeFileSync` reader, регистрирует себя в shared модуле при import
+  - Side-effect import `import "@/lib/ai/model-overrides-node"` в `chat/route.ts`
+  - DevPanel footer badge «⚙ OVERRIDE» (жёлтый) при `data.prompt.overrideActive`
+  - **3 попытки backend** до финального решения: cookies через next/headers (Next 15 async API ломал) → AsyncLocalStorage + cookie header (Chrome DevTools ненадёжен) → file-based (стабильное решение)
+
+- **Stage 2 — `/dev/models` page** (`d716d61`):
+  - Server Component: dev-gate `notFound()` + auth + загрузка 39 задач + каталог + ENV-статусы 8 провайдеров
+  - Server Actions: `setOverride`, `clearTaskOverride`, `resetAllOverrides`
+  - Client Component: 4 секции (LLM Providers, Raw Providers, Task Assignments с inline dropdown, Model Catalog), live filter, capability warnings
+
+- **Stage 2 бонусный рефакторинг — Catalog SSOT for capabilities** (`882b525`):
+  - Обнаружено в ходе тестов: override `simply-chat → Haiku` НЕ включал prompt caching. Корневая причина: `chat/route.ts` угадывал `isAnthropicModel` из `chatMode/think/hasAttachments`, а не из catalog entry
+  - Добавлен `supportsCompaction: boolean` в `ModelCapabilities`
+  - `chat/route.ts` теперь резолвит `effectiveCatalogEntry` через catalog, флаги `isAnthropicModel`/`modelSupportsCompaction`/`needsSnapshotFallback` — все через caps
+  - Подтверждено end-to-end: `Cache read: 16 315` появился в DevPanel (до фикса было 0)
+
+- **Stage 2 catalog refresh** (`1a98c64`): WebFetch верификация цен через OpenRouter API + docs.x.ai — обновлены 11 моделей (5 OpenRouter + 6 Grok), добавлены 2 vision-модели OpenRouter (GLM 4.6V, GLM 5V Turbo), новый preset `CAPS_OPENROUTER_VISION`
+
+- **Stage 3 — Per-message Switcher в DevPanel** (`2469605`):
+  - `components/dev-panel/sections/switchboard-section.tsx` — секция в DevPanel drawer
+  - `components/shared/model-select.tsx` — shared dropdown (вынесен из dev-models-client, переиспользуется в обоих местах)
+  - Apply / Reset / ссылка на полный switchboard
+
+- **Stage 4 — Polish + Catalog Audit** (`ed77812` + `d8a944a`):
+  - Toast + undo через sonner на `/dev/models` (5s window)
+  - Prod smoke test пройден (`SIMPLY_DEV_MODE=false` → /dev/models 404)
+  - **Создан Workflow-документ `docs/model-catalog-ops.md`** — для систематического аудита каталога: добавление моделей, проверка цен через API провайдеров (с конкретными URL), верификация capabilities, кэширование per provider, чеклист регулярного аудита
+  - **Catalog audit fixes** (по результатам прогона Workflow через WebFetch к API всех провайдеров):
+    - `qwen/qwen3.6-plus` vision: false → true (OpenRouter API подтвердил text+image+video modality)
+    - `claude-opus-4-6` maxOutput: 32K → 128K (Anthropic docs)
+    - `grok-4` помечен DEPRECATED (не в docs.x.ai)
+    - Добавлен комментарий про haiku Extended Thinking (поддерживается, но cost-control решение держать false)
+  - **Откат:** ссылка "Dev Models" в sidebar была добавлена и сразу убрана — dev-инструмент не должен лезть в продуктовую навигацию
+
+- **Stage 5 — Финализация** (`32d2862`): ADR 048, обновление docs (CLAUDE.md, SIMPLY_STATUS, architecture, design-system, CHANGELOG), version 3.83 → 3.84, архив
+
+**Архитектурные решения:**
+
+1. **File-based вместо cookies** — `.simply-dev-overrides.json` в корне (`.gitignore`). JSON-формат `{ "taskId": "catalogId" }`. Стабильно через hot-reloads, не зависит от Next 15 async cookies API, не требует AsyncLocalStorage.
+
+2. **Triple dev-gate** — три независимых уровня изоляции prod:
+   - `lookupOverride()` → silent null если `!isSimplyDevMode`
+   - `/dev/models` page → `notFound()` если `!isSimplyDevMode`
+   - Server Actions → `throw` если `!isSimplyDevMode`
+
+3. **Catalog SSOT для capabilities** — больше нигде в коде нет угадывания провайдера/возможностей. `chat/route.ts` всегда читает `effectiveCatalogEntry.capabilities`. Это починило баг с cache read и упростило логику маршрутизации.
+
+4. **Никаких изменений в сигнатурах** — 39 call-sites `getModel(taskId)` не тронуты. Override применяется внутри `getModel()` через `lookupOverride()`.
+
+5. **Workflow-документ vs ad-hoc исправления** — пользователь нашёл ошибку в каталоге (qwen vision). Вместо точечного фикса создан Workflow-документ + прогнан полный аудит через API провайдеров → исправлены ВСЕ найденные расхождения разом. Документ теперь можно использовать для регулярных еженедельных аудитов.
+
+**Известные ограничения (вынесены в OPEN QUESTIONS, не входят в скоуп ТЗ-2):**
+
+1. **Кэш истории сообщений** — `cacheControl: { type: 'ephemeral' }` ставится только на system prompt. История user/assistant сообщений летит fresh каждый запрос. В длинном диалоге это съедает основную часть экономии кэша.
+
+2. **Grok / OpenRouter caching** — каталог содержит `cachedInput` цены, но `cacheControl` в `chat/route.ts` подставляется ТОЛЬКО для Anthropic. Для override на Grok/OpenRouter `cache_read` всегда 0 в DevPanel → отображаемая стоимость = fresh price.
+
+3. **Raw-fetch сервисы НЕ переключаемы** — Perplexity (deep research), Deepgram (voice), Voyage (embeddings), Gemini TTS используют прямые fetch вне registry. Для их подключения к switchboard потребуется отдельное ТЗ с рефакторингом каждого сервиса.
+
+4. **Tiered pricing** (Qwen 3.6 Plus >256K = $1.30/$3.90 vs base $0.325/$1.95) не поддержан в каталоге — `ModelPricingUsd` хранит только base tier, cost tracking занижает для длинных контекстов.
+
+**Ключевые файлы:**
+
+- `lib/ai/model-overrides.ts` + `model-overrides-node.ts` — backend overrides
+- `lib/ai/getModel.ts::lookupOverride()` — точка применения override
+- `lib/ai/model-catalog.ts` — `supportsCompaction` flag, audit fixes
+- `app/(dashboard)/dev/models/{page,actions,dev-models-client}.tsx` — UI
+- `components/dev-panel/sections/switchboard-section.tsx` — DevPanel switcher
+- `components/shared/model-select.tsx` — shared dropdown
+- `app/(chat)/api/chat/route.ts` — catalog SSOT для capabilities (effectiveCatalogEntry)
+- `.simply-dev-overrides.json` — runtime SSOT (gitignored)
+- `docs/model-catalog-ops.md` — Workflow для аудита каталога
+- **ADR:** [048-dev-switchboard-ui](docs/decisions/048-dev-switchboard-ui.md)
+
+---
 
 ### ТЗ-1: CoreRegistry — Task-based Model Resolution — ✅ ЗАВЕРШЁН (v3.83.0)
 
@@ -379,7 +473,7 @@ components/projects/
 
 **Главное архитектурное достижение:** Во время Stage 3 мануального тестирования **одной строкой в `task-assignments.ts`** переключили 8 taskId (chat:sonnet/opus, project:expert:haiku/sonnet/opus, professor:planning/review/pipeline-{analyze,synthesize}) с Opus/Sonnet на Haiku. Все call-sites автоматически подхватили новую модель через `getModel()` + HMR. **Это именно тот use case, ради которого строился Core Registry** — возможность переключать модели без касания call-sites.
 
-**Готовность к ТЗ-2 (User Overrides):** Сигнатура `getModel(taskId, context?: GetModelContext)` стабильна. `GetModelContext` уже принимает `{ userId?, requestCookies? }`, `lookupOverride()` — stub возвращает `null`. В ТЗ-2 потребуется только активировать `lookupOverride` без правок call-sites.
+**Готовность к ТЗ-2 (Dev Overrides):** Сигнатура `getModel(taskId, context?: GetModelContext)` стабильна. `lookupOverride()` — stub возвращает `null`. В ТЗ-2 активируется без правок call-sites. (Реализовано в v3.84.0 — см. секцию ниже.)
 
 **Ключевые файлы:**
 - `lib/ai/getModel.ts` — SSOT резолва моделей
