@@ -283,21 +283,19 @@ UI слои:
 
 ## Этап 4: Polish + edge cases
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (2026-04-12)
 
 **Цель:** Отполировать UX, покрыть edge cases, убедиться что ничего не течёт в prod.
 
 **Задачи:**
-- [ ] Toast + undo через sonner (5s window)
-- [ ] Warning-иконка в dropdown если capabilities модели не совпадают с категорией задачи
-  - Простая эвристика: если taskId содержит `vision` → warning если `!capabilities.vision`
-  - Если `embedding` → warning если `!embeddings`
-- [ ] Keyboard shortcut: `Cmd+K` на `/dev/models` → focus на search/task filter (nice-to-have)
-- [ ] Ссылка в UserMenu / Sidebar на `/dev/models` — **только** при `NEXT_PUBLIC_SIMPLY_DEV_MODE=true` (в dashboard sidebar)
-- [ ] Проверить что cookie flag `httpOnly=false` чтобы localStorage-зеркало работало (или `httpOnly=true` + полагаться только на server rerender)
-  - Решение: `httpOnly=false` + `SameSite=Lax` + `path=/` — cookie читается клиентом для instant feedback
-- [ ] Prod smoke test: сборка + start + заход на `/dev/models` → 404
-- [ ] Prod smoke test: подсунуть cookie `x-model-overrides` вручную в prod → убедиться что игнорируется
+- [x] Toast + undo через sonner (5s window) — handleSet/handleClear с undo action
+- [x] Warning-иконка в dropdown если capabilities модели не совпадают с категорией задачи
+  - Реализовано в shared ModelSelect (taskRequiresCapability) ещё на Этапе 2
+- [x] Ссылка в Sidebar на `/dev/models` — **только** при `NEXT_PUBLIC_SIMPLY_DEV_MODE=true` (Settings2 icon)
+- [x] Prod smoke test: `SIMPLY_DEV_MODE=false npm run build` — успешен, `/dev/models` → auth redirect (middleware) → notFound (dev gate)
+- [x] Model catalog audit: docs/model-catalog-ops.md + исправлены 5 ошибок в каталоге (qwen vision, opus maxOutput, grok-4 deprecated, haiku thinking note, grok context note)
+- [ ] ~~Keyboard shortcut Cmd+K~~ — отложен (nice-to-have)
+- [ ] ~~cookie httpOnly check~~ — N/A (file-based overrides, не cookie)
 
 **Файлы:**
 - `app/(dev)/dev/models/*` — мелкие правки
@@ -305,12 +303,11 @@ UI слои:
 - `components/app-sidebar.tsx` или UserMenu — dev link
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Prod smoke: `SIMPLY_DEV_MODE=false npm run build && npm start` → `/dev/models` → 404
-- [ ] Prod smoke: cookie подсунут вручную → дефолт используется
-- [ ] Toast undo работает — ставишь override, жмёшь undo, override уходит
-- [ ] 🧪 Мануальный тест пользователем: полный сценарий (dev + prod)
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен (dev + prod)
+- [x] Prod smoke: `SIMPLY_DEV_MODE=false npm run build && npm start` → `/dev/models` → redirect/404
+- [x] Toast undo работает — ставишь override, жмёшь undo, override уходит
+- [x] 🧪 Мануальный тест пользователем: toast, undo, dev-link в sidebar, catalog fixes на /dev/models — ОК
 
 **Git:** `git commit -m "feat(tz-2): polish, edge cases, dev-link in sidebar"`
 

@@ -499,6 +499,7 @@ vercel --prod            # Deploy на Vercel
 **Техническая (AI):**
 - [docs/ai-chats-map.md](docs/ai-chats-map.md) — **Карта всех чатов и моделей (SSOT)**
 - [docs/ai-providers.md](docs/ai-providers.md) — Провайдеры, модели, цены
+- [docs/model-catalog-ops.md](docs/model-catalog-ops.md) — **Workflow: аудит каталога, добавление моделей, кэширование**
 - [docs/ai-minimax.md](docs/ai-minimax.md) — **MiniMax M2.7 — интеграция, pricing, ограничения**
 - [docs/ai-agents.md](docs/ai-agents.md) — Система промптов и помощники
 - [docs/ai-artifacts.md](docs/ai-artifacts.md) — Документы в холсте

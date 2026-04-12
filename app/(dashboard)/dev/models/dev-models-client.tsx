@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -232,14 +233,51 @@ export function DevModelsClient({ data }: { data: DevModelsPageData }) {
   }, [filter, data.tasks]);
 
   const handleSet = (taskId: string, catalogId: string) => {
+    // Remember previous value for undo
+    const prev = data.tasks.find((t) => t.taskId === taskId);
+    const prevCatalogId = prev?.effectiveCatalogId;
+
     startTransition(async () => {
       await setOverride(taskId, catalogId);
+      toast(`Override: ${taskId} → ${catalogId}`, {
+        action: prevCatalogId
+          ? {
+              label: "Undo",
+              onClick: () => {
+                startTransition(async () => {
+                  if (prev?.hasOverride) {
+                    await setOverride(taskId, prevCatalogId);
+                  } else {
+                    await clearTaskOverride(taskId);
+                  }
+                });
+              },
+            }
+          : undefined,
+        duration: 5000,
+      });
     });
   };
 
   const handleClear = (taskId: string) => {
+    const prev = data.tasks.find((t) => t.taskId === taskId);
+    const prevCatalogId = prev?.effectiveCatalogId;
+
     startTransition(async () => {
       await clearTaskOverride(taskId);
+      toast(`Reset: ${taskId} → default`, {
+        action: prevCatalogId
+          ? {
+              label: "Undo",
+              onClick: () => {
+                startTransition(async () => {
+                  await setOverride(taskId, prevCatalogId);
+                });
+              },
+            }
+          : undefined,
+        duration: 5000,
+      });
     });
   };
 
@@ -247,6 +285,7 @@ export function DevModelsClient({ data }: { data: DevModelsPageData }) {
     if (!confirm("Reset ALL overrides?")) return;
     startTransition(async () => {
       await resetAllOverrides();
+      toast("All overrides cleared");
     });
   };
 

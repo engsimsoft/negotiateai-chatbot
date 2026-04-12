@@ -159,6 +159,10 @@ const ENTRIES: ModelEntry[] = [
     modelId: "claude-haiku-4-5-20251001",
     displayName: "Claude Haiku 4.5",
     pricing: { input: 1, output: 5, cachedInput: 0.1, cacheWrite: 1.25 },
+    // Haiku 4.5 supports Extended Thinking per Anthropic docs (2026-04-12),
+    // but we keep thinking:false as a deliberate cost-control choice — enabling
+    // thinking on Haiku would increase token usage without clear benefit for
+    // the utility tasks it handles (title gen, file analysis, OCR, snapshots).
     capabilities: { ...CAPS_CLAUDE, thinking: false, supportsCompaction: false },
     contextWindow: 200_000,
     maxOutput: 64_000,
@@ -171,7 +175,7 @@ const ENTRIES: ModelEntry[] = [
     pricing: { input: 5, output: 25, cachedInput: 0.5, cacheWrite: 6.25 },
     capabilities: CAPS_CLAUDE,
     contextWindow: 1_000_000,
-    maxOutput: 32_000,
+    maxOutput: 128_000, // Updated 2026-04-12: Anthropic increased from 32K to 128K
   },
   // Legacy snapshot — остаётся в pricing для старых записей ai_usage_log
   {
@@ -220,7 +224,7 @@ const ENTRIES: ModelEntry[] = [
     pricing: { input: 5, output: 25, cachedInput: 0.5, cacheWrite: 6.25 },
     capabilities: CAPS_CLAUDE,
     contextWindow: 1_000_000,
-    maxOutput: 32_000,
+    maxOutput: 128_000,
     aliasOf: "claude-opus-4-6",
   },
   {
@@ -273,9 +277,12 @@ const ENTRIES: ModelEntry[] = [
   },
 
   // =========================================================================
-  // xAI Grok — verified against docs.x.ai/docs/models (fetched 2026-04-12).
-  // All 4.20 variants (reasoning/non-reasoning/multi-agent) share the same
-  // $2/$6 pricing. Cached input is ~10% of fresh for both tiers.
+  // xAI Grok — pricing verified against docs.x.ai/docs/models (2026-04-12).
+  // All 4.20 variants share $2/$6, Fast tier $0.20/$0.50. Cached input ~10%.
+  //
+  // Context window: docs.x.ai reports 2M for all models, but this may be
+  // aspirational. Using conservative values (256K/128K) until confirmed via
+  // actual API testing. Re-check at next audit.
   // =========================================================================
   {
     id: "grok-4.20-0309-reasoning",
@@ -340,7 +347,7 @@ const ENTRIES: ModelEntry[] = [
     capabilities: { ...CAPS_GROK, thinking: false },
     contextWindow: 256_000,
     maxOutput: 16_000,
-    notes: "Not in current docs.x.ai models list — pricing is an educated guess",
+    notes: "DEPRECATED — not in docs.x.ai models list (2026-04-12). Pricing is an educated guess. Prefer grok-4.20-0309-* or grok-4-1-fast-*.",
   },
 
   // =========================================================================
@@ -378,7 +385,7 @@ const ENTRIES: ModelEntry[] = [
     // $1.30/$3.90. ModelPricingUsd has no tier support yet, so we store the
     // base ≤256K tier. Cost tracking underestimates for requests >256K input.
     pricing: { input: 0.325, output: 1.95, cachedInput: 0, cacheWrite: 0 },
-    capabilities: CAPS_OPENROUTER_TEXT,
+    capabilities: CAPS_OPENROUTER_VISION, // Verified 2026-04-12: OpenRouter reports modality text+image+video→text
     contextWindow: 1_000_000,
     maxOutput: 65_536,
     notes: "Tiered pricing: >256K input tokens cost 4× base ($1.30/$3.90). Catalog stores base tier only.",
