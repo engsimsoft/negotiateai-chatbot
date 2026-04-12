@@ -49,23 +49,26 @@
 
 ## Этап 1: Переключение MiniMax namespace на Anthropic-compat
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (2026-04-13, commit `5fdfcd6`)
 
 **Цель:** MiniMax работает через Anthropic-compatible API (`api.minimax.io/anthropic`), метрики кэша становятся видны автоматически, все существующие фичи продолжают работать.
 
 **⛔ НЕ начинать до завершения Этапа 0.**
 
 **Задачи:**
-- [ ] Заменить `createMinimaxOpenAI` → `createMinimax` в `lib/ai/registry.ts` (для `minimax` и `minimaxLong`)
-- [ ] Явно передать `apiKey: process.env.MINIMAX_API_KEY` (раньше был implicit)
-- [ ] `npx tsc --noEmit` → 0 ошибок
-- [ ] Smoke-тест 1: Simply Chat текст (MiniMax M2.7) — 2 сообщения подряд, визуально проверить DevPanel tokens-section (cache поля должны появиться)
-- [ ] Smoke-тест 2: Briefing generation на тестовой теме — один запуск через UI, мониторить что работает без ошибок
-- [ ] Smoke-тест 3: Podcast script generation — короткий скрипт, проверить без ошибок
-- [ ] Smoke-тест 4: MIND extract через `generateObject` — один extract с тестового сообщения. **Критическая точка**: если `generateObject` падает в Anthropic-compat mode → rollback и разбор.
-- [ ] Smoke-тест 5: MIND consolidate — если extract прошёл, запустить consolidate
-- [ ] SQL через mcp__postgres__query после тестов — проверить, что UsageLog содержит ненулевые cacheReadTokens/cacheWriteTokens для MiniMax строк
-- [ ] Git commit
+- [x] Заменить `createMinimaxOpenAI` → `createMinimax` в `lib/ai/registry.ts` (для `minimax` и `minimaxLong`)
+- [x] Явно передать `apiKey: process.env.MINIMAX_API_KEY`
+- [x] **Удалить хак** `config.includeUsage = true` в `lib/ai/getModel.ts:171-179` — не нужен в Anthropic-compat режиме
+- [x] `npx tsc --noEmit` → 0 ошибок
+- [x] `npm run build` → успех
+- [x] Integration тест `scripts/test-minimax-via-registry.ts` → `getModel('simply-chat')` и `getModel('briefing:filter')` резолвятся корректно
+- [x] 🧪 Мануальный тест 1: Simply Chat текст — MiniMax M2.7, usage пишется корректно
+- [x] 🧪 Мануальный тест 2: Simply Chat второе сообщение — **cacheRead 13883 (96.8% hit)**, стоимость $0.0044 → $0.0011 (4×)
+- [x] 🧪 Мануальный тест 3: Simply «Думать» — переключение на Haiku работает, cacheWrite 19065 native
+- [x] 🧪 Мануальный тест 4: Briefing generation — filter + author pipeline через `minimaxLong` отработал (153с, $0.0074 + $0.0022), usage корректен
+- [~] 🧪 Мануальный тест 5: Service-chat — **пропущено**: система deprecated по решению пользователя 2026-04-13
+- [x] SQL после тестов: `cacheWriteTokens` у MiniMax всё ещё 0 (ожидаемо — explicit breakpoints добавляются в Этапе 3, сейчас работает только passive auto-cache)
+- [x] Git commit `5fdfcd6`
 
 **Файлы:**
 - `lib/ai/registry.ts` — замена фабрики
@@ -87,33 +90,33 @@
 
 ## Этап 2: Code Health Cleanup (оздоровление кода)
 
-**Статус:** ⬜ Не начат
+**Статус:** 🔄 Код готов, ждём мануального smoke-теста (commit ожидается)
 
 **Цель:** Убрать все костыли, связанные с MiniMax, которые остались от предыдущего агента. Переписать лживую документацию. Привести подключение в эталонное состояние.
 
 **⛔ НЕ начинать до подтверждения Этапа 1 пользователем.**
 
 **Задачи — ревизия костылей:**
-- [ ] **Удалить/обновить `scripts/test-minimax.ts`** — содержит ложные утверждения о `minimaxAnthropic (prev)`. Либо полностью переписать (убрать сравнительную таблицу с fake-данными), либо удалить и заменить на `test-minimax-anthropic-compat.ts` (созданный в Этапе 0) как единственный источник правды.
-- [ ] **Удалить/обновить `scripts/test-minimax-generate-object.ts`** — использует `createMinimaxOpenAI` и `includeUsage` hack. Обновить на `createMinimax` или удалить (покрыто test-minimax-anthropic-compat.ts Test 3).
-- [ ] **Удалить/обновить `scripts/test-think-models.ts`** — проверить, что там за логика, актуален ли.
-- [ ] **Проверить `lib/ai/chat-mode-config.ts` и `lib/ai/task-assignments.ts`** — что-то про MiniMax может быть завязано на старый namespace или включать обходные пути.
-- [ ] **Проверить `app/(chat)/api/chat/route.ts`** — найти все упоминания `isSimplyNonAnthropicModel`, `stripMiniMaxToolParts`, `stripMediaPartsForTextModel`. Определить, какие из них теперь избыточны в Anthropic-compat режиме, а какие остаются валидными (vision всё ещё нет → strip media всё ещё нужен).
-- [ ] **Проверить `providerOptions` compactionOptions** — сейчас отключён для MiniMax через `isSimplyNonAnthropicModel`. MiniMax Anthropic-compat API **игнорирует** Context Management (подтверждено их документацией), значит логику оставляем: compaction только для реального Anthropic. Но переименовать переменную, если её название вводит в заблуждение.
-- [ ] **`lib/ai/memory/extract.ts`** — проверить, есть ли там `as any` хаки или обходные пути.
-- [ ] **`lib/briefing/briefing-author.ts`, `briefing-filter.ts`, `briefing-section-author.ts`** — проверить, нет ли `includeUsage` хака или обходных путей для MiniMax.
-- [ ] **`lib/podcast/script-generator.ts`** — то же самое.
+- [x] **Удалены untracked мусорные скрипты** (`scripts/test-minimax.ts`, `test-minimax-generate-object.ts`, `test-think-models.ts`) — они не в git, локально использовали `createMinimaxOpenAI` + `includeUsage` хак. Единый референс — `test-minimax-anthropic-compat.ts` (в git).
+- [x] **`app/(chat)/api/chat/route.ts`** — переименована `stripMiniMaxToolParts` → `stripLegacyOpenAICompatToolParts` с полным историческим docstring. **Исправлено условие применения** — теперь применяется ВСЕГДА для `chatMode === "simply"`, а не только для Anthropic ветки. Это был скрытый баг: после Этапа 1 Simply+MiniMax перестал чистить legacy parts, только 4 legacy сообщения в БД не взорвали тесты по случайности.
+- [x] **`stripMediaPartsForTextModel` — оставлена как валидная.** MiniMax не поддерживает vision ни в одном режиме → Gemini 3 Flash маршрутизация остаётся. Claude умеет vision → media parts не стриппим.
+- [x] **`isSimplyNonAnthropicModel` — оставлена.** Валидная логика для (а) temperature 0.7 (MiniMax ограничен (0, 1]) и (б) выбор strip media. Название точное, не переименовываем.
+- [x] **Compaction options** — логика корректна: применяется только для Anthropic ветки (через `compactionOptions` в `providerOptions`), MiniMax игнорирует Context Management (подтверждено официальной документацией).
+- [~] **Костыли в pipelines — ОТЛОЖЕНЫ в follow-up ТЗ.** В `lib/podcast/script-generator.ts`, `lib/briefing/briefing-author.ts`, `lib/briefing/research-engine.ts`, `lib/briefing/briefing-filter.ts`, `lib/briefing/briefing-section-author.ts`, `lib/ai/memory/extract.ts` обнаружен хардкод `cacheReadTokens: 0`/`cacheWriteTokens: 0` + `as any` cast (ручной accumulator `totalPromptTokens` теряет cache поля). После переключения на Anthropic-compat MiniMax начнёт возвращать эти поля, но pipeline-код их игнорирует. **НЕ правим** потому что файлы содержат uncommitted changes от замороженного ТЗ-MindArtifacts — правка приведёт к merge-конфликту. Зафиксировано в `ANALYSIS.md → Technical debt` как follow-up ТЗ после разморозки MindArtifacts.
+- [~] **`app/(chat)/api/service-chat/route.ts`** — не трогаем, система deprecated (2026-04-13, подтверждение пользователя).
 
 **Задачи — документация (переписать, не копировать):**
-- [ ] **`docs/ai-minimax.md`** — полностью переписать:
-  - Удалить раздел 3 («используется `minimaxOpenAI`, НЕ `minimax`. Причина: Anthropic endpoint не возвращает cache tokens») — это лживое утверждение
-  - Удалить костыль `includeUsage: true` через `as any` — не нужен в новой реализации
-  - Обновить раздел 5 «Автоматическое кэширование»: добавить секцию про explicit cache breakpoints
-  - Обновить раздел 7 «Ограничения модели»: убрать строку «generateObject не работает» (это ложь), обновить stop_sequences/top_k (они не используются в Anthropic-compat mode — это НЕ наша проблема)
-  - Обновить раздел 10 «Известный технический долг»: пункты 1 (includeUsage hack), 3 (cacheWriteTokens=0), 6 (generateObject) — **закрываются** этим ТЗ
-  - Добавить Feature matrix OpenAI-compat vs Anthropic-compat с обоснованием выбора
-- [ ] **`docs/ai-providers.md`** — обновить секцию MiniMax: baseURL, фабрика, features, pricing
-- [ ] **`docs/ai-chats-map.md`** — свериться с новым `lib/ai/registry.ts`
+- [x] **`docs/ai-minimax.md`** — полностью переписан с нуля. Удалены все лживые утверждения:
+  - ❌ «используется `minimaxOpenAI`, НЕ `minimax`. Причина: Anthropic endpoint не возвращает cache tokens» — ложь
+  - ❌ «generateObject не работает (провайдер не реализует responseFormat)» — ложь, работает через `mode: "tool"`
+  - ❌ «Кнопка Думать → Sonnet» — на деле Haiku 4.5 (проверено в логах Этапа 1)
+  - ❌ Костыль `includeUsage: true` через `as any` — удалён из кода, удалён из документации
+  - ✅ Добавлен раздел про passive auto-cache + explicit cacheControl breakpoints с реальными метриками из Этапа 1 (96.8% hit rate, 4× экономия)
+  - ✅ Добавлен раздел 10 про `stripLegacyOpenAICompatToolParts` с условием удаления (legacy в БД → 0)
+  - ✅ Добавлена полная история миграций, включая честное признание ошибки в v3.77 и откат в v3.85
+- [x] **`docs/ai-providers.md`** — секция MiniMax обновлена: `createMinimax()` фабрика, `api.minimax.io/anthropic/v1` endpoint, прокси через `AnthropicMessagesLanguageModel`, детальное описание prompt caching (passive + explicit), ссылка на ADR 049 (создаётся в Этапе 6)
+- [x] **`docs/architecture.md:113`** — обновлена строка про `vercel-minimax-ai-provider`: «Anthropic-compatible для MiniMax, прокси через @ai-sdk/anthropic/internal»
+- [x] **`docs/ai-chats-map.md`** — grep показал, что устаревших упоминаний `createMinimaxOpenAI`/`api.minimax.io/v1` нет — файл синхронен с новым кодом
 
 **Задачи — валидация:**
 - [ ] `npx tsc --noEmit` — 0 ошибок
@@ -121,12 +124,12 @@
 - [ ] Все MiniMax точки (Simply Chat, briefing, podcast, MIND) продолжают работать — smoke повтор
 
 **Файлы:**
-- `scripts/test-minimax.ts` — удалить или переписать
-- `scripts/test-minimax-generate-object.ts` — удалить или переписать
-- `scripts/test-think-models.ts` — проверить
-- `app/(chat)/api/chat/route.ts` — возможное упрощение условий
-- `app/(chat)/api/service-chat/route.ts` — то же
-- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — то же
+- `scripts/test-minimax.ts` — **удалить** (untracked, не в git, использует костыль `includeUsage`)
+- `scripts/test-minimax-generate-object.ts` — **удалить** (untracked, функция покрыта `test-minimax-anthropic-compat.ts:test3`)
+- `scripts/test-think-models.ts` — **удалить или сохранить** (untracked, проверить актуальность)
+- `app/(chat)/api/chat/route.ts` — упрощение: убрать избыточные условия `isSimplyNonAnthropicModel`, `stripMiniMaxToolParts`
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — то же, если есть MiniMax-специфичная логика
+- ~~`app/(chat)/api/service-chat/route.ts`~~ — **deprecated** (не трогаем, решение пользователя 2026-04-13)
 - `docs/ai-minimax.md` — полное переписывание
 - `docs/ai-providers.md` — обновление секции MiniMax
 - `docs/ai-chats-map.md` — верификация
@@ -178,25 +181,24 @@
 
 ---
 
-## Этап 4: Cache breakpoints в остальных chat routes
+## Этап 4: Cache breakpoints в task-expert route
 
 **Статус:** ⬜ Не начат
 
-**Цель:** Те же 3 breakpoints в service-chat и task-expert routes.
+**Цель:** Те же 3 breakpoints в task-expert route.
+
+**Scope скорректирован 2026-04-13:** service-chat удалён из списка — система deprecated, оптимизировать нет смысла.
 
 **⛔ НЕ начинать до подтверждения Этапа 3 пользователем.**
 
 **Задачи:**
-- [ ] `app/(chat)/api/service-chat/route.ts` — те же 3 breakpoints (tools + system + last-user)
-- [ ] `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — те же 3 breakpoints
+- [ ] `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — те же 3 breakpoints (tools + system + last-user)
 - [ ] **Проверить стабильность** `projectManifest` в task-expert: если блок перестраивается на каждый запрос → НЕ кэшировать его отдельно. Если стабилен в рамках задачи → кэшировать как 4-й breakpoint.
 - [ ] `npx tsc --noEmit` → 0 ошибок
-- [ ] Smoke-тест service-chat (Бен или project-creation)
 - [ ] Smoke-тест task-expert (зайти в задачу проекта, отправить сообщение)
 - [ ] Git commit
 
 **Файлы:**
-- `app/(chat)/api/service-chat/route.ts`
 - `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`
 
 **Валидация этапа:**

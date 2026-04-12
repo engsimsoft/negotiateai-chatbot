@@ -1,248 +1,256 @@
 # MiniMax M2.7 — Интеграция в Simply
 
-**Статус:** ✅ Внедрена и проверена в production
-**Версия проекта:** 3.82.0
-**Дата последнего аудита:** 2026-04-10
+**Статус:** ✅ В production через официальный Anthropic-compatible режим
+**Версия проекта:** 3.85.0 (после ТЗ-CacheAudit)
+**Дата последнего аудита:** 2026-04-13
 
 > Этот документ — единственный источник правды по MiniMax M2.7 в Simply.
-> ADR: [043-minimax-simply-routing.md](decisions/043-minimax-simply-routing.md), [046-podcast-tts-revert-and-briefing-stability.md](decisions/046-podcast-tts-revert-and-briefing-stability.md)
-
-## История миграций
-
-- **v3.77.0** — MiniMax M2.7 для Simply Chat (text)
-- **v3.80.0 (ТЗ-Briefing-1)** — Briefing Filter + Author переведены с Gemini/Sonnet на MiniMax M2.7. Цена брифинга: $0.074 → $0.011 (6.6×)
-- **v3.81.0 (ТЗ-Briefing-2)** — Podcast Script + TTS переведены на MiniMax (Speech 2.8 HD)
-- **v3.82.0 (ТЗ-MapReduce)** — TTS откачен на Gemini Flash TTS (качество хуже + 53× дороже). Script остался на M2.7. Map-Reduce для Author отклонён (sequential streamText socket bug — монолит стабилен на 26K+ tokens)
+> Актуальные ADR: [043-minimax-simply-routing.md](decisions/043-minimax-simply-routing.md), [046-podcast-tts-revert-and-briefing-stability.md](decisions/046-podcast-tts-revert-and-briefing-stability.md), [049-minimax-anthropic-compat-mode.md](decisions/049-minimax-anthropic-compat-mode.md).
 
 ---
 
-## 1. Зачем MiniMax M2.7
+## 1. Что такое MiniMax M2.7 для Simply
 
-| Параметр | Haiku 4.5 (было) | MiniMax M2.7 (сейчас) |
-|----------|-------------------|------------------------|
+MiniMax M2.7 — основная текстовая LLM проекта для задач, где Claude избыточен по цене или нужна специфика MiniMax. Применяется в Simply Chat (текст), briefing pipeline (filter + author + section + podcast-script), memory (extract-batch + consolidate + profile).
+
+| Параметр | Haiku 4.5 (было до v3.77) | MiniMax M2.7 (сейчас) |
+|---|---|---|
 | Intelligence Index | 31 | 50 (уровень Opus) |
-| Input | $0.80/M | $0.30/M |
-| Output | $4.00/M | $1.20/M |
-| Cache Read | $0.08/M (ручная настройка) | $0.06/M (автоматический) |
-| Реальная стоимость сообщения | ~$0.005 | ~$0.001 |
-| Настройка кэша | Явный `cache_control` | Ноль конфигурации |
+| Input price | $0.80/M | **$0.30/M** |
+| Output price | $4.00/M | **$1.20/M** |
+| Cache read | $0.08/M (через явный `cache_control`) | $0.03–0.06/M (passive auto-cache + explicit через Anthropic-compat) |
+| Context window | 200K | 204K |
+| Vision | ✅ | ❌ (маршрутизация на Gemini 3 Flash для image/PDF) |
 
-**Итог:** в 3-5 раз дешевле, в 1.6 раза умнее, кэш из коробки.
-
----
-
-## 2. Архитектура подключения
-
-```
-chatMode=simply (текст)     → MiniMax M2.7, thinking OFF
-chatMode=simply (вложения)  → Gemini 3 Flash (vision)
-chatMode=simply (Думать)    → Anthropic Sonnet (разово, следующее → MiniMax)
-chatMode=expertise           → Anthropic Sonnet (без изменений)
-chatMode=create              → Anthropic Sonnet (без изменений)
-Projects                     → Anthropic Haiku/Sonnet/Opus (без изменений)
-
-Briefing Filter              → MiniMax M2.7 (минимониторинг)
-Briefing Author              → MiniMax M2.7 (монолит, 26K+ tokens OK)
-Podcast Script               → MiniMax M2.7 (диалоги Host/Expert)
-Podcast TTS                  → Gemini Flash TTS (НЕ MiniMax — см. v3.82 revert)
-
-MIND extract/consolidate     → MiniMax M2.7 (batch фактов)
-```
-
-**Ключевое:** MiniMax — основная модель для всех текстовых задач (Simply, Briefing, Podcast script, MIND). НЕ используется для vision и TTS — там Gemini.
+**Итог:** ~3–5× дешевле Haiku, Intelligence Index в 1.6× выше, официальная Anthropic-совместимая интеграция.
 
 ---
 
-## 3. Технические детали реализации
+## 2. Архитектура маршрутизации
+
+```
+chatMode=simply (текст)         → MiniMax M2.7
+chatMode=simply (вложения)      → Gemini 3 Flash (vision + docs)
+chatMode=simply (Думать)        → Claude Haiku 4.5 (разово, след. сообщение → MiniMax)
+chatMode=expertise              → Claude Sonnet
+chatMode=create                 → Claude Sonnet
+Projects (expert chat)          → Claude Haiku/Sonnet/Opus (tier-based)
+
+Briefing Filter                 → MiniMax M2.7 (через minimaxLong, 180s timeout)
+Briefing Author                 → MiniMax M2.7 (через minimaxLong, монолит 26K+ tokens)
+Briefing Section                → MiniMax M2.7
+Podcast Script                  → MiniMax M2.7
+Podcast TTS                     → Gemini Flash TTS (не MiniMax, см. ADR 046)
+
+MIND memory:extract-batch       → MiniMax M2.7
+MIND memory:consolidate         → MiniMax M2.7
+MIND memory:profile             → MiniMax M2.7
+```
+
+---
+
+## 3. Технические детали подключения
 
 ### Провайдер
 
+**Пакет:** `vercel-minimax-ai-provider@0.0.2` — официальный пакет MiniMax (автор `"MiniMax"`, maintainer `dyh_sjtu@163.com`). Последняя версия на npm, опубликована 10 января 2026.
+
+**Фабрика:** `createMinimax()` — Anthropic-compatible режим (**default export пакета**, официально рекомендован самими MiniMax).
+
+**Что это значит технически:** `createMinimax()` под капотом проксирует запросы через `AnthropicMessagesLanguageModel` из `@ai-sdk/anthropic/internal`. Это **тот же класс**, что используется для обычного Claude через AI SDK v6 — все фичи Anthropic provider (streamText, tool calling, generateObject, reasoning parts, explicit cacheControl) работают автоматически. Это не отдельная реализация, а тонкая обёртка с другим baseURL и заголовками.
+
+### Registry (lib/ai/registry.ts)
+
 ```typescript
-// route.ts
-import { createMinimaxOpenAI } from "vercel-minimax-ai-provider";
+import { createMinimax } from "vercel-minimax-ai-provider";
 
-const minimaxProvider = createMinimaxOpenAI();
-function minimaxModel(modelId: string) {
-  const model = minimaxProvider(modelId) as any;
-  model.config = { ...model.config, includeUsage: true };
-  return model;
-}
+// Default namespace — 60s fetch timeout (Simply Chat, короткие вызовы)
+const minimax = createMinimax({
+  apiKey: process.env.MINIMAX_API_KEY,
+});
 
-// Вызов
-modelToUse = minimaxModel("MiniMax-M2.7");
+// Long-timeout namespace — 180s для briefing и memory pipelines с крупными промптами
+const minimaxLong = createMinimax({
+  apiKey: process.env.MINIMAX_API_KEY,
+  fetch: async (url, init) =>
+    fetch(url, { ...init, signal: AbortSignal.timeout(180_000) }),
+});
 ```
 
-**Критически важно:** используется `minimaxOpenAI` (OpenAI-совместимый endpoint), НЕ `minimax` (Anthropic-совместимый). Причина: Anthropic endpoint не возвращает cache tokens — теряется видимость кэширования и завышается стоимость.
+### Endpoint
 
-### Зависимость
-
-```
-vercel-minimax-ai-provider: ^0.0.2
-```
-
-Pre-release версия. При обновлении проверять:
-- Появилась ли опция `includeUsage` в public API (сейчас патчим через `as any`)
-- Не сломался ли маппинг usage полей
+`https://api.minimax.io/anthropic/v1` — hardcoded в пакете, заголовок `anthropic-version: 2023-06-01` ставится автоматически.
 
 ### ENV
 
 ```
-MINIMAX_API_KEY=ключ_из_platform.minimax.io
+MINIMAX_API_KEY=<ключ с platform.minimax.io>
 ```
 
-Есть в `.env.local` и `.env.example`.
+Загружается из `.env.local` локально и из Vercel Environment Variables в production.
+
+### Задачи в task-assignments.ts
+
+Все `MiniMax-M2.7` taskId резолвятся через `getModel(taskId) → registry.languageModel("minimax:MiniMax-M2.7")` или `"minimaxLong:MiniMax-M2.7"` (для briefing/memory). Model-catalog содержит алиасы для разделения namespace.
 
 ---
 
-## 4. Кнопка «Думать»
+## 4. Кнопка «Думать» в Simply
 
-Кнопка видна только при `chatMode === "simply"`. Логика:
+Видима только при `chatMode === "simply"`. Поведение:
 
 - **Не нажата** → MiniMax M2.7 (быстро, дёшево)
-- **Нажата** → Anthropic Sonnet (разово, одно сообщение)
-- **Следующее сообщение** → снова MiniMax M2.7
+- **Нажата** → `simply-chat-think` taskId → **Claude Haiku 4.5** (разово, одно сообщение)
+- **Следующее сообщение** → автоматически снова MiniMax M2.7
 
-Кнопка «Думать» = «получить более качественный ответ от более сильной модели». Не связана с thinking/reasoning режимом MiniMax.
+Кнопка = «получить качественный ответ от Anthropic модели». Какой именно Claude резолвится — определяется `DEFAULT_TASK_MODELS['simply-chat-think']` в `task-assignments.ts` (сейчас Haiku 4.5). Может быть переопределено через Dev Switchboard `/dev/models`.
 
----
-
-## 5. Автоматическое кэширование
-
-MiniMax кэширует автоматически без конфигурации. System prompt + MIND + история чата кэшируются на стороне MiniMax.
-
-**Проверено в production:**
-
-| Метрика | Значение |
-|---------|----------|
-| Cache hit rate | 97% |
-| Стоимость с кэшем | ~$0.0011/сообщение |
-| Стоимость без кэша | ~$0.0038/сообщение |
-| Экономия | 3.5x на сообщение |
-
-**Что видим в логах:**
-- `cacheReadTokens` — приходят корректно (11K+ из 11.7K total)
-- `cacheWriteTokens` — всегда 0 (MiniMax не возвращает, кэш создаётся неявно)
-- `reasoningTokens` — всегда 0 (ограничение API MiniMax, reasoning включён в outputTokens)
+**Важно:** кнопка «Думать» не связана с внутренним thinking/reasoning режимом MiniMax. MiniMax M2.7 всегда использует interleaved thinking, его нельзя отключить — это фича модели, не наш параметр.
 
 ---
 
-## 6. Pricing
+## 5. Prompt caching
 
-Файл: `lib/ai/providers.ts`, объект `MODEL_PRICING_RUB`
+MiniMax через Anthropic-compatible endpoint поддерживает **оба** уровня кэширования по документации [platform.minimax.io/docs/api-reference/anthropic-api-compatible-cache](https://platform.minimax.io/docs/api-reference/anthropic-api-compatible-cache):
+
+### Passive auto-cache (без параметров)
+
+- Срабатывает **автоматически** от 512 input tokens
+- Порядок prefix-matching: `tools → system → user messages`
+- TTL 5 минут с автообновлением при каждом hit
+- Метрика в response: `cache_read_input_tokens` → AI SDK v6 мапит в `inputTokenDetails.cacheReadTokens` → читается нашим `extractUsageFields()`
+
+**Production validation (Этап 1 ТЗ-CacheAudit, 2026-04-13):**
+- Simply Chat msg 1 (cold): `cacheReadTokens = 0`, `inputTokens = 14280`, cost $0.0044
+- Simply Chat msg 2 (follow-up): `cacheReadTokens = 13883` (**96.8% hit**), cost $0.0011
+- Экономия ~4× на втором сообщении без единой строки explicit cacheControl
+
+### Explicit cache control
+
+Доступен до **4 breakpoints** на запрос через тот же синтаксис, что у Anthropic API:
 
 ```typescript
-"MiniMax-M2.7": {
-  input: 0.03,        // $0.30/M → ₽0.03/1K
-  output: 0.12,       // $1.20/M → ₽0.12/1K
-  cached: 0.006,      // $0.06/M → ₽0.006/1K (cache read)
-  cacheWrite: 0.0375  // $0.375/M → ₽0.0375/1K
-}
+messages: [
+  {
+    role: 'system',
+    content: systemPromptText,
+    providerOptions: {
+      anthropic: { cacheControl: { type: 'ephemeral' } }
+    }
+  },
+  // ...
+]
 ```
 
-Формула расчёта:
+На уровне tools — `providerOptions.anthropic.cacheControl` ставится на tool object. TTL option: `{ type: 'ephemeral', ttl: '1h' }` (по умолчанию 5m).
 
-```
-costRub = (freshInputTokens / 1000 × 0.03)
-        + (cacheReadTokens  / 1000 × 0.006)
-        + (outputTokens     / 1000 × 0.12)
-```
+**Метрики:** `cache_creation_input_tokens` (cache write) и `cache_read_input_tokens` — возвращаются через стандартные поля AI SDK v6 `inputTokenDetails.cacheWriteTokens` и `inputTokenDetails.cacheReadTokens`.
 
-Проверено: расчёт совпадает с реальным биллингом MiniMax.
+**Pricing для M2.7:**
+- Fresh input — $0.30/M (1×)
+- Cache write — $0.375/M (1.25×)
+- Cache read — $0.03–0.06/M (~0.1× = **скидка 90%**)
+- Output — $1.20/M
 
----
-
-## 7. Ограничения модели
-
-| Что | Статус |
-|-----|--------|
-| Текст | ✅ Полная поддержка |
-| Tool calling | ✅ Полная поддержка |
-| Изображения на входе | ❌ Не поддерживает (→ Gemini 3 Flash) |
-| Документы на входе (PDF/DOCX) | ❌ Не поддерживает |
-| MCP servers | ❌ Игнорируется |
-| stop_sequences | ❌ Игнорируется |
-| top_k | ❌ Игнорируется |
-| Temperature = 0 | ❌ Вызовет ошибку! Диапазон строго (0.0, 1.0] |
-| generateObject (AI SDK) | ❌ Провайдер v0.0.2 не реализует responseFormat — возвращает Markdown |
-
-**Temperature в Simply:** 0.7 для MiniMax, 1.0 для Anthropic.
+Формула `calculateCostRub()` в `lib/ai/providers.ts` учитывает все три input-ставки через disjoint fields.
 
 ---
 
-## 8. Контекстное окно
+## 6. Ограничения MiniMax
 
-- **Максимум:** 204,800 токенов
-- **Стратегия:** Sliding Window (последние 20 сообщений, `SIMPLY_SLIDING_WINDOW_SIZE`)
-- **Compaction:** отключён для MiniMax (флаг `isSimplyNonAnthropicModel`)
-- **Snapshot:** используется стандартный механизм Simply (legacy, для Haiku)
+| Фича | Статус | Комментарий |
+|---|---|---|
+| Текст | ✅ | Полная поддержка |
+| Streaming | ✅ | Нативно через AnthropicMessagesLanguageModel |
+| System prompts | ✅ | Полная поддержка |
+| Tool calling (function call) | ✅ | JSON Schema, interleaved thinking работает |
+| `generateObject(mode: "tool")` | ✅ | Работает через tool calling под капотом AI SDK v6 |
+| Extended thinking | ✅ | Всегда включён, отключить нельзя (фича модели) |
+| Images на входе | ❌ | Не поддерживается ни в одном режиме → маршрутизация на Gemini 3 Flash |
+| Documents на входе (PDF/DOCX) | ❌ | То же самое → Gemini |
+| Temperature = 0 | ❌ | Диапазон строго `(0.0, 1.0]` — вызов с 0 вернёт ошибку |
+| `stop_sequences` | ❌ | Игнорируется в Anthropic-compat mode (нам не нужен — используем SDK-level `stopWhen`) |
+| `top_k` | ❌ | Игнорируется |
+| Anthropic MCP servers | ❌ | Не поддерживается (нам не нужно) |
+| Anthropic Context Management (Claude Compaction) | ❌ | Игнорируется MiniMax API (мы её применяем только к Claude через `isSimplyNonAnthropicModel` флаг) |
 
----
-
-## 9. DevPanel
-
-- **Модель:** отображается как «MiniMax M2.7» (маппинг в `MODEL_DISPLAY`)
-- **Токены:** inputTokens, outputTokens, cacheReadTokens — видны корректно
-- **Reasoning:** показывается 0 (ограничение API), но reasoning стримится в UI как «Thinking...»
-- **Стоимость:** считается с учётом кэша
-
----
-
-## 10. Известный технический долг
-
-| # | Что | Приоритет | Когда решать |
-|---|-----|-----------|-------------|
-| 1 | `includeUsage` через `as any` | Низкий | При обновлении провайдера выше 0.0.2 |
-| 2 | `reasoningTokens` = 0 | Вне контроля | Ждём обновления MiniMax API |
-| 3 | `cacheWriteTokens` = 0 | Вне контроля | Ждём обновления MiniMax API |
-| 4 | Нет fallback на Haiku при падении MiniMax | Средний | Ближайшее ТЗ |
-| 5 | Нет записи для M2.7-highspeed в pricing | Низкий | Если решим использовать highspeed |
-| 6 | generateObject не работает (провайдер не реализует responseFormat) | Средний | При обновлении провайдера или raw fetch |
+**Temperature в Simply Chat:** 0.7 для MiniMax, 1.0 для Claude. Управляется переменной `isSimplyNonAnthropicModel` в `app/(chat)/api/chat/route.ts`.
 
 ---
 
-## 11. Файлы в проекте
+## 7. Контекстное окно
 
-| Файл | Что связано с MiniMax |
-|------|----------------------|
-| `lib/ai/registry.ts` | `minimax` + `minimaxLong` namespace (180s timeout для briefing) (v3.83+) |
-| `lib/ai/model-catalog.ts` | `MiniMax-M2.7` и `MiniMax-M2.7-long` entries с pricing (v3.83+) |
-| `lib/ai/task-assignments.ts` | `simply-chat`, `briefing:filter`, `briefing:author`, `briefing:section`, `briefing:podcast-script`, `memory:extract-batch`, `memory:consolidate`, `memory:profile` → MiniMax (v3.83+) |
-| `lib/ai/providers.ts` | Pricing helpers только (после Stage 5 ТЗ-1) — модели живут в catalog |
-| `app/(chat)/api/chat/route.ts` | Simply Chat — маршрутизация на MiniMax через `getModel("simply-chat")`, sliding window, temperature |
-| `lib/briefing/briefing-filter.ts` | Briefing Filter — streamText + JSON.parse + Zod, retry, content truncation |
-| `lib/briefing/briefing-author.ts` | Briefing Author — монолит (Map-Reduce dead code оставлен на будущее) |
-| `lib/briefing/briefing-section-author.ts` | Per-section refresh + потенциал для Map-Reduce (`mode: "initial"`) |
-| `lib/podcast/script-generator.ts` | Podcast script — generateText + universal parser (JSON или plain text) |
-| `lib/ai/memory/extract.ts` | MIND batch extraction — streamText + JSON |
-| `lib/ai/memory/consolidate.ts` | MIND consolidation |
-| `lib/ai/memory/profile.ts` | MIND profile generation |
-| `lib/ai/usage-utils.ts` | extractUsageFields() — универсальный для всех провайдеров |
-| `components/dev-panel/sections/model-section.tsx` | MODEL_DISPLAY маппинг |
-| `components/dev-panel/dev-panel-footer.tsx` | MODEL_DISPLAY маппинг |
-| `components/input/input-think-button.tsx` | Кнопка «Думать» (видна только при chatMode=simply) |
-| `.env.example` | MINIMAX_API_KEY |
+- **Максимум:** 204,800 tokens
+- **Стратегия в Simply:** `SIMPLY_CONTEXT_LIMIT` в `lib/ai/context-limits.ts` с extract-on-compression (при 60% / 80% полного контекста → batch extract facts → исключение обработанных сообщений)
+- **Compaction (Claude Compaction API):** отключён для MiniMax, работает только для Claude-моделей в expertise/create/projects chatModes
 
 ---
 
-## 12. Валидация биллинга
+## 8. Валидация биллинга
 
-Для проверки корректности расчётов — сравнивать:
+**Метод:** сумма `costUsd` из `ai_usage_log` `WHERE "modelId" = 'MiniMax-M2.7'` сравнивается с реальным списанием баланса на `platform.minimax.io → Balance`.
 
-- **Наш расчёт:** сумма `costUsd` из `ai_usage_log` WHERE model = 'MiniMax-M2.7'
-- **Реальное списание:** баланс на platform.minimax.io → Balance
-
-При расхождении >10% — сообщить для корректировки ставок в `providers.ts`.
+**При расхождении >10%** — проверить ставки в `lib/ai/model-catalog.ts` (секция MiniMax) и сверить с актуальным pricing на https://platform.minimax.io/docs/guides/pricing.
 
 ---
 
-## 13. Краткая справка для ТЗ
+## 9. Файлы в проекте
 
-При написании ТЗ, затрагивающих `chatMode=simply`:
+| Файл | Роль |
+|---|---|
+| `lib/ai/registry.ts` | `minimax` + `minimaxLong` namespace через `createMinimax()` |
+| `lib/ai/getModel.ts` | Резолв `simply-chat`/`briefing:*`/`memory:*` taskId → Minimax через registry |
+| `lib/ai/model-catalog.ts` | `MiniMax-M2.7` + `MiniMax-M2.7-long` entries с pricing |
+| `lib/ai/task-assignments.ts` | `DEFAULT_TASK_MODELS` — все MiniMax taskId |
+| `lib/ai/providers.ts` | Pricing helpers: `calculateCostRub`, `extractUsageForPricing` |
+| `lib/ai/usage-utils.ts` | `extractUsageFields` + `logUsage` — универсальны для всех провайдеров включая MiniMax |
+| `app/(chat)/api/chat/route.ts` | Simply Chat route, `isSimplyNonAnthropicModel` флаг, `stripLegacyOpenAICompatToolParts` (legacy compat), `stripMediaPartsForTextModel` (media → placeholder) |
+| `lib/briefing/briefing-filter.ts` | Briefing Filter через `getModel("briefing:filter")` |
+| `lib/briefing/briefing-author.ts` | Briefing Author через `getModel("briefing:author")`, 180s timeout через `minimaxLong` |
+| `lib/briefing/briefing-section-author.ts` | Per-section refresh |
+| `lib/podcast/script-generator.ts` | Podcast script через `getModel("briefing:podcast-script")` |
+| `lib/ai/memory/extract.ts` | MIND batch extraction + consolidation |
+| `lib/ai/memory/profile.ts` | MIND user profile |
+| `scripts/test-minimax-anthropic-compat.ts` | **Референсный валидатор** всех фич провайдера (streamText, tool calling, generateObject mode:tool, explicit cacheControl) — запускать при обновлении пакета |
+| `scripts/test-minimax-via-registry.ts` | Integration smoke-тест резолва через `getModel → registry → language model` |
+| `components/dev-panel/sections/model-section.tsx` | MODEL_DISPLAY mapping для UI |
+| `.env.example` | `MINIMAX_API_KEY` template |
 
-- Модель: MiniMax M2.7 через OpenAI-совместимый endpoint
-- Text-only: для изображений → Gemini 3 Flash (автоматическая маршрутизация)
-- Кэш: автоматический, не требует конфигурации
-- Temperature: 0.7 (не менять на 0!)
-- Compaction: отключён для MiniMax
-- Tools: поддерживаются полностью
-- Thinking/Reasoning: модель сама решает когда думать, мы не управляем
+---
+
+## 10. Legacy compatibility: `stripLegacyOpenAICompatToolParts`
+
+До ТЗ-CacheAudit (2026-04-13) MiniMax подключался через `createMinimaxOpenAI()` — OpenAI-совместимый endpoint (устаревшая кастомная реализация в том же пакете). Он хранил tool calls как inline parts с `toolCallId` в формате `call_function_*` без соответствующего `tool_result` сообщения.
+
+После переключения на `createMinimax()` все новые tool calls идут в нативном Anthropic формате (`toolu_*`) с обязательной парой `tool_use + tool_result`. Но в БД **остаются legacy сообщения** в старом формате — orphan `tool_use` блоки вызывают 400 ошибку в `AnthropicMessagesLanguageModel` (которая одинакова для Claude и MiniMax Anthropic-compat).
+
+Функция `stripLegacyOpenAICompatToolParts()` в `app/(chat)/api/chat/route.ts` применяется ко всем сообщениям `chatMode=simply` перед `convertToModelMessages()` и чистит legacy parts по префиксу `call_function_`. При отсутствии таких parts — no-op.
+
+**Когда можно удалить:** через 30+ дней после деплоя, когда все legacy сообщения либо будут вручную почищены, либо не попадут в контекст. Перед удалением — SQL: `SELECT COUNT(*) FROM "Message_v2" WHERE parts::text LIKE '%call_function_%'` должен вернуть 0.
+
+---
+
+## 11. История миграций
+
+| Версия | ТЗ | Что сделано |
+|---|---|---|
+| v3.77.0 | ТЗ-MinimaxCleanup | MiniMax M2.7 для Simply Chat (text). Костыль: использовался OpenAI-compat factory на основании ошибочных выводов — через 8 версий исправлено |
+| v3.80.0 | ТЗ-Briefing-1 | Briefing Filter + Author переведены с Gemini/Sonnet на MiniMax M2.7. Цена брифинга $0.074 → $0.011 (6.6×) |
+| v3.81.0 | ТЗ-Briefing-2 | Podcast Script + TTS переведены на MiniMax |
+| v3.82.0 | ТЗ-MapReduce | TTS откачен на Gemini Flash TTS (качество + 53× дешевле); Script остался на MiniMax. Map-Reduce для Author отклонён (streamText socket bug) |
+| **v3.85.0** | **ТЗ-CacheAudit (2026-04-13)** | **Возврат к официальному Anthropic-compat режиму через `createMinimax()`. Удалён костыль `config.includeUsage = true` из `getModel.ts` (не нужен в новой реализации). Подтверждено independent тестом (`test-minimax-anthropic-compat.ts`): streamText, tool calling с параметрами, generateObject(mode:tool), explicit cacheControl — всё работает. Предыдущее решение использовать OpenAI-compat (v3.77) базировалось на ошибочных выводах агента, который не смог правильно протестировать Anthropic-compat** |
+
+---
+
+## 12. Краткая справка для ТЗ
+
+При написании ТЗ, затрагивающих `chatMode=simply` или MiniMax pipelines:
+
+- Модель резолвится через `getModel('simply-chat' | 'briefing:*' | 'memory:*')`, не через direct factory
+- Text-only: для изображений/PDF → Gemini 3 Flash (автоматическая маршрутизация по media parts)
+- Кэш: passive auto-cache работает из коробки (512+ tokens), explicit cache control доступен через стандартный Anthropic синтаксис `providerOptions.anthropic.cacheControl`
+- Temperature: 0.7 для MiniMax, не ставить 0 (API вернёт ошибку)
+- Compaction API: отключён для MiniMax (`isSimplyNonAnthropicModel` флаг)
+- Tools: полная поддержка, включая `generateObject(mode: 'tool')` для structured output
+- Thinking/Reasoning: модель сама решает когда думать, отключить нельзя, reasoning parts стримятся через AI SDK v6 reasoning events автоматически
+- Валидировать новые версии пакета — запускать `npx tsx scripts/test-minimax-anthropic-compat.ts` (все 4 теста должны PASS)

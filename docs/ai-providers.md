@@ -109,14 +109,21 @@ Voyage (embeddings), Deepgram (speech-to-text), Perplexity (deep research), Gemi
 
 | Параметр | Значение |
 |----------|----------|
-| SDK | `vercel-minimax-ai-provider` (OpenAI-compatible) |
+| SDK | `vercel-minimax-ai-provider@0.0.2` (официальный пакет MiniMax, Anthropic-compatible) |
+| Factory | `createMinimax()` (default export). Под капотом — тонкая обёртка над `AnthropicMessagesLanguageModel` из `@ai-sdk/anthropic/internal` |
 | API Key | `MINIMAX_API_KEY` |
-| Endpoint | `https://api.minimax.io/v1` |
-| Registry namespace | `minimax` (default) + `minimaxLong` (180s timeout для briefing) |
-| Документация | https://platform.minimax.io/docs/ |
-| Детали | [ai-minimax.md](ai-minimax.md) |
+| Endpoint | `https://api.minimax.io/anthropic/v1` |
+| Registry namespace | `minimax` (default, 60s fetch timeout) + `minimaxLong` (180s timeout для briefing/memory pipelines) |
+| Документация | https://platform.minimax.io/docs/api-reference/text-anthropic-api |
+| Детали | [ai-minimax.md](ai-minimax.md), ADR 049 |
 
-Используется для: `simply-chat`, `briefing:filter`, `briefing:author`, `briefing:section`, `briefing:podcast-script`, `memory:extract-batch`, `memory:consolidate`, `memory:profile`. **НЕ используется** для vision и TTS.
+Используется для: `simply-chat`, `briefing:filter`, `briefing:author`, `briefing:section`, `briefing:podcast-script`, `memory:extract-batch`, `memory:consolidate`, `memory:profile`. **НЕ используется** для vision и TTS (MiniMax не поддерживает ни image, ни document input ни в одном режиме).
+
+**Prompt caching.** Режим Anthropic-compat даёт два уровня кэширования:
+- **Passive auto-cache** — срабатывает автоматически от 512 tokens, порядок prefix-matching `tools → system → messages`. Нет параметров в запросе. Метрика в response: `cache_read_input_tokens` (AI SDK v6 мапит в `inputTokenDetails.cacheReadTokens`).
+- **Explicit cache control** — `providerOptions.anthropic.cacheControl: { type: 'ephemeral' }` на content-part или tool. До 4 breakpoints, TTL 5 минут с автопродлением при hit. Идентичен синтаксису Anthropic, т.к. пакет проксирует через `AnthropicMessagesLanguageModel`. Метрики: `cache_creation_input_tokens` + `cache_read_input_tokens`.
+
+Pricing (M2.7): base $0.30/M input, cache write $0.375/M (1.25×), cache read $0.03–0.06/M (~0.1× = скидка 90%), output $1.20/M.
 
 ### Google AI
 

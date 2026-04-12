@@ -110,7 +110,7 @@
 
 #### AI SDK version
 - `ai@6.x` + `@ai-sdk/anthropic@3.x` + `@ai-sdk/google@3.x` + `@ai-sdk/xai@3.x` + `@ai-sdk/react@3.x`
-- `vercel-minimax-ai-provider` (OpenAI-compatible для MiniMax)
+- `vercel-minimax-ai-provider@0.0.2` (Anthropic-compatible для MiniMax, прокси через `@ai-sdk/anthropic/internal`, ADR 049)
 - `@openrouter/ai-sdk-provider` (GLM, Qwen — зарезервировано)
 
 #### Prompt System (v3.3 — Skills + Agents)

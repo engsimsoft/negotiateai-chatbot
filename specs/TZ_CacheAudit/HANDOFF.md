@@ -8,32 +8,42 @@
 ## Статус этапов
 
 - [x] Phase 1: Анализ (официальная документация изучена, находки зафиксированы в ANALYSIS.md)
-- [x] Phase 2: Планирование (план одобрен пользователем, решения приняты)
-- [x] Этап 0: Pre-flight проверки (2026-04-12) — **все 4 теста PASS, переход безопасен**
-- [ ] Этап 1: Переключение MiniMax namespace на Anthropic-compat ← **СЛЕДУЮЩИЙ**
-- [ ] Этап 2: Cache breakpoints в основном chat route + MIND transplant
-- [ ] Этап 3: Cache breakpoints в service-chat и task-expert
-- [ ] Этап 4: Валидация эффективности
-- [ ] Этап 5: Финализация
+- [x] Phase 2: Планирование (план одобрен пользователем, расширен в ходе сессии на 7 этапов)
+- [x] Этап 0: Pre-flight проверки (2026-04-12) — все 4 теста PASS, переход безопасен
+- [x] Этап 1: Переключение фабрики (commit `5fdfcd6`) — валидировано через UI 2026-04-13
+- [🔄] Этап 2: Code Health Cleanup — код готов, ждёт мануального smoke-теста ← **ТЕКУЩЕЕ СОСТОЯНИЕ**
+- [ ] Этап 3: Cache breakpoints в chat route + MIND transplant
+- [ ] Этап 4: Cache breakpoints в task-expert (service-chat deprecated — исключён)
+- [ ] Этап 5: Валидация эффективности
+- [ ] Этап 6: Финализация
 
 ## Следующая сессия: начни с
 
-1. **Ждать разрешение пользователя** на Этап 1 (переключение фабрики)
-2. Прочитать `ROADMAP.md` → Этап 1
-3. Заменить `createMinimaxOpenAI` → `createMinimax` в `lib/ai/registry.ts` (2 места: minimax, minimaxLong)
-4. `npx tsc --noEmit` → 0 ошибок
-5. Smoke-тесты всех 5 MiniMax точек через UI
-6. SQL-проверка ai_usage_log после тестов — ожидается ненулевой cacheWriteTokens
-7. Git commit + запрос мануального теста у пользователя
+1. Прочитать ROADMAP → Этап 2 (Code Health Cleanup)
+2. Удалить untracked мусорные скрипты (`test-minimax.ts`, `test-minimax-generate-object.ts`, `test-think-models.ts`) — они не в git
+3. Прочитать полностью `app/(chat)/api/chat/route.ts` — найти всю MiniMax-специфичную логику (`isSimplyNonAnthropicModel`, `stripMiniMaxToolParts`, `stripMediaPartsForTextModel`)
+4. Определить, какие условия избыточны после переключения на Anthropic-compat, какие остаются (vision всё ещё недоступна → `stripMediaPartsForTextModel` валиден)
+5. Переписать `docs/ai-minimax.md` полностью, убрав ложные утверждения
+6. Обновить `docs/ai-providers.md` секцию MiniMax
+7. `npx tsc --noEmit` + `npm run build`
+8. Git commit Этапа 2
+9. Запрос мануального теста (короткий — Simply Chat ещё раз, убедиться что очистка условий не сломала)
 
-## В процессе
-- Этап 0 завершён полностью. Независимый тест `scripts/test-minimax-anthropic-compat.ts` создан и работает.
+## Ключевые находки к текущему моменту
 
-## Ключевые находки Этапа 0
-1. Предыдущий агент выдумал проблемы Anthropic-compat режима — подтверждено собственным тестом на версии 0.0.2
-2. Anthropic-compat в пакете — прокси через `AnthropicMessagesLanguageModel` из `@ai-sdk/anthropic/internal` (не кастомная реализация)
-3. MiniMax cache частично работает сейчас (cacheRead avg 2282), но cacheWrite всегда 0 — измерительная дыра
-4. После переключения: cacheWriteTokens начнут приходить, cacheRead вырастет с ~25% до 60-90% через explicit breakpoints
+### Этап 0 (pre-flight)
+- Предыдущий агент выдумал проблемы Anthropic-compat режима — опровергнуто независимым тестом на версии 0.0.2
+- Anthropic-compat в пакете — прокси через `AnthropicMessagesLanguageModel` из `@ai-sdk/anthropic/internal`
+- MiniMax cache частично работает до переключения (cacheRead avg 2282), cacheWrite всегда 0
+
+### Этап 1 (переключение фабрики)
+- Валидация через UI показала: regression-free, passive cache работает (96.8% hit), экономия 4× на 2-м сообщении
+- Simply «Думать» резолвится в **Haiku**, НЕ Sonnet как заявлено в `docs/ai-minimax.md:97-105` — ещё один слой лжи, исправится в Этапе 2
+- Briefing pipeline через `minimaxLong` работает, 153с в пределах 180с timeout
+- `cacheWriteTokens` всё ещё 0 у MiniMax — ожидаемо, появится только после Этапа 3 (explicit `providerOptions.anthropic.cacheControl`)
+
+### Scope update (2026-04-13)
+- service-chat исключён из всех последующих этапов ТЗ — система deprecated
 
 ## Блокеры / Вопросы
 - Нет

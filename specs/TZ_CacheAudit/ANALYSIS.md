@@ -305,6 +305,77 @@ OpenAI-compat, наоборот — кастомная собственная р
 
 ---
 
+## Technical debt (follow-up, вне scope ТЗ-CacheAudit)
+
+В процессе Этапа 2 обнаружены дополнительные костыли в pipeline-файлах, которые **НЕ правятся в этом ТЗ** по следующей причине: соответствующие файлы содержат uncommitted changes от замороженного ТЗ-MindArtifacts / ТЗ-SaveFactV2. Лезть туда = создать merge-конфликт на чужой работе. Правильный подход — зафиксировать долг и создать отдельное ТЗ после разморозки.
+
+### Костыль 1: хардкод `cacheReadTokens: 0`/`cacheWriteTokens: 0` в pipeline usage logging
+
+**Где:**
+- `lib/podcast/script-generator.ts:97-98,118-119,162-171,187-195` — аккумулирует usage вручную через `totalPromptTokens += result.usage?.inputTokens` + `totalCompletionTokens += result.usage?.outputTokens`, теряя все остальные поля (`inputTokenDetails.cacheReadTokens`, `cacheWriteTokens`, `outputTokenDetails.reasoningTokens`). Затем в `logUsage()` передаёт объект с принудительными нулями для cache полей с `as any` cast.
+- `lib/briefing/research-engine.ts:308-316` — аналогичный хардкод
+- `lib/briefing/briefing-author.ts:762-763` (в fallback trace) — хардкод нулей
+
+**Последствия после ТЗ-CacheAudit:**
+MiniMax Anthropic-compat endpoint теперь **возвращает** `cache_creation_input_tokens` и `cache_read_input_tokens` через стандартные поля AI SDK v6 `inputTokenDetails.cacheReadTokens/cacheWriteTokens`. Но эти pipeline-файлы их игнорируют и пишут нули. В итоге:
+- `ai_usage_log` для MiniMax briefing/podcast будет продолжать показывать `cacheWrite = 0`, хотя реальная стоимость cache creation отличается от 0
+- DevPanel для briefing/podcast pipelines показывает заниженную стоимость
+- Биллинг pipelines расходится с реальностью MiniMax Balance на 10–25% (cache write cost теряется)
+
+**Правильное решение:**
+Вместо ручного аккумулятора `totalPromptTokens += ...` использовать полный `LanguageModelUsage` из каждого шага:
+```ts
+// Было (теряет cache):
+totalPromptTokens += result.usage?.inputTokens ?? 0;
+totalCompletionTokens += result.usage?.outputTokens ?? 0;
+
+// Должно стать (все disjoint поля):
+const fields = extractUsageForPricing(result.usage);
+total.noCacheInputTokens += fields.noCacheInputTokens;
+total.cacheReadTokens += fields.cacheReadTokens;
+total.cacheWriteTokens += fields.cacheWriteTokens;
+total.outputTokens += fields.outputTokens;
+total.reasoningTokens += fields.reasoningTokens ?? 0;
+```
+
+И в `logUsage()` передавать полный `LanguageModelUsage`-совместимый объект без `as any`:
+```ts
+usage: {
+  inputTokens: total.noCacheInputTokens + total.cacheReadTokens + total.cacheWriteTokens,
+  outputTokens: total.outputTokens,
+  totalTokens: ...,
+  inputTokenDetails: {
+    cacheReadTokens: total.cacheReadTokens,
+    cacheWriteTokens: total.cacheWriteTokens,
+  },
+  outputTokenDetails: {
+    reasoningTokens: total.reasoningTokens,
+  },
+} satisfies LanguageModelUsage
+```
+
+**Почему откладываем:**
+- Файлы находятся в uncommitted state от чужих параллельных работ (по грепу `git status` — modified: briefing-author.ts, briefing-filter.ts, briefing-section-author.ts, podcast/script-generator.ts, podcast/index.ts, research-engine.ts, memory/extract.ts)
+- Правки в тех же функциях приведут к merge-конфликтам при коммите чужой работы
+- Правильный workflow: дождаться закрытия/отмены параллельных ТЗ, потом отдельное follow-up ТЗ «CachePipelineMetrics» или аналог
+- Объём работы: ~3-4 файла, ~15 точек замены, 1-2 сессии
+
+### Костыль 2: `as any` в Gemini TTS usage logging (не MiniMax)
+
+- `lib/podcast/tts-gemini.ts:86,121` — `usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } as any`
+
+**Природа:** Gemini 2.5 Flash TTS API не имеет стандартного `LanguageModelUsage` формата (это не language model, а TTS endpoint). Cast `as any` используется чтобы передать пустой usage в `logUsage()`, а реальная стоимость идёт через `costUsdOverride` из `calculateGeminiTtsCostUsd()`. Это **не настоящий костыль**, а workaround для того, что `logUsage` требует `LanguageModelUsage` тип.
+
+**Правильное решение (если захотим чистить):** добавить альтернативный entry point `logUsageForNonLLM()` в `usage-utils.ts`, принимающий простой объект `{ inputTokens, outputTokens, costUsdOverride }` без cast. Мелкая правка, не блокер.
+
+### Костыль 3: Jina Reader quota exceeded (не наш код)
+
+В логах Этапа 1 зафиксировано `[Jina Reader] QUOTA EXCEEDED: url=https://thecode.media/`. Это внешний сервис (`lib/ai/tools/jina-reader.ts`), у которого закончилась месячная квота. Fallback через `Readability → semantic → Jina` в `lib/ai/tools/fetch-page.ts` корректно обрабатывает — briefing сгенерился (`Full text hit: 4/4 candidates`). Но долгосрочно нужен либо upgrade Jina quota, либо мониторинг.
+
+**Приоритет:** средний. Follow-up.
+
+---
+
 ## Рекомендации разработчика (Код-ревью ТЗ)
 
 ### ✅ Согласен с целью ТЗ

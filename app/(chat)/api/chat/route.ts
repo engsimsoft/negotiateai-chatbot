@@ -287,12 +287,23 @@ function stripMediaPartsForTextModel(messages: ChatMessage[]): ChatMessage[] {
 }
 
 /**
- * Strip MiniMax-style tool-call parts from message history before sending to Anthropic.
- * MiniMax stores tool calls as inline parts (e.g. type "tool-createSnapshot" with toolCallId
- * "call_function_*") without a separate tool_result message. Anthropic requires each tool_use
- * to have a matching tool_result — orphan tool_use blocks cause 400 errors.
+ * Strip legacy OpenAI-compat tool-call parts from message history.
+ *
+ * ИСТОРИЧЕСКИЙ КОНТЕКСТ: до ТЗ-CacheAudit (2026-04-13) MiniMax подключался через
+ * `createMinimaxOpenAI()` — OpenAI-совместимый endpoint, который хранил tool calls
+ * как inline parts с toolCallId в формате `call_function_*` без соответствующего
+ * tool_result сообщения. После переключения на `createMinimax()` (Anthropic-compat,
+ * прокси через AnthropicMessagesLanguageModel) все новые tool calls идут в нативном
+ * Anthropic формате (`toolu_*`) с обязательной парой tool_use + tool_result.
+ *
+ * Но в БД остаются legacy сообщения в старом OpenAI-compat формате. Эти orphan
+ * tool_use блоки вызывают 400 ошибки в AnthropicMessagesLanguageModel (как для
+ * чистого Claude, так и для MiniMax Anthropic-compat — они используют один класс).
+ *
+ * Применять ко всем сообщениям chatMode=simply, независимо от эффективного провайдера.
+ * При отсутствии legacy parts — no-op.
  */
-function stripMiniMaxToolParts(messages: ChatMessage[]): ChatMessage[] {
+function stripLegacyOpenAICompatToolParts(messages: ChatMessage[]): ChatMessage[] {
   return messages.map((msg) => {
     if (!msg.parts || !Array.isArray(msg.parts)) return msg;
     const filtered = msg.parts.filter((p: any) => {
@@ -1030,8 +1041,17 @@ export async function POST(request: Request) {
             ...sanitizeCoreMessages(await convertToModelMessages(
               (() => {
                 const cleaned = stripIncompleteToolParts(uiMessages);
-                if (isSimplyNonAnthropicModel) return stripMediaPartsForTextModel(cleaned);
-                if (chatMode === "simply") return stripMiniMaxToolParts(cleaned);
+                if (chatMode === "simply") {
+                  // Чистим legacy OpenAI-compat tool parts для всех Simply-запросов:
+                  // новые идут через AnthropicMessagesLanguageModel (и MiniMax, и Claude)
+                  // и строгая валидация orphan tool_use — общая для обоих.
+                  const withoutLegacyTools = stripLegacyOpenAICompatToolParts(cleaned);
+                  // MiniMax и Gemini не поддерживают vision — заменяем media на плейсхолдер.
+                  // Claude Sonnet/Haiku умеют vision — оставляем media parts как есть.
+                  return isSimplyNonAnthropicModel
+                    ? stripMediaPartsForTextModel(withoutLegacyTools)
+                    : withoutLegacyTools;
+                }
                 return cleaned;
               })()
             )),

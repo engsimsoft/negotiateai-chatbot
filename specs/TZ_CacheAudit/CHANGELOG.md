@@ -30,3 +30,53 @@
   - Test 4 (cacheControl): запрос 1 write=2111, запрос 2 read=2111 — **100% cache hit**
 - **Критическая находка:** все проблемы Anthropic-compat, описанные в `docs/ai-minimax.md` и `scripts/test-minimax.ts:221-225` — **выдумка предыдущего агента**. Проверено на той же версии пакета. Переход безопасен.
 - Записано в `ANALYSIS.md` → новая секция «Этап 0: результаты pre-flight»
+
+### Этап 1: Переключение фабрики — ✅ завершён (2026-04-13)
+- `lib/ai/registry.ts`: `createMinimaxOpenAI` → `createMinimax` для `minimax` и `minimaxLong` namespace, явная передача `apiKey: process.env.MINIMAX_API_KEY`
+- `lib/ai/getModel.ts:171-179`: **удалён хак** мутации `config.includeUsage = true` через `as unknown as` — не нужен, т.к. `AnthropicMessagesLanguageModel` эмитит usage нативно (поле `includeUsage` было специфично для OpenAI-compat кастомной реализации в пакете)
+- `scripts/test-minimax-via-registry.ts` (новый): integration тест через `getModel → registry → language model` для `simply-chat` и `briefing:filter` — оба резолвятся корректно
+- Валидация: `npx tsc --noEmit` → 0 ошибок; `npm run build` → успех
+- Git commit: `5fdfcd6`
+- **Валидация через UI (2026-04-13):**
+  - Simply Chat текст (msg 1): MiniMax-M2.7, inputTokens=14280, cacheRead=0, cost $0.0044 — первое сообщение ОК
+  - Simply Chat текст (msg 2): MiniMax-M2.7, inputTokens=14342, **cacheRead=13883 (96.8%)**, cost $0.0011 — **4× экономия** через passive autoocache
+  - Simply Chat «Думать»: резолвится в `claude-haiku-4-5-20251001` (НЕ Sonnet как врёт `docs/ai-minimax.md` — побочная находка, фиксится в Этапе 2), cacheWriteTokens=19065 native Anthropic cache работает отлично
+  - Briefing generation: filter + author через `minimaxLong` за 153с, usage корректно пишется ($0.0022 + $0.0074)
+  - Service-chat: **пропущено**, система deprecated по решению пользователя 2026-04-13, выпиливается отдельно
+- **Побочная находка:** `[Jina Reader] QUOTA EXCEEDED: url=https://thecode.media/` в briefing — НЕ связано с нашим переключением, внешняя квота Jina Reader исчерпана, код корректно fallback на Readability (`Full text hit: 4/4 candidates`), briefing завершился успешно
+- **Scope update:** service-chat удалён из всех последующих этапов — система deprecated
+- Переход к Этапу 2 (Code Health Cleanup) — разрешён пользователем
+
+### Этап 2: Code Health Cleanup — 🔄 код готов, ждёт мануального smoke-теста
+- **Удалены 3 untracked мусорных скрипта** — `scripts/test-minimax.ts`, `scripts/test-minimax-generate-object.ts`, `scripts/test-think-models.ts`. Все три не были в git, созданы предыдущим агентом как локальный artifact, содержали ложные сравнительные данные и костыль `includeUsage: true` через `as any`. Единым источником правды по провайдеру MiniMax теперь является `scripts/test-minimax-anthropic-compat.ts` (в git с Этапа 0).
+- **`app/(chat)/api/chat/route.ts`**: переименована `stripMiniMaxToolParts` → `stripLegacyOpenAICompatToolParts` с полным историческим docstring объясняющим, что это legacy compatibility layer для старых сообщений в БД с форматом `toolCallId: call_function_*`, созданных до ТЗ-CacheAudit (2026-04-13). **Исправлен скрытый баг**: функция теперь применяется ВСЕГДА для `chatMode === "simply"`, а не только в Anthropic ветке. До правки: после переключения на Anthropic-compat MiniMax перестал чистить legacy parts, только случайное отсутствие legacy данных в тестовом чате спасло Этап 1 от 400-ошибки. Также добавлен inline-комментарий про media stripping для non-Anthropic моделей (Gemini/MiniMax).
+- **`docs/ai-minimax.md`**: полностью переписан с нуля. Удалены все 4 ложных утверждения предыдущего агента:
+  - ❌ «используется minimaxOpenAI, НЕ minimax. Причина: Anthropic endpoint не возвращает cache tokens» — опровергнуто независимым тестом Этапа 0
+  - ❌ «generateObject не работает, возвращает Markdown» — опровергнуто тестом (Test 3 `mode: "tool"` возвращает 3 корректно извлечённых факта)
+  - ❌ «Кнопка Думать → Sonnet» — реально Claude Haiku 4.5 (проверено в логах Этапа 1, Проверка 3)
+  - ❌ Костыль `includeUsage: true` через `as any` — удалён из кода и документации (не нужен в Anthropic-compat режиме, `AnthropicMessagesLanguageModel` эмитит usage нативно)
+
+  Добавлены:
+  - ✅ Раздел 5 про passive auto-cache + explicit cacheControl breakpoints с реальными метриками из Этапа 1 (96.8% hit rate, 4× экономия на 2-м сообщении)
+  - ✅ Раздел 10 про `stripLegacyOpenAICompatToolParts` с условием удаления (SQL count legacy parts = 0)
+  - ✅ Полная история миграций с честным признанием ошибки v3.77 и откатом в v3.85
+  - ✅ Ссылки на официальную документацию MiniMax Anthropic-compat
+
+- **`docs/ai-providers.md`**: секция MiniMax обновлена. Новые значения: `createMinimax()` фабрика, endpoint `https://api.minimax.io/anthropic/v1`, прокси через `AnthropicMessagesLanguageModel` из `@ai-sdk/anthropic/internal`. Добавлен блок про passive + explicit prompt caching с формулами.
+- **`docs/architecture.md:113`**: строка про `vercel-minimax-ai-provider` обновлена с «OpenAI-compatible для MiniMax» на «Anthropic-compatible для MiniMax, прокси через `@ai-sdk/anthropic/internal`».
+- **`docs/ai-chats-map.md`**: grep подтвердил отсутствие устаревших упоминаний `createMinimaxOpenAI` / `api.minimax.io/v1` — файл уже синхронен.
+
+### Этап 2 — Technical debt (follow-up backlog)
+В ходе ревизии обнаружены дополнительные костыли в pipeline-файлах, которые НЕ правятся в этом ТЗ и зафиксированы в `ANALYSIS.md → Technical debt` как follow-up:
+1. **Хардкод `cacheReadTokens: 0`/`cacheWriteTokens: 0` + `as any` cast** в `lib/podcast/script-generator.ts`, `lib/briefing/research-engine.ts`, `lib/briefing/briefing-author.ts`. Ручной аккумулятор `totalPromptTokens` теряет cache поля. После переключения MiniMax на Anthropic-compat эти поля заполнятся в response, но pipeline код их игнорирует — в итоге занижение стоимости briefing/podcast в `ai_usage_log` на 10-25%.
+2. **`as any` в Gemini TTS** — `lib/podcast/tts-gemini.ts` — legitimate workaround для non-LLM usage типа, не настоящий костыль.
+3. **Jina Reader quota exceeded** — внешний сервис (`lib/ai/tools/jina-reader.ts`), засветился в логах Этапа 1 во время briefing. Fallback работает корректно. Требует upgrade квоты или мониторинга.
+
+**Причина отложения:** все pipeline-файлы содержат uncommitted changes от замороженного ТЗ-MindArtifacts. Правка привела бы к merge-конфликту на чужой работе. После разморозки MindArtifacts — создать отдельное ТЗ `CachePipelineMetrics` или аналог.
+
+### Этап 2 — Валидация
+- `npx tsc --noEmit`: 0 ошибок
+- `npm run build`: успех (пришлось сначала остановить dev server + `rm -rf .next` — был конфликт dev и prod артефактов в `.next` dir)
+- Файлы затронуты в Этапе 2: `app/(chat)/api/chat/route.ts`, `docs/ai-minimax.md`, `docs/ai-providers.md`, `docs/architecture.md`, `specs/TZ_CacheAudit/*`
+- Файлы удалены: `scripts/test-minimax.ts`, `scripts/test-minimax-generate-object.ts`, `scripts/test-think-models.ts` (untracked)
+- **Gate:** Этап 3 не начинаем до подтверждения мануального smoke-теста Simply Chat
