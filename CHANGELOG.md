@@ -9,7 +9,41 @@
 
 ### Planned (Next Steps)
 - RAG-4: Библиотека MVP (загрузка документов + search)
-- ТЗ-2: User-level overrides моделей (БД + cookies) — активация `context?` в `getModel()`
+- Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
+
+---
+
+## [3.84.0] — 2026-04-12 — Dev Switchboard UI (ТЗ-2)
+
+### Added
+
+- **Dev Model Switchboard** — страница `/dev/models` (Server Component + Client): полная карта 39 задач, каталог моделей, ENV-статусы 8 провайдеров, inline переключение модели через dropdown + Server Actions
+- **File-based overrides** — `.simply-dev-overrides.json` в корне: `model-overrides.ts` (client-safe) + `model-overrides-node.ts` (server-only fs). Triple dev-gate: lookupOverride, page notFound, Server Actions throw
+- **Per-message Switchboard в DevPanel** — быстрое переключение модели прямо из drawer, shared `ModelSelect` компонент
+- **DevPanel footer badge** — жёлтый «OVERRIDE» при активном dev override
+- **Toast + undo** на `/dev/models` через sonner (5s window)
+- **Dev Models link в sidebar** — только при `NEXT_PUBLIC_SIMPLY_DEV_MODE=true`
+- **`docs/model-catalog-ops.md`** — Workflow для аудита каталога: добавление моделей, проверка цен, верификация capabilities, кэширование per provider
+
+### Changed
+
+- **Catalog SSOT для capabilities** — `chat/route.ts` резолвит `effectiveCatalogEntry` через каталог, не угадывает из chatMode/think/attachments. `supportsCompaction: boolean` в `ModelCapabilities`
+- **Catalog audit fixes:** qwen3.6-plus vision=true (было false), claude-opus maxOutput 128K (было 32K), grok-4 помечен DEPRECATED, haiku thinking documented
+
+### Fixed
+
+- Cache read при override: до фикса override `simply-chat → Haiku` не включал prompt caching (все токены fresh). Причина: `isAnthropicModel` угадывался из chatMode, а не из catalog entry
+
+### Files
+
+- `lib/ai/model-overrides.ts`, `lib/ai/model-overrides-node.ts` — новые
+- `lib/ai/model-catalog.ts` — +supportsCompaction, audit fixes
+- `app/(dashboard)/dev/models/` — page, actions, client — новые
+- `components/dev-panel/sections/switchboard-section.tsx` — новый
+- `components/shared/model-select.tsx` — новый
+- `components/app-sidebar.tsx` — dev link
+- `docs/model-catalog-ops.md` — новый
+- **ADR:** [048-dev-switchboard-ui](docs/decisions/048-dev-switchboard-ui.md)
 
 ---
 

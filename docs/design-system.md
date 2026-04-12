@@ -83,7 +83,11 @@ Root Layout (app/layout.tsx)
 │   ├── /briefing/setup → Split layout (preview + чат AI-настройки)
 │   │   User Menu: ✅   Theme Toggle: ✅
 │   │
-│   └── /projects/new → создание проекта (header + UserMenu)
+│   ├── /projects/new → создание проекта (header + UserMenu)
+│   │   User Menu: ✅   Theme Toggle: ✅
+│   │
+│   └── /dev/models → Dev Switchboard (dev-only: SIMPLY_DEV_MODE=true, notFound в prod)
+│       ← Dashboard + "Dev · Models" + UserMenu + Reset All
 │       User Menu: ✅   Theme Toggle: ✅
 │
 └── (task) — БЕЗ глобального sidebar

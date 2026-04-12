@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.83.0
-**Дата:** 2026-04-11
+**Версия:** 3.84.0
+**Дата:** 2026-04-12
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -34,6 +34,7 @@
 | **Запись встречи** | Аудио → Deepgram транскрипция → Claude резюме (3 формата, инструкции, регенерация, PDF) | ✅ v3.62.0 |
 | **AI-провайдер** | Мультипровайдер через Core Registry (`getModel(taskId)`): Anthropic Claude, MiniMax M2.7, Gemini TTS, Voyage, Deepgram, Perplexity. xAI + OpenRouter — в catalog, зарезервированы | ✅ v3.83.0 |
 | **Core Model Registry** | SSOT для 39 AI-точек: task-assignments → catalog → registry. Смена модели = одна строка. `ai_usage_log.provider` column. Capability-driven thinking guard | ✅ v3.83.0 |
+| **Dev Switchboard** | `/dev/models` — переключение модели для любой задачи в dev. Per-message switcher в DevPanel. File-based overrides. Catalog audit workflow | ✅ v3.84.0 |
 | **Smart Routing** | Автовыбор модели для экономии без потери качества | 📋 |
 | **Оплата в рублях** | ЮKassa, Тинькофф, СБП | 📋 |
 

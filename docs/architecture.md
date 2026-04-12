@@ -235,6 +235,15 @@ createUIMessageStream → JsonToSseTransformStream → Response (SSE)
 - Client guard: `NEXT_PUBLIC_SIMPLY_DEV_MODE` early bailout в Provider
 - **ADR:** [029-developer-panel](decisions/029-developer-panel.md)
 
+**Dev Switchboard (v3.84.0 — ТЗ-2):**
+- `/dev/models` — полная карта 39 задач + каталог моделей + ENV-статусы 8 провайдеров
+- File-based overrides: `.simply-dev-overrides.json` → `model-overrides-node.ts` (server-only fs) → `lookupOverride()` в `getModel.ts`
+- Per-message switcher в DevPanel drawer (`switchboard-section.tsx`)
+- Triple dev-gate: `lookupOverride` (silent null), page (`notFound`), Server Actions (`throw`)
+- Catalog SSOT: `chat/route.ts` резолвит capabilities через catalog entry, не угадывает из chatMode
+- Workflow: [docs/model-catalog-ops.md](model-catalog-ops.md) — аудит цен, capabilities, добавление моделей
+- **ADR:** [048-dev-switchboard-ui](decisions/048-dev-switchboard-ui.md)
+
 **Tool Call Guardian (v3.50.0 + v3.51.0):**
 - `lib/ai/tool-call-guardian.ts` — детектор галлюцинаций tool calls
 - **Phase 1 (v3.50.0):** detection + logging. Observer в instrumentedStream
@@ -354,4 +363,4 @@ p-limit(3) concurrent processing
 
 ---
 
-**Обновлено:** 2026-02-28 (v3.57.0 — Developer Panel)
+**Обновлено:** 2026-04-12 (v3.84.0 — Dev Switchboard UI)
