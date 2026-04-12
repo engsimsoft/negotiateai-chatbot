@@ -33,6 +33,17 @@ export interface ModelCapabilities {
   documents: boolean;
   thinking: boolean;
   embeddings: boolean;
+  /**
+   * Does this model support Anthropic's server-side Compaction API
+   * (`providerOptions.anthropic.contextManagement`). Only Sonnet/Opus 4+
+   * support it — Haiku does not. Non-Anthropic models never support it.
+   *
+   * Used by chat/route.ts to decide whether Compaction options go into
+   * streamText AND whether the legacy snapshot-injection fallback must
+   * run instead (for models that lack both, no long-context strategy is
+   * available on the provider side).
+   */
+  supportsCompaction: boolean;
 }
 
 /** Pricing в USD за 1M токенов (формат вендоров — Anthropic, OpenAI и др.). */
@@ -70,6 +81,7 @@ export interface ModelEntry {
 // Capability presets
 // ---------------------------------------------------------------------------
 
+// Sonnet/Opus 4+ support Anthropic Compaction API.
 const CAPS_CLAUDE: ModelCapabilities = {
   streaming: true,
   tools: true,
@@ -77,6 +89,7 @@ const CAPS_CLAUDE: ModelCapabilities = {
   documents: true,
   thinking: true,
   embeddings: false,
+  supportsCompaction: true,
 };
 
 const CAPS_MINIMAX: ModelCapabilities = {
@@ -86,6 +99,7 @@ const CAPS_MINIMAX: ModelCapabilities = {
   documents: false,
   thinking: true,
   embeddings: false,
+  supportsCompaction: false,
 };
 
 const CAPS_GROK: ModelCapabilities = {
@@ -95,6 +109,7 @@ const CAPS_GROK: ModelCapabilities = {
   documents: false,
   thinking: true,
   embeddings: false,
+  supportsCompaction: false,
 };
 
 const CAPS_OPENROUTER_TEXT: ModelCapabilities = {
@@ -104,6 +119,7 @@ const CAPS_OPENROUTER_TEXT: ModelCapabilities = {
   documents: false,
   thinking: false,
   embeddings: false,
+  supportsCompaction: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -130,7 +146,7 @@ const ENTRIES: ModelEntry[] = [
     modelId: "claude-haiku-4-5-20251001",
     displayName: "Claude Haiku 4.5",
     pricing: { input: 1, output: 5, cachedInput: 0.1, cacheWrite: 1.25 },
-    capabilities: { ...CAPS_CLAUDE, thinking: false },
+    capabilities: { ...CAPS_CLAUDE, thinking: false, supportsCompaction: false },
     contextWindow: 200_000,
     maxOutput: 64_000,
   },
@@ -178,7 +194,7 @@ const ENTRIES: ModelEntry[] = [
     modelId: "claude-haiku-4-5-20251001",
     displayName: "Claude Haiku",
     pricing: { input: 1, output: 5, cachedInput: 0.1, cacheWrite: 1.25 },
-    capabilities: { ...CAPS_CLAUDE, thinking: false },
+    capabilities: { ...CAPS_CLAUDE, thinking: false, supportsCompaction: false },
     contextWindow: 200_000,
     maxOutput: 64_000,
     aliasOf: "claude-haiku-4-5-20251001",
@@ -200,7 +216,7 @@ const ENTRIES: ModelEntry[] = [
     modelId: "claude-haiku-4-5-20251001",
     displayName: "Title Model (Haiku)",
     pricing: { input: 1, output: 5, cachedInput: 0.1, cacheWrite: 1.25 },
-    capabilities: { ...CAPS_CLAUDE, thinking: false },
+    capabilities: { ...CAPS_CLAUDE, thinking: false, supportsCompaction: false },
     contextWindow: 200_000,
     maxOutput: 64_000,
     aliasOf: "claude-haiku-4-5-20251001",
@@ -335,6 +351,7 @@ const ENTRIES: ModelEntry[] = [
     capabilities: {
       streaming: false, tools: false, vision: false,
       documents: false, thinking: false, embeddings: true,
+      supportsCompaction: false,
     },
     contextWindow: 32_000,
     maxOutput: 0,
@@ -348,6 +365,7 @@ const ENTRIES: ModelEntry[] = [
     capabilities: {
       streaming: false, tools: false, vision: false,
       documents: false, thinking: false, embeddings: true,
+      supportsCompaction: false,
     },
     contextWindow: 32_000,
     maxOutput: 0,
@@ -361,6 +379,7 @@ const ENTRIES: ModelEntry[] = [
     capabilities: {
       streaming: false, tools: false, vision: false,
       documents: false, thinking: false, embeddings: false,
+      supportsCompaction: false,
     },
     contextWindow: 200_000,
     maxOutput: 4_000,
@@ -375,6 +394,7 @@ const ENTRIES: ModelEntry[] = [
     capabilities: {
       streaming: false, tools: false, vision: false,
       documents: false, thinking: true, embeddings: false,
+      supportsCompaction: false,
     },
     contextWindow: 200_000,
     maxOutput: 8_000,
@@ -388,6 +408,7 @@ const ENTRIES: ModelEntry[] = [
     capabilities: {
       streaming: false, tools: false, vision: false,
       documents: false, thinking: false, embeddings: false,
+      supportsCompaction: false,
     },
     contextWindow: 0,
     maxOutput: 0,
@@ -402,6 +423,7 @@ const ENTRIES: ModelEntry[] = [
     capabilities: {
       streaming: false, tools: false, vision: false,
       documents: false, thinking: false, embeddings: false,
+      supportsCompaction: false,
     },
     contextWindow: 0,
     maxOutput: 0,

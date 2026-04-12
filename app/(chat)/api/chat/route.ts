@@ -23,6 +23,7 @@ import {
   getProviderForTask,
   isTaskOverridden,
 } from "@/lib/ai/getModel";
+import { getModelEntry } from "@/lib/ai/model-catalog";
 // ТЗ-2: side-effect import installs the file-based overrides reader at
 // module-eval time. Without this import the client-safe stub (returns {})
 // stays active and getModel() never sees dev overrides.
@@ -440,8 +441,11 @@ export async function POST(request: Request) {
     // contextState is used later in threshold checking for Haiku
     let contextState: { suggestionActive: boolean; messagesSinceSuggestion: number } | null = null;
 
-    // Snapshot context management: only for chatMode="chat" (Haiku)
-    // Simply uses MiniMax/Gemini — no snapshot, no compaction (будет Extract при сжатии)
+    // Snapshot state loading: this runs BEFORE activeTaskId is known (still
+    // outside the streamText execute callback), so we gate on chatMode alone.
+    // The actual snapshot INJECTION (inside the callback, below) uses the
+    // capability-based `needsSnapshotFallback` flag so dev overrides can opt
+    // out when the effective model supports Compaction. ТЗ-2.
     const isHaikuChat = chatMode === "chat";
     if (isHaikuChat) {
       const chatWithState = await getChatWithSnapshotState({ chatId: id });
@@ -615,6 +619,26 @@ export async function POST(request: Request) {
           console.log(`[Chat API] Model selection: chatMode=${chatMode}, task=${activeTaskId}, model=${getModelIdForTask(activeTaskId)}`);
         }
 
+        // ТЗ-2: Resolve the catalog entry for the effective model ONCE, right
+        // after activeTaskId is known. All downstream "does the model support
+        // X?" checks read from these capability flags instead of guessing
+        // from chatMode/think/hasAttachments. That's the SSOT fix that lets
+        // dev overrides (/dev/models) correctly enable Anthropic prompt caching
+        // and Compaction API on any task the developer reroutes to Claude.
+        const effectiveCatalogEntry = activeTaskId
+          ? getModelEntry(getModelIdForTask(activeTaskId))
+          : undefined;
+        const effectiveProvider = effectiveCatalogEntry?.provider ?? "anthropic";
+        const isAnthropicModel = effectiveProvider === "anthropic";
+        const modelSupportsCompaction =
+          effectiveCatalogEntry?.capabilities.supportsCompaction ?? false;
+        // Snapshot-injection fallback exists for the legacy `chatMode === "chat"`
+        // flow when the model is Haiku (no Compaction API). If a dev override
+        // points that task at Sonnet/Opus, Compaction takes over and we skip
+        // the snapshot hints entirely.
+        const needsSnapshotFallback =
+          chatMode === "chat" && !modelSupportsCompaction;
+
         // ТЗ-C3: Inject previous snapshot context into system prompt
         if (snapshotContext) {
           systemPromptText += `\n\n<previous_context>\n${snapshotContext}\n</previous_context>`;
@@ -760,9 +784,12 @@ export async function POST(request: Request) {
           }
         }
 
-        // ТЗ-C3/RAG3: Snapshot context management — only for Haiku chats (chat/simply)
-        // Sonnet/Opus use Compaction API (providerOptions.anthropic.contextManagement)
-        if (isHaikuChat) {
+        // ТЗ-C3/RAG3: Snapshot context management — only when the EFFECTIVE
+        // model lacks Compaction (i.e. Haiku). ТЗ-2 note: using
+        // `needsSnapshotFallback` (computed above from the catalog) instead of
+        // `isHaikuChat` lets dev overrides correctly disable snapshot hints when
+        // chatMode="chat" gets routed to Sonnet/Opus — Compaction takes over.
+        if (needsSnapshotFallback) {
           const systemPromptTokens = estimateMessageTokens([
             { type: "text", text: systemPromptText },
           ]);
@@ -958,12 +985,12 @@ export async function POST(request: Request) {
           return; // Exit execute for professor mode
         }
 
-        // ТЗ-RAG3: Compaction only for Anthropic models that support it (Sonnet/Opus, NOT Haiku)
-        // ТЗ-MinimaxCleanup: Simply uses MiniMax — no compaction
-        // Simply with attachments uses Haiku which also doesn't support compaction
-        const isAnthropicModel = chatMode !== "simply" || think || hasAttachments(message.parts);
-        const isHaikuModel = isHaikuChat || (chatMode === "simply" && hasAttachments(message.parts) && !think);
-        const supportsCompaction = isAnthropicModel && (!isHaikuModel || isProjectChat);
+        // ТЗ-2: `effectiveCatalogEntry` / `isAnthropicModel` /
+        // `modelSupportsCompaction` are computed once near the routing
+        // decision above — reuse them here. `|| isProjectChat` preserves the
+        // legacy project-tier exception unchanged.
+        const supportsCompaction =
+          isAnthropicModel && (modelSupportsCompaction || isProjectChat);
         const compactionOptions = supportsCompaction ? {
           anthropic: {
             contextManagement: {
@@ -978,7 +1005,11 @@ export async function POST(request: Request) {
         } : undefined;
 
         // ТЗ-MinimaxCleanup: Simply with MiniMax/Gemini — no tools, no Anthropic cacheControl
-        const isSimplyNonAnthropicModel = chatMode === "simply" && !think && !hasAttachments(message.parts);
+        // ТЗ-2: `effectiveProvider` respects dev overrides — a simply-chat task
+        // pointed at Claude via override correctly reports non-MiniMax here, so
+        // image/PDF parts stay in the message history and temperature stays at 1.0.
+        const isSimplyNonAnthropicModel =
+          chatMode === "simply" && effectiveProvider !== "anthropic";
 
         // Standard streaming mode (non-professor)
         const result = streamText({
