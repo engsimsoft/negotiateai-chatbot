@@ -2,7 +2,7 @@
 
 **Создан:** 2026-04-12
 **Версия проекта:** 3.83.0 → 3.84.0
-**Статус:** 🔄 В работе
+**Статус:** 🔄 В работе — Этапы 0–2 завершены, Этап 3 следующий
 
 ---
 
@@ -11,22 +11,27 @@
 | Метрика | Значение |
 |---------|----------|
 | Этапов | 5 |
-| Текущий этап | 0 (не начат) |
-| Сессий (оценка) | 3–4 |
-| Затронуто call-sites `getModel()` | 0 (threading не требуется) |
+| Текущий этап | 3 (следующий) |
+| Сессий (факт) | 2 (Этапы 0–2 закрыты) |
+| Затронуто call-sites `getModel()` | 0 (threading не потребовался — file-based + ALS callback) |
 
 ---
 
-## Архитектурный каркас
+## Архитектурный каркас (итог после Этапа 2)
+
+**Финальная версия (rev3, file-based) — НЕ cookie:**
 
 ```
-Cookie `x-model-overrides` (JSON: taskId → catalogId)   [dev-only]
+.simply-dev-overrides.json  (dotfile в корне, .gitignore)
+        │
+        ▼ fs.readFileSync (sync, server-only)
+model-overrides-node.ts → registerOverridesReader() → getActiveOverrides()
         │
         ▼
-lookupOverride() в getModel.ts
+lookupOverride(taskId) в getModel.ts
   ├─ dev-gate (SIMPLY_DEV_MODE)
-  ├─ try { cookies() } catch → null (background scope)
-  └─ parse JSON → overrides[taskId]
+  ├─ getActiveOverrides() — synchronous file read per getModel() call
+  └─ return overrides[taskId] ?? null
         │
         ▼
 DEFAULT_TASK_MODELS[taskId]  → catalog id → registry → LanguageModel
@@ -116,7 +121,22 @@ UI слои:
 
 ## Этап 2: Страница /dev/models — полная карта
 
-**Статус:** 🔄 В работе — код готов, ждёт мануальный тест
+**Статус:** ✅ Завершён — код написан, протестирован end-to-end, цены в каталоге верифицированы через WebFetch
+
+**Итог:**
+- `/dev/models` работает, все 4 секции рендерятся (LLM/Raw providers, Task Assignments, Model Catalog)
+- Server Actions `setOverride/clearTaskOverride/resetAllOverrides` работают, revalidatePath обновляет UI мгновенно
+- Пользователь подтвердил переключение на Grok 4.1 Fast через dropdown — override применяется к следующему запросу в Simply Chat
+- Grok 4.1 Fast vision протестирован на картинке — работает
+- Cache read подтверждён (`Cache read: 16315` в DevPanel) — фикс `isAnthropicModel` через catalog flag работает
+- Каталог обновлён через WebFetch: 5 OpenRouter моделей (включая 2 vision), 6 xAI Grok, verified pricing
+
+**НЕЗАПЛАНИРОВАННЫЙ бонусный рефакторинг (коммит 882b525):** в процессе тестов обнаружилось что `chat/route.ts` угадывал провайдера из chatMode/think/attachments — это ломало cache при override. Решение: добавлен флаг `supportsCompaction: boolean` в `ModelCapabilities`, все флаги в route.ts теперь читают catalog entry для `activeTaskId`. Полностью убрано угадывание, заменено на SSOT через каталог.
+
+**Коммиты Этапа 2:**
+- `d716d61` — /dev/models page
+- `882b525` — SSOT cache/compaction flag refactor (kardinal)
+- `1a98c64` — catalog refresh (verified pricing + vision models)
 
 **Цель:** Показать разработчику всю систему — все ~40 задач, каталог моделей, провайдеры, статусы ENV-ключей — с возможностью переключать модели.
 
@@ -185,6 +205,38 @@ UI слои:
 **Git:** `git commit -m "feat(tz-2): /dev/models page with full switchboard"`
 
 **Критерий готовности:** Страница работает, переключения влияют на runtime модели, prod-гейт рабочий.
+
+---
+
+## ⚠ OPEN QUESTIONS (вынести в отдельные ТЗ после финализации ТЗ-2)
+
+Эти вопросы обнаружились во время тестов Этапа 2. Архитектор подтвердил: **не трогать в скоупе ТЗ-2**, вынести в отдельное ТЗ после финализации.
+
+### 1. Кэш истории сообщений
+
+Сейчас `cacheControl: { type: 'ephemeral' }` стоит только на system prompt. История предыдущих user/assistant сообщений не кэшируется и летит fresh каждый запрос. В длинном диалоге это съедает основную часть экономии от кэша (цифровой пример из пользовательского теста: 10k fresh из ~26k total на 3-м сообщении).
+
+**Требует:** анализ Anthropic cache_control возможностей на content-block level, тесты на разных сценариях, возможно 2-3 отдельных ТЗ.
+
+### 2. Grok / OpenRouter prompt caching не активирован
+
+Каталог содержит реальные `cachedInput` цены для Grok ($0.05-0.20) и OpenRouter ($0.24-0.475 для GLM 5.1 / 5V Turbo). Но `chat/route.ts` подставляет `cacheControl` **только** в ветке `isAnthropicModel`.
+
+**Следствие:** для override на Grok/OpenRouter `cache_read` всегда 0 в DevPanel → отображаемая стоимость как будто cache не работает (хотя провайдер может кэшировать автоматически).
+
+**Требует:** провайдер-специфичная активация (xAI parameter, OpenRouter usage.prompt_tokens_details.cached_tokens), возможно unified wrapper в AI SDK v6.
+
+### 3. Grok vision — подтверждено только одно сочетание
+
+В каталоге `CAPS_GROK.vision = true` для всех моделей. На практике проверена только `grok-4-1-fast-reasoning` с картинкой — работает. Для остальных (4.20 family, multi-agent) — доверяем каталогу, не тестировали.
+
+**Риск:** 400 error при vision override на некорректную модель. Можно проверить в Этапе 4 polish или оставить известным ограничением.
+
+### 4. `grok-4` отсутствует в docs.x.ai/docs/models
+
+Запись оставлена с пометкой в `notes`, pricing взят из 4.20 tier как educated guess. При использовании может вернуть 404.
+
+**Решение:** либо удалить в Этапе 4, либо оставить с более жирной warning в UI.
 
 ---
 
