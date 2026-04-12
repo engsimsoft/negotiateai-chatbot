@@ -18,6 +18,7 @@ import { ToolsSection } from "./sections/tools-section";
 import { CostBreakdownSection } from "./sections/cost-breakdown-section";
 import { ErrorsSection } from "./sections/errors-section";
 import { RawSection } from "./sections/raw-section";
+import { SwitchboardSection } from "./sections/switchboard-section";
 
 export function DevPanelDrawer({
   open,
@@ -42,6 +43,7 @@ export function DevPanelDrawer({
           {/* ТЗ-DevPanelErrors: errors/warnings first so users see them immediately */}
           <ErrorsSection data={data} />
           <ModelSection data={data} />
+          <SwitchboardSection data={data} />
           <TokensSection data={data} />
           <CostBreakdownSection data={data} />
           <TimelineSection data={data} />

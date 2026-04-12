@@ -242,22 +242,23 @@ UI слои:
 
 ## Этап 3: Per-message Model Switcher в DevPanel
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (2026-04-12) — мануальный тест пройден: override через DevPanel Switchboard + reset + default восстановлен
 
 **Цель:** Быстрый переключатель прямо в DevPanel — не уходя из чата поменять модель для **текущей задачи** (которую ассистент использует).
 
 **Задачи:**
-- [ ] Расширить `DebugPromptData` / `DebugStepData` — добавить `taskId?: string` (если ещё нет), чтобы DevPanel знал какой taskId показывать в switcher
-  - Проверить: уже ли пишется taskId в debug events. Если нет — добавить в call-sites которые зовут `getModel()` (минимум для chat/route.ts — там 3 варианта simply)
-- [ ] Создать `components/dev-panel/sections/switchboard-section.tsx`:
+- [x] Расширить `DebugPromptData` / `DebugStepData` — добавить `taskId?: string` (если ещё нет), чтобы DevPanel знал какой taskId показывать в switcher
+  - ✅ Уже реализовано на Этапе 1: `DebugPromptData.taskId`, `overrideActive`, `defaultModelId`, `effectiveModelId`
+- [x] Создать `components/dev-panel/sections/switchboard-section.tsx`:
   - Если `data.taskId` не определён → секция скрыта
   - Заголовок «Model Switchboard»
-  - Строка: «Current task: `<taskId>`» + описание из TASK_DESCRIPTIONS
+  - Строка: «Current task: `<taskId>`» + OVERRIDE badge
   - Dropdown — те же опции что и на `/dev/models` (все модели + warning)
   - Кнопка «Apply» → вызывает ту же Server Action `setOverride`
-  - Ссылка «Open full switchboard →» на `/dev/models`
-- [ ] Интегрировать в `components/dev-panel/dev-panel-drawer.tsx` — новая секция после ModelSection
-- [ ] Shared код для dropdown — вынести `model-select.tsx` в общее место, чтобы `/dev/models` и DevPanel использовали одно
+  - Кнопка «Reset» → clearTaskOverride
+  - Ссылка «Full switchboard →» на `/dev/models`
+- [x] Интегрировать в `components/dev-panel/dev-panel-drawer.tsx` — новая секция после ModelSection
+- [x] Shared код для dropdown — вынесен `model-select.tsx` в `components/shared/model-select.tsx`, `/dev/models` и DevPanel используют одно
 
 **Файлы:**
 - `lib/ai/debug-events.ts` — поле taskId (если нужно)
@@ -267,12 +268,12 @@ UI слои:
 - `components/shared/model-select.tsx` — перенос из dev/models/components (или alias)
 
 **Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] Отправить сообщение в Simply Chat → открыть DevPanel → секция Switchboard показывает `simply-chat`
-- [ ] Сменить модель через dropdown → следующее сообщение использует новую
-- [ ] Проверить что секция скрыта если `data.taskId` неизвестен (например, в старых сообщениях из localStorage)
-- [ ] 🧪 Мануальный тест пользователем: переключение через DevPanel без ухода со страницы чата
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `npm run build` — успешен
+- [x] Отправить сообщение в Simply Chat → открыть DevPanel → секция Switchboard показывает `simply-chat`
+- [x] Сменить модель через dropdown → следующее сообщение использует новую (grok-4-1-fast-non-reasoning)
+- [x] Проверить что секция скрыта если `data.taskId` неизвестен (например, в старых сообщениях из localStorage)
+- [x] 🧪 Мануальный тест пользователем: переключение через DevPanel без ухода со страницы чата — ОК, reset → MiniMax-M2.7 восстановлен
 
 **Git:** `git commit -m "feat(tz-2): per-message model switchboard in DevPanel"`
 
