@@ -122,6 +122,19 @@ const CAPS_OPENROUTER_TEXT: ModelCapabilities = {
   supportsCompaction: false,
 };
 
+// Vision-capable OpenRouter models (GLM V-series and similar multimodal).
+// Documents stay false — OpenRouter v1 doesn't route PDFs through these models
+// directly; images/video are the supported media types.
+const CAPS_OPENROUTER_VISION: ModelCapabilities = {
+  streaming: true,
+  tools: true,
+  vision: true,
+  documents: false,
+  thinking: false,
+  embeddings: false,
+  supportsCompaction: false,
+};
+
 // ---------------------------------------------------------------------------
 // Catalog — все записи
 // ---------------------------------------------------------------------------
@@ -260,25 +273,38 @@ const ENTRIES: ModelEntry[] = [
   },
 
   // =========================================================================
-  // xAI Grok (все 5 по ТЗ)
+  // xAI Grok — verified against docs.x.ai/docs/models (fetched 2026-04-12).
+  // All 4.20 variants (reasoning/non-reasoning/multi-agent) share the same
+  // $2/$6 pricing. Cached input is ~10% of fresh for both tiers.
   // =========================================================================
   {
-    id: "grok-4.20-reasoning",
+    id: "grok-4.20-0309-reasoning",
     provider: "xai",
-    modelId: "grok-4.20-reasoning",
+    modelId: "grok-4.20-0309-reasoning",
     displayName: "Grok 4.20 (reasoning)",
-    pricing: { input: 3, output: 15, cachedInput: 0, cacheWrite: 0 },
+    pricing: { input: 2, output: 6, cachedInput: 0.2, cacheWrite: 0 },
     capabilities: CAPS_GROK,
     contextWindow: 256_000,
     maxOutput: 16_000,
   },
   {
-    id: "grok-4.20-non-reasoning",
+    id: "grok-4.20-0309-non-reasoning",
     provider: "xai",
-    modelId: "grok-4.20-non-reasoning",
+    modelId: "grok-4.20-0309-non-reasoning",
     displayName: "Grok 4.20",
-    pricing: { input: 3, output: 15, cachedInput: 0, cacheWrite: 0 },
+    pricing: { input: 2, output: 6, cachedInput: 0.2, cacheWrite: 0 },
     capabilities: { ...CAPS_GROK, thinking: false },
+    contextWindow: 256_000,
+    maxOutput: 16_000,
+  },
+  {
+    id: "grok-4.20-multi-agent-0309",
+    provider: "xai",
+    modelId: "grok-4.20-multi-agent-0309",
+    displayName: "Grok 4.20 Multi-Agent",
+    // Multi-agent uses the same $2/$6 per xAI docs — no ensemble markup.
+    pricing: { input: 2, output: 6, cachedInput: 0.2, cacheWrite: 0 },
+    capabilities: CAPS_GROK,
     contextWindow: 256_000,
     maxOutput: 16_000,
   },
@@ -287,7 +313,7 @@ const ENTRIES: ModelEntry[] = [
     provider: "xai",
     modelId: "grok-4-1-fast-reasoning",
     displayName: "Grok 4.1 Fast (reasoning)",
-    pricing: { input: 0.2, output: 0.5, cachedInput: 0, cacheWrite: 0 },
+    pricing: { input: 0.2, output: 0.5, cachedInput: 0.05, cacheWrite: 0 },
     capabilities: CAPS_GROK,
     contextWindow: 128_000,
     maxOutput: 16_000,
@@ -297,7 +323,7 @@ const ENTRIES: ModelEntry[] = [
     provider: "xai",
     modelId: "grok-4-1-fast-non-reasoning",
     displayName: "Grok 4.1 Fast",
-    pricing: { input: 0.2, output: 0.5, cachedInput: 0, cacheWrite: 0 },
+    pricing: { input: 0.2, output: 0.5, cachedInput: 0.05, cacheWrite: 0 },
     capabilities: { ...CAPS_GROK, thinking: false },
     contextWindow: 128_000,
     maxOutput: 16_000,
@@ -307,36 +333,79 @@ const ENTRIES: ModelEntry[] = [
     provider: "xai",
     modelId: "grok-4",
     displayName: "Grok 4",
-    pricing: { input: 3, output: 15, cachedInput: 0, cacheWrite: 0 },
+    // Not in docs.x.ai/docs/models as of 2026-04-12 — retained for backward
+    // compatibility with earlier tests. Pricing borrowed from 4.20 tier; may
+    // be inaccurate. Prefer grok-4.20-0309-* or grok-4-1-fast-* for new work.
+    pricing: { input: 2, output: 6, cachedInput: 0.2, cacheWrite: 0 },
     capabilities: { ...CAPS_GROK, thinking: false },
     contextWindow: 256_000,
     maxOutput: 16_000,
+    notes: "Not in current docs.x.ai models list — pricing is an educated guess",
   },
 
   // =========================================================================
-  // OpenRouter (тестовые модели, model ID из scripts/test-think-models.ts)
+  // OpenRouter — verified against https://openrouter.ai/api/v1/models
+  // (fetched 2026-04-12). Per-token values converted from raw $/token to $/M.
   // =========================================================================
   {
     id: "z-ai/glm-4.6",
     provider: "openrouter",
     modelId: "z-ai/glm-4.6",
     displayName: "GLM 4.6 (OpenRouter)",
-    pricing: { input: 0.5, output: 1.5, cachedInput: 0, cacheWrite: 0 },
+    pricing: { input: 0.39, output: 1.9, cachedInput: 0, cacheWrite: 0 },
     capabilities: CAPS_OPENROUTER_TEXT,
-    contextWindow: 200_000,
-    maxOutput: 16_000,
-    notes: "ID из scripts/test-think-models.ts — уточнить при добавлении в UI",
+    contextWindow: 204_800,
+    maxOutput: 204_800,
   },
   {
-    id: "qwen/qwen3-max",
+    id: "z-ai/glm-5.1",
     provider: "openrouter",
-    modelId: "qwen/qwen3-max",
-    displayName: "Qwen 3 Max (OpenRouter)",
-    pricing: { input: 1, output: 4, cachedInput: 0, cacheWrite: 0 },
+    modelId: "z-ai/glm-5.1",
+    displayName: "GLM 5.1 (OpenRouter)",
+    // First non-Anthropic entry in the catalog with cache reads — OpenRouter
+    // exposes $0.475/M for cached input, so cost tracking respects it.
+    pricing: { input: 0.95, output: 3.15, cachedInput: 0.475, cacheWrite: 0 },
     capabilities: CAPS_OPENROUTER_TEXT,
-    contextWindow: 256_000,
-    maxOutput: 16_000,
-    notes: "ID из scripts/test-think-models.ts — уточнить при добавлении в UI",
+    contextWindow: 202_752,
+    maxOutput: 65_535,
+  },
+  {
+    id: "qwen/qwen3.6-plus",
+    provider: "openrouter",
+    modelId: "qwen/qwen3.6-plus",
+    displayName: "Qwen 3.6 Plus (OpenRouter)",
+    // Tiered pricing on OpenRouter: ≤256K tokens is $0.325/$1.95, >256K is
+    // $1.30/$3.90. ModelPricingUsd has no tier support yet, so we store the
+    // base ≤256K tier. Cost tracking underestimates for requests >256K input.
+    pricing: { input: 0.325, output: 1.95, cachedInput: 0, cacheWrite: 0 },
+    capabilities: CAPS_OPENROUTER_TEXT,
+    contextWindow: 1_000_000,
+    maxOutput: 65_536,
+    notes: "Tiered pricing: >256K input tokens cost 4× base ($1.30/$3.90). Catalog stores base tier only.",
+  },
+  // --- OpenRouter vision models ------------------------------------------
+  {
+    id: "z-ai/glm-4.6v",
+    provider: "openrouter",
+    modelId: "z-ai/glm-4.6v",
+    displayName: "GLM 4.6V (vision)",
+    // Verified via openrouter.ai/api/v1/models — smaller/cheaper vision tier
+    // than 5V Turbo. No cache read price exposed.
+    pricing: { input: 0.3, output: 0.9, cachedInput: 0, cacheWrite: 0 },
+    capabilities: CAPS_OPENROUTER_VISION,
+    contextWindow: 131_072,
+    maxOutput: 131_072,
+  },
+  {
+    id: "z-ai/glm-5v-turbo",
+    provider: "openrouter",
+    modelId: "z-ai/glm-5v-turbo",
+    displayName: "GLM 5V Turbo (vision)",
+    // Multimodal (image + video + text). Cache read supported at $0.24/M.
+    pricing: { input: 1.2, output: 4, cachedInput: 0.24, cacheWrite: 0 },
+    capabilities: CAPS_OPENROUTER_VISION,
+    contextWindow: 202_752,
+    maxOutput: 131_072,
   },
 
   // =========================================================================
