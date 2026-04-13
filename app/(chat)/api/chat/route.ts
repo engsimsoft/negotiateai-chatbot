@@ -47,7 +47,7 @@ import {
   calcUsagePercent,
 } from "@/lib/ai/context-limits";
 import { executeProfessorPipeline } from "@/lib/ai/professor-pipeline";
-import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
+import { getStandardTools, getActiveToolNames, withCacheControlOnLastTool } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment, isSimplyDevMode } from "@/lib/constants";
 import { createStepTracker, type GuardianFlags } from "@/lib/ai/tool-call-guardian";
 import { calculateCostRub, RUB_PER_USD } from "@/lib/ai/providers";
@@ -1015,54 +1015,129 @@ export async function POST(request: Request) {
           }
         } : undefined;
 
-        // ТЗ-MinimaxCleanup: Simply with MiniMax/Gemini — no tools, no Anthropic cacheControl
+        // ТЗ-MinimaxCleanup: Simply with MiniMax/Gemini — temperature ≤1.0, strip media
         // ТЗ-2: `effectiveProvider` respects dev overrides — a simply-chat task
         // pointed at Claude via override correctly reports non-MiniMax here, so
         // image/PDF parts stay in the message history and temperature stays at 1.0.
         const isSimplyNonAnthropicModel =
           chatMode === "simply" && effectiveProvider !== "anthropic";
 
+        // ТЗ-CacheAudit Этап 3: Anthropic-protocol providers — пакет
+        // `vercel-minimax-ai-provider` под капотом проксирует запросы через
+        // `AnthropicMessagesLanguageModel` из `@ai-sdk/anthropic/internal`,
+        // поэтому MiniMax принимает тот же синтаксис `providerOptions.anthropic.*`
+        // что и чистый Claude: `cacheControl`, reasoning parts и т.д.
+        // `contextManagement` (Claude Compaction) MiniMax игнорирует — для него
+        // используется отдельная проверка `isAnthropicModel`.
+        const isAnthropicProtocolModel =
+          effectiveProvider === "anthropic" || effectiveProvider === "minimax";
+
+        // ─── Подготовка tools и messages для streamText ──────────────────────
+        // Выносим построение messages из inline literal до вызова streamText,
+        // потому что (а) convertToModelMessages async, (б) MIND transplant
+        // требует мутации последнего user message content-part.
+
+        // Tools: стандартный набор + optional cache breakpoint на последнем
+        // tool для Anthropic-protocol моделей (кэширует весь блок определений).
+        const standardTools = getStandardTools({
+          session,
+          dataStream,
+          isProjectChat,
+          projectId: projectId || undefined,
+          chatId: id,
+          messageId: assistantMessageId,
+          chatMode,
+          researchDepth,
+        });
+        const toolsForRequest = isAnthropicProtocolModel
+          ? withCacheControlOnLastTool(standardTools)
+          : standardTools;
+
+        // Очистка и конверсия истории сообщений.
+        // stripIncompleteToolParts — универсальный (все провайдеры).
+        // Для Simply: дополнительно stripLegacyOpenAICompatToolParts (legacy data
+        // от OpenAI-compat MiniMax до ТЗ-CacheAudit) + stripMediaPartsForTextModel
+        // для провайдеров без vision (MiniMax/Gemini). Для Claude в Simply media
+        // parts сохраняем (vision работает).
+        const cleanedHistory = stripIncompleteToolParts(uiMessages);
+        const preparedHistory =
+          chatMode === "simply"
+            ? isSimplyNonAnthropicModel
+              ? stripMediaPartsForTextModel(stripLegacyOpenAICompatToolParts(cleanedHistory))
+              : stripLegacyOpenAICompatToolParts(cleanedHistory)
+            : cleanedHistory;
+        const coreHistory = sanitizeCoreMessages(
+          await convertToModelMessages(preparedHistory),
+        );
+
+        // Сборка messages с 3 cache breakpoints (только для Anthropic-protocol):
+        //  [1] static system prompt (breakpoint 1)
+        //  [2] ...history
+        //  [3] last user message с inline breakpoint на последнем text-part (breakpoint 3)
+        //      + trailing MIND block как dynamic content-part (после breakpoint → не ломает кэш)
+        // Дополнительно: breakpoint 2 — на последнем tool определении через
+        // `withCacheControlOnLastTool` выше.
+        //
+        // Для non-Anthropic-protocol (например Gemini через dev override) —
+        // MIND идёт как второй system message (legacy path), breakpoints не ставятся.
+        const messagesForRequest: Parameters<typeof streamText>[0]["messages"] = [
+          {
+            role: "system" as const,
+            content: systemPromptText,
+            ...(isAnthropicProtocolModel
+              ? { providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } } }
+              : {}),
+          },
+          ...coreHistory,
+        ];
+
+        if (mindDynamicBlock) {
+          const lastIdx = messagesForRequest.length - 1;
+          const lastMsg = messagesForRequest[lastIdx];
+          if (isAnthropicProtocolModel && lastMsg?.role === "user") {
+            // Normalize content to array form, mark last existing part with
+            // cacheControl, append MIND block as trailing dynamic part.
+            // Cast через `unknown` — AI SDK v6 union типы (TextPart | ImagePart
+            // | FilePart) не дают прямого доступа к `providerOptions`, но оно
+            // валидное поле на любом part (SharedV2 protocol).
+            const existingParts: any[] = Array.isArray(lastMsg.content)
+              ? [...(lastMsg.content as unknown as any[])]
+              : [{ type: "text", text: String(lastMsg.content) }];
+            const lastPartIdx = existingParts.length - 1;
+            const lastPart = existingParts[lastPartIdx];
+            existingParts[lastPartIdx] = {
+              ...lastPart,
+              providerOptions: {
+                ...(lastPart.providerOptions ?? {}),
+                anthropic: { cacheControl: { type: "ephemeral" as const } },
+              },
+            };
+            existingParts.push({
+              type: "text",
+              text: `\n\n${mindDynamicBlock}`,
+            });
+            messagesForRequest[lastIdx] = {
+              ...lastMsg,
+              content: existingParts as unknown as typeof lastMsg.content,
+            };
+          } else {
+            // Legacy path: non-Anthropic-protocol or last message is not user.
+            // Append MIND as a separate system message (behavior pre-ТЗ-CacheAudit Этап 3).
+            messagesForRequest.push({ role: "system" as const, content: mindDynamicBlock });
+          }
+        }
+
         // Standard streaming mode (non-professor)
         const result = streamText({
           model: modelToUse,
-          messages: [
-            // System prompt — with Anthropic cacheControl only for Anthropic models
-            {
-              role: 'system' as const,
-              content: systemPromptText,
-              ...(isAnthropicModel ? { providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } } : {}),
-            },
-            // ТЗ-KITT/CACHE: MIND retrieved facts (dynamic per query) — NOT cached
-            ...(mindDynamicBlock ? [{ role: 'system' as const, content: mindDynamicBlock }] : []),
-            // ТЗ-1 hotfix: stripIncompleteToolParts (universal) removes failed/in-flight
-            // tool parts before any provider-specific stripping. Applied to ALL branches.
-            // ТЗ-SimplyToolsMinimax: then strip images/files for MiniMax (text-only)
-            // or MiniMax tool parts for Anthropic switchover.
-            ...sanitizeCoreMessages(await convertToModelMessages(
-              (() => {
-                const cleaned = stripIncompleteToolParts(uiMessages);
-                if (chatMode === "simply") {
-                  // Чистим legacy OpenAI-compat tool parts для всех Simply-запросов:
-                  // новые идут через AnthropicMessagesLanguageModel (и MiniMax, и Claude)
-                  // и строгая валидация orphan tool_use — общая для обоих.
-                  const withoutLegacyTools = stripLegacyOpenAICompatToolParts(cleaned);
-                  // MiniMax и Gemini не поддерживают vision — заменяем media на плейсхолдер.
-                  // Claude Sonnet/Haiku умеют vision — оставляем media parts как есть.
-                  return isSimplyNonAnthropicModel
-                    ? stripMediaPartsForTextModel(withoutLegacyTools)
-                    : withoutLegacyTools;
-                }
-                return cleaned;
-              })()
-            )),
-          ],
+          messages: messagesForRequest,
           providerOptions: compactionOptions,
           temperature: isSimplyNonAnthropicModel ? 0.7 : 1.0,
           stopWhen: stepCountIs(5),
           // ТЗ-SimplyToolsMinimax: Tools enabled for all models including MiniMax.
           // deepResearch filtered for simply (MiniMax) via SIMPLY_MODE_EXCLUDED_TOOLS in chat-tools.ts
           experimental_activeTools: getActiveToolNames(isProjectChat, chatMode, think),
-          tools: getStandardTools({ session, dataStream, isProjectChat, projectId: projectId || undefined, chatId: id, messageId: assistantMessageId, chatMode, researchDepth }),
+          tools: toolsForRequest,
           experimental_transform: smoothStream({ chunking: "word" }),
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,

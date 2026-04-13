@@ -11,11 +11,11 @@
 - [x] Phase 2: Планирование (план одобрен пользователем, расширен в ходе сессии на 7 этапов)
 - [x] Этап 0: Pre-flight проверки (2026-04-12) — все 4 теста PASS, переход безопасен
 - [x] Этап 1: Переключение фабрики (commit `5fdfcd6`) — валидировано через UI 2026-04-13
-- [🔄] Этап 2: Code Health Cleanup — код готов, ждёт мануального smoke-теста ← **ТЕКУЩЕЕ СОСТОЯНИЕ**
-- [ ] Этап 3: Cache breakpoints в chat route + MIND transplant
-- [ ] Этап 4: Cache breakpoints в task-expert (service-chat deprecated — исключён)
-- [ ] Этап 5: Валидация эффективности
-- [ ] Этап 6: Финализация
+- [x] Этап 2: Code Health Cleanup (commit `ca56256`) — валидировано через smoke 2026-04-13
+- [x] Этап 3: Cache breakpoints + MIND transplant — валидировано через UI 2026-04-13, 54-58% экономии подтверждены
+- [🔄] Этап 4: Cache breakpoints в task-expert route ← **ТЕКУЩЕЕ СОСТОЯНИЕ**
+- [ ] Этап 5: Валидация эффективности (SQL за 24ч real traffic)
+- [ ] Этап 6: Финализация (ADR 049/050, docs, CHANGELOG, package.json 3.85.0)
 
 ## Следующая сессия: начни с
 

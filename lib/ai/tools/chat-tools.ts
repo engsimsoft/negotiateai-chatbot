@@ -75,6 +75,47 @@ export function getStandardTools({
   };
 }
 
+/**
+ * Wrap the LAST tool in the object with Anthropic `providerOptions.cacheControl`.
+ *
+ * Per Anthropic prompt caching spec ([docs](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)),
+ * placing `cache_control` on the last tool definition caches ALL preceding tool
+ * definitions (including the last one itself) as a single cache breakpoint. The
+ * contents of tool definitions rarely change, so this gives a large cacheable
+ * block essentially for free.
+ *
+ * Safe to apply to:
+ *  - `anthropic` provider (pure Claude через `@ai-sdk/anthropic`)
+ *  - `minimax` / `minimaxLong` providers (тонкая обёртка над `AnthropicMessages-
+ *    LanguageModel` из `@ai-sdk/anthropic/internal`, идентичный синтаксис)
+ *
+ * The last key is chosen by JavaScript object-key insertion order, which is
+ * deterministic since ES2015. In `getStandardTools()` the last entry is always
+ * `readTelegramChannel` (both for project and non-project flows), so the
+ * cache key stays stable across requests.
+ */
+export function withCacheControlOnLastTool<T extends Record<string, any>>(
+  tools: T,
+): T {
+  const keys = Object.keys(tools);
+  if (keys.length === 0) return tools;
+  const lastKey = keys[keys.length - 1];
+  const lastTool = tools[lastKey];
+  return {
+    ...tools,
+    [lastKey]: {
+      ...lastTool,
+      providerOptions: {
+        ...((lastTool as { providerOptions?: Record<string, unknown> }).providerOptions ?? {}),
+        anthropic: {
+          ...(((lastTool as { providerOptions?: { anthropic?: Record<string, unknown> } }).providerOptions?.anthropic) ?? {}),
+          cacheControl: { type: "ephemeral" as const },
+        },
+      },
+    },
+  } as T;
+}
+
 /** All tool names that can be active */
 const ALL_TOOL_NAMES = [
   "getCurrentDate",

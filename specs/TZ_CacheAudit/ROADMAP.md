@@ -148,22 +148,34 @@
 
 ## Этап 3: Cache breakpoints в основном chat route + MIND transplant
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён (2026-04-13, validated через UI тест)
 
 **Цель:** 3 cache breakpoints (tools + static system + last-user) в `app/(chat)/api/chat/route.ts`, MIND dynamic block перенесён в content-part последнего user message.
 
 **⛔ НЕ начинать до подтверждения Этапа 2 пользователем.**
 
 **Задачи:**
-- [ ] Добавить breakpoint 1 (tools) — точный синтаксис по результатам Этапа 0
-- [ ] Убедиться что breakpoint 2 (static system) продолжает работать
-- [ ] Перенести MIND dynamic block из отдельного system message в content-part последнего user message (префикс «Релевантные факты из памяти:»)
-- [ ] Добавить breakpoint 3 на content-part последнего user message
-- [ ] Расширить условие `isAnthropicModel` → `isCacheCapableModel = isAnthropicModel || isMiniMaxAnthropicCompatModel`
-- [ ] `npx tsc --noEmit` → 0 ошибок
-- [ ] Мануальный тест: задать вопрос, ответ на который зависит от факта памяти (например, «когда у меня дедлайн?» если факт есть) — проверить что модель использует факты
-- [ ] SQL-проверка: `cacheReadTokens > 0` на 2-м сообщении Simply Chat с MiniMax
-- [ ] Git commit
+- [x] Добавлен helper `withCacheControlOnLastTool()` в `lib/ai/tools/chat-tools.ts` — оборачивает последний tool (`readTelegramChannel`) через `providerOptions.anthropic.cacheControl`. Per Anthropic spec — кэширует все предыдущие tool definitions одним breakpoint.
+- [x] Breakpoint 1 (static system): расширено условие с `isAnthropicModel` на `isAnthropicProtocolModel` — теперь применяется к MiniMax тоже
+- [x] Breakpoint 2 (tools): применяется через `withCacheControlOnLastTool` в route.ts для `isAnthropicProtocolModel`
+- [x] Breakpoint 3 (last user text-part): inline cacheControl на последнем существующем content-part последнего user message
+- [x] MIND dynamic block transplant: перенесён из отдельного system message в trailing text-part последнего user message (после breakpoint 3 → не ломает кэш)
+- [x] Введено `isAnthropicProtocolModel = (effectiveProvider === "anthropic" || effectiveProvider === "minimax")` с комментарием про proxy через `AnthropicMessagesLanguageModel`
+- [x] `compactionOptions` остаётся условным по `isAnthropicModel` (MiniMax игнорирует Context Management)
+- [x] `temperature` остаётся условным по `isSimplyNonAnthropicModel` (MiniMax требует ≤1.0)
+- [x] Построение `messagesForRequest` вынесено из inline literal до вызова `streamText` (async convertToModelMessages + mutation последнего user message)
+- [x] `npx tsc --noEmit` → 0 ошибок
+- [x] `npm run build` → успех (после rm -rf .next)
+- [x] 🧪 **Мануальный UI тест 2026-04-13 — ВСЕ МЕТРИКИ ЗЕЛЁНЫЕ:**
+  - **MiniMax cacheWriteTokens впервые ненулевой** — 8424 токена на cold сообщении (раньше всегда 0). Measurement blind spot из Этапа 2 technical debt закрывается автоматически.
+  - **Claude Haiku Msg 1 (cold):** 32739 in, cacheWrite=19065, cost $0.0379
+  - **Claude Haiku Msg 2 (hot):** 32849 in, **cacheRead=19065** (100% hit), cost **$0.0160** — **58% экономии**
+  - **MiniMax Msg 1 (cold):** 13841 in, cacheWrite=8424, cost $0.005
+  - **MiniMax Msg 2 (hot):** 13971 in, **cacheRead=8424** (100% hit), cost **$0.0023** — **54% экономии**
+  - **MiniMax Msg 3 (tool-call `getCurrentDate`):** 28111 in, cacheRead=16848, tool отработал, Guardian чист
+  - TTFT 7-13мс во всех запросах, никаких ошибок в логах
+- [x] SQL проверка: `cacheReadTokens > 0` на 2-м сообщении для обоих провайдеров ✅
+- [x] Git commit
 
 **Файлы:**
 - `app/(chat)/api/chat/route.ts:1015-1050`

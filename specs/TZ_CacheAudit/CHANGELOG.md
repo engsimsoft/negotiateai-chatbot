@@ -79,4 +79,42 @@
 - `npm run build`: успех (пришлось сначала остановить dev server + `rm -rf .next` — был конфликт dev и prod артефактов в `.next` dir)
 - Файлы затронуты в Этапе 2: `app/(chat)/api/chat/route.ts`, `docs/ai-minimax.md`, `docs/ai-providers.md`, `docs/architecture.md`, `specs/TZ_CacheAudit/*`
 - Файлы удалены: `scripts/test-minimax.ts`, `scripts/test-minimax-generate-object.ts`, `scripts/test-think-models.ts` (untracked)
-- **Gate:** Этап 3 не начинаем до подтверждения мануального smoke-теста Simply Chat
+
+### Этап 3: Cache breakpoints + MIND transplant — ✅ завершён (2026-04-13)
+- **`lib/ai/tools/chat-tools.ts`**: добавлен helper `withCacheControlOnLastTool<T>()` который оборачивает последний tool в объекте через `providerOptions.anthropic.cacheControl: { type: 'ephemeral' }`. Последний ключ в `getStandardTools()` всегда `readTelegramChannel` (insertion order ES2015+), что гарантирует стабильный cache key между запросами. Per Anthropic spec, placing cacheControl на последнем tool кэширует ВСЕ предыдущие tool definitions одним breakpoint.
+- **`app/(chat)/api/chat/route.ts`**:
+  - Введена локальная переменная `isAnthropicProtocolModel = effectiveProvider === "anthropic" || effectiveProvider === "minimax"` — обоснование: `vercel-minimax-ai-provider@0.0.2` через `createMinimax()` проксирует запросы через `AnthropicMessagesLanguageModel` из `@ai-sdk/anthropic/internal`, поэтому MiniMax принимает идентичный `providerOptions.anthropic.*` синтаксис.
+  - **Breakpoint 1** (system prompt): условие применения расширено с `isAnthropicModel` на `isAnthropicProtocolModel` — теперь работает и для MiniMax.
+  - **Breakpoint 2** (tools): новый, через `withCacheControlOnLastTool(standardTools)` — применяется при `isAnthropicProtocolModel`.
+  - **Breakpoint 3** (last user message content-part): новый, inline `providerOptions.anthropic.cacheControl` на последнем text-part последнего user message через мутацию `messagesForRequest[lastIdx]`.
+  - **MIND dynamic block transplant**: перенесён из отдельного `system` message в trailing text-part последнего user message. Структура теперь: `[system, ...history, { role: 'user', content: [textPart(breakpoint), mindPart(dynamic)] }]`. MIND находится **за** breakpoint → не ломает кэш префикса при смене фактов между запросами.
+  - Построение `messagesForRequest` вынесено из inline literal внутри `streamText({...})` до вызова — async `convertToModelMessages` + мутация последнего user message требовали раскрытия.
+  - `compactionOptions` остаётся под `isAnthropicModel` (не `isAnthropicProtocolModel`) — MiniMax API **игнорирует** Context Management (подтверждено их документацией).
+  - `temperature: isSimplyNonAnthropicModel ? 0.7 : 1.0` остаётся — MiniMax требует `(0, 1]`.
+
+- **Reality check в мануальном UI тесте (2026-04-13) — ВСЕ МЕТРИКИ ЗЕЛЁНЫЕ:**
+
+  **Claude Haiku 4.5 (Simply «Думать»):**
+  | Msg | inputTokens | cacheWrite | cacheRead | costUsd |
+  |-----|-----------|-----------|-----------|---------|
+  | 1 cold | 32739 | **19065** | 0 | $0.0379 |
+  | 2 hot | 32849 | 0 | **19065** (100%) | **$0.0160** (58% экономии) |
+
+  **MiniMax M2.7 (Simply):**
+  | Msg | inputTokens | cacheWrite | cacheRead | costUsd |
+  |-----|-----------|-----------|-----------|---------|
+  | 1 cold | 13841 | **8424** ⭐ | 0 | $0.005 |
+  | 2 hot | 13971 | 0 | **8424** (100%) | **$0.0023** (54% экономии) |
+  | 3 tool-call | 28111 | 0 | **16848** | $0.0045 |
+
+  **⭐ Впервые в истории проекта** `cacheWriteTokens > 0` для MiniMax. Это закрывает одну из technical debt из Этапа 2 автоматически — MiniMax через Anthropic-compat режим возвращает `cache_creation_input_tokens`, AI SDK v6 мапит в `inputTokenDetails.cacheWriteTokens`, наш `extractUsageFields` читает корректно, `ai_usage_log` пишет ненулевое значение. Measurement blind spot исчез.
+
+  Msg 3 с tool call (`getCurrentDate`) не сломал кэш — после tool_use + tool_result цикла MiniMax продолжил читать префикс. TTFT 7-13 мс во всех 5 запросах (включая Haiku), никаких ошибок/варнингов, Guardian ни разу не блокировал.
+
+- **Stripcontext:** в логах подтверждено что MiniMax в Anthropic-compat режиме продолжает использовать `call_function_*` префикс для `toolCallId` (увидели в `msg 3 getCurrentDate` call). Значит `stripLegacyOpenAICompatToolParts` из Этапа 2 остаётся **постоянной** санитацией (а не только legacy) — нужно будет скорректировать docstring на Этапе 6 финализации.
+
+- **Validation:**
+  - `npx tsc --noEmit`: 0 ошибок (после `as unknown as` cast fix для AI SDK v6 union типов content parts)
+  - `npm run build`: успех
+  - Реальный UI тест: 5 сообщений (3 MiniMax + 2 Haiku), все метрики сошлись с ожиданиями
+  - SQL `ai_usage_log` за последние 15 минут: все записи корректны, regressions нет
