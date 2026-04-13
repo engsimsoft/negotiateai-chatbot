@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.87.1
-**Дата:** 2026-04-13
+**Версия:** 3.87.2
+**Дата:** 2026-04-14
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -337,6 +337,28 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-StreamObservability: Observable stream errors + recovery UX — ✅ ЗАВЕРШЁН (v3.87.2)
+
+**Проблема (Finding #5 из TZ_LegacyChatCleanup):** `createUIMessageStream.onError` в обоих chat routes был молчалив — `onError: () => "Oops, an error occurred!"` без `console.error` и без `emitDebugError`. Любая ошибка стрима (Anthropic 5xx/429, tool crash, network glitch) исчезала в никуда, владелец видел только генерическую строку в UI без возможности отладить. При smoke test всплыла вторая проблема: после error state `useChat` переходит в `"error"`, а submit guard в `MultimodalInput` блокировал отправку при любом status ≠ `"ready"` → user не мог продолжить без reload страницы.
+
+**Что сделано (Stage 1 — server observability):**
+- Оба chat routes (`app/(chat)/api/chat/route.ts`, `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`) — `onError` принимает `(error: unknown)`, пишет `console.error("[Chat Stream onError]", error)` с полным stack, вызывает `emitDebugError(dataStreamRef, { source, message, stack, context })` через closure-captured `UIMessageStreamWriter`, возвращает локализованную строку `"Произошла ошибка при генерации ответа. Попробуйте повторить."`.
+- Closure capture паттерн: `let dataStreamRef: UIMessageStreamWriter | null = null` выше `createUIMessageStream`, `dataStreamRef = dataStream` первой строкой в `execute`.
+- Task-expert route: добавлен `emitDebugError` в существующий import block из `@/lib/ai/debug-events`.
+
+**Что сделано (Stage 2b — recovery UX, расширенный скоуп):**
+- `useChat` destructuring в `components/chat.tsx` и `components/projects/task-chat.tsx` теперь включает `clearError`, проп передаётся в `MultimodalInput`.
+- Submit guard в `components/multimodal-input.tsx` переписан: блок только при `status === "submitted" | "streaming"`; при `status === "error"` вызов `clearError?.()` и продолжение — AI SDK v6 docs требуют explicit clear перед повторным `sendMessage`.
+- Атрибуты `disabled` на voice button и attachments button переведены с `status !== "ready"` на `status === "submitted" || status === "streaming"` — в error state UI полностью интерактивен.
+
+**Smoke test (2 этапа, user-confirmed):**
+1. Temporary throw в `execute` → отправлено сообщение → `[Chat Stream onError]` в server logs с полным stack, Session Errors popup с русской строкой в DevPanel, user-facing текст в UI.
+2. Throw повторён → первое сообщение ошибка → **без reload** отправлено второе → улетело, никакого "Please wait..." toast, никакой блокировки. User: «отправил два сообщения вышло две ошибки».
+
+**Lesson learned:** SPEC в изначальном формулировании покрывал только server-side observability, но без recovery UX фикс бесполезен для пользователя (ошибка логируется, но пользователь не может восстановиться). Правильная реакция — расширить скоуп прямо в ТЗ, а не откладывать в follow-up. Владелец продукта (non-programmer) поднял это как блокирующую UX-проблему, указав что нужно хотя бы подсказать как сбросить ошибку — это стало триггером для Stage 2b.
+
+---
 
 ### ТЗ-OpenRouterCostTracking: Cost display fix для OpenRouter моделей — ✅ ЗАВЕРШЁН (v3.87.1, patch)
 

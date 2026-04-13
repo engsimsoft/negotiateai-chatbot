@@ -127,6 +127,7 @@ export function TaskChat({
     status,
     stop,
     regenerate,
+    clearError,
   } = useChat<ChatMessage>({
     id: chatId,
     messages: initialMessages,
@@ -306,6 +307,7 @@ export function TaskChat({
               setInput={setInput}
               setMessages={setMessages}
               status={status}
+              clearError={clearError}
               stop={stop}
               selectedModelId="claude-sonnet"
               selectedVisibilityType="private"

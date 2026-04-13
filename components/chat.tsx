@@ -234,6 +234,7 @@ export function Chat({
     stop,
     regenerate,
     resumeStream,
+    clearError,
   } = useChat<ChatMessage>({
     id,
     messages: initialMessages,
@@ -509,6 +510,7 @@ export function Chat({
                 setInput={setInput}
                 setMessages={setMessages}
                 status={status}
+                clearError={clearError}
                 stop={stop}
                 usage={usage}
                 isProjectChat={!!projectId}

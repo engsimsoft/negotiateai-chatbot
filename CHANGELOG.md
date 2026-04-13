@@ -13,6 +13,63 @@
 
 ---
 
+## [3.87.2] — 2026-04-14 — Stream Observability + Recovery UX (ТЗ-StreamObservability)
+
+Закрытие Finding #5 из TZ_LegacyChatCleanup. Два слоя фикса: (1) наблюдаемость server-side stream errors, (2) UX-восстановление после ошибки без reload страницы.
+
+### Fixed
+
+**Server-side observability в `createUIMessageStream.onError` (обе chat routes):**
+
+- [app/(chat)/api/chat/route.ts](app/(chat)/api/chat/route.ts) и [app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts](app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts): `onError: () => "Oops, an error occurred!"` заменён на полноценный handler, принимающий `(error: unknown)`, пишущий `console.error("[Chat Stream onError]", error)` (полный stack в server logs), вызывающий `emitDebugError(dataStreamRef, { source, message, stack, context })` через closure-capture writer'а, и возвращающий локализованную строку `"Произошла ошибка при генерации ответа. Попробуйте повторить."` вместо английского Oops.
+- Добавлен импорт `type UIMessageStreamWriter` из `ai` в обоих файлах для типа closure-ref.
+- В task-expert route добавлен `emitDebugError` в существующий import block из `@/lib/ai/debug-events`.
+
+**UX Recovery после stream error — клиент больше не застревает:**
+
+До фикса: `useChat` после ошибки переходил в status `"error"`, а [components/multimodal-input.tsx:383](components/multimodal-input.tsx#L383) содержал `if (status !== "ready") toast.error("Please wait for the model...")` — т.е. блокировал отправку в error state тоже. Пользователь не мог продолжить без reload страницы.
+
+- [components/chat.tsx](components/chat.tsx) и [components/projects/task-chat.tsx](components/projects/task-chat.tsx): вытаскиваем `clearError` из `useChat` destructuring и прокидываем пропом в `MultimodalInput`.
+- [components/multimodal-input.tsx](components/multimodal-input.tsx): новый prop `clearError?: UseChatHelpers<ChatMessage>["clearError"]`. Submit guard переписан: блокируется **только** при `status === "submitted" | "streaming"`; при `status === "error"` вызывается `clearError?.()` и `submitForm()` — AI SDK v6 требует explicit clear перед повторным `sendMessage`. Атрибуты `disabled` на voice button и attachments button переведены с `status !== "ready"` на `status === "submitted" || status === "streaming"` — т.е. в error state всё интерактивно.
+
+### Why recovery UX was in scope
+
+Изначальный SPEC (Finding #5) просил только server-side observability. При smoke-тестировании обнаружилось что без recovery UX фикс бесполезен для пользователя: ошибка логируется и даже показывается в DevPanel Session Errors, но сам чат зависает. Владелец продукта (non-programmer) указал на это как на блокирующую UX-проблему. Расширение скоупа на Stage 2b — правильная реакция: без него observability не доходит до своей цели (помочь пользователю восстановиться из ошибки).
+
+### Smoke test (two stages, user-confirmed)
+
+**Stage 1 (server observability):**
+1. Временный `throw new Error("TEST: stream observability smoke")` в начале `execute` main chat route
+2. Отправлено тестовое сообщение
+3. Server logs: `[Chat Stream onError] Error: TEST: stream observability smoke` + full stack (строка 545)
+4. DevPanel Session Errors indicator зажегся, карточка содержит русскую строку ошибки
+5. В UI чата — локализованная строка вместо ответа ассистента
+
+**Stage 2 (recovery UX):**
+1. Throw повторён
+2. Первое сообщение → error
+3. **Без reload** отправлено второе сообщение
+4. Никакого "Please wait for the model..." toast, поле ввода не заблокировано, сообщение улетело
+5. Подтверждено user: «отправил два сообщения вышло две ошибки» — recovery работает
+
+### Architectural notes
+
+**`dataStreamRef` closure capture — необходимый паттерн.** `onError` — sibling `execute` на уровне параметров `createUIMessageStream({...})`, а `dataStream` деструктурируется только внутри `execute`. Чтобы `emitDebugError` смог записать в DevPanel, writer капчится в closure через `let dataStreamRef: UIMessageStreamWriter | null = null` выше объявления stream, затем `dataStreamRef = dataStream` первой строкой в `execute`. `emitDebugError` self-guarded try/catch внутри — если stream уже закрыт к моменту вызова, write молча swallow'нется. Тем не менее в наблюдаемом случае server-side emit попадает в client через **onError useChat hook** (client:useChat source) а не напрямую через per-message DevPanel Error section — это предсказуемо, т.к. to момент срабатывания onError стрим активен лишь для финального error-сообщения, не для message-level events.
+
+**Почему `clearError` нельзя опустить.** AI SDK v6 docs (https://ai-sdk.dev/docs/reference/ai-sdk-ui/use-chat) явно разделяют `clearError` как отдельный метод: *"Clears the error state"*. Вызов `sendMessage()` во время `status === "error"` **не** сбрасывает error state автоматически — нужен explicit `clearError()` первым. Без этого новое сообщение либо игнорируется, либо приходит в stale state.
+
+### Изученная документация (WORKFLOW Правило 1)
+
+| Источник | URL | Что взято |
+|---|---|---|
+| AI SDK UI — `createUIMessageStream` | https://ai-sdk.dev/docs/reference/ai-sdk-ui/create-ui-message-stream | Сигнатура `onError: (error: unknown) => string`, поведение в merged streams |
+| AI SDK UI — `useChat` | https://ai-sdk.dev/docs/reference/ai-sdk-ui/use-chat | Status transitions, `clearError` semantics, error recovery pattern |
+| AI SDK UI — Error Handling | https://ai-sdk.dev/docs/ai-sdk-ui/error-handling | Generic user-facing message рекомендация (не утекать stack/internals) |
+| AI SDK Core — Error Handling | https://ai-sdk.dev/docs/ai-sdk-core/error-handling | Full-stream error parts, try/catch паттерн |
+| AI SDK Errors — `APICallError` | https://ai-sdk.dev/docs/reference/ai-sdk-errors/ai-api-call-error | `isInstance` pattern, fields (обдуманно не включён в Stage 1 — YAGNI) |
+
+---
+
 ## [3.87.1] — 2026-04-13 — OpenRouter Cost Tracking Fix (ТЗ-OpenRouterCostTracking, patch)
 
 Одно-файловый bug fix: DevPanel показывал `Cost: ₽0.00` для OpenRouter моделей (qwen, z-ai/glm) несмотря на корректно учтённые токены. Pre-existing bug, обнаруженный при первом UI-тесте OpenRouter в предыдущей сессии.

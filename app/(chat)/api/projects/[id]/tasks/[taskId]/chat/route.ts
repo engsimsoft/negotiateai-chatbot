@@ -5,6 +5,7 @@ import {
   smoothStream,
   stepCountIs,
   streamText,
+  type UIMessageStreamWriter,
 } from "ai";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
@@ -23,6 +24,7 @@ import {
   emitDebugPrompt,
   emitDebugCompaction,
   emitDebugWarning,
+  emitDebugError,
   truncateForDebug,
   DEBUG_EVENT_SCHEMA_VERSION,
   type DebugStepData,
@@ -262,9 +264,13 @@ export async function POST(
     const startTime = Date.now();
     let firstTokenTime: number | null = null;
 
+    // ТЗ-StreamObservability: closure-capture writer so onError can emit to DevPanel
+    let dataStreamRef: UIMessageStreamWriter | null = null;
+
     const stream = createUIMessageStream({
       originalMessages: uiMessages,
       execute: async ({ writer: dataStream }) => {
+        dataStreamRef = dataStream;
         // ТЗ-DEV1: Emit debug prompt info
         {
           const injections: string[] = ["project-context"];
@@ -742,8 +748,17 @@ export async function POST(
           }
         }
       },
-      onError: () => {
-        return "Oops, an error occurred!";
+      onError: (error: unknown) => {
+        console.error("[Task Expert Stream onError]", error);
+        if (dataStreamRef) {
+          emitDebugError(dataStreamRef, {
+            source: "server:task-expert-stream-onError",
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack?.slice(0, 2000) : undefined,
+            context: { projectId, taskId, chatId, userId: session.user.id },
+          });
+        }
+        return "Произошла ошибка при генерации ответа. Попробуйте повторить.";
       },
     });
 

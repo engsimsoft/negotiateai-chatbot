@@ -56,6 +56,7 @@ function PureMultimodalInput({
   input,
   setInput,
   status,
+  clearError,
   retryState,
   delayState,
   stop,
@@ -82,6 +83,7 @@ function PureMultimodalInput({
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
   status: UseChatHelpers<ChatMessage>["status"];
+  clearError?: UseChatHelpers<ChatMessage>["clearError"];
   retryState?: { count: number; maxRetries: number };
   delayState?: "normal" | "slow" | "timeout";
   stop: () => void;
@@ -380,11 +382,16 @@ function PureMultimodalInput({
         className="rounded-xl border border-border bg-background p-3 shadow-xs transition-all duration-200 focus-within:border-border hover:border-muted-foreground/50"
         onSubmit={(event) => {
           event.preventDefault();
-          if (status !== "ready") {
+          // ТЗ-StreamObservability: block only while actively streaming.
+          // For "error" state — clear it via useChat.clearError(), then resend.
+          if (status === "submitted" || status === "streaming") {
             toast.error("Please wait for the model to finish its response!");
-          } else {
-            submitForm();
+            return;
           }
+          if (status === "error") {
+            clearError?.();
+          }
+          submitForm();
         }}
       >
         {(attachments.length > 0 || uploadQueue.length > 0) && (
@@ -449,7 +456,7 @@ function PureMultimodalInput({
                 state={voiceState}
                 onStart={startRecording}
                 onStop={stopRecording}
-                disabled={status !== "ready"}
+                disabled={status === "submitted" || status === "streaming"}
               />
             )}
             {/* ТЗ-KITT: Think button — one-shot Sonnet for Simply mode */}
@@ -606,7 +613,7 @@ function PureAttachmentsButton({
     <Button
       className="aspect-square h-8 rounded-lg p-1 transition-colors hover:bg-accent"
       data-testid="attachments-button"
-      disabled={status !== "ready" || isReasoningModel}
+      disabled={status === "submitted" || status === "streaming" || isReasoningModel}
       onClick={(event) => {
         event.preventDefault();
         fileInputRef.current?.click();

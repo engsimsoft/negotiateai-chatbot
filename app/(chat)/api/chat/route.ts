@@ -7,6 +7,7 @@ import {
   smoothStream,
   stepCountIs,
   streamText,
+  type UIMessageStreamWriter,
 } from "ai";
 import { z } from "zod";
 import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
@@ -533,9 +534,13 @@ export async function POST(request: Request) {
     // ТЗ-LegacyChatCleanup: chat mode removed — gate covers all three remaining modes
     let isMemoryEnabled = ["simply", "expertise", "create"].includes(chatMode);
 
+    // ТЗ-StreamObservability: closure-capture writer so onError can emit to DevPanel
+    let dataStreamRef: UIMessageStreamWriter | null = null;
+
     const stream = createUIMessageStream({
       originalMessages: uiMessages,
       execute: async ({ writer: dataStream }) => {
+        dataStreamRef = dataStream;
         // ТЗ-03: Build system prompt - different for project vs regular chat
         let systemPromptText: string;
         let modelToUse;
@@ -1534,8 +1539,17 @@ export async function POST(request: Request) {
           }).catch(() => {});
         }
       },
-      onError: () => {
-        return "Oops, an error occurred!";
+      onError: (error: unknown) => {
+        console.error("[Chat Stream onError]", error);
+        if (dataStreamRef) {
+          emitDebugError(dataStreamRef, {
+            source: "server:chat-stream-onError",
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack?.slice(0, 2000) : undefined,
+            context: { chatId: id, userId: session.user.id },
+          });
+        }
+        return "Произошла ошибка при генерации ответа. Попробуйте повторить.";
       },
     });
 
