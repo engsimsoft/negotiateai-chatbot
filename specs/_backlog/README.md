@@ -32,7 +32,6 @@
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
 | [TZ_DeadModelSelectors](TZ_DeadModelSelectors.md) | Удалить `lib/ai/models.ts` + 5 dead импортёров (3 model-selector компонента, dropdown в multimodal-input, entitlements). Покрывает Findings #4, #6, #7 из TZ_LegacyChatCleanup | 1–2 сессии | TZ_LegacyChatCleanup |
-| [TZ_UsageLoggingCoverage](TZ_UsageLoggingCoverage.md) | Покрыть `ai_usage_log` всеми вызовами `getModel(taskId)` (фоновые: util:title, OCR, клерки, сервисные чаты, briefing pipelines). Расхождение с Anthropic Console ~10%. Включает переименование/документирование `inputTokens` (Findings #2, #3) | 1 сессия | TZ_LegacyChatCleanup |
 | [TZ_StreamObservability](TZ_StreamObservability.md) | Заменить молчаливый `onError: () => "Oops"` в обоих chat routes на `console.error` + `emitDebugError` (Finding #5) | 0.5 сессии | TZ_LegacyChatCleanup |
 | [TZ_CreateSnapshotAudit](TZ_CreateSnapshotAudit.md) | SQL audit реальных вызовов `createSnapshot` tool. Если 0 — удалить tool целиком. Если есть — задокументировать use case (Finding #8) | 0.5 сессии | TZ_LegacyChatCleanup |
 
@@ -46,6 +45,12 @@
 
 ## Происхождение по ТЗ
 
-| ТЗ-источник | Дата | Долгов внесено |
+| ТЗ-источник | Дата | Долгов внесено | Закрытые |
+|---|---|---|---|
+| TZ_LegacyChatCleanup | 2026-04-13 | 5 (4 medium + 1 low) | — |
+
+## Закрытые долги
+
+| ТЗ | Закрыто в | Как |
 |---|---|---|
-| TZ_LegacyChatCleanup | 2026-04-13 | 5 (4 medium + 1 low) |
+| TZ_UsageLoggingCoverage | 2026-04-13 (TZ_UnfreezePipelines v3.86.1) | Слит в `TZ_CachePipelineMetrics` — обе задачи трогают одни и те же pipeline-файлы, раздельное выполнение было бы двойной работой |

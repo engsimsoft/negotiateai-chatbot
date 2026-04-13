@@ -8,10 +8,101 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- **TZ_UnfreezePipelines** — аудит + классификация 12 uncommitted файлов от замороженных TZ_MindArtifacts/TZ_SaveFactV2 (дисциплинарная git hygiene, без нового кода)
-- **TZ_CachePipelineMetrics** — расстановка cache breakpoints в briefing/podcast/research pipelines + фикс хардкода `cacheReadTokens: 0` в usage logging
+- **TZ_CachePipelineMetrics** (объединённый) — cache breakpoints в briefing/podcast pipelines + фикс хардкода `cacheReadTokens: 0` + покрытие `ai_usage_log` фоновыми вызовами (util:title, OCR, клерки, сервисные чаты). Поглощает backlog/TZ_UsageLoggingCoverage
 - RAG-4: Библиотека MVP (загрузка документов + search)
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
+
+---
+
+## [3.86.1] — 2026-04-13 — Working Tree Unfreeze (ТЗ-UnfreezePipelines, disciplinary)
+
+Дисциплинарная git hygiene без нового продуктового кода. Аудит 21 uncommitted элемента (13 modified + 2 untracked + 6 deletions), классификация через правило «при сомнении → stash», приведение working tree к чистому состоянию перед объединённым `TZ_CachePipelineMetrics`.
+
+### Changed
+
+- **Working tree clean** — 11 infra prep правок закоммичены одним кластером (`803102e`), 2 podcast-файла откатаны, `TZ_SlidingWindow` v3.76.0 восстановлен из git и правильно перенесён в `_archive/` (`47f84c4`)
+- **ТЗ-SaveFactV2 infrastructure committed** (не активирует frozen ТЗ, но разблокирует его будущую разморозку): `TaskMetadata` / `CalendarMetadata` / `FactMetadata` типы в `lib/ai/memory/types.ts`, `metadata?` поле на `NewMemoryEntry`, миграция БД `0051_memory-metadata.sql` (`ALTER TABLE memory_entry ADD COLUMN metadata JSONB`)
+- **Voyage pricing SSOT** — `lib/ai/memory/voyage-client.ts` получил `VOYAGE_PRICING_USD_PER_MTOK` таблицу и `calcVoyageCostUsd(model, tokens)` helper. `lib/ai/memory/extract.ts` больше не хардкодит `$0.06` per million
+- **`retryWithLogging` — required `provider` field** для корректного заполнения `ai_usage_log.provider` (раньше было NULL). Все 3 briefing pipeline caller'а (briefing-author, briefing-section-author, briefing-filter) обновлены, передают `getProviderForTask(taskId)`
+- **`updateDocument` tool** — `z.string().uuid("...")` валидация `id` вместо простой `z.string()`. Фикс галлюцинаций UUID моделью: при копировании через toString AI иногда теряла символы, документ «не находился»
+- **Error handling / observability** — `components/artifact-actions.tsx` и `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` логируют `console.error` вместо молчаливого catch
+
+### Removed (rollback orphaned WIP)
+
+- **`lib/podcast/index.ts` +124 строк TTS chunking** — откатано. Комментарий в коде декларировал «Gemini 2.5 Flash TTS 32K token budget», но реальный socket drop bug был у MiniMax TTS, из-за которого мы вернулись на Gemini. Фикс был написан под ошибочный диагноз
+- **`lib/podcast/script-generator.ts` MIN_SCRIPT_LINES retry loop removal** — откатано. Удаление страховки делалось на старой нестабильной OpenAI-compat интеграции MiniMax, до перехода на Anthropic-compat режим в v3.85.0. Текущая интеграция стабильна — нет оснований убирать retry на 6 реплик
+- **`.simply-dev-overrides.json` исторический debt** — не связано с этим ТЗ, но попутно: `scripts/debug-orphan-tool-use.ts` оставлен untracked как legitimate dev script (см. ROADMAP)
+
+### Fixed
+
+- **LegacyChatCleanup version bump gap** — предыдущий ТЗ LegacyChatCleanup отметился в `SIMPLY_STATUS.md` как v3.86.0, но `package.json` и `CHANGELOG.md` не были обновлены (commit `0058517` делал только doc-финализацию). Исправлено этим release-коммитом: секция [3.86.0] добавлена ниже, `package.json` → 3.86.1
+
+### Merged into next TZ
+
+- **backlog/TZ_UsageLoggingCoverage** → слит с `TZ_CachePipelineMetrics`. Обе задачи трогают одни и те же pipeline-файлы (`briefing-author.ts`, `briefing-section-author.ts`, `briefing-filter.ts`, `podcast/script-generator.ts`) — раздельное выполнение привело бы к двойной работе. Объединённый scope: cache breakpoints + хардкод fix + полное покрытие `ai_usage_log` всеми фоновыми вызовами `getModel()`
+
+### Commits
+
+- `803102e` — chore(tz-unfreeze): infrastructure prep cluster (11 files, +96/-10)
+- `47f84c4` — chore(tz-unfreeze): archive TZ_SlidingWindow в _archive/
+
+### Files affected
+
+11 committed (см. `803102e`), 2 rolled back (podcast/*), 6 moved (TZ_SlidingWindow → _archive/).
+
+---
+
+## [3.86.0] — 2026-04-13 — Legacy Chat Mode Cleanup (ТЗ-LegacyChatCleanup)
+
+> **Примечание:** версия выпущена post-hoc в release 3.86.1 — LegacyChatCleanup финализировал свою работу только в `SIMPLY_STATUS.md`, без bump'а `package.json` и без entry в главном CHANGELOG. TZ_UnfreezePipelines закрыл этот gap.
+
+Удаление legacy `chatMode='chat'` и инфраструктуры «обычного чата». Концептуальное изменение: Simply Chat — единственная постоянная точка диалога, expertise/create — отдельные специализированные флоу. Детали — `SIMPLY_STATUS.md` раздел «ТЗ-LegacyChatCleanup» и `_archive/TZ_LegacyChatCleanup/`.
+
+### Removed
+
+- **Маршруты `/chat/[id]` и `/chat`** — страницы, роутинг, builder switch
+- **Страница `/chats`** — общий список legacy чатов, функция `getGeneralChatsWithStats`
+- **TaskId `chat:haiku`, `chat:sonnet`, `chat:opus`** — три слота из task-assignments. `chat:opus` был мёртвым всё время. Замены: `expertise` (Grok 4.20), `create` (MiniMax M2.7)
+- **Snapshot-fallback блок в `chat/route.ts`** — ~120 строк мёртвого кода: состояние снапшотов, `isHaikuChat`, `needsSnapshotFallback`, ContextIndicator emit. 7 dead-импортов
+- **`components/projects/context-indicator.tsx`** — мёртвый компонент привязанный к удалённому snapshot-fallback
+- **`CHAT_MODE_EXCLUDED_TOOLS`** фильтр в chat-tools.ts — исключал deepResearch/fetchUrl для Haiku-chat, после удаления режима ветвь недостижима
+- **Deprecated compatibility layer** в `lib/prompts/builder/index.ts`: `buildPrompt`, `getAvailablePrompts`, `getConfig`, `buildPromptAgentPrompt` — никем не импортировались
+- **10 legacy чатов из БД** + 107 сообщений + 52 stream + 141 `ai_usage_log` + 2 ProjectTask + 1 vote. Транзакционный SQL cleanup. 30 `memory_entry` записей получили `sourceChatId = NULL` (факты сохранены, теряется только обратная ссылка)
+
+### Changed
+
+- **`chatMode` обязательное поле** в API schema и `saveChat` — убран silent default `chatMode || "chat"`, компилятор теперь ловит забывания на этапе сборки
+- **`lib/ai/chat-mode-config.ts`** — zod enum сужен до `simply | expertise | create`
+- **`lib/utils.ts:getChatUrl`** — default-ветка бросает `Error` вместо `/chat/${id}` (лучше падение, чем ссылка на 404)
+- **Дефолт title в новых ветках** — mode-aware: `"Новый запрос"` (expertise) / `"Новое задание"` (create) / `"Чат проекта"` (project) / `"Новый чат"` (simply). `autoNameChat` gate расширен на 4 default-имени
+- **`components/app-sidebar.tsx`** — тип `ChatMode` сужен, default fallback контекста → `simply`, удалены default-ветки в 4 функциях навигации
+- **5 страниц чата** — убрано чтение cookie `chat-model` и импорт `DEFAULT_CHAT_MODEL`, заменено на локальную константу `"auto"`
+
+### Fixed
+
+- **Молчаливый `catch {}` на `getMemorySettings`** в chat/route.ts — глотал ошибки БД и тихо считал что память включена. Теперь `console.warn` с текстом ошибки
+- **`lib/ai/models.ts` оставлен как `@deprecated` тонкая заглушка** — полное удаление отложено в follow-up `TZ_DeadModelSelectors` (5 dead импортёров)
+
+### Workflow
+
+- **WORKFLOW.md → правило 8 — FINDINGS.md** — новое правило: все обнаруженные вне-scope находки записываются в `specs/TZ_*/FINDINGS.md` СРАЗУ, не отвлекаясь на починку. После закрытия ТЗ — оформляются как follow-up ТЗ. Родилось именно из этого ТЗ, когда накопилось 8 находок
+- **WORKFLOW.md → правило 9 — backlog долгов** (commit `a65e4b0`) — после завершения ТЗ follow-up находки из FINDINGS уходят в `specs/_backlog/TZ_<name>.md` как заготовки будущих ТЗ
+
+### FINDINGS → 5 follow-up ТЗ (в `specs/_backlog/`)
+
+| # | Находка | Follow-up |
+|---|---|---|
+| 1 | Grok 4.20 context window: каталог 256K, docs.x.ai 2M | `TZ_GrokContextWindowAudit` |
+| 2+3 | `ai_usage_log` неполный (фоновые вызовы не пишутся) + gross `inputTokens` misleading | `TZ_UsageLoggingCoverage` (слит с `TZ_CachePipelineMetrics` в 3.86.1) |
+| 4+6+7 | `lib/ai/models.ts` + 5 dead импортёров | `TZ_DeadModelSelectors` |
+| 5 | Stream-level `onError: () => "Oops"` без logging | `TZ_StreamObservability` |
+| 8 | `createSnapshot` tool — потенциально мёртв для проектов | `TZ_CreateSnapshotAudit` |
+
+### Commits
+
+- `620730b` — refactor: этапы 1+2 удаление legacy chatMode='chat' и маршрутов
+- `0058517` — docs: этап 3 финализация (db cleanup, документация, follow-up ТЗ)
+- `a65e4b0` — docs(workflow): правило 9 — backlog долгов
 
 ---
 

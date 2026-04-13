@@ -405,7 +405,10 @@ WHERE "chatMode" LIKE 'podcast:%'
 
 ### Блокер и путь решения
 
-**Блокер:** все файлы из Фазы 1 и Фазы 2 находятся в uncommitted state от замороженного TZ_MindArtifacts / TZ_SaveFactV2.
+> ✅ **Блокер СНЯТ** — ТЗ-UnfreezePipelines (v3.85.1), 2026-04-13.
+> Working tree приведён в чистое состояние. Infra prep закоммичен (метаданные SaveFactV2, voyage pricing, provider field, error handling). Podcast-файлы откатаны как WIP на ошибочном диагнозе. TZ_SlidingWindow v3.76.0 перенесён в `_archive/`. Следующий ТЗ — объединённый `TZ_CachePipelineMetrics` (cache breakpoints + usage logging coverage, бывш. backlog/TZ_UsageLoggingCoverage).
+
+**Блокер (исторический):** все файлы из Фазы 1 и Фазы 2 находились в uncommitted state от замороженного TZ_MindArtifacts / TZ_SaveFactV2.
 
 Текущее состояние uncommitted в этих файлах (по `git diff --stat`):
 

@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.86.0
+**Версия:** 3.86.1
 **Дата:** 2026-04-13
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -338,7 +338,52 @@ components/projects/
 
 ## План развития
 
-### ТЗ-LegacyChatCleanup: Удаление legacy `chatMode='chat'` и инфраструктуры обычного чата — ✅ ЗАВЕРШЁН (v3.86.0)
+### ТЗ-UnfreezePipelines: Дисциплинарный аудит uncommitted changes — ✅ ЗАВЕРШЁН (v3.86.1)
+
+**Проблема:** После финализации ТЗ-CacheAudit (v3.85.0) в рабочем дереве висели uncommitted правки (13 modified + 2 untracked + 6 deletions) от замороженных TZ_MindArtifacts/TZ_SaveFactV2 и прочих экспериментов. Любая работа над pipeline-кодом блокировалась merge-конфликтами. Главный cost — billing observability gap: `/admin/cost-audit` занижал pipeline-затраты на 10-25%. Правил к коммиту не было — код «висел» неделями. Плюс обнаружился accumulated gap: LegacyChatCleanup отметил себя v3.86.0 в `SIMPLY_STATUS`, но `package.json` и главный `CHANGELOG` не бампал.
+
+**Решение:** дисциплинарная git hygiene без нового продуктового кода. Правило «при сомнении → stash» как защита от потери работы. Классификация каждого файла по 3 категориям: (a) infra prep → commit, (b) orphaned WIP → rollback, (c) frozen TZ exploration → named stash.
+
+**Выполнено:**
+
+- **Этап 0 — Pre-flight:** git status snapshot, stash list (пусто), TS check (clean). Обнаружено расхождение со SPEC: 3 файла из первоначального списка уже были чистыми, 6 deletions `TZ_SlidingWindow/` — папка удалена мимо процесса `_archive/`
+- **Этап 1 — Аудит 21 элемента:** `git diff` по каждому файлу + классификация с обоснованием. Таблица решений — в `_archive/TZ_UnfreezePipelines/CHANGELOG.md`
+- **Этап 2a — ROLLBACK (категория b):** `lib/podcast/index.ts` (+124 строк TTS chunking под ошибочный диагноз — socket drop был у MiniMax TTS, мы уже ушли на Gemini) и `lib/podcast/script-generator.ts` (MIN_SCRIPT_LINES retry loop removal от старой нестабильной MiniMax интеграции, до Anthropic-compat режима v3.85.0)
+- **Этап 2b — COMMIT cluster** (`803102e`): 11 файлов в одном атомарном коммите: SaveFactV2 metadata types + миграция 0051, Voyage pricing SSOT (убран хардкод $0.06), required `provider` field в `retryWithLogging` + все 3 briefing pipelines, `z.uuid()` валидация в `updateDocument`, observability fix в artifact-actions + task-expert route error handling
+- **Этап 2c — SlidingWindow archive** (`47f84c4`): восстановлены 6 файлов через `git checkout` → перенесены в `_archive/TZ_SlidingWindow/` через `git mv`. Папка была удалена в какой-то из прошлых сессий без commit и без переноса
+- **Этап 3 — Валидация:** `npx tsc --noEmit` → 0 ошибок, `npm run build` → успех (все 47 маршрутов), working tree чистый (только разрешённые untracked)
+- **Этап 4 — Финализация:**
+  - Закрытие **LegacyChatCleanup version bump gap**: `package.json` 3.85.0 → 3.86.1, главный `CHANGELOG.md` получил полные записи [3.86.0] (LegacyChatCleanup post-hoc) и [3.86.1] (UnfreezePipelines)
+  - **Слияние backlog/TZ_UsageLoggingCoverage → TZ_CachePipelineMetrics** — обе задачи трогают одни и те же pipeline-файлы, раздельное выполнение было бы двойной работой. Объединённый scope см. `specs/TZ_CachePipelineMetrics/SPEC.md`
+  - Обновлены `ANALYSIS_MIND_ARTIFACTS_SAVEFACT.md` раздел 9 («Блокер СНЯТ»), `CLAUDE.md` (добавлено в «Завершены»)
+  - Перенос `specs/TZ_UnfreezePipelines/` → `_archive/TZ_UnfreezePipelines/`
+
+**Метрики:**
+
+| Что | До | После |
+|---|---|---|
+| Uncommitted файлов | 13 modified + 2 untracked + 6 deletions | 0 в scope ТЗ |
+| Коммитов | — | 3 (cluster infra prep + archive move + release) |
+| Stashes | — | 0 (все рассмотренные (c) переклассифицированы в rollback после владельческого review) |
+| TS clean | ✅ | ✅ |
+| Build clean | ✅ | ✅ |
+| `/admin/cost-audit` точность pipelines | занижение 10-25% | **остаётся** — фиксируется в следующем ТЗ |
+| Version consistency | package.json=3.85.0, SIMPLY_STATUS=3.86.0 | все в 3.86.1 |
+
+**Ключевой принцип из этого ТЗ:**
+
+> **Дисциплинарная работа должна быть отдельной от feature work.** Попытка совместить «почистим working tree заодно» с «расставим cache breakpoints» в одном ТЗ привела бы к риску частичного состояния (commit половины, застрявшая работа). Разделение гарантирует: либо working tree чистый → следующий ТЗ стартует на чистой базе, либо не чистый → остановились, не сломав ничего. Stash + rollback + commit по отдельности, никогда одним коммитом.
+
+**Ключевые файлы (для истории):**
+- `lib/ai/memory/types.ts` — metadata types committed
+- `lib/db/migrations/0051_memory-metadata.sql` — new migration committed
+- `lib/ai/memory/voyage-client.ts` — pricing SSOT committed
+- `lib/ai/retry-with-logging.ts` — required provider field
+- `lib/podcast/index.ts`, `script-generator.ts` — откатаны до HEAD (v3.85.0 baseline)
+
+---
+
+### ТЗ-LegacyChatCleanup: Удаление legacy `chatMode='chat'` и инфраструктуры обычного чата — ✅ ЗАВЕРШЁН (v3.86.0, formally finalized в v3.86.1)
 
 **Проблема:** В кодовой базе остался крупный пласт «обычного чата» (legacy `chatMode="chat"`) — отдельный маршрут `/chat/[id]`, страница «Все чаты» `/chats`, задания `chat:haiku/sonnet/opus` в task-assignments, snapshot-fallback цикл context-management для Haiku. Концепция продукта изменилась — постоянная точка диалога теперь Simply Chat (один вечный чат на пользователя), `expertise` и `create` — отдельные специализированные флоу с разовыми ветками. Legacy путал dev panel `/dev/models` (три «слота» `chat:*` интерпретировались как «три тира одного режима», хотя на деле это три разных chatMode, один из которых — `chat:opus` — вообще нигде не использовался). Внутри `route.ts` лежал мёртвый snapshot-fallback блок (~120 строк) и молчаливый catch без логирования. Цель — выпилить legacy полностью и попутно поймать костыли прошлых агентов.
 
