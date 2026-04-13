@@ -8,8 +8,69 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
+- **TZ_UnfreezePipelines** — аудит + классификация 12 uncommitted файлов от замороженных TZ_MindArtifacts/TZ_SaveFactV2 (дисциплинарная git hygiene, без нового кода)
+- **TZ_CachePipelineMetrics** — расстановка cache breakpoints в briefing/podcast/research pipelines + фикс хардкода `cacheReadTokens: 0` в usage logging
 - RAG-4: Библиотека MVP (загрузка документов + search)
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
+
+---
+
+## [3.85.0] — 2026-04-13 — MiniMax Anthropic-compat + 3-Breakpoint Cache Strategy (ТЗ-CacheAudit)
+
+### Added
+
+- **3 explicit cache breakpoints** в chat-routes (Simply Chat и task-expert): static system + tools + last user text-part. Экономия валидирована UI-тестами: 54% на MiniMax Simply, 58% на Claude Haiku «Думать», 74% на Claude Haiku task-expert executor
+- **`withCacheControlOnLastTool<T>()`** helper в `lib/ai/tools/chat-tools.ts` — помечает последний tool в объекте как cache breakpoint на весь tools block
+- **MIND transplant pattern** — динамический memory block выносится в trailing content-part последнего user message **за** breakpoint 3, сохраняя cache hit префикса при смене retrieved facts между запросами
+- **ADR 049** — `docs/decisions/049-minimax-anthropic-compat-mode.md` — решение о переключении MiniMax на Anthropic-compat режим как SSOT
+- **ADR 050** — `docs/decisions/050-cache-breakpoints-strategy.md` — стратегия 3-breakpoint кэширования + MIND transplant
+- **`scripts/test-minimax-anthropic-compat.ts`** — независимая 4-тестовая валидация пакета `vercel-minimax-ai-provider` в Anthropic-compat режиме (streamText, tool calling, generateObject, cacheControl)
+- **`scripts/test-minimax-via-registry.ts`** — integration тест резолва MiniMax через `getModel() → registry → language model`
+
+### Changed
+
+- **MiniMax подключён через `createMinimax()`** (default Anthropic-compat режим) вместо `createMinimaxOpenAI()`. Под капотом — тонкая обёртка над `AnthropicMessagesLanguageModel` из `@ai-sdk/anthropic/internal`, тот же класс что и чистый Claude. `cacheReadTokens` / `cacheWriteTokens` теперь эмитятся в нативном формате AI SDK v6
+- **`docs/ai-minimax.md`** — полностью переписан. Предыдущая версия содержала ложные утверждения о поломках Anthropic-compat режима — опровергнуто независимым тестом на той же версии пакета 0.0.2
+- **`chat/route.ts`** — `messagesForRequest` собирается перед `streamText({...})` с mutated last user message (MIND transplant). `stripLegacyOpenAICompatToolParts` применяется как defense-in-depth
+- **`task-expert/route.ts`** — разделён `finalSystemPrompt` (static) и `mindDynamicBlock` (dynamic). Compaction API гейтится через `getModelEntry(getProjectTierModelId(tier))?.capabilities.supportsCompaction` — предотвращает 400 error при переключении executor tier на Haiku
+- **Docstring `stripLegacyOpenAICompatToolParts`** — переписан: формат `call_function_*` в toolCallId это **не legacy**, а текущее поведение MiniMax в обоих compat режимах. Функция работает как defense против orphan tool_use в истории независимо от эффективного провайдера
+
+### Fixed
+
+- **Скрытый баг в task-expert route:** `finalSystemPrompt += memoryResult.promptBlock` на стр. 190 смешивал динамичный MIND с кэшируемым system prompt → existing breakpoint на system был фактически бесполезен при активной памяти. Исправлено через разделение static/dynamic
+- **Compaction API 400 error на Haiku:** task-expert передавал `providerOptions.anthropic.contextManagement = compact_20260112` безусловно всем tier'ам. Haiku не поддерживает Compaction → 400 error при переключении executor в середине чата. Fix: gate через capability из `model-catalog.ts` (hotfix `ea8ff0c`)
+- **MiniMax `cacheWriteTokens` всегда 0** (measurement blind spot) — автоматически закрылся при переключении на Anthropic-compat. Теперь cost audit dashboard показывает реальную стоимость
+
+### Removed
+
+- **Костыль `config.includeUsage = true`** в `lib/ai/getModel.ts:171-179` — был специфичен для OpenAI-compat кастомной реализации в `createMinimaxOpenAI`. `AnthropicMessagesLanguageModel` эмитит usage нативно, костыль не нужен
+- **Ложная документация Anthropic-compat ограничений** из `docs/ai-minimax.md` — опровергнута независимым тестом
+
+### Known Limitations
+
+- **Pipelines (briefing, podcast, research) не покрыты** — там нет cache breakpoints, и usage logging хардкодит `cacheReadTokens: 0` через `as any` cast. Блокер: uncommitted changes от замороженных ТЗ_MindArtifacts / ТЗ_SaveFactV2 в тех же файлах. Следующие ТЗ — `TZ_UnfreezePipelines` → `TZ_CachePipelineMetrics`
+
+### Files
+
+- `lib/ai/registry.ts` — `createMinimax()` для minimax/minimaxLong namespace
+- `lib/ai/getModel.ts` — удалён `includeUsage` костыль
+- `lib/ai/tools/chat-tools.ts` — новый helper `withCacheControlOnLastTool<T>()`
+- `app/(chat)/api/chat/route.ts` — 3 breakpoints + MIND transplant + переписанный docstring
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — 3 breakpoints + MIND transplant + capability-gated Compaction
+- `docs/decisions/049-minimax-anthropic-compat-mode.md` — новый ADR
+- `docs/decisions/050-cache-breakpoints-strategy.md` — новый ADR
+- `docs/ai-minimax.md` — полностью переписан
+- `scripts/test-minimax-anthropic-compat.ts` — новый
+- `scripts/test-minimax-via-registry.ts` — новый
+
+### Commits
+
+- `5fdfcd6` — Этап 1: переключить MiniMax на Anthropic-compat
+- `ca56256` — Этап 2: оздоровление кода MiniMax — удалить костыли и переписать документацию
+- `583b7f3` — Этап 3: 3 cache breakpoints + MIND transplant в chat route
+- `da0a59c` — Этап 4: 3 cache breakpoints + MIND transplant в task-expert route
+- `7211021` — Передача смены (HANDOFF update)
+- `ea8ff0c` — Этап 4 hotfix: gate Compaction API по capability в task-expert
 
 ---
 

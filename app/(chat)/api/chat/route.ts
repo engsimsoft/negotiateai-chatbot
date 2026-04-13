@@ -287,20 +287,25 @@ function stripMediaPartsForTextModel(messages: ChatMessage[]): ChatMessage[] {
 }
 
 /**
- * Strip legacy OpenAI-compat tool-call parts from message history.
+ * Санитация orphan MiniMax tool-call parts перед отправкой в Anthropic API.
  *
- * ИСТОРИЧЕСКИЙ КОНТЕКСТ: до ТЗ-CacheAudit (2026-04-13) MiniMax подключался через
- * `createMinimaxOpenAI()` — OpenAI-совместимый endpoint, который хранил tool calls
- * как inline parts с toolCallId в формате `call_function_*` без соответствующего
- * tool_result сообщения. После переключения на `createMinimax()` (Anthropic-compat,
- * прокси через AnthropicMessagesLanguageModel) все новые tool calls идут в нативном
- * Anthropic формате (`toolu_*`) с обязательной парой tool_use + tool_result.
+ * КОНТЕКСТ: MiniMax (и в прежнем OpenAI-compat режиме, и в текущем Anthropic-compat
+ * после ТЗ-CacheAudit 2026-04-13) эмитит tool calls с идентификатором формата
+ * `call_function_*`, а не в нативном Anthropic формате `toolu_*`. В обоих случаях
+ * это происходит потому что MiniMax backend генерирует id сам, а не через
+ * `AnthropicMessagesLanguageModel` — при этом oboth MiniMax и чистый Claude
+ * проходят через один и тот же класс из `@ai-sdk/anthropic/internal`.
  *
- * Но в БД остаются legacy сообщения в старом OpenAI-compat формате. Эти orphan
- * tool_use блоки вызывают 400 ошибки в AnthropicMessagesLanguageModel (как для
- * чистого Claude, так и для MiniMax Anthropic-compat — они используют один класс).
+ * Проблема проявляется при **orphan** tool-call parts в БД — когда tool_use был
+ * сохранён, а соответствующий tool_result отсутствует (stream прерван, ошибка
+ * модели, миграция данных). Такие orphan блоки вызывают 400 ошибки от
+ * Anthropic API при следующем запросе: `tool_use блок без парного tool_result`.
  *
- * Применять ко всем сообщениям chatMode=simply, независимо от эффективного провайдера.
+ * Функция фильтрует parts с `toolCallId.startsWith('call_function_')` —
+ * это пересекает только MiniMax-сгенерированные идентификаторы и не трогает
+ * чистые Claude tool calls (`toolu_*`). Применять ко всем сообщениям chatMode=simply,
+ * независимо от эффективного провайдера (dev может переключить simply на Sonnet
+ * через /dev/models — при этом в истории могут быть смешанные записи).
  * При отсутствии legacy parts — no-op.
  */
 function stripLegacyOpenAICompatToolParts(messages: ChatMessage[]): ChatMessage[] {

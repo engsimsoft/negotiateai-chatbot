@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.84.0
-**Дата:** 2026-04-12
+**Версия:** 3.85.0
+**Дата:** 2026-04-13
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -337,6 +337,54 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-CacheAudit: MiniMax Anthropic-compat + 3-breakpoint Cache Strategy — ✅ ЗАВЕРШЁН (v3.85.0)
+
+**Проблема:** Кэширование в Simply Chat полагалось на passive cache Anthropic — неконтролируемый механизм без прямой наблюдаемости. MiniMax был подключён через OpenAI-compat режим (`createMinimaxOpenAI`), который **не возвращал** `cacheWriteTokens` — measurement blind spot. Плюс MIND memory конкатенировался в system prompt, инвалидируя кэш при каждом обновлении фактов. В task-expert route — та же проблема скрытым багом через `+=`. Цель — перейти на explicit cache breakpoints, получить стабильные 50%+ экономии, закрыть observability gap.
+
+**Решение:** Трёхуровневая работа:
+
+1. **Переключение фабрики MiniMax** на default Anthropic-compat режим (`createMinimax`). Это fundament — без него ни cacheControl, ни Compaction API не работали бы. Независимый тест показал что утверждения предыдущей документации о поломках были ложными (см. ADR 049)
+2. **3 explicit cache breakpoints** в chat-routes: static system + tools (через `withCacheControlOnLastTool`) + last user text-part
+3. **MIND transplant** — динамический memory block выносится в trailing content-part **за** breakpoint 3, не ломая кэш префикса
+
+**Выполнено (6 этапов):**
+
+- **Этап 0 — Pre-flight:** независимый тест `scripts/test-minimax-anthropic-compat.ts` на 4 сценариях (streamText, tool calling, generateObject, cacheControl). **Все 4 PASS.** Опроверг ложные утверждения из документации ТЗ-MinimaxCleanup. Baseline через `ai_usage_log` за 14 дней.
+- **Этап 1 — Переключение фабрики** (`5fdfcd6`): `createMinimaxOpenAI` → `createMinimax` в `lib/ai/registry.ts`. Удалён костыль мутации `config.includeUsage = true` в `getModel.ts`. Новый `scripts/test-minimax-via-registry.ts`.
+- **Этап 2 — Cleanup** (`ca56256`): полностью переписана лживая документация `docs/ai-minimax.md`. Удалены устаревшие комментарии.
+- **Этап 3 — Cache breakpoints в chat/route** (`583b7f3`): 3 breakpoints + MIND transplant для Simply Chat. Новый helper `withCacheControlOnLastTool<T>()` в `lib/ai/tools/chat-tools.ts`. Валидировано UI-тестом: **54% экономии на MiniMax**, **58% на Claude Haiku** (Simply «Думать»).
+- **Этап 4 — Cache breakpoints в task-expert** (`da0a59c` + hotfix `ea8ff0c`): те же 3 breakpoints. Найден скрытый баг: `finalSystemPrompt += memoryResult.promptBlock` на стр. 190 ломал кэш system через смешивание с динамичным MIND. Исправлено через разделение static/dynamic. **Hotfix:** Compaction API `compact_20260112` не поддерживает Haiku → 400 error при переключении tier на executor. Добавлен gate через `getModelEntry(getProjectTierModelId(tier))?.capabilities.supportsCompaction`. Валидировано UI-тестом: **74% экономии на Claude Haiku** (task-expert executor tier).
+- **Этап 5 — Валидация эффективности:** засчитан на основе синтетических UI-тестов Этапов 1+3+4. Цифры однозначные.
+- **Этап 6 — Финализация:** ADR 049 (MiniMax Anthropic-compat), ADR 050 (Cache Breakpoints Strategy), переписан docstring `stripLegacyOpenAICompatToolParts` (перестал называть формат `call_function_*` legacy — это текущее поведение MiniMax, не legacy).
+
+**Метрики экономии (валидированы UI-тестами):**
+
+| Provider / chatMode | Msg 1 (cold) | Msg 2 (hot) | Экономия на Msg 2 |
+|---|---|---|---|
+| MiniMax M2.7 (Simply Chat) | ~8.4K write | ~8.1K read | **54%** |
+| Claude Haiku (Simply «Думать») | ~19.1K write | ~19.1K read | **58%** |
+| Claude Haiku (task-expert executor) | 11.8K write | 11.8K read | **74%** |
+
+**Ключевые файлы:**
+- `lib/ai/registry.ts` — `createMinimax()` (Anthropic-compat) для `minimax` и `minimaxLong` namespace
+- `lib/ai/tools/chat-tools.ts` — новый helper `withCacheControlOnLastTool<T>()`
+- `app/(chat)/api/chat/route.ts` — 3 breakpoints + MIND transplant + capability-gated Compaction (~999-1130)
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — те же 3 breakpoints + capability-gated Compaction (~280-400)
+- `docs/decisions/049-minimax-anthropic-compat-mode.md` — ADR про переключение фабрики
+- `docs/decisions/050-cache-breakpoints-strategy.md` — ADR про 3-breakpoint стратегию
+- `docs/ai-minimax.md` — переписанная правдивая документация MiniMax
+- `scripts/test-minimax-anthropic-compat.ts` + `scripts/test-minimax-via-registry.ts` — early warning tests
+
+**Архитектурный вывод (важен для будущих ТЗ):**
+
+> **SSOT правды — исходный код (пакета или API), а не накопленная документация.** Правило 1 WORKFLOW (Official docs FIRST) включает не только внешние docs, но и **независимую верификацию утверждений предыдущих ТЗ**. Перед повторной сменой провайдера / фабрики / режима — всегда запустить 4-тестовую валидацию, даже если «все знают что не работает».
+
+**Открытый технический долг (вынесен в новое ТЗ):**
+
+Кэширование MiniMax в **pipelines** (briefing, podcast, research-engine) НЕ реализовано — там нет ни `providerOptions.anthropic.cacheControl`, ни корректного usage logging (хардкод `cacheReadTokens: 0` через `as any` cast). Блокер — uncommitted changes от замороженных ТЗ_MindArtifacts / ТЗ_SaveFactV2 в этих же файлах. Следующий ТЗ — **TZ_UnfreezePipelines** (дисциплинарная работа по git hygiene: аудит + классификация + commit/stash/rollback 12 uncommitted файлов) перед **TZ_CachePipelineMetrics** (собственно кэширование). См. `ANALYSIS_MIND_ARTIFACTS_SAVEFACT.md` раздел 9.
+
+---
 
 ### ТЗ-DevPanelErrors: DevPanel Errors & Warnings — ✅ ЗАВЕРШЁН (параллельно v3.83.0, коммит `83792b3`)
 
