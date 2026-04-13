@@ -12,6 +12,7 @@ import { buildTaskExpertPrompt } from "@/lib/prompts/build-task-expert-prompt";
 import { getProjectModel, isValidModelTier, DEFAULT_PROJECT_MODEL } from "@/lib/ai/model-tiers";
 import { getProjectTierModelId, getTaskIdForTier } from "@/lib/ai/model-tiers";
 import { getProviderForTask } from "@/lib/ai/getModel";
+import { getModelEntry } from "@/lib/ai/model-catalog";
 import { getStandardTools, getActiveToolNames, withCacheControlOnLastTool } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment, isSimplyDevMode } from "@/lib/constants";
 import { calculateCostRub } from "@/lib/ai/providers";
@@ -348,22 +349,32 @@ export async function POST(
           messagesForRequest.push({ role: "system" as const, content: mindDynamicBlock });
         }
 
+        // ТЗ-CacheAudit Этап 4 hotfix: Compaction API (`compact_20260112`)
+        // поддерживается только Sonnet/Opus. При переключении tier на executor
+        // (Haiku) в середине чата запрос падал с 400 от Anthropic. Гейтим по
+        // capability из model-catalog — SSOT для таких проверок.
+        const effectiveCatalogEntry = getModelEntry(getProjectTierModelId(tier));
+        const modelSupportsCompaction =
+          effectiveCatalogEntry?.capabilities.supportsCompaction ?? false;
+        const compactionProviderOptions = modelSupportsCompaction
+          ? {
+              anthropic: {
+                contextManagement: {
+                  edits: [{
+                    type: 'compact_20260112' as const,
+                    trigger: { type: 'input_tokens' as const, value: 100_000 },
+                    pauseAfterCompaction: false,
+                    instructions: 'Сохрани обязательно: имена людей и организаций, даты и дедлайны, принятые решения и обоснования, числа и суммы, контекст текущего проекта/задачи, незавершённые задачи и открытые вопросы, предпочтения пользователя, контекст задачи, связь с планом проекта, результаты предыдущих шагов. Удали: повторяющиеся приветствия, промежуточные рассуждения если итог зафиксирован, дублирующуюся информацию, технические детали tool calls если результат уже в контексте.',
+                  }]
+                }
+              }
+            }
+          : undefined;
+
         const result = streamText({
           model: modelToUse,
           messages: messagesForRequest,
-          // ТЗ-RAG3: Anthropic Compaction API — automatic context management
-          providerOptions: {
-            anthropic: {
-              contextManagement: {
-                edits: [{
-                  type: 'compact_20260112' as const,
-                  trigger: { type: 'input_tokens' as const, value: 100_000 },
-                  pauseAfterCompaction: false,
-                  instructions: 'Сохрани обязательно: имена людей и организаций, даты и дедлайны, принятые решения и обоснования, числа и суммы, контекст текущего проекта/задачи, незавершённые задачи и открытые вопросы, предпочтения пользователя, контекст задачи, связь с планом проекта, результаты предыдущих шагов. Удали: повторяющиеся приветствия, промежуточные рассуждения если итог зафиксирован, дублирующуюся информацию, технические детали tool calls если результат уже в контексте.',
-                }]
-              }
-            }
-          },
+          ...(compactionProviderOptions ? { providerOptions: compactionProviderOptions } : {}),
           temperature: 1.0,
           stopWhen: stepCountIs(5),
           experimental_activeTools: getActiveToolNames(isProjectChat),

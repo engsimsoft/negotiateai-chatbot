@@ -195,7 +195,7 @@
 
 ## Этап 4: Cache breakpoints в task-expert route
 
-**Статус:** 🔄 Код готов, ждём мануального теста
+**Статус:** ✅ Завершён (2026-04-13, сессия 2) — валидирован smoke-тестом на Haiku, экономия ~74%
 
 **Цель:** Те же 3 breakpoints в task-expert route.
 
@@ -215,8 +215,12 @@
 - [x] **`projectManifest` 4-й breakpoint** — вопрос не актуализирован: в task-expert route нет отдельного `projectManifest` блока, контекст проекта собирается через `buildTaskExpertPrompt()` и попадает в `systemPromptText` целиком. Значит он уже кэшируется breakpoint 1 как часть system. Дополнительный breakpoint не нужен.
 - [x] `npx tsc --noEmit` → 0 ошибок
 - [x] `npm run build` → успех
-- [ ] 🧪 Мануальный тест: открыть задачу в проекте, отправить 2 сообщения, проверить cacheRead на 2-м
-- [ ] Git commit
+- [x] 🧪 Мануальный тест: Haiku executor tier, 2 сообщения, 2-е с MIND
+  - Msg 1 cold: `cacheWriteTokens=11786`, `cacheReadTokens=0`, 16.9s
+  - Msg 2 hot+MIND: `cacheReadTokens=11786` (точно сумма write предыдущего), `cacheWriteTokens=237`, 13.2s
+  - Экономия ~74% (Haiku: $0.01421 → $0.00366)
+- [x] **Hotfix:** Compaction API не поддерживает Haiku → 400 error при переключении tier executor. Добавлен gate `compactionProviderOptions` через `getModelEntry(getProjectTierModelId(tier))?.capabilities.supportsCompaction` (тот же паттерн что в `chat/route.ts` Этапа 3). Spread в `streamText({...})`.
+- [x] Git commit
 
 **Файлы:**
 - `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — 3 breakpoints + MIND transplant

@@ -119,7 +119,7 @@
   - Реальный UI тест: 5 сообщений (3 MiniMax + 2 Haiku), все метрики сошлись с ожиданиями
   - SQL `ai_usage_log` за последние 15 минут: все записи корректны, regressions нет
 
-### Этап 4: Cache breakpoints в task-expert route — 🔄 код готов
+### Этап 4: Cache breakpoints в task-expert route — ✅ завершён (2026-04-13, сессия 2)
 - **Импорт:** добавлен `withCacheControlOnLastTool` в `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`
 - **Найдена скрытая проблема в текущей логике** (та же что была в `chat/route.ts` Этапа 3, только в другой форме): `finalSystemPrompt` склеивался с `memoryResult.promptBlock` через `+=` на строке 190 → MIND динамика попадала **внутрь** content помеченного `cacheControl` → cache key инвалидировался при смене фактов памяти между запросами → **существующий breakpoint на system был фактически бесполезен** для task-expert при активной MIND памяти.
 - **Исправление:**
@@ -137,3 +137,16 @@
   - `npx tsc --noEmit`: 0 ошибок
   - `npm run build`: успех
   - Мануальный smoke-тест ожидается
+
+### Этап 4 hotfix: Compaction gate по capability (2026-04-13, сессия 2)
+- **Проблема:** первый smoke-тест Этапа 4 упал на 2-м сообщении — пользователь переключил tier на executor (Haiku) между сообщениями. Anthropic вернул `400 invalid_request_error: 'claude-haiku-4-5-20251001' does not support the 'compact_20260112' context management strategy`. Compaction API работает только на Sonnet/Opus, Haiku его не поддерживает. Task-expert route передавал `providerOptions.anthropic.contextManagement` безусловно всем моделям.
+- **Исправление:** gate `compactionProviderOptions` через `getModelEntry(getProjectTierModelId(tier))?.capabilities.supportsCompaction`. SSOT = `model-catalog.ts` (тот же паттерн что в `chat/route.ts` Этапа 3). Spread `...(compactionProviderOptions ? { providerOptions } : {})` при вызове `streamText`.
+- **Новый импорт:** `getModelEntry` из `lib/ai/model-catalog`.
+- **Smoke-тест валидирован после hotfix** (Haiku tier, 2 сообщения, 2-е с MIND):
+  - Msg 1 (cold): `inputTokens=11789, cacheWriteTokens=11786, cacheReadTokens=0, output=227` — 16.9s
+  - Msg 2 (hot + MIND): `inputTokens=12320, cacheReadTokens=11786, cacheWriteTokens=237, noCache=297, output=378` — 13.2s
+  - **Экономия на Msg 2: ~74%** (Haiku pricing: $0.01421 без кэша → $0.00366 с кэшем)
+  - MIND transplant работает: 5 фактов инжектнуто, cache префикса сохранился, новый breakpoint 237 токенов для следующего turn'а
+  - Ошибки `compact_20260112` ушли
+- **Foreign uncommitted changes management:** та же зона error handling 88-97 от другой работы в файле. Подход: Edit для временного возврата зоны к HEAD-версии → commit чистого hotfix → re-apply foreign hunk через Edit обратно.
+- **Validation:** `npx tsc --noEmit` → 0 ошибок
