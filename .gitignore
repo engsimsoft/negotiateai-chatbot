@@ -43,3 +43,8 @@ next-env.d.ts
 
 # ТЗ-2: dev-only model overrides (never commit — local to dev machine)
 .simply-dev-overrides.json
+
+# local IDE / tooling config (personal, not project-wide)
+.claude/
+.vscode/
+.mcp.json
