@@ -1,11 +1,13 @@
 import { streamObject, tool, type UIMessageStreamWriter } from "ai";
 import type { Session } from "next-auth";
 import { z } from "zod";
+import { waitUntil } from "@vercel/functions";
 import { getDocumentById, saveSuggestions } from "@/lib/db/queries";
 import type { Suggestion } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
-import { getModel } from "../getModel";
+import { getModel, getModelIdForTask, getProviderForTask } from "../getModel";
+import { logUsage } from "../usage-utils";
 import { wrapToolExecution } from "./tool-wrapper";
 
 type RequestSuggestionsProps = {
@@ -44,7 +46,7 @@ export const requestSuggestions = ({
         "userId" | "createdAt" | "documentCreatedAt"
       >[] = [];
 
-      const { elementStream } = streamObject({
+      const { elementStream, usage } = streamObject({
         // ТЗ-1 CoreRegistry
         model: getModel("util:artifact-suggestions"),
         system:
@@ -57,6 +59,28 @@ export const requestSuggestions = ({
           description: z.string().describe("The description of the suggestion"),
         }),
       });
+
+      // ТЗ-CachePipelineMetrics: закрытие GAP #1 — логируем usage
+      // request-suggestions ранее не писал в ai_usage_log вообще.
+      // fire-and-forget: не блокируем ответ пользователю.
+      if (session.user?.id) {
+        const suggestionsUserId = session.user.id;
+        waitUntil(
+          usage
+            .then((resolvedUsage) =>
+              logUsage({
+                userId: suggestionsUserId,
+                usage: resolvedUsage,
+                modelId: getModelIdForTask("util:artifact-suggestions"),
+                provider: getProviderForTask("util:artifact-suggestions"),
+                chatMode: "util:artifact-suggestions",
+              }),
+            )
+            .catch(() => {
+              // stream errored or usage never resolved — no-op
+            }),
+        );
+      }
 
       for await (const element of elementStream) {
         // @ts-expect-error todo: fix type

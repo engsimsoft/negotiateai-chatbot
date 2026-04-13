@@ -305,6 +305,9 @@ async function researchSingleTopic(
         modelId: "sonar-pro",
         promptPreview: query.slice(0, 500),
         noCacheInputTokens,
+        // Perplexity Sonar Pro НЕ имеет prompt caching API — хардкод 0
+        // математически корректный. Pricing в model-catalog.ts для sonar-pro
+        // содержит cachedInput: 0 / cacheWrite: 0. Это НЕ bug.
         cacheReadTokens: 0,
         cacheWriteTokens: 0,
         outputTokens,

@@ -546,6 +546,23 @@ export const aiUsageLog = pgTable(
     // voyage, deepgram, perplexity, google). Nullable для обратной совместимости
     // со старыми записями — backfill выполнен миграцией 0053.
     provider: varchar("provider", { length: 32 }),
+    /**
+     * ⚠️ GROSS input tokens — includes cacheReadTokens AND cacheWriteTokens.
+     *
+     * Mirrors Anthropic Console "Total tokens in" format so billing cross-checks
+     * with provider dashboards are straightforward. Cache breakdown lives in
+     * separate columns `cacheReadTokens` / `cacheWriteTokens`.
+     *
+     * ⚠️ NEVER sum in SQL aggregations — you will double count:
+     *   BAD:  SUM(inputTokens + cacheReadTokens + cacheWriteTokens)
+     *   GOOD: SUM(inputTokens)   -- already gross
+     *
+     * For "fresh input tokens only" (cache miss, billed at full rate):
+     *   inputTokens - cacheReadTokens - cacheWriteTokens
+     *
+     * Source: `logUsage()` passes `usage.inputTokens` from AI SDK v6 which is
+     * already gross per spec.
+     */
     inputTokens: integer("inputTokens").notNull().default(0),
     outputTokens: integer("outputTokens").notNull().default(0),
     thinkingTokens: integer("thinkingTokens").notNull().default(0),

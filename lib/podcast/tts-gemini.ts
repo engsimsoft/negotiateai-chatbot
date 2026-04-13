@@ -79,7 +79,11 @@ export async function generateSpeechWithRetry(
     // PCM: 24kHz, 16-bit mono → 48000 bytes/sec
     const audioDurationSeconds = Math.round(buffer.length / 48000);
 
-    // ТЗ-CACHE2+P5: Usage logging — costUsdOverride bypasses calcCostUsd for char-based pricing
+    // ТЗ-CACHE2+P5: Usage logging — costUsdOverride bypasses calcCostUsd for char-based pricing.
+    // Gemini 2.5 Flash TTS billing — per-character, НЕ per-token. LanguageModelUsage
+    // нужен только для типа logUsage, значения игнорируются. `as any` — legitimate
+    // escape hatch для non-token providers (Deepgram тоже так делает). Реальная
+    // стоимость идёт через costUsdOverride. Это НЕ hardcode bug, это паттерн.
     if (userId) {
       waitUntil(logUsage({
         userId,
