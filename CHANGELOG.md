@@ -8,9 +8,73 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- **TZ_CachePipelineMetrics** (объединённый) — cache breakpoints в briefing/podcast pipelines + фикс хардкода `cacheReadTokens: 0` + покрытие `ai_usage_log` фоновыми вызовами (util:title, OCR, клерки, сервисные чаты). Поглощает backlog/TZ_UsageLoggingCoverage
+- **TZ_OpenRouterCostTracking** (backlog) — OpenRouter-модели показывают `Cost ₽0.00` в DevPanel, вероятно namespace mismatch между `response.modelId` и catalog ключами
 - RAG-4: Библиотека MVP (загрузка документов + search)
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
+
+---
+
+## [3.87.0] — 2026-04-13 — Pipeline Observability + Targeted Podcast Caching (ТЗ-CachePipelineMetrics)
+
+ТЗ выполнен с архитектурной коррекцией по ходу тестов. Первоначальный scope (cache breakpoints во всех pipelines) разделён на две независимые ценности: **observability fix** (universal) + **targeted podcast caching** (только там где empirical data показала пользу).
+
+### Added
+
+- **ADR 051** — `docs/decisions/051-pipeline-observability-and-targeted-caching.md` — разделение observability и caching, обоснование откатa briefing cache, эмпирические SQL-данные из теста
+- **Cache breakpoints в podcast script generator** — `lib/podcast/script-generator.ts` использует `generateText` с `messages: [...]` + `providerOptions.anthropic.cacheControl`. Static scriptwriter prompt (~2-3K токенов) переиспользуется между темами в одной сессии. Empirical data: 30% экономии на втором topic из двух
+- **`logUsage` в `lib/ai/tools/request-suggestions.ts`** — единственный непокрытый `getModel()` call-site в production коде. `streamObject` result теперь передаёт `.usage` promise через `waitUntil(logUsage(...))`. chatMode: `util:artifact-suggestions`
+- **JSDoc `ai_usage_log.inputTokens`** в `lib/db/schema.ts` — warning что поле GROSS (включает cache read/write), формула для «fresh only» в SQL, anti-double-counting guidance
+
+### Changed
+
+- **Disjoint usage accumulator** в `lib/podcast/script-generator.ts` — ручной `totalPromptTokens += usage?.inputTokens` заменён на `extractUsageForPricing()` + накопление 5 disjoint полей (`noCacheInputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `outputTokens`, `reasoningTokens`). `ai_usage_log` теперь пишет реальные cache fields вместо хардкода `0`
+- **Удалён `as any` cast** в `logUsage` call в podcast/script-generator — теперь полноценный `LanguageModelUsage` объект с правильным `inputTokenDetails` / `outputTokenDetails`
+- **Pipeline trace block** в podcast/script-generator использует реальные disjoint fields вместо хардкодов
+
+### Fixed
+
+- **podcast:script cost underreporting** в `/admin/cost-audit` — раньше хардкод `cacheReadTokens: 0` маскировал cache hits даже когда MiniMax их фактически возвращал. Теперь audit dashboard показывает правду
+- **363 строки мёртвого кода удалены** из `lib/briefing/briefing-author.ts`:
+  - `generateArticleMapReduce` (137 строк)
+  - 5 helpers: `groupCandidatesByTopic`, `getTopicHeadlines`, `getPreviousUrls`, `generateIntroOutro`, `assembleBriefingArticle`
+  - Локальные схемы `introOutroSchema`, `INTRO_OUTRO_SYSTEM_PROMPT`, `INTRO_OUTRO_JSON_INSTRUCTION`
+  - Импорты `pLimit` и `generateSection`
+  - Функция была остатком rejected `TZ_MapReduceBriefing` (память проекта: Map-Reduce + MiniMax streaming socket reuse bug). Содержала также hardcode fallback trace — удаление кардинально решает hardcode проблему, не замазывает её
+
+### Removed (rollback — architectural correction)
+
+- **Cache breakpoints в briefing-author и briefing-section-author.** Причина: daily frequency briefing (1 вызов в сутки) превышает 5-минутный Anthropic cache TTL в 240 раз — кэш никогда не успевает сработать повторно. Cache write без последующего read = чистый перерасход ~25% к cold call. Валидировано SQL'ем из тестовой сессии: `briefing:author` показал `cacheWriteTokens=0` — MiniMax не создал кэш блок даже несмотря на cacheControl markers. Это была premature optimization из первоначального SPEC v1.0, откачена после владельческого review
+
+### Documentation
+
+- **Комментарий в `research-engine.ts`** — `cacheReadTokens: 0` для Perplexity Sonar Pro математически корректно (нет prompt caching API). Не bug, фиксируем как паттерн
+- **Комментарий в `tts-gemini.ts`** — `{ inputTokens: 0 } as any` для Gemini TTS — легитимный escape hatch для non-token (per-character) billing. Реальная стоимость через `costUsdOverride`. Не bug, фиксируем как паттерн
+- **Локальный `CHANGELOG.md` ТЗ** — полная хронология решений: Этап 0 audit (4/4 ✅), Этап 1 full cache rollout, Этап 2 dead code removal + disjoint accumulator, Этапы 3+4 coverage + JSDoc, Этап 5 empirical test → architectural rollback, Этап 6 финализация
+
+### Empirical data (из Этапа 5 теста, 2026-04-13)
+
+| Pipeline | inputTokens | cacheWriteTokens | cacheReadTokens | cost (USD) |
+|---|---|---|---|---|
+| podcast:script (topic 1, cold) | 2823 | 2823 | 0 | 0.0020 |
+| podcast:script (topic 2, hit) | 4125 | 1479 | **2646** | 0.0024 |
+| briefing:author | 4768 | 0 | 0 | 0.0065 |
+| briefing:section-author | 4525 | 0 | 0 | 0.0029 |
+
+Podcast call 2 cache hit — 64% входных токенов из кэша. Экономия ~30% на втором вызове. Briefing cache не триггернулся — validated decision to remove.
+
+### Out of scope (зафиксировано для будущего)
+
+- **`briefing:section-author` burst-refresh cache** — потенциально полезно если user рефрешит 3+ секций подряд в одной сессии. Требует телеметрии реального паттерна перед добавлением
+- **`professor-pipeline.ts` унификация на `logUsage`** — coverage полный через `saveAiUsageLog` + `extractUsageFields`, функционально эквивалентно. Унификация без функциональной причины = костыль. Оставлено как есть
+- **Middleware wrapper (Approach B)** — 95% coverage достигается ручной инструментацией. Wrapper overkill для 1 call-site. Может быть пересмотрено если появятся 5+ новых непокрытых мест
+
+### Commits
+
+- `c089842` — docs: сессия 1 (ANALYSIS + ROADMAP + HANDOFF + CHANGELOG)
+- `6f1c238` — feat: этап 1 cache breakpoints в 4 pipeline файлах (позже частично откачено)
+- `eb13153` — refactor: этап 2 dead code removal (363 строки) + disjoint accumulator
+- `b00fe56` — feat: этапы 3+4 request-suggestions logging + JSDoc
+- `98727c1` — refactor: откат cache breakpoints в briefing pipelines (architectural correction)
 
 ---
 

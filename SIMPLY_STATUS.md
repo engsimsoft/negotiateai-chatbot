@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.86.1
+**Версия:** 3.87.0
 **Дата:** 2026-04-13
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -337,6 +337,77 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-CachePipelineMetrics: Pipeline observability + targeted podcast caching — ✅ ЗАВЕРШЁН (v3.87.0)
+
+**Проблема:** После ТЗ-CacheAudit (v3.85.0) 3-breakpoint cache strategy была доказана в chat-routes (54-74% экономии). Логичный follow-up — применить тот же паттерн к pipelines. Плюс pipelines хардкодили `cacheReadTokens: 0 as any` в usage logging → `/admin/cost-audit` занижал реальную стоимость podcast pipeline на 10-25%. Плюс backlog/TZ_UsageLoggingCoverage указывал на непокрытые `getModel()` call-sites.
+
+**Решение:** ТЗ прошёл через архитектурную коррекцию по ходу empirical SQL-тестов. Разделили две независимые ценности: **observability fix** (universal) + **targeted caching** (только там где frequency показала пользу). Итог — каждое решение основано на данных, а не на гипотезе «кэш везде полезен».
+
+**Выполнено (6 этапов):**
+
+- **Этап 0 — Audit** (read-only): grep 38 `getModel()` call-sites → покрытие logUsage уже 95%. 4 вопроса закрыты:
+  - briefing-author fallback (`"(map-reduce)"` trace, line 762 hardcode) — DEAD CODE от rejected `TZ_MapReduceBriefing` (363 строки, никем не вызывалось)
+  - professor-pipeline — полное покрытие через `saveAiUsageLog + extractUsageFields`, не трогаем
+  - `generateText + providerOptions.cacheControl` — совместимо (AI SDK v6 единый `CallSettings` тип)
+  - `util:artifact-suggestions` taskId существует (claude-sonnet-4-6)
+
+- **Этап 1 — Cache breakpoints** (commit `6f1c238`): расставлены в 4 местах — briefing-author/generateArticle, briefing-author/generateIntroOutro (позже удалено как dead), briefing-section-author, podcast/script-generator. Паттерн ADR 050 через message-level `providerOptions.anthropic.cacheControl`
+
+- **Этап 2 — Dead code + hardcode fix** (commit `eb13153`): удалён весь `generateArticleMapReduce` блок (363 строки) от rejected ТЗ + disjoint usage accumulator в podcast/script-generator (заменён ручной `totalPromptTokens += usage?.inputTokens` на `extractUsageForPricing()` helper с 5-field aggregation). Удалён `as any` cast
+
+- **Этапы 3+4 — Coverage + JSDoc** (commit `b00fe56`): `waitUntil(logUsage(...))` в request-suggestions (единственный непокрытый call-site, streamObject.usage promise). JSDoc над `ai_usage_log.inputTokens` с warning о gross semantics + формулой для «fresh only» SQL. Пояснительные комментарии к legit `cacheReadTokens: 0` в research-engine (Perplexity) и `as any` в tts-gemini (non-token pricing)
+
+- **Этап 5 — Empirical validation + architectural rollback** (commit `98727c1`):
+  - Manual smoke test: briefing + podcast + per-section refresh
+  - SQL проверка `ai_usage_log` показала: **podcast:script cache работает** (call 1 write=2823, call 2 read=2646, write=1479, ~30% экономия на втором вызове), **briefing:author и briefing:section-author cache не работает** (cache fields = 0)
+  - Владельческий review frequency: briefing вызывается раз в сутки → 5-минутный TTL Anthropic cache истекает 240 раз между вызовами → cache write без последующего read = чистый перерасход
+  - **Откачены cache breakpoints из briefing-author и briefing-section-author**. Оставлен кэш только в podcast/script-generator где empirical data подтвердила работу
+
+- **Этап 6 — Финализация** (v3.87.0):
+  - ADR 051 (Pipeline observability + targeted caching)
+  - `CHANGELOG.md [3.87.0]`, `SIMPLY_STATUS.md`, `CLAUDE.md`
+  - `ANALYSIS_MIND_ARTIFACTS_SAVEFACT.md` раздел 9 полностью закрыт
+  - `package.json` 3.86.1 → 3.87.0
+
+**Ключевая архитектурная коррекция:**
+
+Первоначальный SPEC описывал «cache breakpoints во всех pipelines» как cross-cutting optimization. Эмпирический тест показал что это была premature optimization без frequency audit. В ходе работы изменили подход на **targeted caching based on real usage patterns**. Это не провал — это правильный процесс: гипотеза → данные → коррекция.
+
+**Метрики (до/после):**
+
+| Показатель | До | После |
+|---|---|---|
+| podcast:script `ai_usage_log.cacheReadTokens` | всегда 0 (хардкод) | реальные значения (например 2646) |
+| podcast:script cache savings per multi-topic | invisible | ~30% на втором+ вызове |
+| Непокрытые `getModel()` call-sites в production | 1 (request-suggestions) | 0 |
+| Dead code в briefing-author | 363 строки (map-reduce) | 0 |
+| Pipeline hardcode `cacheReadTokens: 0 as any` | 2 места | 0 (оставлены только legit non-token) |
+| ADR про pipeline caching | нет | ADR 051 |
+
+**Ключевые файлы:**
+- `lib/podcast/script-generator.ts` — единственный pipeline с cache breakpoints + disjoint accumulator
+- `lib/briefing/briefing-author.ts` — 438 строк (было 800, удалено 363)
+- `lib/ai/tools/request-suggestions.ts` — добавлен logUsage
+- `lib/db/schema.ts` — JSDoc inputTokens
+- `docs/decisions/051-pipeline-observability-and-targeted-caching.md` — ADR
+
+**Закрыто в backlog:**
+- `TZ_UsageLoggingCoverage` полностью поглощён (слит с `TZ_CachePipelineMetrics` в v2.0 SPEC)
+- Раздел 9 `ANALYSIS_MIND_ARTIFACTS_SAVEFACT.md` полностью закрыт
+
+**Не закрыто, вынесено в follow-up:**
+- `briefing:section-author` burst-refresh cache — требует телеметрии реального паттерна use перед добавлением
+- Unify `professor-pipeline` на `logUsage` wrapper — нет функциональной причины
+- Middleware wrapper для auto-logging (Approach B) — overkill для 95% уже покрытого кода
+
+**Три урока из этого ТЗ (для процесса):**
+
+1. **Frequency audit перед cache optimization.** Гипотеза «70% экономии» в ANALYSIS.md была без данных. Нужно было сразу обозначить как гипотезу и попросить empirical подтверждение на 1 pipeline до раскатки на 4.
+2. **Empirical test на малом scope до раскатки.** Проверить cache work на podcast отдельным stage и только потом применять к briefing — сэкономило бы один rollback.
+3. **Respectful rollback как нормальная часть процесса.** Когда владелец (не программист) задал правильный архитектурный вопрос про frequency — правильная реакция переоценить, не защищать предыдущее решение.
+
+---
 
 ### ТЗ-UnfreezePipelines: Дисциплинарный аудит uncommitted changes — ✅ ЗАВЕРШЁН (v3.86.1)
 

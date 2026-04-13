@@ -405,8 +405,17 @@ WHERE "chatMode" LIKE 'podcast:%'
 
 ### Блокер и путь решения
 
-> ✅ **Блокер СНЯТ** — ТЗ-UnfreezePipelines (v3.85.1), 2026-04-13.
-> Working tree приведён в чистое состояние. Infra prep закоммичен (метаданные SaveFactV2, voyage pricing, provider field, error handling). Podcast-файлы откатаны как WIP на ошибочном диагнозе. TZ_SlidingWindow v3.76.0 перенесён в `_archive/`. Следующий ТЗ — объединённый `TZ_CachePipelineMetrics` (cache breakpoints + usage logging coverage, бывш. backlog/TZ_UsageLoggingCoverage).
+> ✅ **Блокер СНЯТ полностью** — ТЗ-UnfreezePipelines (v3.86.1) + ТЗ-CachePipelineMetrics (v3.87.0), 2026-04-13.
+>
+> **ТЗ-UnfreezePipelines** привёл working tree в чистое состояние (infra prep commit, podcast-файлы откатаны как WIP на ошибочном диагнозе, SlidingWindow перенесён в archive).
+>
+> **ТЗ-CachePipelineMetrics** решил обе части блокера:
+> 1. **Observability:** podcast:script `cacheReadTokens: 0 as any` хардкод заменён на disjoint accumulator через `extractUsageForPricing()`. `ai_usage_log` теперь пишет реальные cache fields для podcast pipeline. `/admin/cost-audit` перестал занижать стоимость. JSDoc над `ai_usage_log.inputTokens` документирует gross semantics с формулой для «fresh only» в SQL. 363 строки мёртвого Map-Reduce кода удалены из briefing-author.ts. `util:artifact-suggestions` добавлен в coverage через logUsage в request-suggestions.
+> 2. **Caching:** targeted подход — cache breakpoints только в podcast/script-generator (N=3-5 topics в одной сессии за 1-2 минуты, empirical SQL подтвердил 30% экономии на втором вызове). Briefing cache откачен — daily frequency (1 вызов в сутки) превышает 5-минутный TTL Anthropic cache в 240 раз, cache write без read = чистый перерасход. See ADR 051.
+>
+> Архитектурный принцип: **frequency audit перед cache optimization**. ТЗ прошёл через empirical SQL validation, в результате первоначальный scope (cache breakpoints во всех 5 pipelines) скорректирован на single-pipeline targeted caching.
+
+**Блокер (исторический):** все файлы из Фазы 1 и Фазы 2 находились в uncommitted state от замороженного TZ_MindArtifacts / TZ_SaveFactV2.
 
 **Блокер (исторический):** все файлы из Фазы 1 и Фазы 2 находились в uncommitted state от замороженного TZ_MindArtifacts / TZ_SaveFactV2.
 
