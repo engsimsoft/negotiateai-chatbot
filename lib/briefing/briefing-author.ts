@@ -202,23 +202,15 @@ export async function generateArticle(
   // JSON.parse and Zod.parse inside callback — errors trigger automatic retry via retryWithLogging
   const { result: article, usage, attempts, totalDurationMs } = await retryWithLogging(
     async () => {
+      // ТЗ-CachePipelineMetrics: cache breakpoints здесь НЕ используются.
+      // Briefing генерится раз в сутки, 5-минутный TTL Anthropic кэша истекает
+      // задолго до следующего вызова — кэш-запись была бы чистым перерасходом
+      // без последующего read. Для per-topic циклов (podcast script generator)
+      // cache работает и сохранён. См. CHANGELOG.md [3.87.0] "Why briefing skip".
       const res = streamText({
         model: getModel(BRIEFING_AUTHOR_TASK),
-        // ТЗ-CachePipelineMetrics: 2 cache breakpoints (static system + last user).
-        // Паттерн из ADR 050. MiniMax после v3.85.0 Anthropic-compat режиме
-        // поддерживает providerOptions.anthropic.cacheControl нативно.
-        messages: [
-          {
-            role: "system",
-            content: SYSTEM_PROMPT + JSON_INSTRUCTION,
-            providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
-          },
-          {
-            role: "user",
-            content: userMessage,
-            providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
-          },
-        ],
+        system: SYSTEM_PROMPT + JSON_INSTRUCTION,
+        prompt: userMessage,
         maxOutputTokens: maxTokens,
         temperature: 0.7,
         maxRetries: 0,

@@ -179,23 +179,16 @@ export async function generateSection(
 
   const { result: section, usage, attempts, totalDurationMs } = await retryWithLogging(
     async () => {
+      // ТЗ-CachePipelineMetrics: cache breakpoints здесь НЕ используются.
+      // Per-section refresh — редкий UX кейс (user обычно смотрит секцию и
+      // идёт дальше, refresh нажимается 0-1 раз). Для гипотетического burst
+      // refresh'а 3-5 секций подряд экономия будет маленькая; риск cold
+      // cache write без read — больше. Оставляем без кэша до появления
+      // реальных данных о частоте burst-refresh.
       const res = streamText({
         model: getModel(BRIEFING_SECTION_TASK),
-        // ТЗ-CachePipelineMetrics: 2 cache breakpoints (ADR 050 pattern).
-        // Главный profit — per-section refresh: user кликает ↻ на 3-5 секциях
-        // подряд → static systemPrompt переиспользуется из кэша.
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt + SECTION_JSON_INSTRUCTION,
-            providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
-          },
-          {
-            role: "user",
-            content: userMessage,
-            providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
-          },
-        ],
+        system: systemPrompt + SECTION_JSON_INSTRUCTION,
+        prompt: userMessage,
         maxOutputTokens: 8192,
         temperature: 0.7,
         maxRetries: 0,
