@@ -30,6 +30,7 @@ const MEMORY_DEDUP_VERIFY_TASK = "memory:dedup-verify" as const;
 import {
   embedText,
   VOYAGE_INDEX_MODEL,
+  calcVoyageCostUsd,
 } from "./voyage-client";
 import {
   insertMemoryEntry,
@@ -514,7 +515,7 @@ async function processAndStoreFact(
   const embedDurationMs = Date.now() - embedStartTime;
 
   // Log Voyage embed usage (costUsdOverride — Voyage pricing is per-token, too small for RUB rounding)
-  const voyageEmbedCostUsd = (totalTokens / 1_000_000) * 0.06; // voyage-4: $0.06/1M tokens
+  const voyageEmbedCostUsd = calcVoyageCostUsd(VOYAGE_INDEX_MODEL, totalTokens);
   logUsage({
     userId: input.userId,
     usage: {

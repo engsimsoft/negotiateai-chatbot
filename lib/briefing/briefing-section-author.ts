@@ -12,6 +12,7 @@ import { retryWithLogging } from "@/lib/ai/retry-with-logging";
 import {
   getModel,
   getModelIdForTask,
+  getProviderForTask,
 } from "@/lib/ai/getModel";
 
 const BRIEFING_SECTION_TASK = "briefing:section" as const;
@@ -197,7 +198,13 @@ export async function generateSection(
 
       return { result: parsed, usage };
     },
-    { maxAttempts: 3, userId, modelId: resolvedModelId, chatMode: "briefing:section-author" },
+    {
+      maxAttempts: 3,
+      userId,
+      modelId: resolvedModelId,
+      provider: getProviderForTask(BRIEFING_SECTION_TASK),
+      chatMode: "briefing:section-author",
+    },
   );
 
   const retryCount = attempts.length - 1;

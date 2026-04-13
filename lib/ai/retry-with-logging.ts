@@ -43,6 +43,11 @@ export interface RetryWithLoggingOptions {
   userId?: string;
   /** Model ID for usage logging */
   modelId: string;
+  /**
+   * Provider id (anthropic, minimax, xai, google, voyage, …). Required so
+   * ai_usage_log.provider is never NULL. Resolve via getProviderForTask(taskId).
+   */
+  provider: string;
   /** Chat mode for usage logging (e.g. "briefing:author") */
   chatMode: string;
   /** Delay between retries in ms (default: 2000) */
@@ -70,6 +75,7 @@ export async function retryWithLogging<T>(
     maxAttempts,
     userId,
     modelId,
+    provider,
     chatMode,
     retryDelayMs = 2000,
   } = options;
@@ -88,7 +94,9 @@ export async function retryWithLogging<T>(
 
       // Log successful attempt
       if (userId) {
-        waitUntil(logUsage({ userId, usage, modelId, chatMode, durationMs }));
+        waitUntil(
+          logUsage({ userId, usage, modelId, provider, chatMode, durationMs }),
+        );
       }
 
       return {

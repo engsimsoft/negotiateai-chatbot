@@ -8,6 +8,7 @@ import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-tra
 import {
   getModel,
   getModelIdForTask,
+  getProviderForTask,
 } from "@/lib/ai/getModel";
 import { retryWithLogging } from "@/lib/ai/retry-with-logging";
 import { MAX_FILTER_CANDIDATES } from "./briefing-config";
@@ -128,7 +129,13 @@ Output JSON with "candidates" array.` + FILTER_JSON_INSTRUCTION;
       const object = filterResultSchema.parse(JSON.parse(cleaned));
       return { result: { candidates: object.candidates.slice(0, MAX_FILTER_CANDIDATES), usage }, usage };
     },
-    { maxAttempts: 3, userId, modelId: resolvedModelId, chatMode: "briefing:filter" },
+    {
+      maxAttempts: 3,
+      userId,
+      modelId: resolvedModelId,
+      provider: getProviderForTask(BRIEFING_FILTER_TASK),
+      chatMode: "briefing:filter",
+    },
   );
 
   const candidates = parsedCandidates;

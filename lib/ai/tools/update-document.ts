@@ -15,7 +15,14 @@ export const updateDocument = ({ session, dataStream }: UpdateDocumentProps) =>
   tool({
     description: "Update a document with the given description.",
     inputSchema: z.object({
-      id: z.string().describe("The ID of the document to update"),
+      id: z
+        .string()
+        .uuid(
+          "id must be a valid UUID returned by createDocument — copy it character-by-character"
+        )
+        .describe(
+          "The exact UUID returned by createDocument. Copy symbol-by-symbol, do not paraphrase or abbreviate."
+        ),
       description: z
         .string()
         .describe("The description of changes that need to be made"),

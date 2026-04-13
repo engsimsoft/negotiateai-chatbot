@@ -89,8 +89,12 @@ export async function POST(
   try {
     const json = await request.json();
     requestBody = taskChatRequestSchema.parse(json);
-  } catch (_error) {
-    return new ChatSDKError("bad_request:api").toResponse();
+  } catch (error) {
+    console.error("[task-chat] request parsing failed:", error);
+    return new ChatSDKError(
+      "bad_request:api",
+      error instanceof Error ? error.message : "Failed to parse task chat request"
+    ).toResponse();
   }
 
   try {

@@ -48,6 +48,26 @@ export const MEMORY_SOURCES = [
 export type MemorySource = (typeof MEMORY_SOURCES)[number];
 
 // ---------------------------------------------------------------------------
+// Metadata types (ТЗ-SaveFactV2)
+// ---------------------------------------------------------------------------
+
+export const TASK_STATUSES = ["new", "in_progress", "done"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+export interface TaskMetadata {
+  status: TaskStatus;
+}
+
+export interface CalendarMetadata {
+  date?: string;
+  time?: string;
+  endDate?: string;
+  endTime?: string;
+}
+
+export type FactMetadata = Record<string, unknown>;
+
+// ---------------------------------------------------------------------------
 // New memory entry (for insertion)
 // ---------------------------------------------------------------------------
 
@@ -61,6 +81,7 @@ export interface NewMemoryEntry {
   source?: MemorySource;
   sourceChatId?: string | null;
   sourceProjectId?: string | null;
+  metadata?: FactMetadata | null;
 }
 
 // ---------------------------------------------------------------------------

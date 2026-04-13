@@ -12,6 +12,7 @@ import type { LanguageModelUsage } from "ai";
 import {
   getModel,
   getModelIdForTask,
+  getProviderForTask,
 } from "@/lib/ai/getModel";
 
 const BRIEFING_AUTHOR_TASK = "briefing:author" as const;
@@ -238,7 +239,13 @@ export async function generateArticle(
 
       return { result: parsed, usage };
     },
-    { maxAttempts: 3, userId, modelId: resolvedModelId, chatMode: "briefing:author" },
+    {
+      maxAttempts: 3,
+      userId,
+      modelId: resolvedModelId,
+      provider: getProviderForTask(BRIEFING_AUTHOR_TASK),
+      chatMode: "briefing:author",
+    },
   );
 
   const retryCount = attempts.length - 1;
@@ -557,7 +564,13 @@ ${sectionSummaries}`;
       const parsed = introOutroSchema.parse(JSON.parse(cleaned));
       return { result: parsed, usage };
     },
-    { maxAttempts: 3, userId, modelId: resolvedModelId, chatMode: "briefing:intro-outro" },
+    {
+      maxAttempts: 3,
+      userId,
+      modelId: resolvedModelId,
+      provider: getProviderForTask(BRIEFING_AUTHOR_TASK),
+      chatMode: "briefing:intro-outro",
+    },
   );
 
   const ai = buildAiCallTrace(

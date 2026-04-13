@@ -30,6 +30,21 @@ export const VOYAGE_DIMENSIONS = 1024;
 /** Max items per batch request */
 const MAX_BATCH_SIZE = 128;
 
+/**
+ * Voyage AI embedding pricing in USD per 1M tokens.
+ * SSOT — always read pricing from here, never hardcode in call sites.
+ * Source: https://docs.voyageai.com/docs/pricing
+ */
+export const VOYAGE_PRICING_USD_PER_MTOK: Record<string, number> = {
+  "voyage-4": 0.06,
+  "voyage-4-lite": 0.02,
+};
+
+export function calcVoyageCostUsd(model: string, tokens: number): number {
+  const pricePerMtok = VOYAGE_PRICING_USD_PER_MTOK[model] ?? 0;
+  return (tokens / 1_000_000) * pricePerMtok;
+}
+
 // ---------------------------------------------------------------------------
 // Core API call
 // ---------------------------------------------------------------------------
