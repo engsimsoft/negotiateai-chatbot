@@ -3,13 +3,14 @@
 
 import fs from "fs";
 import path from "path";
-import { generateText } from "ai";
+import { generateText, type LanguageModelUsage } from "ai";
 import {
   getModel,
   getModelIdForTask,
   getProviderForTask,
 } from "@/lib/ai/getModel";
 import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
+import { extractUsageForPricing } from "@/lib/ai/providers";
 
 const PODCAST_SCRIPT_TASK = "briefing:podcast-script" as const;
 import type { ModelCatalog } from "tokenlens/core";
@@ -97,8 +98,17 @@ export async function generateScript(
 ): Promise<{ script: string; lines: ScriptLine[]; replicaCount: number; trace?: PipelineStageTrace }> {
   const baseMessage = buildScriptwriterMessage(section, context);
   const startTime = Date.now();
-  let totalPromptTokens = 0;
-  let totalCompletionTokens = 0;
+  // ТЗ-CachePipelineMetrics: disjoint accumulator — отслеживаем все 5 полей
+  // из inputTokenDetails/outputTokenDetails вместо gross inputTokens/outputTokens.
+  // Даёт реальные cacheReadTokens/cacheWriteTokens в ai_usage_log и DevPanel
+  // вместо хардкода 0.
+  const totalUsage = {
+    noCacheInputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+  };
   let lastFinishReason = "unknown";
 
   for (let attempt = 0; attempt <= MAX_SCRIPT_RETRIES; attempt++) {
@@ -131,8 +141,12 @@ export async function generateScript(
       temperature: 0.7,
     });
 
-    totalPromptTokens += result.usage?.inputTokens ?? 0;
-    totalCompletionTokens += result.usage?.outputTokens ?? 0;
+    const stepFields = extractUsageForPricing(result.usage);
+    totalUsage.noCacheInputTokens += stepFields.noCacheInputTokens;
+    totalUsage.cacheReadTokens    += stepFields.cacheReadTokens;
+    totalUsage.cacheWriteTokens   += stepFields.cacheWriteTokens;
+    totalUsage.outputTokens       += stepFields.outputTokens;
+    totalUsage.reasoningTokens    += stepFields.reasoningTokens ?? 0;
     lastFinishReason = result.finishReason ?? "unknown";
 
     const rawText = result.text.trim();
@@ -178,21 +192,32 @@ export async function generateScript(
     }
 
     const durationMs = Date.now() - startTime;
-    const totalTokens = totalPromptTokens + totalCompletionTokens;
+    // Gross input = noCache + cacheRead + cacheWrite (Anthropic Console formula)
+    const grossInputTokens =
+      totalUsage.noCacheInputTokens +
+      totalUsage.cacheReadTokens +
+      totalUsage.cacheWriteTokens;
+    const totalTokens =
+      grossInputTokens + totalUsage.outputTokens + totalUsage.reasoningTokens;
 
     if (userId) {
+      const usageForLog: LanguageModelUsage = {
+        inputTokens: grossInputTokens,
+        outputTokens: totalUsage.outputTokens,
+        totalTokens,
+        inputTokenDetails: {
+          noCacheTokens: totalUsage.noCacheInputTokens,
+          cacheReadTokens: totalUsage.cacheReadTokens,
+          cacheWriteTokens: totalUsage.cacheWriteTokens,
+        },
+        outputTokenDetails: {
+          textTokens: totalUsage.outputTokens,
+          reasoningTokens: totalUsage.reasoningTokens,
+        },
+      };
       waitUntil(logUsage({
         userId,
-        usage: {
-          inputTokens: totalPromptTokens,
-          outputTokens: totalCompletionTokens,
-          totalTokens,
-          inputTokenDetails: {
-            noCacheTokens: totalPromptTokens,
-            cacheReadTokens: 0,
-            cacheWriteTokens: 0,
-          },
-        } as any,
+        usage: usageForLog,
         modelId: SCRIPT_MODEL,
         provider: getProviderForTask(PODCAST_SCRIPT_TASK),
         chatMode: "podcast:script",
@@ -207,17 +232,18 @@ export async function generateScript(
       ai: {
         modelId: SCRIPT_MODEL,
         promptPreview: baseMessage.slice(0, 500),
-        noCacheInputTokens: totalPromptTokens,
-        cacheReadTokens: 0,
-        cacheWriteTokens: 0,
-        outputTokens: totalCompletionTokens,
-        reasoningTokens: 0,
+        noCacheInputTokens: totalUsage.noCacheInputTokens,
+        cacheReadTokens: totalUsage.cacheReadTokens,
+        cacheWriteTokens: totalUsage.cacheWriteTokens,
+        outputTokens: totalUsage.outputTokens,
+        reasoningTokens: totalUsage.reasoningTokens,
         totalTokens,
         costRub: calcStepCostRub(SCRIPT_MODEL, {
-          noCacheInputTokens: totalPromptTokens,
-          cacheReadTokens: 0,
-          cacheWriteTokens: 0,
-          outputTokens: totalCompletionTokens,
+          noCacheInputTokens: totalUsage.noCacheInputTokens,
+          cacheReadTokens: totalUsage.cacheReadTokens,
+          cacheWriteTokens: totalUsage.cacheWriteTokens,
+          outputTokens: totalUsage.outputTokens,
+          reasoningTokens: totalUsage.reasoningTokens,
         }, catalog),
         finishReason: lastFinishReason,
         retryCount: attempt,
