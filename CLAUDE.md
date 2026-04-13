@@ -162,23 +162,21 @@
 - `components/list-detail/list-detail-page.tsx` — Универсальный composition layout (header, two-column, empty state)
 - `components/list-detail/index.ts` — exports
 
-**Chat History (v3.5.0, v3.24.0 — ListDetailPage):**
-- `app/(dashboard)/chats/page.tsx` — Страница истории чатов (chatMode='chat' only)
-- `app/(dashboard)/expertise/page.tsx` — Страница экспертиз (chatMode='expertise')
-- `app/(dashboard)/create/page.tsx` — Страница создания (chatMode='create')
-- `components/chats/` — Компоненты для /chats
-- `components/chats/chats-page-content.tsx` — Клиентский контейнер с ListDetailPage
-- `components/chats/mode-chats-page.tsx` — Shared компонент для /expertise и /create
-- `components/chats/chat-list.tsx` — Левая колонка (список чатов)
+**Списки веток режимов (v3.5.0, v3.24.0 — ListDetailPage, v3.86.0 — LegacyChatCleanup):**
+- `app/(dashboard)/expertise/page.tsx` — Страница списка запросов экспертизы
+- `app/(dashboard)/create/page.tsx` — Страница списка заданий создания
+- `components/chats/mode-chats-page.tsx` — Shared компонент для /expertise и /create (UUID-навигация для новых веток)
+- `components/chats/chat-list.tsx` — Левая колонка (список веток)
 - `components/chats/chat-list-item.tsx` — Элемент списка (⭐, date, chatMode badge, actions)
 - `components/chats/chat-detail-panel.tsx` — Правая колонка (summary, actions)
+- **Удалено в v3.86.0 (TZ-LegacyChatCleanup):** страница `/chats` (общая история legacy chatMode='chat'), функция `getGeneralChatsWithStats`, компонент `chats-page-content.tsx`
 
-**ChatMode System (v3.24.0) + Route Groups (v3.25.0):**
-- `lib/ai/chat-mode-config.ts` — Тонкая обёртка (v3.83+): `chatMode → taskId → getModel()`. `CHAT_MODE_CONFIG` хранит `displayName` и `tools`; модели берутся из task-assignments.
-- `app/(chat)/chat/[id]/page.tsx` — Маршрут обычного чата (redirect для expertise/create)
+**ChatMode System (v3.24.0) + Route Groups (v3.25.0) + LegacyChatCleanup (v3.86.0):**
+- `lib/ai/chat-mode-config.ts` — Тонкая обёртка (v3.83+): `chatMode → taskId → getModel()`. После v3.86.0 валидные режимы — `simply | expertise | create` (`chat` удалён). `CHAT_MODE_CONFIG` хранит `displayName` и `tools`; модели берутся из task-assignments.
 - `app/(expertise)/expertise/[id]/page.tsx` — Маршрут экспертизы (chatMode=expertise)
 - `app/(create)/create/[id]/page.tsx` — Маршрут создания (chatMode=create)
-- `lib/utils.ts` — `getChatUrl()` — формирование URL по chatMode
+- `lib/utils.ts` — `getChatUrl()` — формирование URL по chatMode (для unknown режима бросает Error)
+- **Удалено в v3.86.0:** маршруты `app/(chat)/chat/page.tsx`, `app/(chat)/chat/[id]/page.tsx`. Концепция «обычного чата» как режима упразднена — Simply Chat является постоянной точкой диалога.
 
 **ServiceChat (v3.8.0):**
 - `components/service-chat/` — Унифицированная система сервисных чатов
@@ -364,13 +362,11 @@
 **Context Window Management (v3.18.0 — ТЗ-C1.5, v3.73.0 — ТЗ-RAG3 Compaction, v3.78.0 — ТЗ-ExtractCompression):**
 - **Extract-on-compression** (v3.78.0) — Simply Chat: при 60% контекста (+ пауза 10мин) или 80% → batch extraction фактов (MiniMax M2.7) → обработанные сообщения исключаются из загрузки (`extractedAt IS NULL`). Событийная цепочка: ≥10 фактов → консолидация (MiniMax) → ≥10 изменений → профиль (MiniMax). Safety-cap 180K. Ночной cron как страховка (>24ч)
 - **Compaction API** (v3.73.0) — Anthropic `compact_20260112` для Sonnet/Opus (expertise, create, project tasks). Trigger: 100K input tokens. Конфигурация через `providerOptions.anthropic.contextManagement` в streamText
-- **Snapshot** (legacy, только Haiku `chatMode="chat"`) — самодельная суммаризация для Haiku 4.5 (не поддерживает Compaction)
-- `lib/ai/context-limits.ts` — Конфиг (CONTEXT_BUDGET, SIMPLY_CONTEXT_LIMIT, EXTRACT_THRESHOLD_SOFT/HARD, EXTRACT_PAUSE_MS, SNAPSHOT_THRESHOLD, FALLBACK_MESSAGE_PAIRS)
-- `lib/ai/tools/create-snapshot.ts` — Tool createSnapshot — только для Haiku
-- `lib/ai/clerks/snapshot-creator.ts` — Fallback-клерк — только для Haiku
-- `lib/prompts/clerks/snapshot-creator.md` — Промпт fallback-клерка
-- `components/projects/snapshot-card.tsx` — SnapshotCard + SnapshotDivider
-- `components/projects/context-indicator.tsx` — Progress bar над input — только для Haiku
+- **Snapshot fallback** (legacy, удалён в v3.86.0 вместе с режимом `chat`) — самодельная суммаризация для Haiku 4.5. Все живые режимы используют либо Compaction (Sonnet/Opus), либо Extract-on-compression (Simply)
+- `lib/ai/context-limits.ts` — Конфиг (SIMPLY_CONTEXT_LIMIT, EXTRACT_THRESHOLD_SOFT/HARD, EXTRACT_PAUSE_MS)
+- `lib/ai/tools/create-snapshot.ts` — Tool createSnapshot (всё ещё импортируется в проектные task expert чаты, статус под аудитом — см. FINDINGS #8 в TZ_LegacyChatCleanup)
+- `components/projects/snapshot-card.tsx` — SnapshotCard + SnapshotDivider (используется при отображении результатов tool createSnapshot)
+- **Удалено в v3.86.0:** `components/projects/context-indicator.tsx`, snapshot fallback блок в `chat/route.ts` (createFallbackSnapshot вызовы), импорты из `clerks/snapshot-creator.ts`
 
 **MIND Memory / RAG (v3.70.0 — ТЗ-RAG0, v3.71.0 — ТЗ-RAG1, v3.72.0 — ТЗ-RAG2, v3.78.0 — ТЗ-ExtractCompression):**
 - `lib/ai/memory/voyage-client.ts` — Voyage AI клиент (raw fetch, embed + batch, voyage-4 / voyage-4-lite)

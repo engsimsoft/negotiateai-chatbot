@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.85.0
+**Версия:** 3.86.0
 **Дата:** 2026-04-13
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -337,6 +337,98 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-LegacyChatCleanup: Удаление legacy `chatMode='chat'` и инфраструктуры обычного чата — ✅ ЗАВЕРШЁН (v3.86.0)
+
+**Проблема:** В кодовой базе остался крупный пласт «обычного чата» (legacy `chatMode="chat"`) — отдельный маршрут `/chat/[id]`, страница «Все чаты» `/chats`, задания `chat:haiku/sonnet/opus` в task-assignments, snapshot-fallback цикл context-management для Haiku. Концепция продукта изменилась — постоянная точка диалога теперь Simply Chat (один вечный чат на пользователя), `expertise` и `create` — отдельные специализированные флоу с разовыми ветками. Legacy путал dev panel `/dev/models` (три «слота» `chat:*` интерпретировались как «три тира одного режима», хотя на деле это три разных chatMode, один из которых — `chat:opus` — вообще нигде не использовался). Внутри `route.ts` лежал мёртвый snapshot-fallback блок (~120 строк) и молчаливый catch без логирования. Цель — выпилить legacy полностью и попутно поймать костыли прошлых агентов.
+
+**Решение:** Три этапа от наименее рискованного к наиболее необратимому: переключение модельного реестра → физические удаления маршрутов и компонентов → cleanup БД и финализация. На каждом этапе — `tsc --noEmit` после каждой задачи и мануальный smoke test всех 4 рабочих режимов после этапа. Между этапами — git commit checkpoint для возможности отката.
+
+**Выполнено (3 этапа):**
+
+- **Этап 1 — Реестр и API** (commit `620730b`):
+  - `lib/ai/task-assignments.ts`: удалены `chat:haiku/sonnet/opus`, добавлены `expertise` (default `grok-4.20-multi-agent-0309`) и `create` (default `MiniMax-M2.7`)
+  - `lib/ai/chat-mode-config.ts`: zod enum сужен до `simply | expertise | create`, ветка `chat` удалена из `getTaskIdForChatMode` и `CHAT_MODE_CONFIG`
+  - `app/(chat)/api/chat/schema.ts`: `chatMode` стал обязательным полем (без default)
+  - `lib/db/queries.ts:saveChat`: `chatMode` стал обязательным параметром (убран костыль `chatMode || "chat"`)
+  - `app/(chat)/api/chat/route.ts`: удалён весь snapshot-fallback блок (~120 строк) — состояние снапшотов, `isHaikuChat`, `needsSnapshotFallback`, ContextIndicator emit. Удалены 7 dead-импортов (`createFallbackSnapshot`, `addChatSnapshot`, `getChatWithSnapshotState`, etc.). Builder switch стал явным `expertise → buildExpertisePrompt / create → buildCreatePrompt / simply → buildChatPrompt`. Исправлен молчаливый `catch {}` на `getMemorySettings` (теперь `console.warn`)
+  - `lib/ai/tools/chat-tools.ts`: удалён `CHAT_MODE_EXCLUDED_TOOLS` фильтр для Haiku-`chat`
+
+- **Этап 2 — Физические удаления** (commit `620730b`):
+  - Удалены маршруты: `app/(chat)/chat/[id]/page.tsx`, `app/(chat)/chat/page.tsx`
+  - Удалена страница: `app/(dashboard)/chats/page.tsx`
+  - Удалена функция: `getGeneralChatsWithStats` из `lib/db/queries.ts`
+  - Удалён мёртвый компонент: `components/projects/context-indicator.tsx` (привязан был к удалённому snapshot-fallback)
+  - Удалён весь deprecated compatibility layer в `lib/prompts/builder/index.ts`: `buildPrompt`, `getAvailablePrompts`, `getConfig`, `buildPromptAgentPrompt` — никем не импортировались
+  - `lib/utils.ts:getChatUrl`: default ветка теперь `throw Error` вместо `/chat/${id}` (явный сигнал об ошибке вместо ссылки на 404)
+  - `components/app-sidebar.tsx`: тип `ChatMode` сужен (без `"chat"`), default-fallback контекста → `simply`, удалены default-ветки в 4 функциях навигации
+  - `components/chats/mode-chats-page.tsx`: упрощена UUID-навигация (убрана проверка `!== "chat"`), `href` стал опциональным
+  - `components/chat.tsx`, `multimodal-input.tsx`, `sidebar-history.tsx`, `hooks/use-chat-visibility.ts`: удалены ветки `chatMode === "chat"`
+  - `app/(dashboard)/expertise/page.tsx` + `create/page.tsx`: убраны мёртвые href на удалённый `/chat?mode=...`
+  - `app/(chat)/api/chat/route.ts`: дефолтный title в `saveChat` стал mode-aware (`Новый запрос` / `Новое задание` / `Чат проекта` / `Новый чат`); `autoNameChat` gate расширен на 4 default-имени
+  - 5 страниц чата: убрано чтение cookie `chat-model` и импорт `DEFAULT_CHAT_MODEL`, заменено на локальную константу `"auto"`
+  - `lib/ai/models.ts` оставлен как `@deprecated` тонкая заглушка (полное удаление файла + 5 импортёров вынесено в follow-up `TZ_DeadModelSelectors` — см. FINDINGS #4)
+
+- **Этап 3 — БД cleanup и финализация:**
+  - SQL pre-audit: 10 legacy чатов, 107 сообщений, 52 stream, 141 ai_usage_log, 2 ProjectTask, 1 vote
+  - Транзакция: `DELETE FROM "Chat" WHERE chatMode='chat'` + каскадные удаления зависимых таблиц через `scripts/cleanup-legacy-chats.ts` (одноразовый, удалён после выполнения). Verify: `chatMode='chat'` = 0
+  - 30 `memory_entry` записей: `sourceChatId` обнулён (факты сохранены, теряется только обратная ссылка)
+  - Документация: обновлены `CLAUDE.md`, `docs/ai-chats-map.md`, `SIMPLY_STATUS.md`
+
+**Костыли прошлых агентов, найденные и исправленные по ходу:**
+
+1. **Молчаливый `catch {}` на `getMemorySettings`** ([route.ts](app/(chat)/api/chat/route.ts)) — глотал ошибки БД и тихо считал что память включена. Исправлен: `console.warn` с текстом ошибки.
+2. **`saveChat({ chatMode: chatMode || "chat" })`** — дефолт `"chat"` молча превращал любой chatless вызов в legacy чат. Исправлен: параметр обязательный.
+3. **`chat:opus` taskId** — мёртвый, нигде не резолвился, комментарий «зарезервирован» без ADR. Удалён.
+4. **`buildChatPrompt` `@deprecated` обёртки** в `lib/prompts/builder/index.ts:189-202` — никем не импортировались. Удалены.
+5. **`CHAT_MODE_EXCLUDED_TOOLS`** в chat-tools.ts — фильтр исключал deepResearch/fetchUrl для Haiku-`chat`. После удаления режима ветка стала недостижимой.
+
+**Костыли, найденные но НЕ исправленные в этом ТЗ** (зафиксированы в `specs/TZ_LegacyChatCleanup/FINDINGS.md`, оформлены как 5 follow-up ТЗ):
+
+| # | Находка | Влияние | Follow-up ТЗ |
+|---|---|---|---|
+| 1 | Grok 4.20 context window: каталог фиксирует 256K, docs.x.ai говорят 2M | low | `TZ_GrokContextWindowAudit` |
+| 2 | `ai_usage_log` неполный — фоновые вызовы Haiku (util:title, OCR, клерки, сервисные чаты) не пишутся | medium | `TZ_UsageLoggingCoverage` |
+| 3 | Поле `inputTokens` в `ai_usage_log` хранит gross input (включая cache), но имя misleading | low | `TZ_UsageLoggingCoverage` |
+| 4 | `lib/ai/models.ts` + 5 dead импортёров (3 model-selector компонента, dropdown в multimodal-input, entitlements) | medium | `TZ_DeadModelSelectors` |
+| 5 | Stream-level `onError: () => "Oops"` без `console.error`/`emitDebugError` | medium | `TZ_StreamObservability` |
+| 6 | `currentModelIdRef` мёртвый useRef в `chat.tsx` | low | `TZ_DeadModelSelectors` |
+| 7 | `isReasoningModel === "chat-model-reasoning"` мёртвая проверка на удалённую модель | low | `TZ_DeadModelSelectors` |
+| 8 | `createSnapshot` tool — потенциально мёртв для проектов (Compaction должен заменить snapshot) | medium | `TZ_CreateSnapshotAudit` |
+
+**Метрики:**
+
+| Что | До | После |
+|---|---|---|
+| Маршруты `/chat`, `/chats` | живые | удалены, 404 |
+| TaskId `chat:*` | 3 (один мёртвый) | 0, заменены `expertise` + `create` |
+| Snapshot-fallback блок в route.ts | ~120 строк живого кода | удалён |
+| Дефолт title в новых ветках | `"Новый чат"` для всех | mode-aware (`"Новый запрос"` / `"Новое задание"` / `"Чат проекта"`) |
+| chatMode валидные значения | `chat | simply | expertise | create` | `simply | expertise | create` |
+| Записи `chatMode='chat'` в БД | 10 чатов, 107 сообщений | 0 (физически удалены) |
+| FINDINGS обнаружено | — | 8 (оформлены в 5 follow-up ТЗ) |
+
+**Ключевые архитектурные изменения:**
+
+1. **Concept change**: «обычный чат» больше не существует как режим. Simply Chat — единственная постоянная точка диалога, expertise/create/projects — отдельные специализированные флоу с разовыми ветками.
+2. **`chatMode` обязательное поле** в API и `saveChat` — компилятор ловит забывания на этапе сборки, никаких silent дефолтов.
+3. **`getChatUrl`** для unknown chatMode бросает Error — лучше упасть громко, чем сгенерить ссылку на 404.
+4. **WORKFLOW.md 1.7 → 1.8**: новое **Правило 8 — FINDINGS.md**. Все обнаруженные вне-scope находки записываются в `specs/TZ_*/FINDINGS.md` СРАЗУ, не отвлекаясь на починку. После закрытия ТЗ — оформляются как follow-up ТЗ. Это правило родилось именно из этого ТЗ, когда быстро накопилось 8 находок и стало понятно что без отдельного механизма они либо размоют scope, либо потеряются.
+
+**Ключевые файлы:**
+- `lib/ai/task-assignments.ts` — `expertise` + `create` taskIds
+- `lib/ai/chat-mode-config.ts` — zod enum + `getTaskIdForChatMode`
+- `app/(chat)/api/chat/route.ts` — основной chat handler, очищен от snapshot fallback и legacy ветвлений
+- `app/(chat)/api/chat/schema.ts` — обязательный `chatMode`
+- `lib/utils.ts:getChatUrl` — throw на unknown
+- `components/app-sidebar.tsx` — sidebar навигация без legacy
+- `specs/TZ_LegacyChatCleanup/SPEC.md` + `ANALYSIS.md` + `ROADMAP.md` + `FINDINGS.md`
+
+**Архитектурный вывод (для будущих ТЗ):**
+
+> **Большие refactor-задачи раскрываются как луковица.** В этом ТЗ изначальный scope «удалить legacy chat режим» оказался переплетён с 8 побочными находками. Без правила FINDINGS.md я бы либо размыл scope (вариант «заодно починим»), либо забыл бы половину (вариант «потом») — и ни один путь не закрыл бы основную задачу чисто. Следующий принцип: **любой большой refactor должен начинаться с создания пустого FINDINGS.md и явного правила «всё что не в scope — туда»**. После закрытия ТЗ FINDINGS становится исходником списка маленьких follow-up ТЗ.
+
+---
 
 ### ТЗ-CacheAudit: MiniMax Anthropic-compat + 3-breakpoint Cache Strategy — ✅ ЗАВЕРШЁН (v3.85.0)
 

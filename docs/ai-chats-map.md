@@ -604,7 +604,7 @@ export function getModel(taskId: TaskId, context?: GetModelContext): LanguageMod
 import { getModel, getModelIdForTask, getProviderForTask } from "@/lib/ai/getModel";
 
 const result = await streamText({
-  model: getModel("chat:sonnet"),  // ← SSOT в task-assignments.ts
+  model: getModel("expertise"),  // ← SSOT в task-assignments.ts
   // ...
 });
 ```
