@@ -111,8 +111,21 @@ export async function generateScript(
 
     const result = await generateText({
       model: getModel(PODCAST_SCRIPT_TASK),
-      system: SYSTEM_PROMPT + JSON_INSTRUCTION,
-      prompt,
+      // ТЗ-CachePipelineMetrics: 2 cache breakpoints (ADR 050 pattern).
+      // Главный profit — multi-topic podcast (3-5 тем): static scriptwriter
+      // system prompt (~3K tokens) переиспользуется из кэша между темами.
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT + JSON_INSTRUCTION,
+          providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+        },
+        {
+          role: "user",
+          content: prompt,
+          providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+        },
+      ],
       maxOutputTokens: 4096,
       maxRetries: 0,
       temperature: 0.7,

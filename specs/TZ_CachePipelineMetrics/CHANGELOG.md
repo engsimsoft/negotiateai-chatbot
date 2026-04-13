@@ -56,15 +56,84 @@
 
 ---
 
-## Сессия 2 — TBD
+## Сессия 2 — 2026-04-13 (продолжение работы)
 
-### Этап 0: Pre-flight + audit
+### Этап 0: Pre-flight + audit — ✅ ЗАВЕРШЁН
 
-[ ] baseline git status / tsc / build
-[ ] Audit #1 — briefing-author fallback dead/live
-[ ] Audit #2 — professor-pipeline coverage
-[ ] Audit #3 — generateText cacheControl compat
-[ ] Audit #4 — util:artifact-suggestions taskId
+**Baseline:**
+- git status: чистый после v3.86.1 + OpenRouter backlog commit
+- tsc: 0 ошибок
+- build: уже прогонялся в прошлых сессиях, пропускаем
+
+**Audit #1 — briefing-author fallback (line 758-770) — DEAD CODE ✅**
+- Grep `generateArticleMapReduce` → **1 hit, только в определении функции** (line 639). Callers нет
+- Функция `generateArticleMapReduce` — код от rejected `TZ_MapReduceBriefing` (память проекта: Map-Reduce + MiniMax streaming несовместимы из-за socket reuse bug)
+- **Решение: удалить всю функцию `generateArticleMapReduce` целиком в Этапе 2** (140+ строк dead code). Hardcode fallback уходит вместе с ней
+- Это cardinal solution, не заплатка на hardcode
+
+**Audit #2 — professor-pipeline.ts — ПОЛНОЕ ПОКРЫТИЕ ✅**
+- 3 фазы (analyze/execute/synthesize), каждая вызывает `saveAiUsageLog` напрямую через `...extractUsageFields(result.usage)`
+- `extractUsageFields` возвращает 5 полей: `inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, thinkingTokens` — всё что нужно для billing
+- Кост считается через `calcCostUsd(modelId, usage)` — валидный path
+- **Решение: НЕ трогать**. Паттерн отличается от `logUsage()` wrapper'а, но функционально эквивалентен. Унификация без причины = костыль
+
+**Audit #3 — generateText + providerOptions cacheControl — СОВМЕСТИМО ✅**
+- Чтение `app/(chat)/api/chat/route.ts:991-1000` (актуальный working паттерн из TZ-CacheAudit):
+  ```ts
+  {
+    role: "system" as const,
+    content: systemPromptText,
+    providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+  }
+  ```
+- `providerOptions` ставится на уровне message (не content part). AI SDK v6 `ModelMessage` тип допускает его для любой роли
+- `streamText` и `generateText` разделяют один и тот же options тип (`CallSettings`) — `providerOptions` работает одинаково
+- **Решение: использовать единый паттерн для всех 4 файлов, включая podcast generateText**
+
+**Audit #4 — util:artifact-suggestions taskId — СУЩЕСТВУЕТ ✅**
+- Найдено в `lib/ai/task-assignments.ts:68` (type union) и line 137 (default: `claude-sonnet-4-6`)
+- Добавление в новый ТЗ не требуется, можно сразу вызывать `logUsage`
+
+### Обновлённый scope Этапа 1 после audit
+
+4 файла, 4 edits. Паттерн единый для всех:
+
+```ts
+// БЫЛО:
+streamText({
+  model: ...,
+  system: SYSTEM_PROMPT + INSTRUCTION,
+  prompt: userMessage,
+  ...
+})
+
+// СТАНЕТ:
+streamText({
+  model: ...,
+  messages: [
+    {
+      role: "system",
+      content: SYSTEM_PROMPT + INSTRUCTION,
+      providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+    },
+    {
+      role: "user",
+      content: userMessage,
+      providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+    },
+  ],
+  ...
+})
+```
+
+Без runtime guard на провайдер — `providerOptions.anthropic.*` безопасно игнорируется не-Anthropic-compat моделями (MiniMax после v3.85.0 через Anthropic-compat режим поддерживает, OpenRouter игнорирует без ошибки).
+
+### Этап 1: Cache breakpoints
+
+[ ] briefing-author generateArticle
+[ ] briefing-author generateIntroOutro
+[ ] briefing-section-author
+[ ] podcast script-generator
 
 ### Этап 1: Cache breakpoints
 

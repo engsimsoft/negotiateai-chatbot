@@ -205,8 +205,21 @@ export async function generateArticle(
     async () => {
       const res = streamText({
         model: getModel(BRIEFING_AUTHOR_TASK),
-        system: SYSTEM_PROMPT + JSON_INSTRUCTION,
-        prompt: userMessage,
+        // ТЗ-CachePipelineMetrics: 2 cache breakpoints (static system + last user).
+        // Паттерн из ADR 050. MiniMax после v3.85.0 Anthropic-compat режиме
+        // поддерживает providerOptions.anthropic.cacheControl нативно.
+        messages: [
+          {
+            role: "system",
+            content: SYSTEM_PROMPT + JSON_INSTRUCTION,
+            providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+          },
+          {
+            role: "user",
+            content: userMessage,
+            providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+          },
+        ],
         maxOutputTokens: maxTokens,
         temperature: 0.7,
         maxRetries: 0,
@@ -550,8 +563,19 @@ ${sectionSummaries}`;
     async () => {
       const res = streamText({
         model: getModel(BRIEFING_AUTHOR_TASK),
-        system: INTRO_OUTRO_SYSTEM_PROMPT + INTRO_OUTRO_JSON_INSTRUCTION,
-        prompt: userMessage,
+        // ТЗ-CachePipelineMetrics: 2 cache breakpoints (ADR 050 pattern)
+        messages: [
+          {
+            role: "system",
+            content: INTRO_OUTRO_SYSTEM_PROMPT + INTRO_OUTRO_JSON_INSTRUCTION,
+            providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+          },
+          {
+            role: "user",
+            content: userMessage,
+            providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+          },
+        ],
         maxOutputTokens: 2048,
         temperature: 0.7,
         maxRetries: 0,
