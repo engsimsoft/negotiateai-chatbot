@@ -66,7 +66,12 @@ export function generateUUID(): string {
 
 /**
  * Build a mode-aware chat URL.
- * /chat/[id], /expertise/[id], /create/[id], or /projects/[pid]/chat/[id]
+ * /simply, /expertise/[id], /create/[id], or /projects/[pid]/chat/[id]
+ *
+ * ТЗ-LegacyChatCleanup: legacy-режим `chat` и маршрут /chat/[id] удалены.
+ * Для unknown chatMode функция бросает Error — это сигнал что в коде где-то
+ * передаётся устаревший или невалидный режим. Лучше упасть громко, чем тихо
+ * сгенерить ссылку на 404. Caller обязан гарантировать корректный chatMode.
  */
 export function getChatUrl(
   chatId: string,
@@ -84,7 +89,9 @@ export function getChatUrl(
     case "create":
       return `/create/${chatId}`;
     default:
-      return `/chat/${chatId}`;
+      throw new Error(
+        `getChatUrl: неизвестный chatMode "${chatMode}". Допустимые: simply | expertise | create | (с projectId — project chat). Возможно вы пытаетесь открыть legacy-чат удалённого режима "chat".`,
+      );
   }
 }
 

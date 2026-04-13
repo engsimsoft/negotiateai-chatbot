@@ -49,11 +49,6 @@ export {
   composeAgentPrompt,
   composeSkillPrompt,
 
-  // Compatibility layer
-  buildPrompt,
-  getAvailablePrompts,
-  getConfig,
-
   // Types
   type SkillMetadata,
   type AgentMetadata,

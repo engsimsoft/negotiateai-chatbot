@@ -1,12 +1,16 @@
-import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
-import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
 import { getChatById, getMessagesByChatId } from "@/lib/db/queries";
 import { convertToUIMessages } from "@/lib/utils";
+
+// ТЗ-LegacyChatCleanup: cookie `chat-model` и DEFAULT_CHAT_MODEL — артефакты старого
+// UI-селектора моделей. Сейчас модель резолвится сервером через getModel(taskId),
+// проп `initialChatModel` сохраняется в Chat → ModelSelectorCompact только для проектов.
+// Для не-проектов передаём константу "auto".
+const INITIAL_CHAT_MODEL = "auto";
 
 export default async function ExpertiseChatPage(props: {
   params: Promise<{ id: string }>;
@@ -24,16 +28,12 @@ export default async function ExpertiseChatPage(props: {
 
   // New expertise chat: no chat in DB yet — render empty Chat component
   if (!chat) {
-    const cookieStore = await cookies();
-    const chatModelFromCookie = cookieStore.get("chat-model");
-    const initialModel = chatModelFromCookie?.value || DEFAULT_CHAT_MODEL;
-
     return (
       <>
         <Chat
           autoResume={false}
           id={id}
-          initialChatModel={initialModel}
+          initialChatModel={INITIAL_CHAT_MODEL}
           initialChatMode="expertise"
           initialMessages={[]}
           initialVisibilityType="private"
@@ -52,16 +52,12 @@ export default async function ExpertiseChatPage(props: {
   const messagesFromDb = await getMessagesByChatId({ id });
   const uiMessages = convertToUIMessages(messagesFromDb);
 
-  const cookieStore = await cookies();
-  const chatModelFromCookie = cookieStore.get("chat-model");
-  const initialModel = chatModelFromCookie?.value || DEFAULT_CHAT_MODEL;
-
   return (
     <>
       <Chat
         autoResume={true}
         id={chat.id}
-        initialChatModel={initialModel}
+        initialChatModel={INITIAL_CHAT_MODEL}
         initialChatMode="expertise"
         initialLastContext={chat.lastContext ?? undefined}
         initialMessages={uiMessages}

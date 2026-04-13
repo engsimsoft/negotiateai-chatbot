@@ -28,7 +28,8 @@ export const postRequestBodySchema = z.object({
     parts: z.array(partSchema),
   }),
   // ТЗ-DV2: chatMode replaces selectedChatModel — server determines model
-  chatMode: chatModeSchema.default("chat"),
+  // ТЗ-LegacyChatCleanup: chatMode обязательное поле без default — клиент должен знать из какого режима он пишет
+  chatMode: chatModeSchema,
   selectedVisibilityType: z.enum(["public", "private"]),
   // ТЗ-03: Project chat support
   projectId: z.string().uuid().optional(),

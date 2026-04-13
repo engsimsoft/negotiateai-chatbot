@@ -17,7 +17,8 @@ export function useChatVisibility({
 }: {
   chatId: string;
   initialVisibilityType: VisibilityType;
-  chatMode?: "chat" | "expertise" | "create";
+  // ТЗ-LegacyChatCleanup: legacy `chat` удалён
+  chatMode?: "simply" | "expertise" | "create";
 }) {
   const { mutate, cache } = useSWRConfig();
   const history: ChatHistory = cache.get("/api/history")?.data;

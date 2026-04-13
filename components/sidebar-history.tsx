@@ -108,7 +108,8 @@ export const getChatHistoryPaginationKey = makeChatHistoryPaginationKey();
 
 export function SidebarHistory({
   user,
-  context = { type: "general", chatMode: "chat" },
+  // ТЗ-LegacyChatCleanup: legacy `chat` режим удалён, дефолт — `simply`
+  context = { type: "general", chatMode: "simply" },
   chatMode,
 }: {
   user: User | undefined;

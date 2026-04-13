@@ -1,17 +1,23 @@
 /**
- * ТЗ-DV2: Chat Mode Configuration
- * ТЗ-1 CoreRegistry: now a thin wrapper over task-assignments.ts
+ * Chat Mode Configuration (ТЗ-DV2, ТЗ-1 CoreRegistry, ТЗ-LegacyChatCleanup)
  *
  * Server-side mapping: chatMode → domain config (displayName, tools, reserved).
  * The actual model for each mode is resolved via getTaskIdForChatMode() →
  * getModel(taskId). Client never chooses the model directly — only the chatMode.
+ *
+ * После ТЗ-LegacyChatCleanup существует ровно три рабочих режима:
+ *  - simply    — вечный чат Simply (Simply Chat)
+ *  - expertise — разовые экспертные запросы
+ *  - create    — разовые задания на создание
+ *
+ * Режим `chat` удалён как концепция вместе с маршрутом /chat/[id].
  */
 
 import { z } from "zod";
 import { getModelIdForTask } from "./getModel";
 import type { TaskId } from "./task-assignments";
 
-export const chatModeSchema = z.enum(["chat", "expertise", "create", "simply"]);
+export const chatModeSchema = z.enum(["expertise", "create", "simply"]);
 export type ChatMode = z.infer<typeof chatModeSchema>;
 
 interface ChatModeEntry {
@@ -27,22 +33,18 @@ interface ChatModeEntry {
  * Model selection is handled via task-assignments — see getTaskIdForChatMode().
  */
 export const CHAT_MODE_CONFIG: Record<ChatMode, ChatModeEntry> = {
-  chat: {
-    displayName: "Haiku",
-    tools: null, // All standard tools
-  },
   simply: {
     displayName: "Simply",
     tools: null, // Tools disabled at route level for MiniMax/Gemini
   },
   expertise: {
-    displayName: "Sonnet",
-    tools: null, // All standard tools (same as chat for now)
+    displayName: "Экспертиза",
+    tools: null, // All standard tools
     reservedTools: ["deep_research", "analyze_document", "vision"],
   },
   create: {
-    displayName: "Sonnet",
-    tools: null, // All standard tools (same as chat for now)
+    displayName: "Создание",
+    tools: null, // All standard tools
     reservedTools: ["create_presentation", "create_image", "file_generation"],
   },
 };
@@ -54,11 +56,10 @@ export const CHAT_MODE_CONFIG: Record<ChatMode, ChatModeEntry> = {
  */
 export function getTaskIdForChatMode(mode: ChatMode): TaskId {
   switch (mode) {
-    case "chat":
-      return "chat:haiku";
     case "expertise":
+      return "expertise";
     case "create":
-      return "chat:sonnet";
+      return "create";
     case "simply":
       return "simply-chat";
   }

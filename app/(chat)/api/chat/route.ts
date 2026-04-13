@@ -36,10 +36,8 @@ import {
   DEFAULT_PROJECT_MODEL,
   type ProjectModelTier,
 } from "@/lib/ai/model-tiers";
-import { createFallbackSnapshot } from "@/lib/ai/clerks/snapshot-creator";
+// ТЗ-LegacyChatCleanup: snapshot fallback path удалён, создание fallback-снапшота больше не нужно
 import {
-  SNAPSHOT_THRESHOLD,
-  FALLBACK_MESSAGE_PAIRS,
   SIMPLY_CONTEXT_LIMIT,
   EXTRACT_THRESHOLD_SOFT,
   EXTRACT_THRESHOLD_HARD,
@@ -67,22 +65,21 @@ import {
 import { retrieveMemoryContext } from "@/lib/ai/memory/retrieve";
 import { getProfileBlock } from "@/lib/ai/memory/profile";
 import { extractAndStoreFacts, batchExtractFacts } from "@/lib/ai/memory/extract";
+// ТЗ-LegacyChatCleanup: snapshot-related queries (addChatSnapshot, getChatWithSnapshotState,
+// resetChatContextState, updateChatContextState) удалены — больше не используются после
+// удаления legacy chatMode="chat" и его snapshot fallback.
 import {
-  addChatSnapshot,
   createStreamId,
   deleteChatById,
   getChatById,
-  getChatWithSnapshotState,
   getFilesByProjectId,
   getMessageCountByUserId,
   getMessagesByChatId,
   getProjectById,
   getUserById,
-  resetChatContextState,
   saveAiUsageLog,
   saveChat,
   saveMessages,
-  updateChatContextState,
   updateChatLastContextById,
   updateChatTitleAndSummary,
   updateChatTaskStatus,
@@ -108,8 +105,11 @@ async function autoNameChat(chatId: string, userId: string): Promise<void> {
   // ТЗ-KITT: Simply chat is never auto-named
   if (chat.chatMode === "simply") return;
 
-  // Skip if already auto-named (title changed from default)
-  if (chat.title !== "Новый чат") return;
+  // ТЗ-LegacyChatCleanup: дефолтные title теперь mode-aware («Новый запрос», «Новое задание»,
+  // «Новый чат» как fallback). Пропускаем autoNaming только если title уже изменился
+  // (либо пользователем, либо предыдущим autoName).
+  const DEFAULT_TITLES = new Set(["Новый чат", "Новый запрос", "Новое задание", "Чат проекта"]);
+  if (!DEFAULT_TITLES.has(chat.title)) return;
 
   const messages = await getMessagesByChatId({ id: chatId });
   if (messages.length < 4) return;
@@ -409,11 +409,21 @@ export async function POST(request: Request) {
         );
       }
     } else {
-      // Performance: Save chat with temporary title, generate real title in background
+      // Performance: Save chat with temporary title, generate real title in background.
+      // ТЗ-LegacyChatCleanup: дефолтный title теперь mode-aware, чтобы в sidebar list
+      // свежесозданная ветка отображалась осмысленно («Новый запрос» / «Новое задание»)
+      // до того, как autoNameChat сгенерирует постоянное имя через Claude.
+      const defaultTitle = projectId
+        ? "Чат проекта"
+        : chatMode === "expertise"
+          ? "Новый запрос"
+          : chatMode === "create"
+            ? "Новое задание"
+            : "Новый чат";
       await saveChat({
         id,
         userId: session.user.id,
-        title: projectId ? `Чат проекта` : "Новый чат",
+        title: defaultTitle,
         visibility: selectedVisibilityType,
         projectId: projectId || undefined,
         chatMode,
@@ -449,64 +459,22 @@ export async function POST(request: Request) {
       excludeExtracted: isSimplyChat,
     });
 
-    // ТЗ-C3/RAG3: Snapshot context management — only for Haiku chats (chatMode="chat"/"simply")
-    // Sonnet/Opus use Anthropic Compaction API instead
-    let snapshotContext: string | undefined;
-    let messagesForModel = messagesFromDb;
-
-    // contextState is used later in threshold checking for Haiku
-    let contextState: { suggestionActive: boolean; messagesSinceSuggestion: number } | null = null;
-
-    // Snapshot state loading: this runs BEFORE activeTaskId is known (still
-    // outside the streamText execute callback), so we gate on chatMode alone.
-    // The actual snapshot INJECTION (inside the callback, below) uses the
-    // capability-based `needsSnapshotFallback` flag so dev overrides can opt
-    // out when the effective model supports Compaction. ТЗ-2.
-    const isHaikuChat = chatMode === "chat";
-    if (isHaikuChat) {
-      const chatWithState = await getChatWithSnapshotState({ chatId: id });
-      const snapshots = chatWithState?.snapshots || [];
-      contextState = chatWithState?.contextState || null;
-
-      if (snapshots.length > 0) {
-        const lastSnapshot = snapshots[snapshots.length - 1];
-        const snapshotMsgIndex = messagesFromDb.findIndex(
-          (m) => m.id === lastSnapshot.messageId
-        );
-
-        if (snapshotMsgIndex >= 0) {
-          const snapshotMsg = messagesFromDb[snapshotMsgIndex];
-          const snapshotPart = (snapshotMsg.parts as any[])?.find(
-            (p: any) =>
-              p.type === "tool-createSnapshot" && p.output?.fullMarkdown
-          );
-          snapshotContext =
-            snapshotPart?.output?.fullMarkdown ||
-            `## Итог\n${lastSnapshot.summary}`;
-          messagesForModel = messagesFromDb.slice(snapshotMsgIndex + 1);
-        } else {
-          snapshotContext =
-            lastSnapshot.fullMarkdown || `## Итог\n${lastSnapshot.summary}`;
-        }
-
-        console.log(
-          `[ContextMgmt] Chat ${id}: snapshot found, trimmed ${messagesFromDb.length - messagesForModel.length} messages, snapshotContext = ${snapshotContext!.length} chars`
-        );
-      }
-    }
+    // ТЗ-LegacyChatCleanup: snapshot fallback removed along with chatMode="chat".
+    // All remaining modes use either Anthropic Compaction (Sonnet/Opus, project chats)
+    // or Extract-on-compression (simply via batchExtractFacts below). No snapshot path needed.
 
     // Claude API не поддерживает text/plain как file attachment — конвертируем в text
     const processedMessage = await convertTextFilePartsInMessage(message as ChatMessage);
-    const uiMessages = [...convertToUIMessages(messagesForModel), processedMessage];
+    const uiMessages = [...convertToUIMessages(messagesFromDb), processedMessage];
 
-    // Подсчитываем общее количество токенов в контексте (after trimming)
-    const totalHistoryTokens = messagesForModel.reduce((sum, msg) => {
+    // Подсчитываем общее количество токенов в контексте
+    const totalHistoryTokens = messagesFromDb.reduce((sum, msg) => {
       return sum + (msg.tokenCount || estimateMessageTokens(msg.parts as any));
     }, 0);
 
     console.log(
       `[Token Aware] Chat ${id}: Total context = ${totalHistoryTokens + newMessageTokens} tokens ` +
-      `(${messagesForModel.length} history messages + 1 new message)`
+      `(${messagesFromDb.length} history messages + 1 new message)`
     );
 
     const { longitude, latitude, city, country } = geolocation(request);
@@ -562,7 +530,8 @@ export async function POST(request: Request) {
     } | null = null;
 
     // ТЗ-RAG2: Shared flag for memory gate (used in both execute and onFinish)
-    let isMemoryEnabled = ["chat", "simply", "expertise", "create"].includes(chatMode);
+    // ТЗ-LegacyChatCleanup: chat mode removed — gate covers all three remaining modes
+    let isMemoryEnabled = ["simply", "expertise", "create"].includes(chatMode);
 
     const stream = createUIMessageStream({
       originalMessages: uiMessages,
@@ -611,13 +580,22 @@ export async function POST(request: Request) {
           console.log(`[Project Chat] Using ${projectModelConfig.name} (${tier}) for project ${project.name}`);
           console.log(`[Project Chat] Context length: ${projectContext.length} chars`);
         } else {
-          // Regular chat: use Claude — builder and model determined by chatMode
-          const builtPrompt = chatMode === 'expertise'
-            ? buildExpertisePrompt(promptContext)
-            : chatMode === 'create'
-              ? buildCreatePrompt(promptContext)
-              : buildChatPrompt(promptContext);
+          // ТЗ-LegacyChatCleanup: explicit switch по chatMode — три ветки, без fallback.
+          // buildChatPrompt используется как билдер Simply (исторически общий builder чата).
+          let builtPrompt;
+          switch (chatMode) {
+            case "expertise":
+              builtPrompt = buildExpertisePrompt(promptContext);
+              break;
+            case "create":
+              builtPrompt = buildCreatePrompt(promptContext);
+              break;
+            case "simply":
+              builtPrompt = buildChatPrompt(promptContext);
+              break;
+          }
           systemPromptText = builtPrompt.systemPrompt;
+
           // ТЗ-MinimaxCleanup + ТЗ-1 CoreRegistry: Model routing for Simply Chat
           // Priority: think → Sonnet, attachments → Haiku 4.5 (vision), default → MiniMax M2.7
           if (chatMode === "simply") {
@@ -648,17 +626,6 @@ export async function POST(request: Request) {
         const isAnthropicModel = effectiveProvider === "anthropic";
         const modelSupportsCompaction =
           effectiveCatalogEntry?.capabilities.supportsCompaction ?? false;
-        // Snapshot-injection fallback exists for the legacy `chatMode === "chat"`
-        // flow when the model is Haiku (no Compaction API). If a dev override
-        // points that task at Sonnet/Opus, Compaction takes over and we skip
-        // the snapshot hints entirely.
-        const needsSnapshotFallback =
-          chatMode === "chat" && !modelSupportsCompaction;
-
-        // ТЗ-C3: Inject previous snapshot context into system prompt
-        if (snapshotContext) {
-          systemPromptText += `\n\n<previous_context>\n${snapshotContext}\n</previous_context>`;
-        }
 
         // ТЗ-RAG1/RAG2: MIND memory — profile + retrieval
         // Scope: chat, expertise, create (not service chats, not professor pipeline)
@@ -668,8 +635,12 @@ export async function POST(request: Request) {
             const { getMemorySettings } = await import("@/lib/db/queries");
             const memSettings = await getMemorySettings({ userId: session.user.id });
             isMemoryEnabled = memSettings.memoryEnabled;
-          } catch {
-            // If settings check fails, default to enabled
+          } catch (error) {
+            // ТЗ-LegacyChatCleanup: исправлен молчаливый catch — раньше глотал ошибку
+            // и оставлял isMemoryEnabled=true (graceful degradation без сигнала)
+            const msg = error instanceof Error ? error.message : String(error);
+            console.warn("[MIND] Memory settings load failed (defaulting to enabled):", msg);
+            // Note: prePromptWarnings ещё не объявлен на этом этапе — буфер создаётся ниже
           }
         }
         let memoryDebugData: Parameters<typeof emitDebugRag>[1] | null = null;
@@ -800,76 +771,9 @@ export async function POST(request: Request) {
           }
         }
 
-        // ТЗ-C3/RAG3: Snapshot context management — only when the EFFECTIVE
-        // model lacks Compaction (i.e. Haiku). ТЗ-2 note: using
-        // `needsSnapshotFallback` (computed above from the catalog) instead of
-        // `isHaikuChat` lets dev overrides correctly disable snapshot hints when
-        // chatMode="chat" gets routed to Sonnet/Opus — Compaction takes over.
-        if (needsSnapshotFallback) {
-          const systemPromptTokens = estimateMessageTokens([
-            { type: "text", text: systemPromptText },
-          ]);
-          const estimatedPercent = calcUsagePercent(
-            totalHistoryTokens + systemPromptTokens + newMessageTokens
-          );
-
-          // Context suggestion injection
-          if (
-            estimatedPercent >= SNAPSHOT_THRESHOLD * 100 &&
-            !contextState?.suggestionActive
-          ) {
-            systemPromptText += `\n\n[SYSTEM: Контекстное окно заполнено на ${Math.round(estimatedPercent)}%. Мягко предложи пользователю зафиксировать итог разговора. Если пользователь согласится, вызови tool createSnapshot.]`;
-            await updateChatContextState({
-              chatId: id,
-              contextState: { suggestionActive: true, messagesSinceSuggestion: 0 },
-            });
-          } else if (contextState?.suggestionActive) {
-            const newCount = (contextState.messagesSinceSuggestion || 0) + 1;
-
-            if (newCount >= FALLBACK_MESSAGE_PAIRS) {
-              console.log(
-                `[ContextMgmt] Chat ${id}: fallback triggered (${newCount} messages since suggestion)`
-              );
-              const fallbackResult = await createFallbackSnapshot({
-                chatTitle: chat?.title || undefined,
-                chatMessages: messagesFromDb,
-                userId: session.user.id,
-              });
-
-              if (fallbackResult) {
-                await addChatSnapshot({
-                  chatId: id,
-                  messageId: `fallback-${generateUUID()}`,
-                  summary: fallbackResult.shortSummary,
-                  fullMarkdown: fallbackResult.fullMarkdown,
-                });
-                await resetChatContextState({ chatId: id });
-                console.log(
-                  `[ContextMgmt] Chat ${id}: fallback snapshot saved — will apply on next request`
-                );
-              } else {
-                await resetChatContextState({ chatId: id });
-                console.warn(
-                  `[ContextMgmt] Chat ${id}: fallback clerk failed — contextState reset`
-                );
-              }
-            } else {
-              await updateChatContextState({
-                chatId: id,
-                contextState: {
-                  ...contextState,
-                  messagesSinceSuggestion: newCount,
-                },
-              });
-            }
-          }
-
-          // Emit context usage to client (for ContextIndicator)
-          dataStream.write({
-            type: "data-context-usage",
-            data: { percent: Math.round(estimatedPercent), tokens: totalHistoryTokens + systemPromptTokens },
-          });
-        }
+        // ТЗ-LegacyChatCleanup: snapshot fallback block removed with chatMode="chat".
+        // Sonnet/Opus (expertise/create/projects) use Anthropic Compaction, simply uses
+        // Extract-on-compression above. No snapshot path needed.
 
         // ТЗ-PX: Emit research depth override for dev UI
         if (researchDepth) {
@@ -887,7 +791,6 @@ export async function POST(request: Request) {
                 : "Simply Chat";
           const injections: string[] = [];
           if (userProfile?.displayName || userProfile?.bio) injections.push("user-profile");
-          if (snapshotContext) injections.push("snapshot-context");
           if (isProjectChat) injections.push("project-context");
           if (systemPromptText.includes("<memory>")) injections.push("mind-memory");
           // ТЗ-2: include task + override info for DevPanel switcher and OVERRIDE badge
@@ -901,7 +804,7 @@ export async function POST(request: Request) {
             chatMode,
             isProjectChat,
             projectTier: isProjectChat ? tier : undefined,
-            hasSnapshotContext: !!snapshotContext,
+            hasSnapshotContext: false,
             contextInjections: injections,
             taskId: activeTaskId ?? undefined,
             overrideActive,
@@ -1597,7 +1500,7 @@ export async function POST(request: Request) {
               userId: session.user.id,
               userMessage: userText,
               assistantMessage: assistantText,
-              sourceType: chatMode as "chat" | "simply" | "expertise" | "create",
+              sourceType: chatMode,
               sourceChatId: id,
             }).catch((err) =>
               console.warn("[MIND] Extract failed (non-blocking):", err instanceof Error ? err.message : err)

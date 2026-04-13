@@ -202,7 +202,9 @@ export async function saveChat({
   title: string;
   visibility: VisibilityType;
   projectId?: string;
-  chatMode?: string;
+  // ТЗ-LegacyChatCleanup: chatMode стал обязательным, дефолт "chat" удалён.
+  // Каждый caller обязан явно передать режим (simply | expertise | create | project).
+  chatMode: string;
 }) {
   try {
     console.log('[saveChat] Attempting to save chat:', { id, userId, title, visibility, projectId, chatMode });
@@ -213,7 +215,7 @@ export async function saveChat({
       title,
       visibility,
       projectId: projectId || null,
-      chatMode: chatMode || "chat",
+      chatMode,
     });
   } catch (error) {
     console.error('[saveChat] Database error:', error);
@@ -840,8 +842,8 @@ export async function updateChatTitle({
 }) {
   try {
     return await db.update(chat).set({ title }).where(eq(chat.id, chatId));
-  } catch (_error) {
-    console.warn("Failed to update chat title:", _error);
+  } catch (error) {
+    console.warn("[updateChatTitle] Failed, non-critical, swallowed:", error);
     // Don't throw - title update is non-critical
   }
 }
@@ -2025,48 +2027,6 @@ export async function getGeneralChatsCount({ userId }: { userId: string }) {
 }
 
 /**
- * Get general chats with message count for /chats page
- * Returns chats not in projects, with messageCount for each
- */
-export async function getGeneralChatsWithStats({
-  userId,
-  limit = 50,
-}: {
-  userId: string;
-  limit?: number;
-}) {
-  try {
-    const result = await db
-      .select({
-        id: chat.id,
-        createdAt: chat.createdAt,
-        title: chat.title,
-        summary: chat.summary,
-        isStarred: chat.isStarred,
-        isRenamed: chat.isRenamed,
-        chatMode: chat.chatMode,
-        messageCount: sql<number>`COALESCE(COUNT(${message.id}), 0)::int`,
-      })
-      .from(chat)
-      .leftJoin(message, eq(message.chatId, chat.id))
-      .where(
-        and(
-          eq(chat.userId, userId),
-          isNull(chat.projectId),
-          eq(chat.chatMode, "chat")
-        )
-      )
-      .groupBy(chat.id)
-      .orderBy(desc(chat.createdAt))
-      .limit(limit);
-
-    return result;
-  } catch (error) {
-    throw new ChatSDKError("bad_request:database", error);
-  }
-}
-
-/**
  * ТЗ-DV2: Get chats filtered by chatMode with stats
  * Used for /expertise and /create pages
  */
@@ -2826,8 +2786,8 @@ export async function getUsersForDelivery({
     //   const wrappedDiff = Math.min(diff, 1440 - diff);
     //   return wrappedDiff <= WINDOW_MINUTES;
     // });
-  } catch (_error) {
-    console.error("[getUsersForDelivery] Failed:", _error);
+  } catch (error) {
+    console.error("[getUsersForDelivery] Failed, returning empty:", error);
     return [];
   }
 }
@@ -3488,9 +3448,9 @@ export async function getPreviousBriefing({
       generatedAt: row.generatedAt.toISOString(),
       article,
     };
-  } catch (_error) {
+  } catch (error) {
     // Non-blocking: if we can't load previous briefing, dedup just won't happen
-    console.warn("[getPreviousBriefing] Failed to load, skipping dedup:", _error);
+    console.warn("[getPreviousBriefing] Failed to load, skipping dedup:", error);
     return null;
   }
 }

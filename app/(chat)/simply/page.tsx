@@ -1,12 +1,13 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
-import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
 import { getOrCreateSimplyChat, getMessagesByChatId } from "@/lib/db/queries";
 import { convertToUIMessages } from "@/lib/utils";
+
+// ТЗ-LegacyChatCleanup: см. expertise/[id]/page.tsx
+const INITIAL_CHAT_MODEL = "auto";
 
 /**
  * ТЗ-KITT: Persistent "Simply" chat page.
@@ -28,16 +29,12 @@ export default async function SimplyPage() {
 
   const uiMessages = convertToUIMessages(messagesFromDb);
 
-  const cookieStore = await cookies();
-  const chatModelFromCookie = cookieStore.get("chat-model");
-  const initialModel = chatModelFromCookie?.value || DEFAULT_CHAT_MODEL;
-
   return (
     <>
       <Chat
         autoResume={true}
         id={simplyChat.id}
-        initialChatModel={initialModel}
+        initialChatModel={INITIAL_CHAT_MODEL}
         initialChatMode="simply"
         initialLastContext={simplyChat.lastContext ?? undefined}
         initialMessages={uiMessages}

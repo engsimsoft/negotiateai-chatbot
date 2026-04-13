@@ -90,7 +90,7 @@ export interface DebugPromptData {
   projectTier?: string;
   hasSnapshotContext: boolean;
   contextInjections: string[];
-  /** ТЗ-2: Registry task id used for this call (e.g. "simply-chat", "chat:sonnet"). */
+  /** ТЗ-2: Registry task id used for this call (e.g. "simply-chat", "expertise"). */
   taskId?: string;
   /** ТЗ-2: True if a dev override (cookie) was applied for this task. */
   overrideActive?: boolean;

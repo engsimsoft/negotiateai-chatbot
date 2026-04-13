@@ -38,7 +38,7 @@ import { ChatSidebar } from "./chat-sidebar";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
-import { ContextIndicator } from "./projects/context-indicator";
+// ТЗ-LegacyChatCleanup: ContextIndicator удалён вместе с legacy `chat` snapshot fallback
 import { ProfessorProgress } from "./projects/professor-progress";
 import { makeChatHistoryPaginationKey } from "./sidebar-history";
 import { toast } from "./toast";
@@ -49,7 +49,8 @@ export function Chat({
   id,
   initialMessages,
   initialChatModel,
-  initialChatMode = "chat",
+  // ТЗ-LegacyChatCleanup: дефолт `simply` вместо удалённого `chat`
+  initialChatMode = "simply",
   initialVisibilityType,
   isReadonly,
   autoResume,
@@ -73,7 +74,7 @@ export function Chat({
   const { visibilityType } = useChatVisibility({
     chatId: id,
     initialVisibilityType,
-    chatMode: initialChatMode as "chat" | "expertise" | "create",
+    chatMode: initialChatMode as "simply" | "expertise" | "create",
   });
 
   const { mutate } = useSWRConfig();
@@ -106,8 +107,7 @@ export function Chat({
     "normal"
   );
 
-  // ТЗ-C3: Context usage indicator
-  const [contextPercent, setContextPercent] = useState(0);
+  // ТЗ-LegacyChatCleanup: contextPercent state удалён — был привязан к legacy snapshot fallback
 
   // ТЗ-03 Фаза 7: Professor Pipeline state
   const [professorPhase, setProfessorPhase] = useState<PipelinePhase | null>(null);
@@ -251,11 +251,8 @@ export function Chat({
         setUsage((prev) => mergeAppUsage(prev, incoming));
       }
 
-      // ТЗ-C3: Handle context usage indicator
-      if (dataPart.type === "data-context-usage") {
-        const data = dataPart.data as { percent: number };
-        setContextPercent(data.percent);
-      }
+      // ТЗ-LegacyChatCleanup: data-context-usage больше не эмитится из route.ts
+      // (был частью snapshot fallback под legacy chatMode="chat")
 
       // ТЗ-03 Фаза 7: Handle Professor Pipeline events
       if (dataPart.type.startsWith("data-professor-") && dataPart.data) {
@@ -299,7 +296,7 @@ export function Chat({
       }
     },
     onFinish: () => {
-      mutate(unstable_serialize(makeChatHistoryPaginationKey(initialChatMode as "chat" | "expertise" | "create")));
+      mutate(unstable_serialize(makeChatHistoryPaginationKey(initialChatMode as "simply" | "expertise" | "create")));
       setRetryState({ count: 0, maxRetries: retryState.maxRetries });
       setDelayState("normal");
       // ТЗ-07: Clear tool-activity events from data stream to prevent stale indicators
@@ -495,8 +492,6 @@ export function Chat({
         />
 
         <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl flex-col gap-0 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
-            {/* ТЗ-C3/RAG3: Context indicator only for Haiku chats (Sonnet/Opus use Compaction) */}
-            {currentChatMode === "chat" && <ContextIndicator percent={contextPercent} />}
             {!isReadonly && (
               <MultimodalInput
                 attachments={attachments}

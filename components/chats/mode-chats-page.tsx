@@ -40,7 +40,10 @@ function makeCountLabel(noun: CountNoun): (count: number) => string {
 
 interface ModeChatsPageProps {
   title: string;
-  createButton?: { label: string; href: string };
+  // ТЗ-LegacyChatCleanup: href опциональный — когда передан chatMode, кнопка работает
+  // через UUID-onClick (см. resolvedCreateButton ниже). href нужен только в legacy-сценарии
+  // без chatMode (которого больше нет). Оставлен в типе ради backward compat вызывающих.
+  createButton?: { label: string; href?: string };
   emptyState: { icon: ReactNode; title: string; description: string };
   initialChats: ChatWithStats[];
   /** chatMode for UUID-based navigation (expertise → /expertise/[uuid]) */
@@ -72,8 +75,10 @@ export function ModeChatsPage({
   const selectedChat = chats.find((c) => c.id === selectedChatId) || null;
 
   // ТЗ-RG: Build create button — use UUID-based onClick for mode-specific routes
+  // ТЗ-LegacyChatCleanup: legacy `chat` режим удалён.
+  // Приоритет: (1) если есть chatMode → UUID-onClick; (2) если есть href → ссылка; (3) ничего.
   const resolvedCreateButton = createButton
-    ? chatMode && chatMode !== "chat"
+    ? chatMode
       ? {
           label: createButton.label,
           onClick: () => {
@@ -81,7 +86,9 @@ export function ModeChatsPage({
             router.push(getChatUrl(newId, chatMode));
           },
         }
-      : createButton
+      : createButton.href
+        ? { label: createButton.label, href: createButton.href }
+        : undefined
     : undefined;
 
   const handleDeleteChat = async (chatId: string) => {

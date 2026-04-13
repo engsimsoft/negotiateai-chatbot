@@ -23,26 +23,25 @@ import {
 } from "@/components/ui/sidebar";
 import { useThemeSync } from "@/hooks/use-theme-sync";
 
-// Типы контекста sidebar (ТЗ-07A, ТЗ-RG)
-export type ChatMode = "chat" | "simply" | "expertise" | "create";
+// Типы контекста sidebar (ТЗ-07A, ТЗ-RG, ТЗ-LegacyChatCleanup)
+export type ChatMode = "simply" | "expertise" | "create";
 
 export type SidebarContext =
   | { type: "general"; chatMode: ChatMode }
   | { type: "project"; projectId: string };
 
 /**
- * Определить контекст sidebar на основе URL
+ * Определить контекст sidebar на основе URL.
+ *
+ * ТЗ-LegacyChatCleanup: legacy режим `chat` удалён. Для незнакомых URL
+ * (например `/dashboard`, `/settings`, `/context`) — fallback на `simply`,
+ * это «домашний» вечный чат пользователя.
  */
 function getSidebarContext(pathname: string): SidebarContext {
   // /projects/[id]/chat/* → проект
   const projectMatch = pathname.match(/^\/projects\/([^/]+)\/chat/);
   if (projectMatch) {
     return { type: "project", projectId: projectMatch[1] };
-  }
-
-  // ТЗ-KITT: /simply → persistent chat
-  if (pathname.startsWith("/simply")) {
-    return { type: "general", chatMode: "simply" };
   }
 
   // ТЗ-RG: Detect chatMode from route group URLs
@@ -54,7 +53,8 @@ function getSidebarContext(pathname: string): SidebarContext {
     return { type: "general", chatMode: "create" };
   }
 
-  return { type: "general", chatMode: "chat" };
+  // ТЗ-KITT: /simply → persistent chat. Также fallback для любых других маршрутов.
+  return { type: "general", chatMode: "simply" };
 }
 
 interface AppSidebarProps {
@@ -73,7 +73,8 @@ export function AppSidebar({ user }: AppSidebarProps) {
   useThemeSync();
 
   // ТЗ-RG: Mode-aware navigation
-  const chatMode = context.type === "general" ? context.chatMode : "chat";
+  // ТЗ-LegacyChatCleanup: после удаления legacy `chat` остаётся simply | expertise | create
+  const chatMode: ChatMode = context.type === "general" ? context.chatMode : "simply";
 
   const getNewChatUrl = () => {
     if (context.type === "project") {
@@ -89,7 +90,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
     switch (chatMode) {
       case "expertise": return "Запросы";
       case "create": return "Задания";
-      default: return "Чаты";
+      case "simply": return "Simply";
     }
   };
 
@@ -97,7 +98,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
     switch (chatMode) {
       case "expertise": return "Новый запрос";
       case "create": return "Новое задание";
-      default: return "Новый чат";
+      case "simply": return "Simply";
     }
   };
 
@@ -105,7 +106,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
     switch (chatMode) {
       case "expertise": return "/expertise";
       case "create": return "/create";
-      default: return "/chats";
+      case "simply": return "/simply";
     }
   };
 
@@ -113,7 +114,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
     switch (chatMode) {
       case "expertise": return "Все запросы";
       case "create": return "Все задания";
-      default: return "Все чаты";
+      case "simply": return "Simply";
     }
   };
 

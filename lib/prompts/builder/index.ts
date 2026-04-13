@@ -171,62 +171,7 @@ export function buildSkillPrompt(
   };
 }
 
-/**
- * @deprecated Prompt-agent removed in ТЗ-09. Skill archived.
- * @see _archive/prompts/prompt-agent-skill.md
- */
-export function buildPromptAgentPrompt(_context: BuildContext = {}): BuiltPrompt {
-  throw new Error('Prompt-agent removed in ТЗ-09');
-}
-
-// =============================================================================
-// Compatibility Layer
-// =============================================================================
-
-// These functions maintain backward compatibility with the old builder
-
-/**
- * @deprecated Use buildChatPrompt instead
- */
-export function buildPrompt(
-  id: 'chat' | 'ben',
-  context: BuildContext = {}
-): BuiltPrompt {
-  switch (id) {
-    case 'chat':
-      return buildChatPrompt(context);
-    case 'ben':
-      const isFirstTime = context.variables?.isFirstTime === 'true';
-      return buildBenPrompt(context, isFirstTime);
-    default:
-      return buildChatPrompt(context);
-  }
-}
-
-/**
- * @deprecated Use getSkillsRegistry or getAgentsRegistry instead
- */
-export function getAvailablePrompts(): ('chat' | 'ben')[] {
-  return ['chat', 'ben'];
-}
-
-/**
- * @deprecated Access configs through registry instead
- */
-export function getConfig(id: string): { id: string; name: string; description: string } | null {
-  if (id === 'chat') {
-    return { id: 'chat', name: 'Simply', description: 'Универсальный AI-помощник' };
-  }
-
-  const agent = getAgentMetadata(id);
-  if (agent) {
-    return { id: agent.id, name: agent.displayName, description: agent.description };
-  }
-
-  const skill = getSkillMetadata(id);
-  if (skill) {
-    return { id: skill.id, name: skill.name, description: skill.description };
-  }
-
-  return null;
-}
+// ТЗ-LegacyChatCleanup: удалён мёртвый @deprecated compatibility layer
+// (buildPrompt, getAvailablePrompts, getConfig, buildPromptAgentPrompt) —
+// никто не импортировал эти функции. Если в будущем понадобится compatibility
+// shim — добавить заново с реальным use case.

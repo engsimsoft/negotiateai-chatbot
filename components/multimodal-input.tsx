@@ -250,7 +250,8 @@ function PureMultimodalInput({
       }
       const { error } = await response.json();
       toast.error(error);
-    } catch (_error) {
+    } catch (error) {
+      console.error("[multimodal-input] upload failed:", error);
       toast.error("Failed to upload file, please try again!");
     }
   }, []);
@@ -480,8 +481,9 @@ function PureMultimodalInput({
               />
             )}
             {/* ТЗ-PX: Dev-mode research depth toggle */}
+            {/* ТЗ-LegacyChatCleanup: legacy `chat` режим удалён, осталось только условие `!== simply` */}
             {process.env.NODE_ENV === "development" &&
-              chatMode !== "chat" && chatMode !== "simply" &&
+              chatMode !== "simply" &&
               onResearchDepthChange && (
                 <Button
                   className="h-8 rounded-lg px-2 text-xs font-medium transition-colors hover:bg-accent"

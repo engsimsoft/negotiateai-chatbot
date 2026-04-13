@@ -2,14 +2,15 @@
  * Task Assignments — маппинг задач на модели (ТЗ-1 CoreRegistry)
  *
  * Единственное место в приложении, где фиксируется выбор модели для
- * конкретной задачи. Любая из 31 AI-точки через getModel(taskId) получает
+ * конкретной задачи. Любая AI-точка через getModel(taskId) получает
  * модель отсюда.
  *
  * Изменение default-модели = одна строка в этом файле.
  *
  * Конвенция taskId — иерархический разделитель `:`. Семантика:
  *  - simply-chat*        — Simply Chat (MiniMax / Sonnet / Haiku vision)
- *  - chat:*              — режимы обычного чата (chatMode → tier)
+ *  - expertise           — ветка «Экспертиза» (разовые экспертные запросы)
+ *  - create              — ветка «Создание» (разовые задания на создание)
  *  - project:expert:*    — чат эксперта по задаче проекта (tier)
  *  - professor:*         — фазы planning/review/pipeline
  *  - clerk:*             — вспомогательные клерки (task summary, snapshot, file analyze)
@@ -26,10 +27,9 @@ export type TaskId =
   | "simply-chat"           // default text → MiniMax M2.7
   | "simply-chat-think"     // кнопка «Думать» → Claude Sonnet
   | "simply-chat-vision"    // attachments (image/pdf) → Claude Haiku
-  // Обычный чат / expertise / create (chatMode)
-  | "chat:haiku"            // chatMode=chat → Haiku
-  | "chat:sonnet"           // chatMode=expertise | create → Sonnet
-  | "chat:opus"             // зарезервирован (tier opus)
+  // Экспертиза и Создание — разовые ветки (ТЗ-LegacyChatCleanup)
+  | "expertise"             // chatMode=expertise → Grok 4.20 Multi-Agent
+  | "create"                // chatMode=create → MiniMax M2.7
   // Проект — экспертный чат по задаче
   | "project:expert:haiku"
   | "project:expert:sonnet"
@@ -87,10 +87,9 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "simply-chat-think":        "claude-sonnet-4-6",
   "simply-chat-vision":       "claude-haiku-4-5-20251001",
 
-  // Обычный чат
-  "chat:haiku":               "claude-haiku-4-5-20251001",
-  "chat:sonnet":              "claude-sonnet-4-6",
-  "chat:opus":                "claude-opus-4-6",
+  // Экспертиза и Создание (ТЗ-LegacyChatCleanup)
+  "expertise":                "grok-4.20-multi-agent-0309",
+  "create":                   "MiniMax-M2.7",
 
   // Проект — экспертный чат (tier)
   "project:expert:haiku":     "claude-haiku-4-5-20251001",
