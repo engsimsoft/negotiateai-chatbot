@@ -118,3 +118,22 @@
   - `npm run build`: успех
   - Реальный UI тест: 5 сообщений (3 MiniMax + 2 Haiku), все метрики сошлись с ожиданиями
   - SQL `ai_usage_log` за последние 15 минут: все записи корректны, regressions нет
+
+### Этап 4: Cache breakpoints в task-expert route — 🔄 код готов
+- **Импорт:** добавлен `withCacheControlOnLastTool` в `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`
+- **Найдена скрытая проблема в текущей логике** (та же что была в `chat/route.ts` Этапа 3, только в другой форме): `finalSystemPrompt` склеивался с `memoryResult.promptBlock` через `+=` на строке 190 → MIND динамика попадала **внутрь** content помеченного `cacheControl` → cache key инвалидировался при смене фактов памяти между запросами → **существующий breakpoint на system был фактически бесполезен** для task-expert при активной MIND памяти.
+- **Исправление:**
+  - `finalSystemPrompt = systemPromptText` (статический, кэшируется)
+  - `mindDynamicBlock = memoryResult.promptBlock` (отдельная переменная, динамическая)
+  - При построении messages MIND переезжает в trailing text-part последнего user message (после breakpoint 3 → не ломает кэш)
+- **Cache breakpoints:**
+  - Breakpoint 1 (system): уже был, остался
+  - Breakpoint 2 (tools): новый, через `withCacheControlOnLastTool(standardTools)` — task-expert всегда Claude (executor/expert/professor tier), поэтому без condition
+  - Breakpoint 3 (last user text-part): новый, inline cacheControl на последнем content-part
+- **`projectManifest` 4-й breakpoint:** не реализован. В task-expert нет отдельного `projectManifest` блока — контекст проекта собирается `buildTaskExpertPrompt()` и попадает в `systemPromptText`, значит уже кэшируется breakpoint 1 как часть system.
+- **Построение `messagesForRequest`** вынесено из inline literal внутри `streamText({...})` до вызова — как в `chat/route.ts` Этапа 3.
+- **Foreign uncommitted changes management:** в начале сессии в этом файле были чужие uncommitted правки (7 строк улучшения error handling в зоне 88-95 — request parsing). Зоны не пересекаются с моими (158-300+). Подход: `git stash push` чужих → правки → tsc + build → commit моих → `git stash apply` для восстановления чужих в uncommitted состояние.
+- **Validation:**
+  - `npx tsc --noEmit`: 0 ошибок
+  - `npm run build`: успех
+  - Мануальный smoke-тест ожидается

@@ -12,7 +12,7 @@ import { buildTaskExpertPrompt } from "@/lib/prompts/build-task-expert-prompt";
 import { getProjectModel, isValidModelTier, DEFAULT_PROJECT_MODEL } from "@/lib/ai/model-tiers";
 import { getProjectTierModelId, getTaskIdForTier } from "@/lib/ai/model-tiers";
 import { getProviderForTask } from "@/lib/ai/getModel";
-import { getStandardTools, getActiveToolNames } from "@/lib/ai/tools/chat-tools";
+import { getStandardTools, getActiveToolNames, withCacheControlOnLastTool } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment, isSimplyDevMode } from "@/lib/constants";
 import { calculateCostRub } from "@/lib/ai/providers";
 import {
@@ -158,7 +158,13 @@ export async function POST(
 
     // ТЗ-RAG1/RAG2: Retrieve MIND memory facts for project tasks
     // Gate: check user's memoryEnabled setting
-    let finalSystemPrompt = systemPromptText;
+    // ТЗ-CacheAudit Этап 4: keep finalSystemPrompt static (= systemPromptText)
+    // and store retrieved memory in `mindDynamicBlock` separately. The dynamic
+    // block is appended as a trailing content-part of the last user message
+    // inside streamText below — this way Anthropic prompt cache breakpoint on
+    // static system stays valid even when MIND facts change between requests.
+    const finalSystemPrompt = systemPromptText;
+    let mindDynamicBlock = "";
     let isMemoryEnabled = true;
     // ТЗ-DevPanelErrors: buffer warnings captured before createUIMessageStream
     // starts — flushed inside execute{} right after emitDebugPrompt creates a batch.
@@ -187,7 +193,8 @@ export async function POST(
             );
 
             if (memoryResult.promptBlock) {
-              finalSystemPrompt += `\n\n${memoryResult.promptBlock}`;
+              // ТЗ-CacheAudit Этап 4: store separately, append at message-build time
+              mindDynamicBlock = memoryResult.promptBlock;
             }
 
             // ТЗ-DevPanelErrors: retrieveMemoryContext uses graceful degradation
@@ -278,14 +285,72 @@ export async function POST(
         // SSOT: prefetch TokenLens catalog for per-step cost calculation
         const tlProviders = isSimplyDevMode ? await getTokenlensCatalog() : undefined;
 
+        // ─── ТЗ-CacheAudit Этап 4: 3 cache breakpoints + MIND transplant ───
+        // Task-expert всегда работает на Claude (executor/expert/professor tier)
+        // → провайдер всегда anthropic → cacheControl применяется безусловно.
+        //
+        // Breakpoint 1: static system (`finalSystemPrompt` = `systemPromptText` без MIND)
+        // Breakpoint 2: tools (через `withCacheControlOnLastTool`, кэширует все tool defs)
+        // Breakpoint 3: inline на последнем text-part последнего user message
+        // MIND dynamic block: trailing text-part того же user message (после breakpoint)
+        const standardTools = getStandardTools({
+          session,
+          dataStream,
+          isProjectChat,
+          projectId,
+          chatId,
+          messageId: assistantMessageId,
+        });
+        const toolsForRequest = withCacheControlOnLastTool(standardTools);
+
+        const coreHistory = sanitizeCoreMessages(
+          await convertToModelMessages(stripIncompleteToolParts(uiMessages)),
+        );
+
+        const messagesForRequest: Parameters<typeof streamText>[0]["messages"] = [
+          {
+            role: "system" as const,
+            content: finalSystemPrompt,
+            providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+          },
+          ...coreHistory,
+        ];
+
+        // MIND transplant + breakpoint 3 на последнем user message
+        const lastIdx = messagesForRequest.length - 1;
+        const lastMsg = messagesForRequest[lastIdx];
+        if (lastMsg?.role === "user") {
+          const existingParts: any[] = Array.isArray(lastMsg.content)
+            ? [...(lastMsg.content as unknown as any[])]
+            : [{ type: "text", text: String(lastMsg.content) }];
+          const lastPartIdx = existingParts.length - 1;
+          const lastPart = existingParts[lastPartIdx];
+          existingParts[lastPartIdx] = {
+            ...lastPart,
+            providerOptions: {
+              ...(lastPart.providerOptions ?? {}),
+              anthropic: { cacheControl: { type: "ephemeral" as const } },
+            },
+          };
+          if (mindDynamicBlock) {
+            existingParts.push({
+              type: "text",
+              text: `\n\n${mindDynamicBlock}`,
+            });
+          }
+          messagesForRequest[lastIdx] = {
+            ...lastMsg,
+            content: existingParts as unknown as typeof lastMsg.content,
+          };
+        } else if (mindDynamicBlock) {
+          // Последнее сообщение не user — fallback: добавляем MIND как отдельный
+          // system после истории. Маловероятный случай для task-expert.
+          messagesForRequest.push({ role: "system" as const, content: mindDynamicBlock });
+        }
+
         const result = streamText({
           model: modelToUse,
-          // ТЗ-CACHE1: system as message with per-message cacheControl (top-level providerOptions doesn't mark messages)
-          messages: [
-            { role: 'system' as const, content: finalSystemPrompt, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },
-            // ТЗ-1 hotfix: strip failed/in-flight tool parts before conversion
-            ...sanitizeCoreMessages(await convertToModelMessages(stripIncompleteToolParts(uiMessages))),
-          ],
+          messages: messagesForRequest,
           // ТЗ-RAG3: Anthropic Compaction API — automatic context management
           providerOptions: {
             anthropic: {
@@ -303,7 +368,7 @@ export async function POST(
           stopWhen: stepCountIs(5),
           experimental_activeTools: getActiveToolNames(isProjectChat),
           experimental_transform: smoothStream({ chunking: "word" }),
-          tools: getStandardTools({ session, dataStream, isProjectChat, projectId, chatId, messageId: assistantMessageId }),
+          tools: toolsForRequest,
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,
             functionId: "stream-task-expert",

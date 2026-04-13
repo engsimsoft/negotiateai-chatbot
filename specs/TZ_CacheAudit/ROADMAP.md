@@ -195,7 +195,7 @@
 
 ## Этап 4: Cache breakpoints в task-expert route
 
-**Статус:** ⬜ Не начат
+**Статус:** 🔄 Код готов, ждём мануального теста
 
 **Цель:** Те же 3 breakpoints в task-expert route.
 
@@ -204,14 +204,23 @@
 **⛔ НЕ начинать до подтверждения Этапа 3 пользователем.**
 
 **Задачи:**
-- [ ] `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — те же 3 breakpoints (tools + system + last-user)
-- [ ] **Проверить стабильность** `projectManifest` в task-expert: если блок перестраивается на каждый запрос → НЕ кэшировать его отдельно. Если стабилен в рамках задачи → кэшировать как 4-й breakpoint.
-- [ ] `npx tsc --noEmit` → 0 ошибок
-- [ ] Smoke-тест task-expert (зайти в задачу проекта, отправить сообщение)
+- [x] Импорт `withCacheControlOnLastTool` в task-expert route
+- [x] **Найдена скрытая проблема**: `finalSystemPrompt` склеивался с `memoryResult.promptBlock` через `+=` (строка 190 до правок) → MIND динамика **попадала под cacheControl** на system message → cache key инвалидировался при смене facts. Та же логическая ошибка что была в `chat/route.ts` Этапа 3 (только там MIND был отдельным system message, здесь — конкатенирован).
+- [x] Разделил: `finalSystemPrompt` оставил статическим (= `systemPromptText`), MIND вынес в `mindDynamicBlock` отдельной переменной
+- [x] Breakpoint 1 (system): уже был, остался
+- [x] Breakpoint 2 (tools): новый, через `withCacheControlOnLastTool(standardTools)` — task-expert всегда работает на Claude (`executor`/`expert`/`professor` tier), поэтому без `isAnthropicProtocolModel` условия
+- [x] Breakpoint 3 (last user text-part): новый, inline cacheControl на последнем content-part последнего user message
+- [x] MIND transplant: добавляется trailing text-part того же user message (за breakpoint → не ломает кэш)
+- [x] Построение `messagesForRequest` вынесено из inline literal до `streamText({...})` (как в `chat/route.ts` Этапа 3)
+- [x] **`projectManifest` 4-й breakpoint** — вопрос не актуализирован: в task-expert route нет отдельного `projectManifest` блока, контекст проекта собирается через `buildTaskExpertPrompt()` и попадает в `systemPromptText` целиком. Значит он уже кэшируется breakpoint 1 как часть system. Дополнительный breakpoint не нужен.
+- [x] `npx tsc --noEmit` → 0 ошибок
+- [x] `npm run build` → успех
+- [ ] 🧪 Мануальный тест: открыть задачу в проекте, отправить 2 сообщения, проверить cacheRead на 2-м
 - [ ] Git commit
 
 **Файлы:**
-- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`
+- `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` — 3 breakpoints + MIND transplant
+- *(чужие 7 строк error handling в зоне 88-95 от другой работы — оставлены в stash, восстанавливаются после моего commit через `git stash apply`)*
 
 **Валидация этапа:**
 - [ ] `npx tsc --noEmit` — 0 ошибок
