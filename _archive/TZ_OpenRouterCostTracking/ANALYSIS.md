@@ -20,7 +20,13 @@
 
 ---
 
-## Root Cause (подтверждён)
+## ⚠️ ВАЖНО — Первая гипотеза оказалась неверной
+
+Первоначальный разбор (ниже, раздел «Root Cause») предполагал namespace prefix `openrouter:qwen/qwen3.6-plus`. Empirical тест 2026-04-13 показал что реальный формат **другой** — **trailing date suffix** `qwen/qwen3.6-plus-04-02`. См. раздел «ФИНАЛЬНЫЙ ROOT CAUSE» в конце файла. Первоначальный анализ оставлен как учебный материал — показывает, как SQL-диагностика помогла выйти на правильную track, но empirical test был нужен для подтверждения гипотезы о формате.
+
+---
+
+## Root Cause (первоначальная гипотеза — опровергнута)
 
 ### Симптом (из сессии 2026-04-13)
 
@@ -236,3 +242,90 @@ export function getModelEntry(id: string): ModelEntry | undefined {
 - Этап 3 (финализация docs + ADR если нужен) — 15 мин
 
 **Total: ~1 час-1.5 часа** реально.
+
+---
+
+## ФИНАЛЬНЫЙ ROOT CAUSE (подтверждён empirical тестом 2026-04-13)
+
+### Что оказалось на самом деле
+
+Добавили временный `console.log("[tz-openrouter-debug]", JSON.stringify(stepModelId))` в `app/(chat)/api/chat/route.ts:1061`, попросили владельца сделать UI-тест через `/dev/models` override на `qwen/qwen3.6-plus`.
+
+**Результаты:**
+
+```
+[tz-openrouter-debug] raw response.modelId: "MiniMax-M2.7"        ← bare, ожидаемо
+[tz-openrouter-debug] raw response.modelId: "qwen/qwen3.6-plus-04-02"  ← SUFFIX!
+```
+
+**Истина:**
+- **MiniMax** возвращает в `response.modelId` bare id (`MiniMax-M2.7`) → catalog key matches → cost calculation OK
+- **AI SDK** не добавляет registry namespace prefix (моя первая гипотеза была ошибочной)
+- **OpenRouter** провайдер на своей стороне **pins bare name to dated snapshot**: SEND `qwen/qwen3.6-plus`, но в `response.modelId` приходит `qwen/qwen3.6-plus-04-02`. AI SDK просто пропускает этот id через себя
+
+**Catalog lookup**: `CATALOG["qwen/qwen3.6-plus-04-02"]` → `undefined` → `calculateCostRub` → `0` → DevPanel показывает `₽0.00`. **Двухпутёвая архитектура** (DB path vs DevPanel path) была частью картины, но истинная поверхность бага — **различия форматов modelId между providers**.
+
+### Почему первая гипотеза казалась правильной
+
+SQL-диагностика показала что `ai_usage_log` имеет bare id + правильный cost. Это корректно указало что problem specifically в DevPanel path (где используется `response.modelId`), а не в DB path (где используется `getModelIdForTask`). Но я предположил что различие — prefix, тогда как на самом деле — suffix.
+
+**Урок:** даже правильная диагностическая half-truth (две ветки кода, одна ломается) не заменяет empirical confirmation формата данных. Всегда запускать diagnostic log **перед** фиксом, если есть малейшие сомнения в формате input данных.
+
+### Фикс — Suffix-tolerant catalog lookup
+
+Вместо prefix-stripping нужен **suffix-walking lookup**:
+
+```ts
+export function getModelEntry(id: string): ModelEntry | undefined {
+  // Exact match первым — покрывает 99% случаев (Anthropic, MiniMax, xAI, catalog keys with explicit versions)
+  const direct = CATALOG[id];
+  if (direct) return direct;
+
+  // Fallback: walk back через dashes пока не найдём match.
+  // Покрывает OpenRouter-style versioned ids (`qwen/qwen3.6-plus-04-02` → `qwen/qwen3.6-plus`).
+  let trimmed = id;
+  while (true) {
+    const lastDash = trimmed.lastIndexOf("-");
+    if (lastDash === -1) return undefined;
+    trimmed = trimmed.slice(0, lastDash);
+    const found = CATALOG[trimmed];
+    if (found) return found;
+  }
+}
+```
+
+### Почему этот подход корректен
+
+**1. Безопасность для моделей с явной версией в catalog id:**
+
+`claude-haiku-4-5-20251001` — exact match **первым**, fallback loop не активируется. Даже если бы активировался — walked down к `claude-haiku-4-5` не дало бы ложный hit (такого ключа нет).
+
+`claude-sonnet-4-6` — exact match, OK.
+
+`MiniMax-M2.7` — exact match (note: `.7` не строкой-dash, exact match работает).
+
+**2. Корректность для OpenRouter suffix:**
+
+`qwen/qwen3.6-plus-04-02` → try exact → miss → strip `-02` → try `qwen/qwen3.6-plus-04` → miss → strip `-04` → try `qwen/qwen3.6-plus` → **match** → return.
+
+**3. Безопасность для unknown models:**
+
+Если ни одного match — loop доходит до `qwen/qwen3.6` → `qwen/qwen3` → `qwen/qwen3.6` (без dash останавливается). Неверный fallback — returns `undefined` как ожидалось.
+
+### Почему не rejected альтернативы
+
+- **Prefix-strip** (первоначальный план A) — решал бы mismatch для гипотетического `openrouter:...` формата, но такого формата не существует. Мёртвое решение.
+- **Регекс `-\d{2}-\d{2}$`** — работает для конкретного известного суффикса, но хрупко к другим версионным форматам (например `-v2`, `-20260401`)
+- **Обновить catalog entries на `qwen/qwen3.6-plus-04-02`** — pins к конкретному snapshot, ломает OpenRouter API call (провайдер принимает обе формы, но нестандарт), требует manual catalog updates при каждой smene snapshot
+- **Второй индекс в catalog** — overkill для single-path fallback
+
+**Walk-back loop** — самое defensive и простое решение. 10 строк в 1 функции.
+
+### Валидация
+
+Empirical:
+- До фикса: qwen response.modelId `"qwen/qwen3.6-plus-04-02"` → getModelEntry undefined → `calculateCostRub` 0 → DevPanel `₽0.00`
+- После фикса: same response.modelId → loop strips `-02` → `-04` → finds `"qwen/qwen3.6-plus"` → entry pricing $0.325/$1.95 per 1M → cost ~0.65 ₽ на ~15K токенов → DevPanel показывает non-zero ✓
+
+SQL подтвердил что 2 qwen-запроса получили правильный `costUsd` ($0.0051, $0.0063) — это ожидаемо, т.к. DB path уже работал раньше через `getModelIdForTask`. Фикс непосредственно влияет на DevPanel path (и любые будущие call-sites, которые используют `response.modelId` напрямую).
+

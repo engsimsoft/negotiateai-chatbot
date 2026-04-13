@@ -519,9 +519,35 @@ const CATALOG: Record<string, ModelEntry> = ENTRIES.reduce(
   {} as Record<string, ModelEntry>,
 );
 
-/** Получить запись каталога по id. Возвращает undefined если модель неизвестна. */
+/**
+ * Получить запись каталога по id. Возвращает undefined если модель неизвестна.
+ *
+ * Tolerant lookup: exact match первый → fallback стрипит trailing segments
+ * разделённые `-` пока не найдёт match. Это нужно для providers (OpenRouter),
+ * которые возвращают в `response.modelId` versioned form:
+ *   - SEND:     "qwen/qwen3.6-plus"
+ *   - RECEIVE:  "qwen/qwen3.6-plus-04-02" (pinned snapshot version)
+ *   - CATALOG:  "qwen/qwen3.6-plus"
+ * Без tolerant lookup cost calculation для OpenRouter-models ломается
+ * (getModelEntry возвращает undefined → calculateCostRub возвращает 0).
+ * См. ТЗ_OpenRouterCostTracking.
+ *
+ * Loop безопасен: срабатывает ТОЛЬКО когда exact match провалился, и идёт
+ * от длинного id к короткому по одному сегменту за раз. Для catalog entry
+ * с явной версией в id (например `claude-haiku-4-5-20251001`) exact match
+ * срабатывает первым — fallback не активируется.
+ */
 export function getModelEntry(id: string): ModelEntry | undefined {
-  return CATALOG[id];
+  const direct = CATALOG[id];
+  if (direct) return direct;
+  let trimmed = id;
+  while (true) {
+    const lastDash = trimmed.lastIndexOf("-");
+    if (lastDash === -1) return undefined;
+    trimmed = trimmed.slice(0, lastDash);
+    const found = CATALOG[trimmed];
+    if (found) return found;
+  }
 }
 
 /** Резолвит алиас до физической модели. Для физических возвращает тот же entry. */

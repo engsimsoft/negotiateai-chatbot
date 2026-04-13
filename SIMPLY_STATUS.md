@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.87.0
+**Версия:** 3.87.1
 **Дата:** 2026-04-13
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -337,6 +337,38 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-OpenRouterCostTracking: Cost display fix для OpenRouter моделей — ✅ ЗАВЕРШЁН (v3.87.1, patch)
+
+**Проблема:** DevPanel показывал `Cost: ₽0.00` для OpenRouter моделей (qwen/qwen3.6-plus, z-ai/glm-*) несмотря на корректно учтённые токены. Pre-existing bug, обнаруженный при первом UI-тесте OpenRouter 2026-04-13.
+
+**Решение:** одна функция, один файл. `lib/ai/model-catalog.ts:getModelEntry()` сделана tolerant к versioned model IDs через walk-back loop: exact match первым → fallback стрипит trailing `-segment` до нахождения catalog match.
+
+**Root cause (empirical confirmation):** OpenRouter на своей стороне pins bare name → dated snapshot version и возвращает последнее в `response.modelId`:
+- SEND: `qwen/qwen3.6-plus`
+- RECEIVE: `qwen/qwen3.6-plus-04-02` (pinned snapshot)
+- CATALOG: `qwen/qwen3.6-plus`
+
+Lookup по `qwen/qwen3.6-plus-04-02` провалился → `calculateCostRub` вернул 0 → DevPanel показал ₽0.00.
+
+**Важный урок процесса:** первоначальная гипотеза (namespace prefix `openrouter:qwen/...`) оказалась **неверной**. SQL-диагностика правильно вывела на «DB path vs DevPanel path», но для ФОРМАТА данных нужен был empirical console.log. Без него час был бы потрачен на prefix-stripping фикс который ничего не решил бы. Lesson for future: **при любом modelId mismatch — сначала print actual value, потом pattern-match**.
+
+**Метрики:**
+
+| Что | До | После |
+|---|---|---|
+| DevPanel cost для qwen/glm | ₽0.00 | real (~0.5-0.7 ₽ на 15K токенов) |
+| `ai_usage_log.costUsd` для OpenRouter | уже работало ($0.0051-0.0069) | без изменений |
+| `getModelEntry` safety для versioned ids | exact only | exact + walk-back fallback |
+| Edge cases проверены | — | 5 (claude-haiku-date, claude-sonnet, MiniMax, qwen, unknown) |
+
+**Ключевой файл:** `lib/ai/model-catalog.ts` (+28/-2 строки, только `getModelEntry` и JSDoc)
+
+**Closed backlog:** `TZ_OpenRouterCostTracking` из `specs/_backlog/`
+
+**Время выполнения:** ~1.5 часа в одной сессии (вместо оценки 0.5-1 сессии в backlog SPEC — больше, потому что потребовался pivot гипотезы + empirical confirmation + Neon flake retry)
+
+---
 
 ### ТЗ-CachePipelineMetrics: Pipeline observability + targeted podcast caching — ✅ ЗАВЕРШЁН (v3.87.0)
 

@@ -31,7 +31,6 @@
 
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
-| [TZ_OpenRouterCostTracking](TZ_OpenRouterCostTracking.md) | OpenRouter-модели (qwen, z-ai/glm, и т.д.) показывают `Cost: ₽0.00` в DevPanel и `ai_usage_log` несмотря на корректно учтённые токены. Вероятный root cause — mismatch между `response.modelId` (с namespace-префиксом) и catalog-ключами (голые). Pre-existing bug, обнаружен при первом UI-тесте OpenRouter 2026-04-13 | 0.5–1 сессия | TZ_UnfreezePipelines session find |
 | [TZ_DeadModelSelectors](TZ_DeadModelSelectors.md) | Удалить `lib/ai/models.ts` + 5 dead импортёров (3 model-selector компонента, dropdown в multimodal-input, entitlements). Покрывает Findings #4, #6, #7 из TZ_LegacyChatCleanup | 1–2 сессии | TZ_LegacyChatCleanup |
 | [TZ_StreamObservability](TZ_StreamObservability.md) | Заменить молчаливый `onError: () => "Oops"` в обоих chat routes на `console.error` + `emitDebugError` (Finding #5) | 0.5 сессии | TZ_LegacyChatCleanup |
 | [TZ_CreateSnapshotAudit](TZ_CreateSnapshotAudit.md) | SQL audit реальных вызовов `createSnapshot` tool. Если 0 — удалить tool целиком. Если есть — задокументировать use case (Finding #8) | 0.5 сессии | TZ_LegacyChatCleanup |
@@ -56,3 +55,4 @@
 | ТЗ | Закрыто в | Как |
 |---|---|---|
 | TZ_UsageLoggingCoverage | 2026-04-13 (TZ_UnfreezePipelines v3.86.1) | Слит в `TZ_CachePipelineMetrics` — обе задачи трогают одни и те же pipeline-файлы, раздельное выполнение было бы двойной работой |
+| TZ_OpenRouterCostTracking | 2026-04-13 (v3.87.1) | Root cause оказался не namespace prefix (первая гипотеза) а version suffix от OpenRouter. Walk-back loop в `getModelEntry` делает lookup tolerant к versioned IDs. См. ADR not needed — patch fix |

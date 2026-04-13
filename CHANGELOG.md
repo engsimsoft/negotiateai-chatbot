@@ -8,9 +8,63 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- **TZ_OpenRouterCostTracking** (backlog) — OpenRouter-модели показывают `Cost ₽0.00` в DevPanel, вероятно namespace mismatch между `response.modelId` и catalog ключами
 - RAG-4: Библиотека MVP (загрузка документов + search)
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
+
+---
+
+## [3.87.1] — 2026-04-13 — OpenRouter Cost Tracking Fix (ТЗ-OpenRouterCostTracking, patch)
+
+Одно-файловый bug fix: DevPanel показывал `Cost: ₽0.00` для OpenRouter моделей (qwen, z-ai/glm) несмотря на корректно учтённые токены. Pre-existing bug, обнаруженный при первом UI-тесте OpenRouter в предыдущей сессии.
+
+### Fixed
+
+- **`lib/ai/model-catalog.ts:getModelEntry()` теперь tolerant к versioned model IDs.** Exact match остаётся первой попыткой; если не находит — walk-back loop убирает trailing `-segment` пока не найдёт catalog match. OpenRouter pins bare name (`qwen/qwen3.6-plus`) к dated snapshot version (`qwen/qwen3.6-plus-04-02`) и возвращает последнее в `response.modelId`. До фикса: catalog lookup fail → `calculateCostRub` returns 0 → DevPanel `₽0.00`. После фикса: loop strips `-02` → `-04` → exact match `qwen/qwen3.6-plus` → cost ~$0.006 на ~15K токенов → DevPanel показывает non-zero.
+
+### Architectural notes
+
+**Первая гипотеза оказалась неверной.** Изначальный ANALYSIS предполагал namespace prefix (`openrouter:qwen/...`). Empirical тест через временный `console.log("[tz-openrouter-debug]", response?.modelId)` в `app/(chat)/api/chat/route.ts` показал что:
+
+- MiniMax возвращает bare `"MiniMax-M2.7"` (без prefix)
+- OpenRouter возвращает `"qwen/qwen3.6-plus-04-02"` (**suffix**, не prefix)
+- AI SDK не добавляет registry namespace в `response.modelId` — это было ошибочное предположение
+
+Это обнажает важный lesson: SQL-диагностика вывела на правильную track (two-path architecture, DB path работает, DevPanel path ломается), но для ФОРМАТА данных нужен empirical log. Без него был бы потрачен час на реализацию неверного prefix-stripping фикса.
+
+### Empirical validation
+
+После фикса, SQL `ai_usage_log` за тестовый период:
+
+| modelId | chatMode | inputTokens | costUsd |
+|---|---|---|---|
+| `qwen/qwen3.6-plus` | simply | 14121 | **$0.0051** |
+| `qwen/qwen3.6-plus` | simply | 14192 | **$0.0063** |
+
+Оба qwen-запроса получили non-zero cost (до фикса DB path уже писал правильный id через `getModelIdForTask`, но DevPanel path через `response.modelId` ломался). User визуально подтвердил что DevPanel теперь показывает цену.
+
+### Walk-back loop safety
+
+Edge cases проверены:
+- `claude-haiku-4-5-20251001` → exact match первым (в catalog), loop не активируется
+- `claude-sonnet-4-6` → exact match
+- `MiniMax-M2.7` → exact match (не dash-separated)
+- `qwen/qwen3.6-plus-04-02` → walk → finds `qwen/qwen3.6-plus`
+- Unknown model → walks до EOS, returns undefined
+
+Loop запускается только на fallback path, safe для всех существующих catalog entries с explicit version в id.
+
+### Unit tests
+
+Test framework в проекте отсутствует (Next.js + integration scripts only). Pure utility function не покрыта unit test'ами — логика валидирована через empirical test + code review. Если vitest будет добавлен в будущем — `getModelEntry` edge cases стоит покрыть первыми.
+
+### Files
+
+- `lib/ai/model-catalog.ts` — walk-back loop в `getModelEntry` (+28/-2 строки включая JSDoc)
+
+### Commits
+
+- `_current_` — fix: walk-back suffix-tolerant getModelEntry + ANALYSIS.md correction + локальный CHANGELOG
+- Following release commit — финализация v3.87.1
 
 ---
 
