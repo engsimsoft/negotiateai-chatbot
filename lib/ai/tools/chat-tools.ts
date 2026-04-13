@@ -8,7 +8,6 @@
 import type { Session } from "next-auth";
 import type { ChatMode } from "@/lib/ai/chat-mode-config";
 import { createDocument } from "./create-document";
-import { createSnapshot } from "./create-snapshot";
 import { parseExcel } from "./excel";
 import { getCurrentDate } from "./get-current-date";
 import { getWeather } from "./get-weather";
@@ -28,8 +27,6 @@ interface GetStandardToolsParams {
   isProjectChat: boolean;
   projectId?: string;
   chatId?: string;
-  /** Current assistant message ID — needed for snapshot tool */
-  messageId?: string;
   /** Chat mode for regular (non-project) chats — determines tool availability */
   chatMode?: ChatMode;
   /** ТЗ-PX: Override depth for deepResearch (from dev-mode UI switcher) */
@@ -49,7 +46,6 @@ export function getStandardTools({
   isProjectChat,
   projectId,
   chatId,
-  messageId,
   chatMode,
   researchDepth,
 }: GetStandardToolsParams) {
@@ -59,9 +55,6 @@ export function getStandardTools({
     ...(isProjectChat ? {} : { readDocument: readDocument({ userId: session.user?.id ?? "" }) }),
     ...(isProjectChat && projectId
       ? { readProjectFile: readProjectFile({ projectId }) }
-      : {}),
-    ...(chatId && messageId
-      ? { createSnapshot: createSnapshot({ chatId, messageId }) }
       : {}),
     createDocument: createDocument({ session, dataStream }),
     updateDocument: updateDocument({ session, dataStream }),
@@ -130,7 +123,6 @@ const ALL_TOOL_NAMES = [
   "loadSkill",
   "readDocument",
   "readProjectFile",
-  "createSnapshot",
   "readTelegramChannel",
 ] as const;
 
@@ -161,7 +153,6 @@ export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode, 
       "parseExcel",
       "loadSkill",
       "readProjectFile",
-      "createSnapshot",
       "readTelegramChannel",
     ];
   }
@@ -178,7 +169,6 @@ export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode, 
     "requestSuggestions",
     "parseExcel",
     "loadSkill",
-    "createSnapshot",
     "readTelegramChannel",
   ];
 

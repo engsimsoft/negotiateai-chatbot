@@ -37,7 +37,6 @@ import {
   DEFAULT_PROJECT_MODEL,
   type ProjectModelTier,
 } from "@/lib/ai/model-tiers";
-// ТЗ-LegacyChatCleanup: snapshot fallback path удалён, создание fallback-снапшота больше не нужно
 import {
   SIMPLY_CONTEXT_LIMIT,
   EXTRACT_THRESHOLD_SOFT,
@@ -66,9 +65,6 @@ import {
 import { retrieveMemoryContext } from "@/lib/ai/memory/retrieve";
 import { getProfileBlock } from "@/lib/ai/memory/profile";
 import { extractAndStoreFacts, batchExtractFacts } from "@/lib/ai/memory/extract";
-// ТЗ-LegacyChatCleanup: snapshot-related queries (addChatSnapshot, getChatWithSnapshotState,
-// resetChatContextState, updateChatContextState) удалены — больше не используются после
-// удаления legacy chatMode="chat" и его snapshot fallback.
 import {
   createStreamId,
   deleteChatById,
@@ -460,10 +456,6 @@ export async function POST(request: Request) {
       excludeExtracted: isSimplyChat,
     });
 
-    // ТЗ-LegacyChatCleanup: snapshot fallback removed along with chatMode="chat".
-    // All remaining modes use either Anthropic Compaction (Sonnet/Opus, project chats)
-    // or Extract-on-compression (simply via batchExtractFacts below). No snapshot path needed.
-
     // Claude API не поддерживает text/plain как file attachment — конвертируем в text
     const processedMessage = await convertTextFilePartsInMessage(message as ChatMessage);
     const uiMessages = [...convertToUIMessages(messagesFromDb), processedMessage];
@@ -776,10 +768,6 @@ export async function POST(request: Request) {
           }
         }
 
-        // ТЗ-LegacyChatCleanup: snapshot fallback block removed with chatMode="chat".
-        // Sonnet/Opus (expertise/create/projects) use Anthropic Compaction, simply uses
-        // Extract-on-compression above. No snapshot path needed.
-
         // ТЗ-PX: Emit research depth override for dev UI
         if (researchDepth) {
           dataStream.write({ type: "data-research-depth", data: { depth: researchDepth } });
@@ -809,7 +797,6 @@ export async function POST(request: Request) {
             chatMode,
             isProjectChat,
             projectTier: isProjectChat ? tier : undefined,
-            hasSnapshotContext: false,
             contextInjections: injections,
             taskId: activeTaskId ?? undefined,
             overrideActive,
@@ -826,9 +813,6 @@ export async function POST(request: Request) {
         if (memoryDebugData) {
           emitDebugRag(dataStream, memoryDebugData);
         }
-
-        // ТЗ-C3: Generate assistant message ID upfront (needed for snapshot tool)
-        const assistantMessageId = generateUUID();
 
         const startTime = Date.now();
         let firstTokenTime: number | null = null;
@@ -958,7 +942,6 @@ export async function POST(request: Request) {
           isProjectChat,
           projectId: projectId || undefined,
           chatId: id,
-          messageId: assistantMessageId,
           chatMode,
           researchDepth,
         });
@@ -1429,11 +1412,6 @@ export async function POST(request: Request) {
             // Keep artifact tool results (createDocument, updateDocument)
             // These are small and needed to render artifact buttons after reload
             if (type === 'tool-createDocument' || type === 'tool-updateDocument') {
-              return true;
-            }
-
-            // ТЗ-C3: Keep snapshot tool results (needed for SnapshotCard after reload)
-            if (type === 'tool-createSnapshot') {
               return true;
             }
 

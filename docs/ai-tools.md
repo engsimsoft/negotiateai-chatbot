@@ -37,7 +37,6 @@
 | `parseExcel` | Анализ загруженных Excel-файлов | Все агенты |
 | `loadSkill` | Загрузка инструкций из SKILL.md (6 скиллов) | Все агенты |
 | `readProjectFile` | Чтение файлов проекта по имени из manifest | Только проектные чаты (Эксперт) |
-| `createSnapshot` | Фиксация прогресса диалога (сжатие контекста) | Все чаты (chatId + messageId). Актуален для Haiku; Sonnet/Opus используют Compaction API |
 
 ### Сервисные инструменты (2 шт)
 
@@ -58,6 +57,7 @@
 |-----------|-------------|--------|---------|
 | `saveFact` | v3.75.0 | v3.76.0 | Заменён Extract-on-compression (v3.78.0) |
 | `startResearch` | v3.52.0 | — | Не отдельный tool, а внутренняя функция briefing research engine |
+| `createSnapshot` | v3.18.0 | v3.87.3 | SQL audit: 2 all-time calls (оба через Sonnet-«Думать»), 0 через MiniMax. Model-invoked trigger ненадёжен, schema хрупкая (1/2 calls failed JSON parse). Заменён Extract-on-compression (L1) + Anthropic Compaction (L2). См. [ADR 052](decisions/052-context-management-strategy-per-provider.md) |
 
 ---
 
@@ -78,7 +78,6 @@
 | `parseExcel` | + | + | + | + | + | + |
 | `loadSkill` | + | + | + | + | + | + |
 | `readProjectFile` | -- | -- | -- | -- | -- | + |
-| `createSnapshot` | + | + | + | + | + | + |
 
 **Примечания:**
 - **chat (Haiku):** `webSearch`, `deepResearch`, `fetchUrl` отфильтрованы через `CHAT_MODE_EXCLUDED_TOOLS` (дорогие для Haiku)
@@ -661,84 +660,6 @@ loadSkill({
 → Получает инструкции
 → Задаёт уточняющие вопросы
 → Создаёт презентацию
-```
-
----
-
-## Create Snapshot
-
-Фиксация прогресса диалога (snapshot) для управления контекстным окном. Добавлен в v3.18.0 (ТЗ-C1.5).
-
-### Доступность
-
-| Тип чата | Доступен |
-|----------|----------|
-| Обычный чат | Да (при наличии chatId + messageId) |
-| Проектный чат (Эксперт) | Да (при наличии chatId + messageId) |
-
-### Когда используется
-
-- Пользователь согласился подвести итог диалога
-- Системный сигнал указывает на заполнение контекста (context indicator)
-- Fallback: если модель игнорирует предложение — клерк `snapshot-creator` создаёт snapshot автоматически
-
-### Возможности
-- Сжатие истории диалога в структурированный markdown
-- Сохранение snapshot в `Chat.snapshots[]` (БД)
-- Сброс `contextState` (счётчик сообщений)
-- Snapshot инжектируется как `<previous_context>` в system prompt на следующем ходе
-
-### Параметры
-
-```typescript
-createSnapshot({
-  shortSummary: string,         // Краткий итог (2-3 предложения)
-  decisions: string[],          // Ключевые решения
-  currentState: string,         // Где остановились
-  artifacts?: string[],         // Созданные артефакты
-  openQuestions?: string[],     // Открытые вопросы
-  nextSteps: string[],          // Следующие шаги
-})
-```
-
-### Возвращает
-
-```typescript
-{
-  status: "snapshot_created",
-  shortSummary: string,
-  fullMarkdown: string,     // Полный markdown (6 секций)
-  message: string,          // Подтверждение
-}
-```
-
-### Архитектура
-
-Closure-based tool — фабричная функция принимает `chatId` + `messageId`:
-
-```typescript
-// lib/ai/tools/create-snapshot.ts
-export const createSnapshot = ({ chatId, messageId }: CreateSnapshotProps) =>
-  tool({ ... });
-```
-
-### Связанные компоненты
-
-- `lib/ai/context-limits.ts` — пороги срабатывания (`SNAPSHOT_THRESHOLD`)
-- `lib/ai/clerks/snapshot-creator.ts` — fallback-клерк
-- `components/projects/snapshot-card.tsx` — UI (expand/collapse)
-- `components/projects/context-indicator.tsx` — progress bar над input
-
-### Файл
-[lib/ai/tools/create-snapshot.ts](../lib/ai/tools/create-snapshot.ts)
-
-### Пример использования
-```
-[Context indicator достиг жёлтой зоны]
-→ Модель предлагает: «Предлагаю зафиксировать прогресс»
-→ Пользователь: «Да, давай»
-→ Модель вызывает createSnapshot({...})
-→ На следующем ходе — чистый контекст + <previous_context>
 ```
 
 ---

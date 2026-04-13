@@ -774,7 +774,6 @@ export async function POST(request: Request) {
             activeAgent: agentName,
             chatMode: `service:${context}`,
             isProjectChat: context === "project-manager",
-            hasSnapshotContext: false,
             contextInjections: injections,
           });
         }

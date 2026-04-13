@@ -39,7 +39,6 @@
 | 11 | `parseExcel` | `lib/ai/tools/excel/parse-excel.ts` | **+** | **+** | **+** | **+** | **+** | **+** |
 | 12 | `loadSkill` | `lib/ai/tools/load-skill.ts` | **+** | **+** | **+** | **+** | **+** | **+** |
 | 13 | `readProjectFile` | `lib/ai/tools/read-project-file.ts` | -- | -- | -- | -- | -- | **+** |
-| 14 | `createSnapshot` | `lib/ai/tools/create-snapshot.ts` | **+** | **+** | **+** | **+** | **+** | **+** |
 
 ### Легенда
 - **+** — доступен
@@ -139,13 +138,6 @@
 - **Особенности:** Текстовые файлы — до 30000 символов, бинарные — описание из metadata
 - **Архитектура:** Closure-based (projectId)
 
-### 2.14 createSnapshot
-- **Что делает:** Фиксация прогресса диалога для управления контекстом
-- **Параметры:** `shortSummary`, `decisions[]`, `currentState`, `artifacts[]?`, `openQuestions[]?`, `nextSteps[]`
-- **Особенности:** Сохраняется в Chat.snapshots[], инжектируется как `<previous_context>` в system prompt
-- **Архитектура:** Closure-based (chatId + messageId)
-- **Актуальность:** Используется только для Haiku (chatMode="chat"). Для Sonnet/Opus — Anthropic Compaction API
-
 ---
 
 ## 3. Сервисные инструменты (service-chat)
@@ -233,7 +225,6 @@
 | `startResearch` | Упоминается в обзорной таблице (15-й инструмент) — это НЕ отдельный tool, а внутренняя функция briefing research engine |
 | Количество инструментов | Документация: «15 инструментов», реально: 14 стандартных + 2 сервисных = 16 |
 | Simply Chat | Не упоминается, что все инструменты отключены |
-| createSnapshot | Не указано что актуален только для Haiku (Sonnet/Opus используют Compaction) |
 
 ---
 

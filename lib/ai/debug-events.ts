@@ -88,7 +88,6 @@ export interface DebugPromptData {
   chatMode: string;
   isProjectChat: boolean;
   projectTier?: string;
-  hasSnapshotContext: boolean;
   contextInjections: string[];
   /** ТЗ-2: Registry task id used for this call (e.g. "simply-chat", "expertise"). */
   taskId?: string;

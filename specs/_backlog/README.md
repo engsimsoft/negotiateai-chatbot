@@ -32,7 +32,6 @@
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
 | [TZ_DeadModelSelectors](TZ_DeadModelSelectors.md) | Удалить `lib/ai/models.ts` + 5 dead импортёров (3 model-selector компонента, dropdown в multimodal-input, entitlements). Покрывает Findings #4, #6, #7 из TZ_LegacyChatCleanup | 1–2 сессии | TZ_LegacyChatCleanup |
-| [TZ_CreateSnapshotAudit](TZ_CreateSnapshotAudit.md) | SQL audit реальных вызовов `createSnapshot` tool. Если 0 — удалить tool целиком. Если есть — задокументировать use case (Finding #8) | 0.5 сессии | TZ_LegacyChatCleanup |
 
 ### 🟩 Low impact
 
@@ -56,3 +55,4 @@
 | TZ_UsageLoggingCoverage | 2026-04-13 (TZ_UnfreezePipelines v3.86.1) | Слит в `TZ_CachePipelineMetrics` — обе задачи трогают одни и те же pipeline-файлы, раздельное выполнение было бы двойной работой |
 | TZ_OpenRouterCostTracking | 2026-04-13 (v3.87.1) | Root cause оказался не namespace prefix (первая гипотеза) а version suffix от OpenRouter. Walk-back loop в `getModelEntry` делает lookup tolerant к versioned IDs. См. ADR not needed — patch fix |
 | TZ_StreamObservability | 2026-04-14 (v3.87.2) | Server-side `onError` в обоих chat routes: console.error + emitDebugError через closure-captured writer + локализованная user-facing строка. Stage 2b расширил скоуп на recovery UX: prop-drill `clearError` из useChat → MultimodalInput, submit guard сужен до streaming/submitted, пользователь больше не зависает после ошибки без reload страницы |
+| TZ_CreateSnapshotAudit | 2026-04-14 (v3.87.3) | SQL audit: 2 all-time calls, 0 через project task expert (ожидавшийся контекст), 1 failed из 2. Fully deleted — 4 файла, 4 queries, 2 schema columns (migration 0054), все UI ветки. ADR 052 «Context Management Strategy per Provider» документирует 4-уровневую стратегию защиты контекста (L1 Extract-on-compression, L2 Anthropic Compaction, L3 Sliding window, L4 planned server-side middleware) |

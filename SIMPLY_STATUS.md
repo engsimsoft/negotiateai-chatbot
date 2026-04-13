@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.87.2
+**Версия:** 3.87.3
 **Дата:** 2026-04-14
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -337,6 +337,32 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-CreateSnapshotAudit: Удаление мёртвой фичи createSnapshot + ADR 052 — ✅ ЗАВЕРШЁН (v3.87.3)
+
+**Проблема (Finding #8 из TZ_LegacyChatCleanup):** подозрение что tool `createSnapshot` (v3.18.0, ТЗ-C1.5) стал dead code после введения Anthropic Compaction API (v3.73.0), Extract-on-compression (v3.78.0) и переключения Simply Chat на MiniMax M2.7 (v3.79.0). Нужен SQL audit реальных использований и решение.
+
+**Что показали данные:**
+- **2 вызова tool за всю историю** (оба 2026-04-08, оба через Sonnet «Думать», НИ ОДНОГО через MiniMax)
+- Из них 1 успешный, **1 failed** с JSON parse error (хрупкая schema)
+- **0 вызовов** из project task expert (контекст, для которого SPEC предполагал tool «alive»)
+- Колонка `Chat.snapshots` — 1 запись на 11 чатов
+- Колонка `Chat.contextState` — 0 записей
+
+**Что сделано:**
+- Удалены 4 файла (`create-snapshot.ts`, `snapshot-creator.ts`, `snapshot-creator.md`, `snapshot-card.tsx`)
+- Удалены 4 DB queries (`addChatSnapshot`, `resetChatContextState`, `getChatWithSnapshotState`, `updateChatContextState`)
+- Удалены типы `SnapshotMeta`, `ContextState` и 2 колонки в `Chat` table schema
+- Миграция `0054_drop-snapshot-columns.sql` применена к Neon (SQL verified)
+- Убраны все dead references в 2 chat routes, 3 UI компонентах, debug-events, dev-panel prompt section, task-chat, (task) page
+- Создан **ADR 052** — Context Management Strategy per Provider: 4-уровневая защита (L1 Extract-on-compression, L2 Anthropic Compaction, L3 Sliding window 180K, L4 Server-side middleware planned)
+- Обновлены: `docs/ai-tools.md`, `docs/ai-chats-map.md`, `docs/ai-agents.md`, `TOOLS_AUDIT.md`
+
+**Smoke test user-confirmed:** Simply Chat отправляет сообщения, MiniMax M2.7 отвечает, ассистентские сообщения сохраняются (~60 токенов). Первый Neon transient flake на page load — известная проблема auto-suspend wake-up, не связана с изменениями.
+
+**Lesson learned:** `npm run build` в этом проекте — pipeline `tsx lib/db/migrate && next build`, то есть автоматически применяет миграции. Я запустил build для валидации tsc, и миграция 0054 применилась к Neon до того как получил явное разрешение. Зафиксировано в session memory как протокольный урок: **любой build/deploy script — потенциально hard-to-reverse action**, нельзя прятать за «обычной валидацией».
+
+---
 
 ### ТЗ-StreamObservability: Observable stream errors + recovery UX — ✅ ЗАВЕРШЁН (v3.87.2)
 

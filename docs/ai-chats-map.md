@@ -42,7 +42,6 @@
 | **Суммаризатор задач** | Claude Haiku | ✅ Работает | Клерк — суммаризация результатов задачи (v3.17) |
 | **Ревьюер задач** | Claude Opus | ✅ Работает | Профессор — ревью завершённой задачи (v3.17) |
 | **Клерк-анализатор** | Claude Haiku | ✅ Работает | Автоматический анализ файлов проекта |
-| **Snapshot Creator** | Claude Haiku | ✅ Работает | Fallback-клерк создания snapshot при заполнении контекста (v3.18) |
 | **Briefing: Онбординг** | Claude Sonnet 4.6 | ✅ Работает | AI-интервью для настройки брифинга (v3.30, v3.53 — save via UI) |
 | **Briefing: Фильтр** | MiniMax M2.7 | ✅ Работает | Фильтрация и дедупликация новостей (v3.26→v3.80) |
 | **Briefing: Автор** | MiniMax M2.7 | ✅ Работает | Генерация статьи из отфильтрованных новостей (v3.31→v3.80, монолит) |
@@ -158,7 +157,7 @@ app/(chat)/api/service-chat/route.ts                # Manager с план-кон
 | **Модель** | `getModel("project:expert:${tier}")` (tier из ProjectTask, см. `task-assignments.ts`) |
 | **Оболочка** | Отдельная route group `app/(task)/` — полноэкранный layout без AppSidebar |
 | **Промпт** | `lib/prompts/experts/task-expert.md` + `buildTaskExpertPrompt()` |
-| **Инструменты** | Shared tools (search, deepResearch, fetchUrl, documents, excel, readProjectFile, createSnapshot) — `getStandardTools()` |
+| **Инструменты** | Shared tools (search, deepResearch, fetchUrl, documents, excel, readProjectFile) — `getStandardTools()` |
 | **Персистенция** | Серверная (Chat в БД, привязан к ProjectTask через chatId) |
 | **Артефакты** | Поддерживаются (SidebarProvider в layout) |
 
@@ -171,13 +170,10 @@ app/(chat)/api/service-chat/route.ts                # Manager с план-кон
 6. System prompt включает: контекст проекта, описание задачи, результаты завершённых задач, manifest
 7. TaskSidebar позволяет переключаться между задачами
 
-**Context Management (v3.18):**
-1. Route оценивает usage из БД (tokenCount) → отправляет `data-context-usage` annotation
-2. При ≥70% → системный сигнал Эксперту предложить `createSnapshot`
-3. Эксперт вызывает tool → snapshot создаётся → карточка в чате → разделитель
-4. При следующем запросе: модель видит только snapshot context + новые сообщения
-5. Fallback: если 5+ пар без snapshot → клерк создаёт его автоматически
-6. UI: ContextIndicator (progress bar), SnapshotCard (expand/collapse), dimming старых сообщений
+**Context Management (v3.73.0, обновлено v3.87.3):**
+1. Для проектных задач активирован **Anthropic Compaction API** (`providerOptions.anthropic.contextManagement`) — сжимает старые сообщения на стороне провайдера прозрачно для нас
+2. Sliding window safety cap (180K токенов) — жёсткий потолок
+3. Сняты: `createSnapshot` tool, `SnapshotCard` UI, `ContextIndicator`, `snapshot-creator` клерк (v3.87.3). Подробности — [ADR 052](decisions/052-context-management-strategy-per-provider.md)
 
 **Завершение задачи (v3.17):**
 1. Кнопка «Завершить задачу» в header → AlertDialog подтверждения → spinner
@@ -282,32 +278,6 @@ lib/prompts/clerks/task-summarizer.md     # Промпт
 lib/ai/professors/task-reviewer.ts        # reviewTask()
 lib/ai/task-completion-types.ts           # professorVerdictSchema
 lib/prompts/professors/task-review.md     # Промпт
-```
-
-#### Snapshot Creator (Клерк v3.18)
-**Где:** Автоматически вызывается при заполнении контекстного окна (fallback)
-
-| Параметр | Значение |
-|----------|----------|
-| **Модель** | Claude Haiku |
-| **Тип** | Backend (внутренний вызов в task expert chat route) |
-| **Триггер** | Если Эксперт игнорирует 5+ пар сообщений после порога (≥70% контекста) |
-
-**Как работает:**
-1. Task expert route отслеживает `Chat.contextState.messagesSinceSuggestion`
-2. Если `messagesSinceSuggestion >= FALLBACK_MESSAGE_PAIRS` (5) → вызывает fallback-клерка
-3. Клерк анализирует последние сообщения и создаёт структурированный snapshot
-4. Snapshot сохраняется в `Chat.snapshots[]`, contextState сбрасывается
-5. При следующем запросе модель видит только snapshot + новые сообщения
-
-**Также:** Эксперт может самостоятельно вызвать `createSnapshot` tool до fallback'а.
-
-**Файлы:**
-```
-lib/ai/clerks/snapshot-creator.ts          # snapshotCreatorClerk()
-lib/ai/tools/create-snapshot.ts            # createSnapshot tool
-lib/ai/context-limits.ts                   # Конфиг бюджетов
-lib/prompts/clerks/snapshot-creator.md     # Промпт клерка
 ```
 
 #### Briefing Onboarding (ТЗ-A2, v3.30)
@@ -634,7 +604,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
 | Модель | Input | Output | Контекст | Используется в |
 |--------|-------|--------|----------|---------------|
 | Claude Sonnet 4.6 (`claude-sonnet-4-6`) | $3 | $15 | 200K | Основной чат (DEFAULT), Секретарь, Эксперт, артефакты, Briefing (онбординг, автор, секция) |
-| Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | $1 | $5 | 200K | Бен, Менеджер, Исполнитель, Клерки (анализатор, суммаризатор, snapshot) |
+| Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | $1 | $5 | 200K | Бен, Менеджер, Исполнитель, Клерки (анализатор, суммаризатор) |
 | Claude Opus 4.6 (`claude-opus-4-6`) | $5 | $25 | 200K | Профессоры (планирование, ревью задач) |
 | Gemini 2.0 Flash (`gemini-2.0-flash`) | ~$0.10 | ~$0.40 | 1M | Briefing: фильтрация и дедупликация (v3.26) |
 | Gemini 2.5 Flash (`gemini-2.5-flash`) | — | — | 1M | Vision OCR: image + PDF, Podcast: скрипт |
@@ -667,8 +637,7 @@ lib/prompts/
 │   └── task-expert.md     # Эксперт по задаче
 ├── clerks/                # Промпты клерков (v3.13+)
 │   ├── file-analyzer.md   # Клерк-анализатор файлов
-│   ├── task-summarizer.md # Клерк-суммаризатор задач (v3.17)
-│   └── snapshot-creator.md # Клерк-создатель snapshot'ов (v3.18)
+│   └── task-summarizer.md # Клерк-суммаризатор задач (v3.17)
 ├── service-chats/         # Промпты сервисных чатов (v3.11+)
 │   ├── project-creation.md # Промпт Секретаря
 │   ├── project-manager.md  # Промпт Менеджера

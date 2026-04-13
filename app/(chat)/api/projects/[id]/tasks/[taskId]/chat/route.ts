@@ -250,9 +250,6 @@ export async function POST(
     const streamId = generateUUID();
     await createStreamId({ streamId, chatId });
 
-    // Generate assistant message ID upfront
-    const assistantMessageId = generateUUID();
-
     // Model: use selected tier (Исполнитель/Эксперт/Профессор)
     const tier = projectModelTier && isValidModelTier(projectModelTier)
       ? projectModelTier
@@ -281,7 +278,6 @@ export async function POST(
             chatMode: `project:${tier}`,
             isProjectChat: true,
             projectTier: tier,
-            hasSnapshotContext: false,
             contextInjections: injections,
           });
           // ТЗ-DevPanelErrors: flush buffered pre-prompt warnings into the batch
@@ -310,7 +306,6 @@ export async function POST(
           isProjectChat,
           projectId,
           chatId,
-          messageId: assistantMessageId,
         });
         const toolsForRequest = withCacheControlOnLastTool(standardTools);
 
@@ -685,7 +680,7 @@ export async function POST(
             if (type === "text" || type === "step-start" || type === "step-finish") {
               return true;
             }
-            if (type === "tool-createDocument" || type === "tool-updateDocument" || type === "tool-createSnapshot") {
+            if (type === "tool-createDocument" || type === "tool-updateDocument") {
               return true;
             }
             return false;

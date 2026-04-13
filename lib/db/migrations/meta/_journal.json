@@ -379,6 +379,13 @@
       "when": 1776038400000,
       "tag": "0053_ai_usage_log_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1776118202514,
+      "tag": "0054_drop-snapshot-columns",
+      "breakpoints": true
     }
   ]
 }

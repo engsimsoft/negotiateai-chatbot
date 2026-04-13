@@ -526,7 +526,6 @@ components/modal-assistants/
 | task-reviewer | Claude Opus 4.6 (`claude-opus-4-6`) | Качественное ревью |
 | professor-planning | Claude Opus 4.6 (`claude-opus-4-6`) | Сложные аналитические задачи |
 | file-analyzer | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Быстрый анализ файлов |
-| snapshot-creator | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Автоматический snapshot контекста |
 | briefing-scriptwriter | Gemini 2.5 Flash (`gemini-2.5-flash`) | Podcast: генерация диалогового сценария |
 | briefing-tts | Gemini 2.5 Flash TTS (`gemini-2.5-flash-preview-tts`) | Podcast: озвучка (multi-speaker) |
 

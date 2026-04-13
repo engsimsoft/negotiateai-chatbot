@@ -36,7 +36,6 @@ import {
   briefingTopics,
   type Chat,
   chat,
-  type ContextState,
   type DBMessage,
   document,
   message,
@@ -50,7 +49,6 @@ import {
   projectTask,
   type SavedBriefingTopic,
   savedBriefingTopics,
-  type SnapshotMeta,
   type Suggestion,
   stream,
   suggestion,
@@ -415,8 +413,6 @@ export async function getChatsByUserId({
           taskStatus: chat.taskStatus,
           visibility: chat.visibility,
           lastContext: sql<null>`NULL`.as("lastContext"),
-          snapshots: sql<null>`NULL`.as("snapshots"),
-          contextState: sql<null>`NULL`.as("contextState"),
         })
         .from(chat)
         .where(
@@ -2525,98 +2521,6 @@ export async function acceptTask({
       unlockedTasks: result.unlockedTasks,
       projectCompleted: result.projectCompleted,
     };
-  } catch (error) {
-    throw new ChatSDKError("bad_request:database", error);
-  }
-}
-
-// ============================================
-// ТЗ-C1.5: Context Snapshot Functions
-// ============================================
-
-/**
- * ТЗ-C1.5: Get chat with snapshot state (one query)
- * Returns Chat including snapshots[] and contextState
- */
-export async function getChatWithSnapshotState({ chatId }: { chatId: string }) {
-  try {
-    const [result] = await db
-      .select({
-        id: chat.id,
-        snapshots: chat.snapshots,
-        contextState: chat.contextState,
-      })
-      .from(chat)
-      .where(eq(chat.id, chatId));
-
-    return result || null;
-  } catch (error) {
-    throw new ChatSDKError("bad_request:database", error);
-  }
-}
-
-/**
- * ТЗ-C1.5: Append a snapshot to Chat.snapshots[] (JSONB append)
- */
-export async function addChatSnapshot({
-  chatId,
-  messageId,
-  summary,
-  fullMarkdown,
-}: {
-  chatId: string;
-  messageId: string;
-  summary: string;
-  fullMarkdown?: string;
-}) {
-  try {
-    const newEntry: SnapshotMeta = {
-      messageId,
-      createdAt: new Date().toISOString(),
-      summary,
-      ...(fullMarkdown && { fullMarkdown }),
-    };
-
-    await db
-      .update(chat)
-      .set({
-        snapshots: sql`COALESCE(${chat.snapshots}, '[]'::jsonb) || ${JSON.stringify(newEntry)}::jsonb`,
-      })
-      .where(eq(chat.id, chatId));
-  } catch (error) {
-    throw new ChatSDKError("bad_request:database", error);
-  }
-}
-
-/**
- * ТЗ-C1.5: Update contextState on Chat
- */
-export async function updateChatContextState({
-  chatId,
-  contextState,
-}: {
-  chatId: string;
-  contextState: ContextState;
-}) {
-  try {
-    await db
-      .update(chat)
-      .set({ contextState })
-      .where(eq(chat.id, chatId));
-  } catch (error) {
-    throw new ChatSDKError("bad_request:database", error);
-  }
-}
-
-/**
- * ТЗ-C1.5: Reset contextState after snapshot is created
- */
-export async function resetChatContextState({ chatId }: { chatId: string }) {
-  try {
-    await db
-      .update(chat)
-      .set({ contextState: null })
-      .where(eq(chat.id, chatId));
   } catch (error) {
     throw new ChatSDKError("bad_request:database", error);
   }

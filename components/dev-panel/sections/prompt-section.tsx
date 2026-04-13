@@ -28,9 +28,6 @@ export function PromptSection({ data }: { data: DevPanelMessageData }) {
           {prompt.projectTier ? ` (${prompt.projectTier})` : ""}
         </span>
 
-        <span className="text-muted-foreground">Snapshot</span>
-        <span>{prompt.hasSnapshotContext ? "Yes" : "No"}</span>
-
         <span className="text-muted-foreground">Prompt length</span>
         <span>{prompt.systemPromptLength.toLocaleString("ru-RU")} chars</span>
       </div>
