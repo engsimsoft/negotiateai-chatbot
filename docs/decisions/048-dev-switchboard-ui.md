@@ -71,3 +71,34 @@ File-based решение: zero-dependency, stable through hot-reloads, рабо
 - `components/dev-panel/sections/switchboard-section.tsx`
 - `components/shared/model-select.tsx`
 - `docs/model-catalog-ops.md` — workflow для аудита каталога
+
+---
+
+## ⚠️ ЯВНО: зачем нужна эта панель и что она НЕ обязана делать
+
+**Назначение:** инструмент разработчика для быстрого переключения модели в любом из 26 call-sites `getModel(taskId)` **на локальной машине** без правки кода. Цель — тестировать поведение чатов/пайплайнов на разных моделях.
+
+**Только dev. Не prod.**
+
+Триггер на трёх уровнях (`isSimplyDevMode === "true"` из `SIMPLY_DEV_MODE=true` в `.env.local`):
+1. `lookupOverride()` в `getModel.ts` → silent null
+2. `/dev/models` page → `notFound()`
+3. Server Actions → `throw`
+
+В production (`SIMPLY_DEV_MODE` не установлен) **файл `.simply-dev-overrides.json` физически не читается** — панель считается архитектурно отсутствующей.
+
+### ⛔ НЕ заводить в backlog «production coverage» для этой панели
+
+Любая находка типа «side-effect import в X файлах из Y, в production это пробел» — **неверна по смыслу**. В production этой фичи нет. Никакой «20 call-sites молча игнорируют override в production» не существует — в production `isOverridesAllowed()` возвращает false **раньше** чем reader вообще вызывается.
+
+Один side-effect import `import "@/lib/ai/model-overrides-node"` в `chat/route.ts` достаточен: в dev Next.js работает одним Node-процессом, модуль `model-overrides.ts` загружается один раз, `activeOverridesReader` — module-local переменная в shared instance, видна всем 26 call-sites `getModel()` через транзитивный импорт того же модуля.
+
+### Если нужен override для какого-то taskId
+
+Открыть `/dev/models` → найти строку ровно с именем taskId из `lib/ai/task-assignments.ts` (например `simply-chat`, `briefing:author`, `clerk:task-summary`) → выбрать модель из каталога → Save. UI пишет в `.simply-dev-overrides.json`. Reader читает файл на каждый `getModel()` вызов — изменения подхватываются мгновенно без перезапуска.
+
+### Постскриптум (2026-04-14, сессия 3)
+
+В `_archive/TZ_DeadModelSelectors/FINDINGS.md` есть Finding #2, утверждающий что «scattered side-effect imports — high-impact architectural concern». Этот finding **неверен**: он сформулирован как production-проблема для dev-only фичи. В сессии 2026-04-14 session 3 попытка его исправить (перенос side-effect import в `instrumentation.ts`) была проведена и полностью откачена без последствий для кода. См. `_archive/TZ_OverridesReaderCentralization/HANDOFF.md` для полного разбора.
+
+**Правило для будущего:** перед заведением любой находки в FINDINGS.md — сверять с действующими ADR. Если ADR явно декларирует ограничение (как здесь «только local dev»), то «отсутствие покрытия за пределами ограничения» — это реализация дизайна, а не долг.
