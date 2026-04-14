@@ -1,8 +1,9 @@
 # Roadmap ТЗ-XAI-1: Фундамент миграции на xAI
 
 **Создан:** 2026-04-14
+**Завершён:** 2026-04-14
 **Версия проекта:** 3.87.5 → 3.88.0
-**Статус:** 🔄 В работе
+**Статус:** ✅ Завершён (commit `ba9e928`)
 
 **Связанные:**
 [SPEC](TZ-XAI-1.md) · [ANALYSIS](ANALYSIS.md) · [ROADMAP серии](../SIMPLY_XAI_ROADMAP.md) · [NOTES](../SIMPLY_XAI_NOTES.md)
@@ -28,52 +29,52 @@
 
 ## Этапы
 
-### Этап 1: Правки каталога
+### Этап 1: Правки каталога ✅
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Задачи:**
-- [ ] Удалить запись `grok-4` из [lib/ai/model-catalog.ts](../../../lib/ai/model-catalog.ts) (0 потребителей, deprecated, не в docs.x.ai)
-- [ ] Обновить комментарий-блок над xAI секцией — убрать устаревшее «Context window: 2M aspirational, conservative values until confirmed». Заменить на пояснение «contextWindow задан с запасом под рабочий бюджет качества, не под провайдерский потолок — см. SIMPLY_XAI_NOTES.md»
-- [ ] Добавить `notes` на запись `grok-4.20-multi-agent-0309`: `"Multi-agent variant не поддерживает client-side function calling через Chat Completions (только built-in tools + remote MCP). Текущее назначение expertise работает как обычный grok-4.20 (ai_usage_log: 1 вызов за историю). ТЗ-XAI-5 переключит expertise на grok-4.20-0309-non-reasoning. Multi-agent активируется только через Responses API — см. будущую ветку ТЗ-XAI-MA-1."`
+- [x] Удалить запись `grok-4` из [lib/ai/model-catalog.ts](../../../lib/ai/model-catalog.ts) — SQL-аудит подтвердил 0 исторических записей в ai_usage_log, оставлен только пояснительный комментарий
+- [x] Обновить комментарий-блок над xAI секцией — убран устаревший TODO про «2M aspirational», добавлено архитектурное обоснование что contextWindow задан под рабочий бюджет качества, не под провайдерский потолок
+- [x] Добавить `notes` на `grok-4.20-multi-agent-0309` с фиксацией что multi-agent не работает через Chat Completions и XAI-5 переключит expertise на non-reasoning variant
 
 **Валидация:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `grep -r "grok-4\"" app/ lib/` — нет ссылок на удалённую запись
-- [ ] `npm run build` — успешен (предупреждение: build автоматически накатывает pending migrations, migrations на этом этапе не добавляем)
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] `grep "grok-4"` (точный id pattern) в app/ lib/ — 0 живых ссылок
+- [x] `npm run build` — EXIT 0, все маршруты собраны
 
 ---
 
-### Этап 2: Документация серии
+### Этап 2: Документация серии ✅
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Задачи:**
-- [ ] Переместить `specs/_backlog/TZ_GrokContextWindowAudit.md` → `specs/_backlog/_archive/` с пометкой «закрыт решением 2026-04-14: тест отвечал на неправильный вопрос, привязка к провайдерскому окну — антипаттерн»
-- [ ] Append-only запись в [../SIMPLY_XAI_NOTES.md](../SIMPLY_XAI_NOTES.md) «2026-04-14 — ТЗ-XAI-1 завершён»: что изменено, что НЕ изменено и почему
-- [ ] `CHANGELOG.md` entry `v3.88.0 — ТЗ-XAI-1 Фундамент миграции на xAI`
-- [ ] `SIMPLY_STATUS.md` — отметить XAI-1 завершённым, XAI-2 next
+- [x] `specs/_backlog/TZ_GrokContextWindowAudit.md` → `specs/_backlog/_archive/` с заголовком «🗄️ АРХИВИРОВАН 2026-04-14 в ТЗ-XAI-1»
+- [x] Append-only запись в [../SIMPLY_XAI_NOTES.md](../SIMPLY_XAI_NOTES.md) «2026-04-14 — ТЗ-XAI-1 завершён (v3.88.0)» с описанием что сделано и что НЕ сделано
+- [x] `CHANGELOG.md` — entry `[3.88.0] — 2026-04-14 — ТЗ-XAI-1 Фундамент миграции на xAI` (Removed/Changed/Архитектурное решение/Closed backlog)
+- [x] `SIMPLY_STATUS.md` — добавлена секция «🎯 Активная серия: Simply_xAI»
+- [x] `docs/ai-providers.md` — таблица xAI обновлена
+- [x] `docs/model-catalog-ops.md` — строка про deprecated grok-4 помечена strikethrough
 
 **Валидация:**
-- [ ] Markdown-ссылки в NOTES/CHANGELOG/STATUS рабочие
-- [ ] `grep "TZ_GrokContextWindowAudit"` в `specs/_backlog/` — только в archived пути
+- [x] Markdown-ссылки рабочие
+- [x] `grep "TZ_GrokContextWindowAudit"` в specs/ — только в archived пути
 
 ---
 
-### Этап 3: Финализация
+### Этап 3: Финализация ✅
 
-**Статус:** ⬜ Не начат
+**Статус:** ✅ Завершён
 
 **Задачи:**
-- [ ] Smoke-тест в браузере: dashboard → Simply Chat → отправить сообщение → ответ приходит (по-прежнему MiniMax, поведение не изменилось — принцип «ноль изменений поведения»)
-- [ ] Smoke-тест: `/dev/models` загружается, все актуальные xAI записи видны, `grok-4` отсутствует
-- [ ] 🧪 Мануальный тест Владимира — явный ОК
-- [ ] Version bump `package.json` → 3.88.0
-- [ ] Git commit `release(v3.88.0): ТЗ-XAI-1 — фундамент миграции на xAI`
+- [x] Смоук-тест Владимира — отправка сообщения в Simply Chat через активный dev override на `grok-4-1-fast-non-reasoning` прошла успешно (TTFT 15ms, total 2.8s). Режим «Думать» на `grok-4-1-fast-reasoning` — успешно (TTFT 8ms, total 68s — нормально для reasoning). MIND retrieval работает. Все тесты прошли
+- [x] Version bump `package.json` → 3.88.0 + `CLAUDE.md` + `SIMPLY_STATUS.md`
+- [x] Git commit `release(v3.88.0): ТЗ-XAI-1 — фундамент миграции на xAI` (`ba9e928`, 13 files, +868 −27)
 
 **Валидация:**
-- [ ] Все галочки выше
-- [ ] Явный ОК Владимира на коммит
+- [x] `npm run build` EXIT 0, все маршруты собраны
+- [x] Явный ОК Владимира получен, коммит создан локально (push — решение Владимира)
 
 ---
 

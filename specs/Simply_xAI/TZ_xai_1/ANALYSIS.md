@@ -1,9 +1,24 @@
 # Анализ ТЗ-XAI-1 — Фундамент миграции на xAI
 
 **Дата анализа:** 2026-04-14
-**Версия проекта:** v3.87.5
-**ТЗ:** [TZ-XAI-1.md](TZ-XAI-1.md)
-**ROADMAP серии:** [../SIMPLY_XAI_ROADMAP.md](../SIMPLY_XAI_ROADMAP.md)
+**Версия проекта:** v3.87.5 → **v3.88.0** ✅
+**Статус ТЗ:** ✅ Завершён 2026-04-14 (commit `ba9e928`)
+**ТЗ:** [TZ-XAI-1.md](TZ-XAI-1.md) · [ROADMAP](ROADMAP.md) · [ROADMAP серии](../SIMPLY_XAI_ROADMAP.md)
+
+---
+
+## Итог (заполнено по завершении)
+
+Все 3 этапа ROADMAP закрыты. Архитектор был прав в стратегии и декомпозиции серии, но ошибся в двух технических допущениях, которые мы сняли через аудит кода и продуктовую коррекцию Владимира:
+
+1. **~60% ТЗ оказались no-op** — регистр/getModel/providers/CAPS_GROK уже сделаны в CoreRegistry (ТЗ-1) и DevSwitchboardUI (ТЗ-2). ТЗ-XAI-1 схлопнулось до 2 содержательных правок в каталоге + notes + документация
+2. **Эмпирический тест контекстного окна отменён** — Владимир поймал что тест отвечал на неправильный вопрос. Вечный чат + Lost in the Middle делают размер провайдерского окна архитектурно иррелевантным. Защита контекста (sliding window + Extract-on-compression) нужна независимо
+3. **R-5** и **R-6** зафиксированы для ТЗ-XAI-5 и ТЗ-XAI-3 соответственно — критические находки, которых в оригинальном ТЗ не было
+4. Новая схема работы без внешнего архитектора зафиксирована в памяти и [SIMPLY_XAI_NOTES.md](../SIMPLY_XAI_NOTES.md)
+
+**Смоук-тест прошёл:** Владимир через активные dev overrides на `/dev/models` проверил оба режима Simply Chat под Grok (`grok-4-1-fast-non-reasoning` для текста, `grok-4-1-fast-reasoning` для режима «Думать»). TTFT 8-15ms, MIND retrieval работает, реплики сохраняются. Правки каталога не сломали резолвинг через registry.
+
+---
 
 ---
 
@@ -114,7 +129,7 @@ docs.x.ai эту цифру **не раскрывает публично**. AI S
 - [task-assignments.ts:91](../../../lib/ai/task-assignments.ts#L91) назначает `expertise` на `grok-4.20-multi-agent-0309`
 - [app/(chat)/api/chat/route.ts:1027](../../../app/(chat)/api/chat/route.ts#L1027) вызывает эту модель через `streamText()` с **client-side tools** (deepResearch, fetchUrl, ...)
 - **xAI docs:** multi-agent variant **не поддерживает client-side function calling**. Только built-in tools + remote MCP
-- **Следствие:** сейчас code либо игнорирует multi-agent поведение и работает как обычный Grok 4.20, либо tools молча игнорируются. `ai_usage_log` показывает **1 вызов за всю историю** — см. [specs/BRAINSTORM\_GrokMultiAgent.md:67](../../../specs/BRAINSTORM_GrokMultiAgent.md#L67). Это фича, которая формально есть, но фактически не активна
+- **Следствие:** сейчас code либо игнорирует multi-agent поведение и работает как обычный Grok 4.20, либо tools молча игнорируются. `ai_usage_log` показывает **1 вызов за всю историю** — см. [BRAINSTORM\_GrokMultiAgent.md:67](../BRAINSTORM_GrokMultiAgent.md#L67). Это фича, которая формально есть, но фактически не активна
 
 **Почему это критично именно для ТЗ-XAI-1:**
 

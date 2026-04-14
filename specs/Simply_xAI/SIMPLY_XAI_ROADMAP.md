@@ -40,13 +40,25 @@
 ## Дорожная карта
 
 ### ТЗ-XAI-1 — Фундамент
-**Статус:** 📋 Написано, готово к реализации  
-**Зависимости:** нет  
-**Риск:** минимальный  
+**Статус:** ✅ Завершён 2026-04-14 (v3.88.0, commit `ba9e928`)
+**Зависимости:** нет
+**Риск:** минимальный (фактически нулевой)
 
-**Суть:** Актуализировать registry, model-catalog, проверить pricing и capabilities для всех xAI моделей. Ноль изменений поведения — все taskId остаются на текущих моделях.
+**Суть:** Актуализировать каталог xAI моделей, зафиксировать архитектурные решения для следующих ТЗ серии. Ноль изменений поведения — все taskId остаются на текущих моделях.
 
-**Результат:** Инфраструктура готова к переключению моделей по одному.
+**Что сделано:**
+- Удалена deprecated `grok-4` запись (SQL-аудит: 0 исторических записей в ai_usage_log)
+- Добавлены `notes` на `grok-4.20-multi-agent-0309` — зафиксировано что multi-agent не работает через Chat Completions
+- Header xAI секции каталога обновлён с архитектурным обоснованием (contextWindow под рабочий бюджет качества, не под провайдерский потолок)
+- Обновлены `docs/ai-providers.md`, `docs/model-catalog-ops.md`
+- Закрыт backlog `TZ_GrokContextWindowAudit` → `specs/_backlog/_archive/`
+- Зафиксированы для следующих ТЗ серии: R-5 (XAI-5 expertise переключить на non-reasoning), R-6 (XAI-3 убрать `isSimplyNonAnthropicModel`)
+
+**Что НЕ сделано (и почему):**
+- contextWindow у xAI записей не изменялся — привязка архитектуры к размеру провайдерского окна признана антипаттерном (вечный чат + Lost in the Middle)
+- Эмпирический тест контекстного окна отменён — отвечал на неправильный вопрос
+
+**Подробности:** [TZ_xai_1/](TZ_xai_1/) · [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) запись 2026-04-14
 
 ---
 
@@ -117,7 +129,7 @@
 
 **Ключевой момент:** Expertise сейчас использует deepResearch (Perplexity). Оставляем — это наш tool, работает через function calling. Встроенный web_search от xAI — дополнительная опция на будущее.
 
-**Multi-agent отложен** в отдельную будущую ветку ТЗ-XAI-MA-1 через Responses API + MCP сервер для custom tools. См. [BRAINSTORM_GrokMultiAgent.md](../BRAINSTORM_GrokMultiAgent.md).
+**Multi-agent отложен** в отдельную будущую ветку ТЗ-XAI-MA-1 через Responses API + MCP сервер для custom tools. См. [BRAINSTORM_GrokMultiAgent.md](BRAINSTORM_GrokMultiAgent.md).
 
 ---
 

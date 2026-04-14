@@ -345,8 +345,8 @@ components/projects/
 **Цель:** Уйти с зоопарка (MiniMax + Anthropic + OpenRouter) на архитектуру **xAI Grok + Anthropic** (vision + Opus для Профессора). 6 изолированных ТЗ, строго по порядку.
 
 **Прогресс:**
-- **ТЗ-XAI-1 Фундамент** — 🔄 В работе (удаление deprecated `grok-4`, notes про multi-agent, закрытие backlog)
-- ТЗ-XAI-2 MIND pipeline → Grok 4.1 Fast — 📋 План
+- **ТЗ-XAI-1 Фундамент** — ✅ Завершён 2026-04-14 (v3.88.0)
+- ТЗ-XAI-2 MIND pipeline → Grok 4.1 Fast — 📋 Next up
 - ТЗ-XAI-3 KITT (Simply Chat) → Grok 4.1 Fast + R-6 очистка strip-функций — 📋 План
 - ТЗ-XAI-4 Utility/Pipeline → Grok (briefing, podcast, meeting, professor, title) — 📋 План
 - ТЗ-XAI-5 Think/Create/Expertise → Grok 4.20 (+ R-5: expertise с multi-agent на non-reasoning) — 📋 План
