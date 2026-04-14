@@ -249,81 +249,6 @@ function hasAttachments(parts: any[]): boolean {
   );
 }
 
-/**
- * ТЗ-SimplyToolsMinimax: Strip non-text file/image parts from messages for text-only models (MiniMax).
- * MiniMax doesn't support images — AI SDK tries to download them and fails with timeout.
- * Replaces image/file parts with a text placeholder so context is preserved.
- */
-function stripMediaPartsForTextModel(messages: ChatMessage[]): ChatMessage[] {
-  return messages.map((msg) => {
-    if (!msg.parts || !Array.isArray(msg.parts)) return msg;
-    const hasMedia = msg.parts.some((p: any) =>
-      p.type === "image" || p.type === "file"
-    );
-    if (!hasMedia) return msg;
-
-    const filteredParts = msg.parts
-      .map((p: any) => {
-        if (p.type === "image") {
-          return { type: "text" as const, text: "[изображение]" };
-        }
-        if (p.type === "file") {
-          // MiniMax doesn't support any file parts — convert to text placeholder
-          const name = p.name || "файл";
-          // For text files, include the content inline
-          if (p.mediaType === "text/plain" && typeof p.text === "string") {
-            return { type: "text" as const, text: `--- Файл: ${name} ---\n${p.text}\n--- Конец файла ---` };
-          }
-          return { type: "text" as const, text: `[${name}]` };
-        }
-        return p;
-      });
-
-    return { ...msg, parts: filteredParts } as ChatMessage;
-  });
-}
-
-/**
- * Санитация orphan MiniMax tool-call parts перед отправкой в Anthropic API.
- *
- * КОНТЕКСТ: MiniMax (и в прежнем OpenAI-compat режиме, и в текущем Anthropic-compat
- * после ТЗ-CacheAudit 2026-04-13) эмитит tool calls с идентификатором формата
- * `call_function_*`, а не в нативном Anthropic формате `toolu_*`. В обоих случаях
- * это происходит потому что MiniMax backend генерирует id сам, а не через
- * `AnthropicMessagesLanguageModel` — при этом oboth MiniMax и чистый Claude
- * проходят через один и тот же класс из `@ai-sdk/anthropic/internal`.
- *
- * Проблема проявляется при **orphan** tool-call parts в БД — когда tool_use был
- * сохранён, а соответствующий tool_result отсутствует (stream прерван, ошибка
- * модели, миграция данных). Такие orphan блоки вызывают 400 ошибки от
- * Anthropic API при следующем запросе: `tool_use блок без парного tool_result`.
- *
- * Функция фильтрует parts с `toolCallId.startsWith('call_function_')` —
- * это пересекает только MiniMax-сгенерированные идентификаторы и не трогает
- * чистые Claude tool calls (`toolu_*`). Применять ко всем сообщениям chatMode=simply,
- * независимо от эффективного провайдера (dev может переключить simply на Sonnet
- * через /dev/models — при этом в истории могут быть смешанные записи).
- * При отсутствии legacy parts — no-op.
- */
-function stripLegacyOpenAICompatToolParts(messages: ChatMessage[]): ChatMessage[] {
-  return messages.map((msg) => {
-    if (!msg.parts || !Array.isArray(msg.parts)) return msg;
-    const filtered = msg.parts.filter((p: any) => {
-      // MiniMax tool calls have toolCallId starting with "call_function_"
-      if (p.toolCallId && typeof p.toolCallId === 'string' && p.toolCallId.startsWith('call_function_')) {
-        return false;
-      }
-      return true;
-    });
-    if (filtered.length === msg.parts.length) return msg;
-    if (filtered.length === 0) {
-      // Keep at least a placeholder so the message isn't empty
-      return { ...msg, parts: [{ type: 'text' as const, text: '[инструмент выполнен]' }] } as ChatMessage;
-    }
-    return { ...msg, parts: filtered } as ChatMessage;
-  });
-}
-
 export async function POST(request: Request) {
   let requestBody: PostRequestBody;
 
@@ -488,16 +413,22 @@ export async function POST(request: Request) {
       },
     };
 
+    // ТЗ-XAI-3 fix 2026-04-15: сохраняем уже-сконвертированные parts (processedMessage),
+    // а не оригинальные message.parts. Раньше в БД летел исходный file part с text/plain,
+    // который при следующем запросе возвращался из истории и ломал xAI SDK
+    // (AI_UnsupportedFunctionalityError). После фикса в БД всегда text parts,
+    // legacy строки от прошлых чатов подхватывает `convertTextFilesInAllMessages`
+    // на этапе preparedHistory ниже.
     await saveMessages({
       messages: [
         {
           chatId: id,
           id: message.id,
           role: "user",
-          parts: message.parts,
+          parts: processedMessage.parts,
           attachments: [],
           createdAt: new Date(),
-          tokenCount: estimateMessageTokens(message.parts),
+          tokenCount: estimateMessageTokens(processedMessage.parts),
           extractedAt: null,
         },
       ],
@@ -912,13 +843,6 @@ export async function POST(request: Request) {
           }
         } : undefined;
 
-        // ТЗ-MinimaxCleanup: Simply with MiniMax/Gemini — temperature ≤1.0, strip media
-        // ТЗ-2: `effectiveProvider` respects dev overrides — a simply-chat task
-        // pointed at Claude via override correctly reports non-MiniMax here, so
-        // image/PDF parts stay in the message history and temperature stays at 1.0.
-        const isSimplyNonAnthropicModel =
-          chatMode === "simply" && effectiveProvider !== "anthropic";
-
         // ТЗ-CacheAudit Этап 3: Anthropic-protocol providers — пакет
         // `vercel-minimax-ai-provider` под капотом проксирует запросы через
         // `AnthropicMessagesLanguageModel` из `@ai-sdk/anthropic/internal`,
@@ -951,16 +875,19 @@ export async function POST(request: Request) {
 
         // Очистка и конверсия истории сообщений.
         // stripIncompleteToolParts — универсальный (все провайдеры).
-        // Для Simply: дополнительно stripLegacyOpenAICompatToolParts (legacy data
-        // от OpenAI-compat MiniMax до ТЗ-CacheAudit) + stripMediaPartsForTextModel
-        // для провайдеров без vision (MiniMax/Gemini). Для Claude в Simply media
-        // parts сохраняем (vision работает).
+        // Для Simply: convertTextFilesInAllMessages — async helper который
+        // fetchit содержимое text/plain file parts по URL (Vercel Blob) и
+        // инлайнит как text. Применяется ко ВСЕЙ истории (не только к новому
+        // сообщению на L429) — нужно для legacy строк в БД от предыдущих
+        // провайдеров + для чатов где первое сообщение с файлом было
+        // сохранено в parts-оригинале (до фикса saveMessages ниже).
+        // Провайдер-агностично: Grok и Claude оба не принимают text/plain
+        // как file part — нужен text part. Fix для ТЗ-XAI-3 после регрессии
+        // 2026-04-15 (AI_UnsupportedFunctionalityError в @ai-sdk/xai).
         const cleanedHistory = stripIncompleteToolParts(uiMessages);
         const preparedHistory =
           chatMode === "simply"
-            ? isSimplyNonAnthropicModel
-              ? stripMediaPartsForTextModel(stripLegacyOpenAICompatToolParts(cleanedHistory))
-              : stripLegacyOpenAICompatToolParts(cleanedHistory)
+            ? await convertTextFilesInAllMessages(cleanedHistory)
             : cleanedHistory;
         const coreHistory = sanitizeCoreMessages(
           await convertToModelMessages(preparedHistory),
@@ -1028,7 +955,10 @@ export async function POST(request: Request) {
           model: modelToUse,
           messages: messagesForRequest,
           providerOptions: compactionOptions,
-          temperature: isSimplyNonAnthropicModel ? 0.7 : 1.0,
+          // ТЗ-XAI-3: Simply Chat — 0.7 для всех провайдеров (стабильность
+          // дворецкого, продуктовое решение, не провайдер-компромисс). Прочие
+          // chatModes (expertise, create, project) — 1.0 дефолт.
+          temperature: chatMode === "simply" ? 0.7 : 1.0,
           stopWhen: stepCountIs(5),
           // ТЗ-SimplyToolsMinimax: Tools enabled for all models including MiniMax.
           // deepResearch filtered for simply (MiniMax) via SIMPLY_MODE_EXCLUDED_TOOLS in chat-tools.ts

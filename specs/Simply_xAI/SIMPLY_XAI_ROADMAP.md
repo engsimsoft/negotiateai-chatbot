@@ -82,10 +82,10 @@
 
 ---
 
-### ТЗ-XAI-3 — KITT (Simply Chat) → Grok 4.1 Fast
-**Статус:** 📋 Планируется  
-**Зависимости:** ТЗ-XAI-1, желательно после ТЗ-XAI-2  
-**Риск:** средний (главный route, tools, providerOptions)  
+### ТЗ-XAI-3 — KITT + Think (Simply Chat) → Grok
+**Статус:** ✅ Завершён 2026-04-15 (v3.90.0)
+**Зависимости:** ТЗ-XAI-1, ТЗ-XAI-2
+**Риск:** средний (главный route, tools, providerOptions) — реализовалось со sideline-регрессией которая была починена в той же сессии
 
 **Суть:** Переключить основной чат (chatMode=simply, текст без вложений) на Grok 4.1 Fast non-reasoning через Chat Completions.
 
@@ -120,17 +120,19 @@
 
 ---
 
-### ТЗ-XAI-5 — Think / Create / Expertise → Grok 4.20
-**Статус:** 📋 Планируется  
-**Зависимости:** ТЗ-XAI-3 (KITT должен работать)  
-**Риск:** средний  
+### ТЗ-XAI-5 — Create / Expertise → Grok 4.20 (+ R-5)
+**Статус:** 📋 Планируется (сужено после ТЗ-XAI-3)
+**Зависимости:** ТЗ-XAI-3 (KITT + Think должны работать)
+**Риск:** средний
 
-**Суть:** Переключить три premium-режима на Grok 4.20 через Chat Completions.
+**Суть:** Переключить Create и Expertise на Grok 4.20 через Chat Completions. Think **уже на Grok 4.20** после ТЗ-XAI-3 — не в scope.
 
 **Что меняется:**
-- simply-chat-think → Grok 4.20 (reasoning автоматический, `reasoning_effort` не передавать)
-- **[R-5, зафиксировано в ТЗ-XAI-1 ANALYSIS]** expertise → **`grok-4.20-0309-non-reasoning`** (явно, не multi-agent). Сейчас expertise указывает на `grok-4.20-multi-agent-0309`, но вызывается через Chat Completions — multi-agent работает только через Responses API → фактически сейчас это обычный Grok 4.20, просто с дороже выглядящим именем. В `ai_usage_log` за всю историю — 1 вызов. Переключение на single-agent variant — фиксация реального поведения
+- **[R-5]** expertise → **`grok-4.20-0309-non-reasoning`** (явно, не multi-agent). Сейчас expertise указывает на `grok-4.20-multi-agent-0309`, но вызывается через Chat Completions — multi-agent работает только через Responses API → фактически сейчас это обычный Grok 4.20 просто с дороже выглядящим именем. В `ai_usage_log` за всю историю — 1 вызов. Переключение на single-agent variant — фиксация реального поведения
 - create → Grok 4.20 (с нашими tools через function calling)
+
+**Убрано из scope (перенесено в XAI-3):**
+- ~~simply-chat-think → Grok 4.20~~ — **уже сделано в ТЗ-XAI-3** (v3.90.0)
 
 **Ключевой момент:** Expertise сейчас использует deepResearch (Perplexity). Оставляем — это наш tool, работает через function calling. Встроенный web_search от xAI — дополнительная опция на будущее.
 
@@ -196,7 +198,7 @@
 |---|---|---|---|---|
 | ТЗ-XAI-1 | ✅ Завершён | 2026-04-14 | 2026-04-14 | v3.88.0 — удалён grok-4, notes про multi-agent, зафиксирована архитектура защиты контекста |
 | ТЗ-XAI-2 | ✅ Завершён | 2026-04-14 | 2026-04-15 | v3.89.0 — 5 memory tasks → Grok (extract на 4.20, остальные на 4.1 Fast), native generateObject, создан MIND_ARCHITECTURE.md |
-| ТЗ-XAI-3 | 📋 План | — | — | KITT + R-6 (убрать isSimplyNonAnthropicModel) |
+| ТЗ-XAI-3 | ✅ Завершён | 2026-04-15 | 2026-04-15 | v3.90.0 — KITT → Grok 4.1 Fast, Think → Grok 4.20 (расширен scope), R-6 cleanup (80 строк strip-функций удалено), backlog [TZ_ErrorRecoveryUI](../../_backlog/TZ_ErrorRecoveryUI.md), [TZ_SimplyReadDocumentTool](../../_backlog/TZ_SimplyReadDocumentTool.md) |
 | ТЗ-XAI-4 | 📋 План | — | — | Utility/Pipeline batch миграция |
-| ТЗ-XAI-5 | 📋 План | — | — | Think/Create/Expertise + R-5 (expertise с multi-agent на non-reasoning) |
+| ТЗ-XAI-5 | 📋 План (сужено) | — | — | Create + Expertise + R-5 (Think уже на Grok 4.20 после XAI-3) |
 | ТЗ-XAI-6 | 📋 План | — | — | Очистка MiniMax/OpenRouter |

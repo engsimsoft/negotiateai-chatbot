@@ -9,6 +9,62 @@
 
 ---
 
+## 2026-04-15 — ТЗ-XAI-3 завершён (v3.90.0)
+
+**Что сделано кратко:** KITT + Think перешли на xAI Grok (4.1 Fast + 4.20 соответственно), удалено 80 строк R-6 зоопарка strip-функций, зафиксированы два backlog-айтема (error recovery UI, readDocument tool quality).
+
+### Расширение scope: Think тоже в XAI-3
+
+Первоначальный план (до сессии): XAI-3 трогает только `simply-chat`, Think уходит в XAI-5. Владимир поймал мою экономически-слабую логику: «а зачем Sonnet на переходный период? Мы же только тестируем, никаких продуктивных задач не решаем, зачем жечь деньги». Правильный довод. Scope расширен: Think default → `grok-4.20-0309-non-reasoning` прямо в XAI-3. ТЗ-XAI-5 сузилось до Create + Expertise + R-5.
+
+### Variant A vs B для Think: принят A (non-reasoning)
+
+Из двух вариантов `grok-4.20-0309-non-reasoning` vs `grok-4.20-0309-reasoning` Владимир выбрал **A**. Обоснование продуктовое: пользователь нажимает «Думать» → ожидает умный ответ, а не UX-паузу с bubble «модель размышляет». Мгновенный умный ответ > отложенный умный ответ. Variant B остаётся доступным через `/dev/models` без коммита — если после эксплуатации захочется dramaturgy паузы, одна запись в override файле.
+
+**Подтверждение на smoke-тесте:** Владимир после Think-теста написал «разница была невероятно крутая». Non-reasoning вариант даёт достаточно ощутимый tier upgrade от 4.1 Fast без добавления reasoning paused tokens.
+
+### Compaction/caching блоки — живы для Haiku vision, не трогаем
+
+Владимир спросил «что за проблема в Compaction/prompt caching блоках, почему ты их не трогаешь». Объяснение пошло по-человечески без жаргона: эти фичи — Anthropic-специфичные, мы включаем флажки через `providerOptions.anthropic.*`, xAI их игнорирует (как китайская открытка в русском письме). Но они **живы для vision-маршрута** — simply-chat-vision всё ещё использует Haiku 4.5, для которого эти фичи дают реальную экономию (кэшированный системный промпт ~3000 токенов не оплачивается на каждый photo-запрос). Удаление этого блока возможно **только когда vision уйдёт с Claude полностью** — это ТЗ-XAI-6 или отдельное решение.
+
+Владимир согласился: «мы теперь не используем автоматическое сжатие из коробки от Anthropic для Grok, но оно работает для Haiku — ок, не трогаем».
+
+### Регрессия на шаге 5 — урок про дубликат функции
+
+Первый Think-тест упал с `AI_UnsupportedFunctionalityError: 'file part media type text/plain' functionality not supported`. Root cause двойной:
+
+1. `saveMessages` сохраняла оригинальные `message.parts` (с file part для text/plain), а не уже-сконвертированные `processedMessage.parts`. Баг существовал давно — но маскировался тем что под Sonnet (think default) Anthropic принимал file parts. Grok не принимает → баг вылез
+2. Моя initial `inlineTextFileParts` была **дубликатом уже существующей `convertTextFilesInAllMessages`** в том же файле. Diagnostic hint `"declared but never read"` про готовую функцию был прямо перед глазами при каждом Edit — я его проигнорировал как "pre-existing noise". Оказалось это готовый async helper который умеет fetch'ить Vercel Blob URL → инлайнить text content. Моя самодельная функция проверяла `typeof p.text === "string"` которое не срабатывало для rehydrated из БД parts (у них был только `.url`, не `.text`)
+
+**Фикс (30 минут debug):**
+- Удалён мой дубликат
+- `preparedHistory` → `await convertTextFilesInAllMessages(cleanedHistory)` (async переход через await)
+- `saveMessages` → `processedMessage.parts` + `estimateMessageTokens(processedMessage.parts)`
+
+**Правило на будущее (зафиксировать в feedback memory?):** при добавлении helper'а в целевой файл — grep на типовые имена функций + **внимательно** смотреть diagnostic hints про `"declared but never used"`. Они часто указывают на готовый dead-but-useful код. Выигрыш 2 минуты grep + 2 минуты анализа hint = экономия 30 минут debug.
+
+### Процессный урок — дисциплина бэклога
+
+Владимир поднял **9-кратный** упрёк про проблему «error state в useChat блокирует следующее сообщение, нужна перезагрузка страницы». Каждый раз обещано «починим», не чинилось, воспроизводилось. Это **не забывчивость, а системный фейл дисциплины бэклога** — проблема откладывалась устно без записи → забывалась.
+
+Исправлено: создан [specs/_backlog/TZ_ErrorRecoveryUI.md](../_backlog/TZ_ErrorRecoveryUI.md) **прямо в сессии**, до технического фикса регрессии. Внутри — история, стадии, Владимир'ов минимальный фикс как Stage 1 («показать в красном флаге текст про перезагрузку страницы»), root cause как Stage 2.
+
+**Правило на будущее:** любая повторяющаяся не-блокер-проблема = немедленно в backlog, даже если фикс откладывается. Устные «потом починим» = сигнал к немедленной backlog-записи.
+
+### xAI implicit caching — приятный бонус
+
+На MIND retrieve тесте DevPanel показал `Cache read: 6520 tokens` при `Input (fresh): 300`. Это **implicit cache у xAI** — OpenAI-совместимые провайдеры эмитят `prompt_tokens_details.cached_tokens` автоматически без нашей конфигурации. Мы отказались от Anthropic cache через `isAnthropicProtocolModel` гейт под Grok, но xAI даёт свой кэш **бесплатно и автоматически**. Наш cost calculator (`extractUsageForPricing`) уже парсит это поле и применяет cached pricing ($0.05/1M вместо $0.20/1M). Итоговая стоимость запроса ₽0.04 отражает экономию.
+
+Не требует никаких правок — просто наблюдение которое хорошо документировать.
+
+### `readDocument` tool путает Grok с attached файлами
+
+На смоук-тестах 4 и 4b Grok вызывал `readDocument` tool на имя attached файла (`API_CHANGES.txt`, `test-valenok.txt`), получал `Access denied: Only files in knowledge/ directory can be read`, но параллельно инлайн-содержимое файла уже было в промпте → ответ всё равно корректный. Quality issue tool-selection у Grok, не блокер миграции.
+
+Backlog: [TZ_SimplyReadDocumentTool.md](../_backlog/TZ_SimplyReadDocumentTool.md). Три подхода: (а) убрать из active tools для simply, (б) научить tool различать knowledge/ vs attached, (в) правка промпта. Решение — в отдельной сессии после серии Simply_xAI.
+
+---
+
 ## 2026-04-14 — Workflow серии: три документа вместо шести локальных CHANGELOG
 
 Владимир: предложил один CHANGELOG на всю серию миграции вместо локальных `CHANGELOG.md` внутри каждой папки `TZ_xai_N/`. Для одиночных ТЗ локальный changelog избыточен (есть глобальный проектный), а для серии из 6 ТЗ ценность факт-листа высока: передача смены, оформление документации, аудит без перебора commit history.

@@ -8,12 +8,79 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- **Simply_xAI миграция** (активная серия, XAI-1 и XAI-2 ✅ завершены, следующий XAI-3): уход с MiniMax + OpenRouter на xAI Grok + Anthropic
+- **Simply_xAI миграция** (активная серия, XAI-1, XAI-2, XAI-3 ✅ завершены, следующий XAI-4 — Utility/Pipeline batch миграция briefing/podcast/meeting/professor/title): уход с MiniMax + OpenRouter на xAI Grok + Anthropic
+- **TZ_ErrorRecoveryUI** ([specs/_backlog/](specs/_backlog/TZ_ErrorRecoveryUI.md)) — высокий приоритет: после stream error инпут Simply Chat блокируется, нужна перезагрузка страницы. Stage 1 — показать в красном флаге текст «перезагрузите страницу чтобы продолжить», Stage 2 — root cause fix через useChat state recovery
+- **TZ_SimplyReadDocumentTool** ([specs/_backlog/](specs/_backlog/TZ_SimplyReadDocumentTool.md)) — Grok в Simply Chat ошибочно вызывает `readDocument` tool на attached файлах (tool предназначен только для knowledge/ директории). Либо убрать из active tools для simply, либо правка промпта, либо научить tool различать контексты
 - RAG-4: Библиотека MVP (загрузка документов + search)
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
 - Universal document router для chatMode `expertise`/`create` — fallback на модель с `documentSupport.supported=true` когда пользователь шлёт PDF в Grok/MiniMax
 - xAI Files API integration — поднять флаги `documentSupport` для Grok reasoning-моделей
 - Alias entries refactor — устранить дублирование `pricing`/`capabilities` в alias через резолв через `aliasOf`
+
+---
+
+## [3.90.0] — 2026-04-15 — ТЗ-XAI-3 KITT (Simply Chat) → Grok + R-6 cleanup
+
+Третий ТЗ серии **Simply_xAI**. Переключение основного дворецкого чата Simply (KITT) и кнопки «Думать» на xAI Grok — Grok 4.1 Fast non-reasoning для дефолта и Grok 4.20 non-reasoning как tier upgrade. Параллельно — удаление R-6 зоопарка strip-функций (80 строк кода) и замена на капабилити-агностичную архитектуру. Vision остаётся на Claude Haiku 4.5.
+
+### Changed
+
+- **Task assignments ([lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)):**
+  - `simply-chat`: `MiniMax-M2.7` → **`grok-4-1-fast-non-reasoning`** (основной дворецкий KITT, быстрый и дешёвый, без reasoning overhead)
+  - `simply-chat-think`: `claude-sonnet-4-6` → **`grok-4.20-0309-non-reasoning`** (кнопка «Думать» = tier upgrade $0.20→$2, ×10 дороже input, заметно сильнее). Расширение scope из ТЗ-XAI-5 в XAI-3 — нет смысла держать Sonnet на переходный период. Variant reasoning/non-reasoning переключается через `/dev/models` без коммита
+  - `simply-chat-vision`: без изменений (Haiku 4.5, проверенное решение для vision)
+
+- **R-6 cleanup в [app/(chat)/api/chat/route.ts](app/(chat)/api/chat/route.ts):** удалены 80 строк хрупкой логики, заменённой на капабилити-провайдер-агностичную архитектуру:
+  - **Удалена** функция `stripMediaPartsForTextModel` (28 строк) — была нужна потому что MiniMax без vision
+  - **Удалена** функция `stripLegacyOpenAICompatToolParts` (40 строк) — SQL-аудит показал 0 legacy `call_function_*` parts в БД Simply чатов, нечего страховать
+  - **Удалён** флаг `isSimplyNonAnthropicModel` (2 строки + 4 строки комментария) — заменён явной проверкой `chatMode === "simply"` в temperature + переходом на capabilities-SSOT логику для cache/compaction (уже provider-aware)
+  - **Упрощён** `preparedHistory` — тройной тернарник с вложенным флагом → `chatMode === "simply" ? await convertTextFilesInAllMessages(cleanedHistory) : cleanedHistory`
+  - **Temperature:** `isSimplyNonAnthropicModel ? 0.7 : 1.0` → `chatMode === "simply" ? 0.7 : 1.0`. 0.7 — это продуктовое решение про стабильность дворецкого KITT, не провайдер-компромисс. Другие chatModes остаются на 1.0 дефолте
+  - **Fix**: `saveMessages` теперь сохраняет `processedMessage.parts` (после L385 конверсии text/plain → text part), а не оригинальные `message.parts`. Раньше в БД летел исходный file part → на следующем запросе возвращался из истории → xAI SDK падал с `AI_UnsupportedFunctionalityError: 'file part media type text/plain' functionality not supported`. После фикса БД всегда содержит text parts, legacy строки подхватывает `convertTextFilesInAllMessages` в preparedHistory
+
+### Added
+
+- **[specs/_backlog/TZ_ErrorRecoveryUI.md](specs/_backlog/TZ_ErrorRecoveryUI.md)** — backlog-запись с историей 9-кратного повторения проблемы «error state в useChat блокирует следующее сообщение». Владимир правильно поднял процессный упрёк: проблема откладывалась из сессии в сессию без backlog-записи → забывалась → воспроизводилась → цикл. Теперь зафиксирована с репро-шагами, Stage 1 (его минимальный фикс про текст «перезагрузите страницу» в флаге), Stage 2 (root cause через useChat state recovery)
+- **[specs/_backlog/TZ_SimplyReadDocumentTool.md](specs/_backlog/TZ_SimplyReadDocumentTool.md)** — backlog: `readDocument` tool путает Grok с attached файлами. При смоук-тестах 4b/4 Grok вызывал tool на имя файла, получал `Access denied: Only files in knowledge/ directory can be read`, но параллельно инлайн-содержимое уже было в промпте → ответ был корректным. Quality issue tool-selection, не блокер миграции
+
+### Архитектурное решение: Think как tier upgrade, не reasoning toggle
+
+Владимир уточнил семантику кнопки «Думать» ещё в ТЗ-XAI-1 NOTES (2026-04-14): это **тировый апгрейд модели**, не переключение reasoning режима. Без кнопки → дефолтная дешёвая модель. С кнопкой → сильная дорогая модель (в 10 раз). Имя — продуктовая метафора для пользователя («используй умную модель»), не техническая.
+
+Выбор между `grok-4.20-0309-non-reasoning` и `grok-4.20-0309-reasoning` для Think: принят **non-reasoning** (вариант A). Причины:
+- Быстрый ответ — пользователь сразу видит разницу в качестве без паузы ожидания reasoning tokens
+- UX-метафора «умная модель» → работает лучше когда ответ мгновенный и умный, чем когда пауза 5-10 секунд с «пузырём размышления»
+- Smoke-тест показал заметную разницу в глубине ответа vs Grok 4.1 Fast — tier upgrade ощутим без reasoning pause
+- Variant B (reasoning) остаётся доступным через `/dev/models` — любой пользовательский сигнал «реально нужна пауза» = одна запись в override файле
+
+### Smoke test — end-to-end live testing (2026-04-15)
+
+6 сценариев, все ✅:
+1. **Текст** — `simply-chat → grok-4-1-fast-non-reasoning`, TTFT 10ms, Total 2.5s
+2. **Function calling** — tool вызвался, ответ получен (quality issue по tool-selection — в backlog, не блокер)
+3. **Vision** — `simply-chat-vision → claude-haiku-4-5-20251001`, корректное описание картинки (R-6 сохранил vision-маршрут без регрессии)
+4. **text/plain файл** — `simply-chat → grok-4-1-fast-non-reasoning`, Grok увидел инлайн-содержимое (файл про секретное слово «ВАЛЕНОК»), проявил safety-сознание и отказался раскрывать — корректное поведение
+5. **Think** — `simply-chat-think → grok-4.20-0309-non-reasoning`, tier upgrade ощутимо сильнее 4.1 Fast (Владимир подтвердил)
+6. **MIND retrieve** — 5/5 фактов injected через pgvector, секция RAG в DevPanel работает, implicit caching от xAI как бонус (6520 cached tokens без нашей конфигурации — OpenAI-совместимый `prompt_tokens_details.cached_tokens`)
+
+### Side-effects обнаруженные и зафиксированные
+
+**Регрессия при smoke-тесте шага 5** (`AI_UnsupportedFunctionalityError`): первая попытка Think с history содержащей text/plain file part из шага 4 упала. Root cause двойной:
+1. `saveMessages` сохраняла `message.parts` (оригинал) вместо `processedMessage.parts` (после L385 конверсии)
+2. Моя initial `inlineTextFileParts` была дубликатом уже существующей `convertTextFilesInAllMessages` helper в том же файле, но проверяла `typeof p.text === "string"` которое не срабатывало для rehydrated из БД parts (там был только `.url`)
+
+**Фикс:** удалён `inlineTextFileParts` дубликат, `preparedHistory` переведён на `await convertTextFilesInAllMessages(cleanedHistory)`, `saveMessages` перевод на `processedMessage.parts`. Retry теста прошёл чисто. **Урок:** diagnostic hints про "declared but never used" часто указывают на готовый dead-but-useful код — grep перед написанием helper'а обязателен (см. NOTES серии 2026-04-15).
+
+### Что НЕ вошло (и почему)
+
+- **Compaction API block** — остаётся живым для vision-маршрута на Haiku (который всё ещё использует cache + compaction). Удаление этого блока возможно только когда vision уедет с Claude полностью — решение будет в ТЗ-XAI-6 (финальная чистка)
+- **`isAnthropicProtocolModel` и cache breakpoints** — аналогично, живы для Haiku vision. Не трогаем
+- **Dev overrides для `simply-chat` / `simply-chat-think`** — сняты перед smoke-тестом (сейчас в `.simply-dev-overrides.json` только `expertise` и `create` для ТЗ-XAI-4/XAI-5)
+- **Narrowing ТЗ-XAI-5 scope** — больше не трогает Think, остаются только Create + Expertise + R-5 (expertise с multi-agent на non-reasoning variant)
+
+### Процессное наблюдение
+
+Владимир поднял важный упрёк за session: «9-й раз повторяется проблема error-state блокирует инпут, каждый раз говорится что починим, не чинится». Это был провал дисциплины бэклога — проблема откладывалась устно без записи. После этого создан [TZ_ErrorRecoveryUI](specs/_backlog/TZ_ErrorRecoveryUI.md) с историей, репро, stages. Правило зафиксировано: любая повторяющаяся не-блокер-проблема = немедленно в backlog, даже если фикс откладывается.
 
 ---
 

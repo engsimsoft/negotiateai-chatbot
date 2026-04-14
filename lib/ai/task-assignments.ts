@@ -24,9 +24,9 @@
 
 export type TaskId =
   // Simply Chat (основной чат продукта)
-  | "simply-chat"           // default text → MiniMax M2.7
-  | "simply-chat-think"     // кнопка «Думать» → Claude Sonnet
-  | "simply-chat-vision"    // attachments (image/pdf) → Claude Haiku
+  | "simply-chat"           // default text → Grok 4.1 Fast (non-reasoning)
+  | "simply-chat-think"     // кнопка «Думать» = tier upgrade → Grok 4.20 (non-reasoning)
+  | "simply-chat-vision"    // attachments (image/pdf) → Claude Haiku 4.5
   // Экспертиза и Создание — разовые ветки (ТЗ-LegacyChatCleanup)
   | "expertise"             // chatMode=expertise → Grok 4.20 Multi-Agent
   | "create"                // chatMode=create → MiniMax M2.7
@@ -82,9 +82,16 @@ export type TaskId =
  * change one line here. Nothing else in the app needs updating.
  */
 export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
-  // Simply Chat
-  "simply-chat":              "MiniMax-M2.7",
-  "simply-chat-think":        "claude-sonnet-4-6",
+  // Simply Chat (ТЗ-XAI-3 2026-04-15)
+  // simply-chat — дворецкий KITT на Grok 4.1 Fast non-reasoning (быстро, дёшево,
+  // не тратит токены на reasoning overhead). Кнопка «Думать» = продуктовая
+  // метафора «используй умную модель» — tier upgrade на Grok 4.20 non-reasoning
+  // ($2/$6 vs $0.20/$0.50, ×10 дороже input, заметно сильнее). Variant
+  // reasoning/non-reasoning для Think — стартовая точка, переключается через
+  // /dev/models без коммита. Vision остаётся на Haiku — проверенное решение,
+  // Claude vision конкурентен Grok'овскому, один провайдер уже в проекте (Opus).
+  "simply-chat":              "grok-4-1-fast-non-reasoning",
+  "simply-chat-think":        "grok-4.20-0309-non-reasoning",
   "simply-chat-vision":       "claude-haiku-4-5-20251001",
 
   // Экспертиза и Создание (ТЗ-LegacyChatCleanup)
