@@ -10,16 +10,17 @@
 
 **Версия после сессии:** 3.87.3 (tag не обновлялся, hotfix + cleanup не релизились)
 **Ветка:** `feature/simply-kitt`
-**Статус:** TZ_DeadModelSelectors закрыт частично (3 коммита), **НЕ запушено**, dev-сервер был запущен во время сессии — проверить в новой
+**Статус:** TZ_DeadModelSelectors закрыт частично (3 фикс-коммита + WORKFLOW финализация), **НЕ запушено**, working tree **clean**, dev-сервер остановлен в конце сессии
 **Session predecessor:** 2026-04-14 session 1 (v3.87.3 handoff, `71de7f9`)
 
 **Критичное для следующей сессии:**
-1. `git push` НЕ сделан — **6 релизных коммитов + 3 tag (v3.87.1/2/3)** ждут push по команде владельца
-2. Dev-сервер запущен через `npm run dev` на порту 3000 с background task `bshrtaqek`. Монитор `btqvielza` активен. В новой сессии проверить `lsof -ti:3000` — если жив, либо переиспользовать либо TaskStop.
-3. Backlog расширился до **4 долгов** (было 1 low). Новые:
-   - 🟥 `TZ_OverridesReaderCentralization` (high) — side-effect import только в 4 из ~20 call-sites `getModel()`
-   - 🟧 `TZ_PromptsDeadCodeCleanup` (medium) — `lib/ai/prompts.ts` на 90% dead
-4. **TZ_DeadModelSelectors** закрыт **частично** (~30% scope). Остальные ~70% намеренно оставлены по решению владельца: `ModelSelectorCompact` в проектах должен сохраниться. Детали в `specs/TZ_DeadModelSelectors/ROADMAP.md`.
+1. `git push` НЕ сделан — **7 коммитов + 3 tag (v3.87.1/2/3)** ждут push по команде владельца
+2. Dev-сервер: проверить `lsof -ti:3000` на старте новой сессии. Если жив — `kill -9` и перезапустить (фоновая задача `bshrtaqek` принадлежит прошлому процессу).
+3. Backlog **3 долга** (было 1 low):
+   - 🟥 `TZ_OverridesReaderCentralization` (high, 1 сессия) — side-effect import только в 4 из ~20 call-sites `getModel()`
+   - 🟧 `TZ_PromptsDeadCodeCleanup` (medium, 0.5 сессии) — `lib/ai/prompts.ts` на 90% dead
+   - 🟩 `TZ_GrokContextWindowAudit` (low, 0.5 сессии)
+4. **TZ_DeadModelSelectors** закрыт **частично** (~30% scope) и **архивирован** в `_archive/TZ_DeadModelSelectors/`. Остальные ~70% намеренно оставлены по решению владельца: `ModelSelectorCompact` в проектах должен сохраниться. Полные детали в `_archive/TZ_DeadModelSelectors/HANDOFF.md` + `ROADMAP.md`.
 
 ---
 
@@ -71,17 +72,19 @@
 
 Все эти вещи — часть работающего проектного flow (Vladimir's `ModelSelectorCompact` для выбора tier 🎯 Эксперт / Haiku / Opus). Удаление безопасно только с архитектурным обсуждением и отдельным ТЗ.
 
-### Рабочая папка ТЗ
+### Рабочая папка ТЗ → архив
 
-Воссоздана ретроспективно: `specs/TZ_DeadModelSelectors/` содержит SPEC, ANALYSIS, ROADMAP, FINDINGS, CHANGELOG. Это не закоммичено ещё (будет в финальном housekeeping commit).
+Папка `specs/TZ_DeadModelSelectors/` была воссоздана ретроспективно (5 файлов: SPEC, ANALYSIS, ROADMAP, FINDINGS, CHANGELOG) после того как первая версия исчезла вместе с откаченным коммитом `772e886`. В финальном housekeeping commit `75fa8fa` добавлен недостающий **HANDOFF.md** и вся папка перенесена в `_archive/TZ_DeadModelSelectors/`. Дубль `specs/_backlog/TZ_DeadModelSelectors.md` удалён (ТЗ уже в разделе «Закрытые» в backlog README).
 
 ---
 
 ## Git state
 
-### Last 8 commits (uncommitted docs pending)
+### Last 9 commits
 
 ```
+75fa8fa docs(archive): TZ_DeadModelSelectors → _archive (партиально закрыт, +HANDOFF)
+7c85eef docs(handoff): сессия 2026-04-14 session 2 — TZ_DeadModelSelectors закрыт частично
 5b2571c chore(cleanup): убрать unused availableChatModelIds из entitlements
 a1923b1 chore(cleanup): удалить 3 мёртвых legacy selector-компонента
 9ddf814 fix(projects): DevPanel Switchboard + dev overrides в проектных task-чатах
@@ -89,27 +92,22 @@ a1923b1 chore(cleanup): удалить 3 мёртвых legacy selector-комп
 b5d48fd release(v3.87.3): ТЗ-CreateSnapshotAudit
 28f28fb release(v3.87.2): ТЗ-StreamObservability
 435e917 release(v3.87.1): ТЗ-OpenRouterCostTracking
-2c8aeae release(v3.87.0): финализация ТЗ-CachePipelineMetrics
 ```
 
-### Uncommitted (housekeeping docs — закоммитить финальным commit сессии)
+### Working tree
 
 ```
-specs/TZ_DeadModelSelectors/ (вся папка — воссоздана ретроспективно)
-specs/_backlog/README.md (добавлены 2 новых долга + перенос TZ_DeadModelSelectors в закрытые)
-specs/_backlog/TZ_PromptsDeadCodeCleanup.md (новый)
-specs/_backlog/TZ_OverridesReaderCentralization.md (новый)
-specs/SESSION_HANDOFF.md (этот файл)
+git status → clean (после 75fa8fa)
 ```
 
 ### Tags
 
 - `v3.87.3` → `b5d48fd` — предыдущий релиз
-- Сегодняшние коммиты **не протагированы** (это patch-level fixes, тег на следующий build)
+- Сегодняшние коммиты **не протагированы** (это patch-level fixes + housekeeping, тег на следующий build)
 
 ### NOT pushed
 
-6 коммитов + 3 tag (v3.87.1/2/3 с предыдущей сессии) ждут push:
+7 коммитов + 3 tag (v3.87.1/2/3 с предыдущей сессии) ждут push:
 ```bash
 git push origin feature/simply-kitt
 git push origin v3.87.1 v3.87.2 v3.87.3
@@ -235,12 +233,13 @@ OpenRouter pin'ит `response.modelId` с dated snapshot suffix. Walk-back loop 
 ## Файлы для чтения в новой сессии (в порядке приоритета)
 
 1. **Этот файл** (SESSION_HANDOFF.md)
-2. **`specs/_backlog/README.md`** — 4 долга + закрытые
-3. **`specs/TZ_DeadModelSelectors/ROADMAP.md`** — полная история сессии 2026-04-14 session 2, что сделано/что оставлено/почему
-4. **`specs/TZ_DeadModelSelectors/FINDINGS.md`** — 2 находки (Finding #1 prompts.ts, Finding #2 scattered side-effect imports)
-5. **`CLAUDE.md`** — не обновлялся (не релизили версию)
-6. **`CHANGELOG.md`** — не обновлялся
-7. **`specs/_backlog/TZ_OverridesReaderCentralization.md`** — если выбрали этот ТЗ, там полный план
+2. **`specs/_backlog/README.md`** — 3 открытых долга + закрытые
+3. **`_archive/TZ_DeadModelSelectors/HANDOFF.md`** — quick résumé + что не сделано / lessons
+4. **`_archive/TZ_DeadModelSelectors/ROADMAP.md`** — полная история сессии 2026-04-14 session 2, что сделано/что оставлено/почему
+5. **`_archive/TZ_DeadModelSelectors/FINDINGS.md`** — 2 находки (Finding #1 prompts.ts, Finding #2 scattered side-effect imports)
+6. **`CLAUDE.md`** — не обновлялся (не релизили версию)
+7. **`CHANGELOG.md`** — не обновлялся
+8. **`specs/_backlog/TZ_OverridesReaderCentralization.md`** — если выбрали этот ТЗ, там полный план (high impact, рекомендация next)
 
 ---
 
@@ -248,9 +247,9 @@ OpenRouter pin'ит `response.modelId` с dated snapshot suffix. Walk-back loop 
 
 ```bash
 cd "/Users/mactm/Projects/NegotiateAI Chatbot"
-git log --oneline -6
+git log --oneline -10
 git tag -l | tail -6
-git status --short  # должны быть только housekeeping docs (TZ_DeadModelSelectors/, _backlog/README.md, новые TZ в backlog, SESSION_HANDOFF.md)
+git status --short  # должно быть пусто
 ```
 
 **Что в состоянии:**
@@ -258,10 +257,11 @@ git status --short  # должны быть только housekeeping docs (TZ_D
 - ✅ next build успешен (верифицировано после финальной правки)
 - ✅ Smoke test проектный override user-confirmed
 - ✅ Smoke test удаление 3 selector-файлов user-confirmed
-- ✅ Working tree clean (будет после housekeeping commit)
-- ⚠️ 6 коммитов + 3 tag не в remote — ждут явного push
+- ✅ Working tree **clean**
+- ✅ TZ_DeadModelSelectors финализирован по WORKFLOW: 6/6 файлов (SPEC, ANALYSIS, ROADMAP, FINDINGS, CHANGELOG, HANDOFF) в `_archive/TZ_DeadModelSelectors/`
+- ⚠️ 7 коммитов + 3 tag не в remote — ждут явного push
 - ⚠️ Dev сервер может быть жив на port 3000 — проверить `lsof` в новой сессии
-- ⚠️ Backlog расширился до 4 долгов — 1 high, 2 medium, 1 low
+- ✅ Backlog **3 открытых долга** — 1 high, 1 medium, 1 low (после переноса DeadModelSelectors в закрытые)
 
 ---
 
