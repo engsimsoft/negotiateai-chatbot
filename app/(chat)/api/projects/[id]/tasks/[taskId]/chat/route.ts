@@ -12,8 +12,13 @@ import { auth } from "@/app/(auth)/auth";
 import { buildTaskExpertPrompt } from "@/lib/prompts/build-task-expert-prompt";
 import { getProjectModel, isValidModelTier, DEFAULT_PROJECT_MODEL } from "@/lib/ai/model-tiers";
 import { getProjectTierModelId, getTaskIdForTier } from "@/lib/ai/model-tiers";
-import { getProviderForTask } from "@/lib/ai/getModel";
+import { getProviderForTask, isTaskOverridden } from "@/lib/ai/getModel";
+import { DEFAULT_TASK_MODELS } from "@/lib/ai/task-assignments";
 import { getModelEntry } from "@/lib/ai/model-catalog";
+// Side-effect import: installs the file-based dev overrides reader.
+// Same pattern as app/(chat)/api/chat/route.ts — required so getModel()
+// sees overrides from /dev/models and DevPanel Switchboard.
+import "@/lib/ai/model-overrides-node";
 import { getStandardTools, getActiveToolNames, withCacheControlOnLastTool } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment, isSimplyDevMode } from "@/lib/constants";
 import { calculateCostRub } from "@/lib/ai/providers";
@@ -271,6 +276,10 @@ export async function POST(
         // ТЗ-DEV1: Emit debug prompt info
         {
           const injections: string[] = ["project-context"];
+          const activeTaskId = getTaskIdForTier(tier);
+          const overrideActive = isTaskOverridden(activeTaskId);
+          const defaultModelId = DEFAULT_TASK_MODELS[activeTaskId];
+          const effectiveModelId = getProjectTierModelId(tier);
           emitDebugPrompt(dataStream, {
             systemPromptPreview: finalSystemPrompt.slice(0, 500),
             systemPromptLength: finalSystemPrompt.length,
@@ -279,6 +288,10 @@ export async function POST(
             isProjectChat: true,
             projectTier: tier,
             contextInjections: injections,
+            taskId: activeTaskId,
+            overrideActive,
+            defaultModelId,
+            effectiveModelId,
           });
           // ТЗ-DevPanelErrors: flush buffered pre-prompt warnings into the batch
           for (const w of prePromptWarnings) {
