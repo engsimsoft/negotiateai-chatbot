@@ -111,6 +111,35 @@
 
 ---
 
+## 2026-04-15 — ТЗ-XAI-2 завершён (v3.89.0)
+
+**Split strategy для MIND:** Владимир поймал мою лень в первоначальной оценке (я предложил все 5 задач на Grok 4.1 Fast, ссылаясь на IFBench флагмана). Ответил корректно: «нельзя приписывать рейтинги 4.20 модели Fast; извлечение фактов это не простая задача». Принятая стратегия: mission-critical `memory:extract` на сильной Grok 4.20, механические задачи на Grok 4.1 Fast. Экономия vs Sonnet ~15× при сохранении качества входа в память.
+
+**Native generateObject на xAI подтверждён** — smoke test 2 кейсов (базовая schema + `.nullable()` поле) оба прошли. Бонус-рефакторинг `batchExtractFacts` и `runConsolidation` возможен: убрали legacy `generateText + JSON.parse + Zod` workaround, заменили на native `generateObject`. Удалилось ~28 строк legacy парсинг-логики.
+
+**End-to-end smoke test через Simply Chat (5 сообщений при временно пониженных EXTRACT_THRESHOLD_SOFT=0.001, EXTRACT_PAUSE_MS=0):**
+- 13 фактов извлечено Grok 4.1 Fast, 10 active + 3 superseded
+- Dedup-verify на русском работает: semantic match «работает над проектом Simply» ≈ «разработчик приложения Simply» (similarity 0.715)
+- Категоризация корректная (`fact/decision/preference/task`), confidence 0.8-1.0
+- Возврат к production defaults (0.6 / 10 мин) перед коммитом
+
+**Side-effects от тестирования:**
+1. `getOrCreateSimplyChat` race condition (SELECT+INSERT без unique constraint) — проявился после `TRUNCATE CASCADE` тестовой БД. 3 параллельных запроса из дашборда создали 3 simply chats. Зафиксирован в [specs/_backlog/TZ_SimplyChatRaceCondition.md](../../specs/_backlog/TZ_SimplyChatRaceCondition.md) — чиним после завершения серии Simply_xAI, строгий фокус держим
+2. **One-message lag** в Simply Chat MIND extract подтверждён Владимиром как known behavior (не баг). Причина: `batchExtractFacts` вызывается до `saveMessages` в том же request handler'е → messagesFromDb не содержит текущую пару. Зафиксировано в [MIND_ARCHITECTURE.md §2](MIND_ARCHITECTURE.md) — чтобы будущие сессии не гонялись за несуществующим багом
+
+**Что НЕ было живьём проверено (и почему):**
+- `memory:extract` (Grok 4.20) — в simply chatMode отключён by design (ТЗ-MinimaxCleanup v3.77.0). Триггерится в expertise/create/project, проверится при обычной эксплуатации
+- `memory:consolidate` и `memory:profile` event chain не дошёл до ≥10 фактов подряд за один batch extract — проверится при нормальной нагрузке или через test script по сценариям C/D в MIND_ARCHITECTURE.md
+
+**Защита через /dev/models:** любой из 5 memory-taskId можно переключить на другую модель через switchboard за секунды, без коммитов. Defaults в task-assignments — стартовые точки, не финальный выбор. Это снимает давление «правильного выбора» в момент миграции.
+
+**Workflow новшества подтверждены:**
+- Smoke test перед рефакторингом — must-have (повторил паттерн ТЗ-XAI-1 с reasoningEffort)
+- Очистка dev-БД перед живым тестом — полезно (даёт чистый сигнал работает/не работает), но надо учитывать что это обнажает скрытые race conditions (см. R-5)
+- MIND_ARCHITECTURE.md как living reference — инвестиция на всю серию, не одноразовый артефакт
+
+---
+
 ## 2026-04-14 — ТЗ-XAI-1 завершён (v3.88.0)
 
 **Что сделано:**

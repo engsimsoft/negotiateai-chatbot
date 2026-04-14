@@ -108,12 +108,19 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "clerk:snapshot":           "claude-haiku-4-5-20251001",
   "clerk:file-analyzer":      "claude-haiku-4-5-20251001",
 
-  // Memory
-  "memory:extract":           "claude-sonnet-4-6",
-  "memory:extract-batch":     "MiniMax-M2.7",
-  "memory:consolidate":       "MiniMax-M2.7",
-  "memory:profile":           "MiniMax-M2.7",
-  "memory:dedup-verify":      "claude-haiku-4-5-20251001",
+  // Memory (ТЗ-XAI-2 2026-04-14)
+  // memory:extract — mission-critical задача извлечения фактов из диалогов.
+  // Оставлена на сильной модели Grok 4.20 (non-reasoning variant — задача
+  // структурированная Zod-схемой, reasoning tokens не нужны). Остальные 4
+  // memory-задачи — механические (batch, dedup, consolidate, profile), им
+  // достаточно рабочей лошадки Grok 4.1 Fast. Любой defaults можно
+  // переключить через /dev/models dev switchboard без правки кода — это
+  // стартовые точки, не финальный выбор.
+  "memory:extract":           "grok-4.20-0309-non-reasoning",
+  "memory:extract-batch":     "grok-4-1-fast-non-reasoning",
+  "memory:consolidate":       "grok-4-1-fast-non-reasoning",
+  "memory:profile":           "grok-4-1-fast-non-reasoning",
+  "memory:dedup-verify":      "grok-4-1-fast-non-reasoning",
 
   // Briefing (MiniMax long timeout — алиас указывает на ту же физическую модель,
   // но через отдельный provider namespace с 180s fetch timeout)

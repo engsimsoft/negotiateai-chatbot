@@ -62,18 +62,23 @@
 
 ---
 
-### ТЗ-XAI-2 — MIND pipeline → Grok 4.1 Fast
-**Статус:** 📋 Планируется  
-**Зависимости:** ТЗ-XAI-1  
-**Риск:** низкий  
+### ТЗ-XAI-2 — MIND pipeline → Grok (split strategy)
+**Статус:** ✅ Завершён 2026-04-15 (v3.89.0)
+**Зависимости:** ТЗ-XAI-1
+**Риск:** низкий (подтверждено smoke test'ом)
 
-**Суть:** Переключить 6 вызовов generateText/generateObject в MIND pipeline (extract, extract-batch, dedup-verify, consolidate, profile) на Grok 4.1 Fast non-reasoning.
+**Что сделано:**
+- `memory:extract` → **`grok-4.20-0309-non-reasoning`** (mission-critical задача — сильная модель, без reasoning overhead)
+- `memory:extract-batch` / `dedup-verify` / `consolidate` / `profile` → **`grok-4-1-fast-non-reasoning`** (механические задачи — рабочая лошадка)
+- Бонус-рефакторинг: `batchExtractFacts` и `runConsolidation` переписаны с legacy `generateText + JSON.parse + Zod` workaround на native `generateObject` (xAI поддерживает structured outputs — verified 2026-04-14)
+- Создан [MIND_ARCHITECTURE.md](MIND_ARCHITECTURE.md) — living doc с pipeline flow, таблицей параметров, адресами промптов, тест-сценариями. Source of truth для MIND на всю серию
 
-**Почему первый:** Нет tools, нет providerOptions, одноразовые вызовы (не многоходовые). Самый безопасный шаг для проверки что xAI работает в нашем pipeline.
+**Ключевые находки:**
+- Split-стратегия принята: mission-critical звено (первичный extract) на сильной модели, остальные на быстрой → экономия ~15× vs Sonnet при сохранении качества входа в память
+- Native `generateObject` работает на xAI через AI SDK v6 (проверено smoke test'ом 2 кейсов: базовая schema + `.nullable()`)
+- One-message lag в Simply Chat MIND подтверждён как known behavior (не баг) — зафиксирован в MIND_ARCHITECTURE.md §2
 
-**Ключевые вопросы:**
-- Проверить: поддерживает ли Grok `generateObject` напрямую (structured outputs) или нужен паттерн `generateText + JSON.parse + Zod` как с MiniMax
-- Пересчитать пороги Extract (L2) в `context-limits.ts` под 2M окно Grok
+**Подробности:** [TZ_xai_2/](TZ_xai_2/) · [SIMPLY_XAI_CHANGELOG.md](SIMPLY_XAI_CHANGELOG.md) запись 2026-04-15
 
 ---
 
@@ -190,7 +195,7 @@
 | ТЗ | Статус | Дата начала | Дата завершения | Примечания |
 |---|---|---|---|---|
 | ТЗ-XAI-1 | ✅ Завершён | 2026-04-14 | 2026-04-14 | v3.88.0 — удалён grok-4, notes про multi-agent, зафиксирована архитектура защиты контекста |
-| ТЗ-XAI-2 | 📋 План | — | — | MIND pipeline → Grok 4.1 Fast, бонус-рефакторинг JSON.parse → generateObject |
+| ТЗ-XAI-2 | ✅ Завершён | 2026-04-14 | 2026-04-15 | v3.89.0 — 5 memory tasks → Grok (extract на 4.20, остальные на 4.1 Fast), native generateObject, создан MIND_ARCHITECTURE.md |
 | ТЗ-XAI-3 | 📋 План | — | — | KITT + R-6 (убрать isSimplyNonAnthropicModel) |
 | ТЗ-XAI-4 | 📋 План | — | — | Utility/Pipeline batch миграция |
 | ТЗ-XAI-5 | 📋 План | — | — | Think/Create/Expertise + R-5 (expertise с multi-agent на non-reasoning) |

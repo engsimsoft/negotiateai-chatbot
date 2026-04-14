@@ -48,6 +48,49 @@
 
 ---
 
+## [ТЗ-XAI-2] 2026-04-15 — MIND pipeline → Grok — v3.89.0
+
+**Коммиты:** TBD (single release commit планируется после финализации)
+
+**Продолжительность:** одна сессия (2026-04-14 → 2026-04-15 по timezone)
+
+**Что сделано:**
+- Переключение 5 memory-задач с Sonnet/MiniMax/Haiku на xAI Grok в [lib/ai/task-assignments.ts](../../lib/ai/task-assignments.ts):
+  - `memory:extract` → **`grok-4.20-0309-non-reasoning`** (mission-critical, сильная модель)
+  - `memory:extract-batch` → `grok-4-1-fast-non-reasoning`
+  - `memory:dedup-verify` → `grok-4-1-fast-non-reasoning`
+  - `memory:consolidate` → `grok-4-1-fast-non-reasoning`
+  - `memory:profile` → `grok-4-1-fast-non-reasoning`
+- **Бонус-рефакторинг в [lib/ai/memory/extract.ts](../../lib/ai/memory/extract.ts) и [lib/ai/memory/consolidate.ts](../../lib/ai/memory/consolidate.ts):** legacy `generateText + JSON.parse + Zod.parse()` workaround заменён на native `generateObject` в `batchExtractFacts` и `runConsolidation`. Workaround существовал потому что MiniMax через Anthropic-compat endpoint не давал чистого `generateObject`. Smoke test 2026-04-14 подтвердил что xAI поддерживает native structured outputs через AI SDK v6, включая `.nullable()` поля. Удалено ~28 строк legacy парсинг-логики.
+- **Dead import удалён:** `calcCostUsd` в [extract.ts:25](../../lib/ai/memory/extract.ts#L25) — 0 живых использований.
+- **Создан [MIND_ARCHITECTURE.md](MIND_ARCHITECTURE.md)** — живой документ-reference серии: 11 секций, охватывает pipeline, chatMode триггеры, task→model маппинги, адреса промптов, параметры с рекомендациями для тюнинга, тест-сценарии, чеклист восстановления, лог-маркеры, схема БД, журнал изменений. Служит testing harness для MIND и заменяет необходимость копания в коде перед каждым ТЗ серии.
+
+**Что НЕ сделано (и почему):**
+- `memory:extract` (Grok 4.20) в боевом тесте не триггерился — в `simply` chatMode этот путь отключён by design (ТЗ-MinimaxCleanup v3.77.0). Триггерится только в `expertise`/`create`/`project` — проверится при нормальной эксплуатации
+- `memory:consolidate` и `memory:profile` event chain не дошёл до ≥10 фактов за один batch — тоже проверится при нормальной эксплуатации
+- Temperature и другие параметры извлечения не менялись — оставлены 0.1 для extract, 0 для dedup-verify, 0.1 для consolidate, 0.3 для profile
+
+**Smoke test — end-to-end через Simply Chat (5 сообщений с Extract-on-compression):**
+- `memory:extract-batch` (Grok 4.1 Fast) — ✅ 5 циклов, извлечено 13 фактов корректно
+- `memory:dedup-verify` (Grok 4.1 Fast) — ✅ 3 раза успешно определил семантически близкие дубли, пример: «работает над проектом Simply» ≈ «разработчик приложения Simply» (similarity 0.715)
+- Qualitative проверка: категоризация корректная (`fact/decision/preference/task`), confidence 0.8-1.0, content на грамматичном русском
+- Временные изменения в [context-limits.ts](../../lib/ai/context-limits.ts) (`EXTRACT_THRESHOLD_SOFT=0.001`, `EXTRACT_PAUSE_MS=0`) — восстановлены к production defaults перед коммитом
+
+**Методологические наблюдения:**
+1. **Smoke test за $0.002 спас от неверного решения:** первая гипотеза была что xAI не поддерживает native `generateObject`, поэтому JSON.parse workaround придётся оставить. Двухкейсный тест показал что поддержка есть, включая `.nullable()` → бонус-рефакторинг стал возможным
+2. **Важность empirical test против архитектурного допущения:** аналогично как в ТЗ-XAI-1 с эмпирическим тестом `reasoningEffort` — предпочитать быстрый реальный вызов docs/documentation interpretation
+3. **Race condition при очистке БД** (`getOrCreateSimplyChat`) — side-effect обнаружен при nuke БД для чистого тестирования. Зафиксирован в [specs/_backlog/TZ_SimplyChatRaceCondition.md](../../specs/_backlog/TZ_SimplyChatRaceCondition.md). Не чинится — строгий фокус на серии
+4. **One-message lag в Simply Chat MIND** — подтверждён Владимиром как known behavior (не баг). Зафиксирован в [MIND_ARCHITECTURE.md §2](MIND_ARCHITECTURE.md) — чтобы будущие сессии не искали баг там где его нет
+
+**Связанные документы:**
+- [TZ_xai_2/ANALYSIS.md](TZ_xai_2/ANALYSIS.md) — анализ call sites + 5 риск-вопросов
+- [MIND_ARCHITECTURE.md](MIND_ARCHITECTURE.md) — **новая инфраструктура**, источник правды для MIND на всю серию
+- [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) — записи про verified `generateObject` на xAI и one-message lag
+
+**Следующий шаг:** ТЗ-XAI-3 — KITT (Simply Chat) → Grok 4.1 Fast non-reasoning. Критичные пункты: R-6 (убрать `isSimplyNonAnthropicModel` + strip-функции, заменить на `capabilities.vision` из каталога SSOT).
+
+---
+
 ## [ТЗ-XAI-1] 2026-04-14 — Фундамент миграции — v3.88.0
 
 **Коммиты:**

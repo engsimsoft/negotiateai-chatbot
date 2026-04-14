@@ -13,7 +13,7 @@ import "server-only";
 
 import fs from "fs";
 import path from "path";
-import { generateObject, generateText } from "ai";
+import { generateObject } from "ai";
 import { z } from "zod";
 
 import {
@@ -22,7 +22,6 @@ import {
   getProviderForTask,
 } from "@/lib/ai/getModel";
 import { logUsage } from "@/lib/ai/usage-utils";
-import { calcCostUsd } from "@/lib/ai/tokenlens-catalog";
 
 const MEMORY_EXTRACT_TASK = "memory:extract" as const;
 const MEMORY_EXTRACT_BATCH_TASK = "memory:extract-batch" as const;
@@ -307,32 +306,21 @@ export async function batchExtractFacts(
 
     const startTime = Date.now();
 
-    // Single batch call for the whole conversation (generateText + JSON.parse + Zod)
-    const { text, usage } = await generateText({
+    // Single batch call for the whole conversation via native generateObject
+    // (ТЗ-XAI-2: raised from legacy generateText+JSON.parse workaround that
+    // existed when this task ran on MiniMax Anthropic-compat, which didn't
+    // expose structured outputs cleanly. Verified 2026-04-14 that xAI
+    // generateObject works natively via @ai-sdk/xai).
+    const { object: parsedResult, usage } = await generateObject({
       model: getModel(MEMORY_EXTRACT_BATCH_TASK),
       maxRetries: 0,
+      schema: extractionResultSchema,
       system: EXTRACT_BATCH_SYSTEM_PROMPT,
       prompt: conversationBlock,
       temperature: 0.1,
     });
 
     const durationMs = Date.now() - startTime;
-
-    // Parse JSON response
-    let parsedResult: z.infer<typeof extractionResultSchema>;
-    try {
-      const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
-      parsedResult = extractionResultSchema.parse(JSON.parse(cleaned));
-    } catch (parseErr) {
-      console.error(
-        `[MIND] Batch extract: failed to parse response:`,
-        parseErr instanceof Error ? parseErr.message : parseErr,
-        `\nRaw text: ${text.slice(0, 500)}`,
-      );
-      // Still mark messages as extracted to avoid retry loop
-      await markMessagesExtracted(batch.map((m) => m.id));
-      return stats;
-    }
 
     // Log usage
     logUsage({

@@ -1,7 +1,7 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.88.0
-**Дата:** 2026-04-14
+**Версия:** 3.89.0
+**Дата:** 2026-04-15
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -346,7 +346,8 @@ components/projects/
 
 **Прогресс:**
 - **ТЗ-XAI-1 Фундамент** — ✅ Завершён 2026-04-14 (v3.88.0)
-- ТЗ-XAI-2 MIND pipeline → Grok 4.1 Fast — 📋 Next up
+- **ТЗ-XAI-2 MIND pipeline → Grok** — ✅ Завершён 2026-04-15 (v3.89.0, split strategy: extract на 4.20, остальные на 4.1 Fast)
+- ТЗ-XAI-3 KITT (Simply Chat) → Grok 4.1 Fast + R-6 cleanup — 📋 Next up
 - ТЗ-XAI-3 KITT (Simply Chat) → Grok 4.1 Fast + R-6 очистка strip-функций — 📋 План
 - ТЗ-XAI-4 Utility/Pipeline → Grok (briefing, podcast, meeting, professor, title) — 📋 План
 - ТЗ-XAI-5 Think/Create/Expertise → Grok 4.20 (+ R-5: expertise с multi-agent на non-reasoning) — 📋 План

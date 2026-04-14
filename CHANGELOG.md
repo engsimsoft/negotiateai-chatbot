@@ -8,12 +8,63 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- **Simply_xAI миграция** (активная серия ТЗ-XAI-1 → ТЗ-XAI-6): уход с MiniMax + OpenRouter на xAI Grok + Anthropic
+- **Simply_xAI миграция** (активная серия, XAI-1 и XAI-2 ✅ завершены, следующий XAI-3): уход с MiniMax + OpenRouter на xAI Grok + Anthropic
 - RAG-4: Библиотека MVP (загрузка документов + search)
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
 - Universal document router для chatMode `expertise`/`create` — fallback на модель с `documentSupport.supported=true` когда пользователь шлёт PDF в Grok/MiniMax
 - xAI Files API integration — поднять флаги `documentSupport` для Grok reasoning-моделей
 - Alias entries refactor — устранить дублирование `pricing`/`capabilities` в alias через резолв через `aliasOf`
+
+---
+
+## [3.89.0] — 2026-04-15 — ТЗ-XAI-2 MIND pipeline → Grok
+
+Второй ТЗ серии **Simply_xAI**. Переключение всех 5 memory-задач MIND pipeline с Sonnet/MiniMax/Haiku на xAI Grok со **split-стратегией**: mission-critical первичное извлечение фактов на сильной модели, механические задачи на быстрой. Плюс бонус-рефакторинг legacy MiniMax workaround на native AI SDK structured outputs.
+
+### Changed
+
+- **Task assignments ([lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)):**
+  - `memory:extract`: `claude-sonnet-4-6` → **`grok-4.20-0309-non-reasoning`** (mission-critical — первичное извлечение фактов из диалога, сильная модель но без reasoning overhead т.к. задача структурированная Zod schema)
+  - `memory:extract-batch`: `MiniMax-M2.7` → **`grok-4-1-fast-non-reasoning`**
+  - `memory:dedup-verify`: `claude-haiku-4-5-20251001` → **`grok-4-1-fast-non-reasoning`**
+  - `memory:consolidate`: `MiniMax-M2.7` → **`grok-4-1-fast-non-reasoning`**
+  - `memory:profile`: `MiniMax-M2.7` → **`grok-4-1-fast-non-reasoning`**
+
+- **[lib/ai/memory/extract.ts](lib/ai/memory/extract.ts)** — `batchExtractFacts` переписан с legacy `generateText + JSON.parse + Zod.parse()` workaround на native `generateObject`. Workaround был нужен потому что MiniMax через Anthropic-compat endpoint не давал чистого structured outputs. Verified 2026-04-14 что xAI поддерживает native `generateObject` через AI SDK v6 (smoke test с `.nullable()` полями). Удалено ~14 строк парсинг-логики.
+
+- **[lib/ai/memory/consolidate.ts](lib/ai/memory/consolidate.ts)** — `runConsolidation` переписан аналогично. Удалено ~11 строк.
+
+### Added
+
+- **[specs/Simply_xAI/MIND_ARCHITECTURE.md](specs/Simply_xAI/MIND_ARCHITECTURE.md)** — living reference документ для всей серии миграции: pipeline diagram, chatMode триггеры, task→model маппинги, адреса всех промптов (MIND + chat system prompts), параметры с рекомендациями для тюнинга, 4 тест-сценария, чеклист восстановления production defaults, лог-маркеры для наблюдаемости, схема БД, append-only журнал изменений. Служит testing harness и snapshot архитектуры MIND — source of truth для всех последующих ТЗ серии и работ с памятью.
+
+### Removed
+
+- **Dead import `calcCostUsd`** в [extract.ts:25](lib/ai/memory/extract.ts#L25) — 0 использований, убран при рефакторинге.
+
+### Архитектурное решение: Split-стратегия
+
+Первоначальное предложение было переключить все 5 memory-задач на Grok 4.1 Fast (экономия ~15× vs Sonnet). Владимир скорректировал: нельзя приписывать рейтинги флагмана 4.20 модели Fast, извлечение фактов из диалога — не простая задача (требует понимания контекста, отличия важного от шума). Принятая split-стратегия:
+
+- **Mission-critical звено** (`memory:extract`) — **Grok 4.20 non-reasoning**. Это точка входа в MIND память; от качества зависит что попадёт в долгосрочное хранилище. Ошибка здесь не компенсируется consolidation
+- **Механические задачи** (`extract-batch`, `dedup-verify`, `consolidate`, `profile`) — **Grok 4.1 Fast**. Работают с уже готовыми фактами / структурой, требуют меньше глубины понимания
+
+Экономия vs Sonnet: ~15× для механических задач, ~2.5× для mission-critical. Качество входа в память сохраняется. Любой из 5 taskId можно переключить через [/dev/models](app/(dashboard)/dev/models/page.tsx) switchboard без коммита — defaults стартовые точки, не финальный выбор.
+
+### Smoke test (live через Simply Chat)
+
+Временные изменения в [context-limits.ts](lib/ai/context-limits.ts): `EXTRACT_THRESHOLD_SOFT=0.001`, `EXTRACT_PAUSE_MS=0` (восстановлены к production defaults перед коммитом). Владимир отправил 5 сообщений, наблюдались:
+- 5 циклов `batchExtractFacts` (Grok 4.1 Fast), 13 фактов извлечено
+- 3 успешных `verifyDuplicatesWithLLM` (Grok 4.1 Fast) — LLM семантически верно находит дубликаты на русском (пример: «работает над проектом Simply» ≈ «разработчик приложения Simply», similarity 0.715)
+- Категоризация корректная (`fact/decision/preference/task`), confidence 0.8-1.0
+- Ни одной ошибки в MIND pipeline
+
+**Не триггерилось** (ожидаемо, проектное поведение): `memory:extract` (в simply chatMode отключён by design с v3.77.0 — работает только в expertise/create/project), `memory:consolidate` и `memory:profile` event chain (требует ≥10 фактов за один batch).
+
+### Side-effects обнаруженные и зафиксированные в backlog
+
+- **`getOrCreateSimplyChat` race condition** ([specs/_backlog/TZ_SimplyChatRaceCondition.md](specs/_backlog/TZ_SimplyChatRaceCondition.md)) — проявился при тестовой очистке БД. SELECT+INSERT без unique constraint на `(userId, chatMode='simply')`. 3 параллельных запроса из дашборда создали 3 simply chats вместо одного persistent. В steady state невиден. Фикс: partial unique index + `onConflictDoNothing`. Чиним после завершения серии Simply_xAI — строгий фокус не отвлекаемся.
+- **One-message lag в Simply Chat MIND extract** — подтверждён Владимиром как known behavior, не баг. Причина: `batchExtractFacts` вызывается до `saveMessages` в том же request handler'е → каждый extract цикл обрабатывает сообщения предыдущего хода. Зафиксирован в [MIND_ARCHITECTURE.md §2](specs/Simply_xAI/MIND_ARCHITECTURE.md) чтобы будущие сессии не искали баг.
 
 ---
 

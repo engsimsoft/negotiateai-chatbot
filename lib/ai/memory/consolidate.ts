@@ -12,7 +12,7 @@ import "server-only";
 
 import fs from "fs";
 import path from "path";
-import { generateText } from "ai";
+import { generateObject } from "ai";
 import { z } from "zod";
 
 import {
@@ -143,31 +143,20 @@ async function runConsolidation(
   const factsText = formatFactsForPrompt(facts);
   const userPrompt = `<facts>\n${factsText}\n</facts>`;
 
-  // Call resolved memory:consolidate model (generateText + JSON.parse + Zod)
-  const { text, usage } = await generateText({
+  // Call resolved memory:consolidate model via native generateObject
+  // (ТЗ-XAI-2: raised from legacy generateText+JSON.parse workaround that
+  // existed when this task ran on MiniMax Anthropic-compat. Verified
+  // 2026-04-14 that xAI generateObject works natively.)
+  const { object, usage } = await generateObject({
     model: getModel(MEMORY_CONSOLIDATE_TASK),
     maxRetries: 0,
+    schema: consolidationResultSchema,
     system: CONSOLIDATE_SYSTEM_PROMPT,
     prompt: userPrompt,
     temperature: 0.1,
   });
 
   const durationMs = Date.now() - startTime;
-
-  // Parse JSON response
-  let object: z.infer<typeof consolidationResultSchema>;
-  try {
-    const cleaned = text.replace(/```json\s*|```\s*/g, "").trim();
-    object = consolidationResultSchema.parse(JSON.parse(cleaned));
-  } catch (parseErr) {
-    console.error(
-      `[MemoryConsolidate] Failed to parse consolidation response:`,
-      parseErr instanceof Error ? parseErr.message : parseErr,
-      `\nRaw text: ${text.slice(0, 500)}`,
-    );
-    stats.durationMs = Date.now() - startTime;
-    return stats;
-  }
 
   // Log usage
   logUsage({
