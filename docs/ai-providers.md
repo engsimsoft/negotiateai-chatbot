@@ -234,11 +234,11 @@ Pricing (M2.7): base $0.30/M input, cache write $0.375/M (1.25×), cache read $0
 
 | Модель | Физический ID | Статус |
 |--------|---------------|--------|
-| Grok 4.20 Reasoning | `grok-4.20-reasoning` | В catalog, не назначен task |
-| Grok 4.20 Non-Reasoning | `grok-4.20-non-reasoning` | В catalog, не назначен task |
-| Grok 4-1 Fast Reasoning | `grok-4-1-fast-reasoning` | В catalog, не назначен task |
-| Grok 4-1 Fast Non-Reasoning | `grok-4-1-fast-non-reasoning` | В catalog, не назначен task |
-| Grok 4 | `grok-4` | В catalog, не назначен task |
+| Grok 4.20 Reasoning | `grok-4.20-0309-reasoning` | В catalog, не назначен task |
+| Grok 4.20 Non-Reasoning | `grok-4.20-0309-non-reasoning` | В catalog, не назначен task |
+| Grok 4.20 Multi-Agent | `grok-4.20-multi-agent-0309` | Назначен на `expertise`, но через Chat Completions работает как обычный 4.20 (см. notes в каталоге). ТЗ-XAI-5 переключит на non-reasoning |
+| Grok 4.1 Fast Reasoning | `grok-4-1-fast-reasoning` | В catalog, не назначен task |
+| Grok 4.1 Fast Non-Reasoning | `grok-4-1-fast-non-reasoning` | В catalog, не назначен task |
 
 ### OpenRouter (зарезервировано в catalog, не активно в task-assignments)
 

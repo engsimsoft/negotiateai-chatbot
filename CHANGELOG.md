@@ -8,11 +8,54 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
+- **Simply_xAI миграция** (активная серия ТЗ-XAI-1 → ТЗ-XAI-6): уход с MiniMax + OpenRouter на xAI Grok + Anthropic
 - RAG-4: Библиотека MVP (загрузка документов + search)
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
 - Universal document router для chatMode `expertise`/`create` — fallback на модель с `documentSupport.supported=true` когда пользователь шлёт PDF в Grok/MiniMax
 - xAI Files API integration — поднять флаги `documentSupport` для Grok reasoning-моделей
 - Alias entries refactor — устранить дублирование `pricing`/`capabilities` в alias через резолв через `aliasOf`
+
+---
+
+## [3.88.0] — 2026-04-14 — ТЗ-XAI-1 Фундамент миграции на xAI
+
+Первый ТЗ серии **Simply_xAI** — подготовка инфраструктуры к миграции с MiniMax + OpenRouter на xAI Grok + Anthropic. Принцип «ноль изменений поведения»: ни один taskId не переключён, все живые модели работают как раньше. Это чистка каталога и фиксация архитектурных решений для следующих ТЗ серии.
+
+### Removed
+
+- **`grok-4`** catalog entry — не было в docs.x.ai/docs/models, 0 потребителей в task-assignments. SQL-аудит ai_usage_log (2026-04-14) подтвердил 0 исторических записей для bare `modelId="grok-4"`. Pricing был educated guess ($2/$6 заимствовано у 4.20 tier). Удаление чистое, walk-back lookup не применим (для `grok-4` стриппинг `-` лендит на `grok` → undefined, но историческая cost calculation не затрагивается).
+
+### Changed
+
+- **[lib/ai/model-catalog.ts](lib/ai/model-catalog.ts)** — обновлён header xAI секции: убран устаревший комментарий про «2M aspirational, test needed», заменён на фиксацию архитектурного решения: `contextWindow` задан с запасом под рабочий бюджет качества (~140K), **НЕ** под провайдерский потолок. Привязка `SIMPLY_CONTEXT_LIMIT` к размеру окна провайдера признана антипаттерном.
+- **`grok-4.20-multi-agent-0309`** — добавлены `notes`: multi-agent variant **не поддерживает client-side function calling** через Chat Completions (только built-in + remote MCP, [docs.x.ai](https://docs.x.ai/developers/model-capabilities/text/multi-agent)). Текущее назначение `expertise → multi-agent` работает как обычный grok-4.20 (SQL-аудит: 1 вызов за всю историю). ТЗ-XAI-5 переключит `expertise` на `grok-4.20-0309-non-reasoning`. Multi-agent через Responses API + MCP server — отдельная ветка ТЗ-XAI-MA-1.
+- **[docs/ai-providers.md](docs/ai-providers.md)** — таблица xAI моделей: удалён `grok-4`, добавлена отметка про multi-agent.
+- **[docs/model-catalog-ops.md](docs/model-catalog-ops.md)** — строка про DEPRECATED `grok-4` помечена strikethrough с пометкой «удалён в v3.88.0».
+
+### Архитектурное решение (Владимир, 2026-04-14)
+
+Во время анализа ТЗ-XAI-1 возникла гипотеза провести эмпирический тест контекстного окна Grok (~$10) чтобы подтвердить 2M и обосновать отказ от Compaction в ТЗ-XAI-3. **Гипотеза отвергнута** — тест отвечал на неправильный вопрос:
+
+1. **Вечный чат** заполнит любое окно — 256K за неделю, 2M за пару месяцев. Защита нужна всегда, независимо от провайдерского потолка.
+2. **Модели деградируют на 30-50%** заявленного окна (Lost in the Middle, Liu et al. 2023). Реальный рабочий бюджет при 2M ≈ 400-600K, не 2M.
+3. **Будущие модели** могут иметь 256K окно и быть лучше по качеству. Привязка архитектуры к размеру окна = переделывать каждый раз.
+
+**Правильная архитектура для ТЗ-XAI-3:**
+- Sliding window (`CONTEXT_BUDGET` 140K) — остаётся, рабочий бюджет качества
+- Extract-on-compression (60%/80% triggers) — остаётся без изменений
+- Compaction API — уже провайдер-aware через `isAnthropicProtocolModel` в chat/route.ts:929, под Grok становится мёртвым но безвредным кодом. Специально удалять не требуется.
+
+Фиксация: [specs/Simply_xAI/SIMPLY_XAI_NOTES.md](specs/Simply_xAI/SIMPLY_XAI_NOTES.md) (запись 2026-04-14 «Коррекция архитектурного допущения»).
+
+### Зафиксировано для будущих ТЗ серии
+
+- **R-5** (expertise/multi-agent) → explicit пункт в ROADMAP-XAI-5: переключить expertise на `grok-4.20-0309-non-reasoning`
+- **R-6** (`isSimplyNonAnthropicModel` strip-функция ломает vision при миграции) → explicit пункт в ROADMAP-XAI-3: полностью убрать strip-функции, заменить на проверку `capabilities.vision` из каталога (SSOT). Не полагаться на маршрутизацию «vision → Haiku спасёт».
+- **Новая схема работы** — без внешнего архитектора, ТЗ как черновик. Работа напрямую user ↔ Claude Code с обязательным ANALYSIS против реального кода. Grok 4.20 Multi-Agent (веб-подписка) используется как факт-чекер для узких xAI вопросов, не как архитектурный консультант.
+
+### Closed backlog
+
+- `specs/_backlog/TZ_GrokContextWindowAudit.md` → `specs/_backlog/_archive/` с пометкой о закрытии (тест отвечал на неправильный вопрос).
 
 ---
 

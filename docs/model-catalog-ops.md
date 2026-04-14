@@ -190,7 +190,7 @@ grep -rn '"claude-\|"MiniMax\|"grok-\|"sonar-\|"nova-\|"voyage-\|"gemini-' lib/ 
 
 - Модель помечена `vision: false` но провайдер заявляет поддержку изображений → **ИСПРАВИТЬ**
 - Модель помечена `thinking: true` но не выдаёт reasoning tokens → **ИСПРАВИТЬ**
-- `grok-4` не в docs.x.ai → **DEPRECATED, пометить или удалить**
+- ~~`grok-4` не в docs.x.ai → **DEPRECATED, пометить или удалить**~~ — удалён в v3.88.0 (ТЗ-XAI-1)
 
 ---
 

@@ -342,9 +342,14 @@ const ENTRIES: ModelEntry[] = [
   // xAI Grok — pricing verified against docs.x.ai/docs/models (2026-04-12).
   // All 4.20 variants share $2/$6, Fast tier $0.20/$0.50. Cached input ~10%.
   //
-  // Context window: docs.x.ai reports 2M for all models, but this may be
-  // aspirational. Using conservative values (256K/128K) until confirmed via
-  // actual API testing. Re-check at next audit.
+  // contextWindow: docs.x.ai заявляет 2M для всех Grok 4.x, но наш
+  // architectural invariant — защита контекста (sliding window + Extract-on-
+  // compression) остаётся независимо от провайдерского окна. Вечный чат
+  // заполнит любое окно; модели деградируют на 30-50% заявленного (Lost in
+  // the Middle). Текущие 256K/128K = заведомо безопасный нижний край,
+  // достаточный для рабочего бюджета качества (CONTEXT_BUDGET 140K).
+  // Привязывать архитектуру к размеру окна провайдера = антипаттерн.
+  // См. specs/Simply_xAI/SIMPLY_XAI_NOTES.md (2026-04-14).
   // =========================================================================
   {
     id: "grok-4.20-0309-reasoning",
@@ -376,6 +381,7 @@ const ENTRIES: ModelEntry[] = [
     capabilities: CAPS_GROK,
     contextWindow: 256_000,
     maxOutput: 16_000,
+    notes: "Multi-agent variant НЕ поддерживает client-side function calling через Chat Completions — только built-in tools (web_search, x_search) и remote MCP (docs.x.ai/developers/model-capabilities/text/multi-agent). Текущее назначение expertise → этой модели фактически работает как обычный grok-4.20 (ai_usage_log: 1 вызов за историю, tools игнорируются). ТЗ-XAI-5 переключит expertise на grok-4.20-0309-non-reasoning. Multi-agent через Responses API + MCP server будет отдельной веткой ТЗ-XAI-MA-1.",
   },
   {
     id: "grok-4-1-fast-reasoning",
@@ -397,20 +403,13 @@ const ENTRIES: ModelEntry[] = [
     contextWindow: 128_000,
     maxOutput: 16_000,
   },
-  {
-    id: "grok-4",
-    provider: "xai",
-    modelId: "grok-4",
-    displayName: "Grok 4",
-    // Not in docs.x.ai/docs/models as of 2026-04-12 — retained for backward
-    // compatibility with earlier tests. Pricing borrowed from 4.20 tier; may
-    // be inaccurate. Prefer grok-4.20-0309-* or grok-4-1-fast-* for new work.
-    pricing: { input: 2, output: 6, cachedInput: 0.2, cacheWrite: 0 },
-    capabilities: { ...CAPS_GROK, thinking: false },
-    contextWindow: 256_000,
-    maxOutput: 16_000,
-    notes: "DEPRECATED — not in docs.x.ai models list (2026-04-12). Pricing is an educated guess. Prefer grok-4.20-0309-* or grok-4-1-fast-*.",
-  },
+  // Note: legacy `grok-4` entry removed in v3.88.0 (ТЗ-XAI-1). It was not in
+  // docs.x.ai/docs/models, had 0 consumers in task-assignments, and SQL audit
+  // against ai_usage_log (2026-04-14) confirmed 0 historical records for bare
+  // modelId "grok-4". Tolerant walk-back in getModelEntry() returns undefined
+  // for "grok-4" (stripping lands on "grok" with no match), but that's a
+  // non-issue — there's nothing to resolve. Pricing for "grok-4" was always
+  // an educated guess borrowed from the 4.20 tier.
 
   // =========================================================================
   // OpenRouter — verified against https://openrouter.ai/api/v1/models

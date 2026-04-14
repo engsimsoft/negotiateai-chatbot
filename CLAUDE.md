@@ -1,6 +1,6 @@
 # Инструкция для Claude Code
 
-**Проект:** Simply | **Версия:** 3.87.5 | **Статус:** Active development
+**Проект:** Simply | **Версия:** 3.88.0 | **Статус:** Active development
 
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 

@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.87.5
+**Версия:** 3.88.0
 **Дата:** 2026-04-14
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -337,6 +337,24 @@ components/projects/
 ---
 
 ## План развития
+
+### 🎯 Активная серия: Simply_xAI — миграция на xAI Grok + Anthropic
+
+**Папка серии:** [specs/Simply_xAI/](specs/Simply_xAI/) · **Дорожная карта:** [SIMPLY_XAI_ROADMAP.md](specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md) · **Лог решений:** [SIMPLY_XAI_NOTES.md](specs/Simply_xAI/SIMPLY_XAI_NOTES.md)
+
+**Цель:** Уйти с зоопарка (MiniMax + Anthropic + OpenRouter) на архитектуру **xAI Grok + Anthropic** (vision + Opus для Профессора). 6 изолированных ТЗ, строго по порядку.
+
+**Прогресс:**
+- **ТЗ-XAI-1 Фундамент** — 🔄 В работе (удаление deprecated `grok-4`, notes про multi-agent, закрытие backlog)
+- ТЗ-XAI-2 MIND pipeline → Grok 4.1 Fast — 📋 План
+- ТЗ-XAI-3 KITT (Simply Chat) → Grok 4.1 Fast + R-6 очистка strip-функций — 📋 План
+- ТЗ-XAI-4 Utility/Pipeline → Grok (briefing, podcast, meeting, professor, title) — 📋 План
+- ТЗ-XAI-5 Think/Create/Expertise → Grok 4.20 (+ R-5: expertise с multi-agent на non-reasoning) — 📋 План
+- ТЗ-XAI-6 Очистка MiniMax/OpenRouter — 📋 План
+
+**Ключевое архитектурное решение (2026-04-14):** Защита контекста (sliding window 140K + Extract-on-compression) остаётся основой независимо от провайдерского окна. Вечный чат заполнит любое окно, модели деградируют на 30-50% заявленного. Привязка `SIMPLY_CONTEXT_LIMIT` к размеру провайдерского окна — антипаттерн.
+
+---
 
 ### ТЗ-AnthropicAliasCleanup: Удаление мёртвых catalog entries — ✅ ЗАВЕРШЁН (v3.87.5)
 
