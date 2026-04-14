@@ -253,23 +253,18 @@ const ENTRIES: ModelEntry[] = [
     contextWindow: 1_000_000,
     maxOutput: 128_000, // Updated 2026-04-12: Anthropic increased from 32K to 128K
   },
-  // Legacy snapshot — остаётся в pricing для старых записей ai_usage_log
-  {
-    id: "claude-sonnet-4-5-20250929",
-    provider: "anthropic",
-    modelId: "claude-sonnet-4-5-20250929",
-    displayName: "Claude Sonnet 4.5",
-    pricing: { input: 3, output: 15, cachedInput: 0.3, cacheWrite: 3.75 },
-    // 200K context (legacy snapshot до Sonnet 4.6 с 1M) → 100 страниц лимит для PDF.
-    capabilities: { ...CAPS_CLAUDE, documentSupport: CAPS_CLAUDE_200K_DOCS },
-    contextWindow: 200_000,
-    maxOutput: 64_000,
-    notes: "Legacy snapshot; kept for historical ai_usage_log cost calc",
-  },
+  // Note on removed legacy entry: `claude-sonnet-4-5-20250929` had only 2
+  // historical records in ai_usage_log (both Feb-Apr 2026), and its pricing
+  // is identical to claude-sonnet-4-6 ($3/$15/$0.3/$3.75). Tolerant lookup in
+  // getModelEntry walks back the trailing `-20250929`/`-4-5` segments and
+  // resolves via the `claude-sonnet` alias → claude-sonnet-4-6, so historical
+  // cost calc stays accurate. Removed in v3.87.5 (TZ_AnthropicAliasCleanup).
 
   // =========================================================================
-  // Anthropic — alias entries (short names that resolve to physical models,
-  // used by task-assignments.ts and cost lookups)
+  // Anthropic — alias entries (short semantic names used by UI layer:
+  // service-chat configs, DevPanel labels, component default props).
+  // Task-assignments uses physical IDs for cost precision; aliases insulate
+  // UI from snapshot version changes (bump catalog once → UI untouched).
   // =========================================================================
   {
     id: "claude-sonnet",
@@ -309,33 +304,13 @@ const ENTRIES: ModelEntry[] = [
     maxOutput: 128_000,
     aliasOf: "claude-opus-4-6",
   },
-  {
-    id: "title-model",
-    provider: "anthropic",
-    modelId: "claude-haiku-4-5-20251001",
-    displayName: "Title Model (Haiku)",
-    pricing: { input: 1, output: 5, cachedInput: 0.1, cacheWrite: 1.25 },
-    capabilities: {
-      ...CAPS_CLAUDE,
-      thinking: false,
-      supportsCompaction: false,
-      documentSupport: CAPS_CLAUDE_200K_DOCS,
-    },
-    contextWindow: 200_000,
-    maxOutput: 64_000,
-    aliasOf: "claude-haiku-4-5-20251001",
-  },
-  {
-    id: "artifact-model",
-    provider: "anthropic",
-    modelId: "claude-sonnet-4-6",
-    displayName: "Artifact Model (Sonnet)",
-    pricing: { input: 3, output: 15, cachedInput: 0.3, cacheWrite: 3.75 },
-    capabilities: CAPS_CLAUDE,
-    contextWindow: 1_000_000,
-    maxOutput: 64_000,
-    aliasOf: "claude-sonnet-4-6",
-  },
+  // Note: `title-model` and `artifact-model` aliases removed in v3.87.5
+  // (TZ_AnthropicAliasCleanup). Both had 0 consumers after ТЗ-1 CoreRegistry
+  // (v3.83.0) — task-assignments.ts uses physical IDs directly:
+  //   util:title       → "claude-haiku-4-5-20251001"
+  //   artifact:*       → "claude-sonnet-4-6"
+  // Dead aliases left behind during ТЗ-1 migration, cleaned up during
+  // catalog audit discovery.
 
   // =========================================================================
   // MiniMax

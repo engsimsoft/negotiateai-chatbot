@@ -16,6 +16,49 @@
 
 ---
 
+## [3.87.5] — 2026-04-14 — Anthropic Alias Cleanup (ТЗ-AnthropicAliasCleanup)
+
+Follow-up к v3.87.4: удаление 3 мёртвых Anthropic catalog entries, обнаруженных в ходе разведки кодовой базы для TZ_ModelCatalogDocumentFlags. Пользователь задал вопрос «почему так много дубликатов Claude в каталоге» — расследование показало dead code, оставшийся после ТЗ-1 CoreRegistry (v3.83.0).
+
+### Removed
+
+- **`title-model`** (alias → claude-haiku-4-5-20251001) — 0 usages в коде. Задача `util:title` использует физический id напрямую.
+- **`artifact-model`** (alias → claude-sonnet-4-6) — 0 usages в коде. Все 5 artifact задач (`artifact:text/markdown/excel/pptx/reveal`) ссылаются на физический id напрямую.
+- **`claude-sonnet-4-5-20250929`** (physical legacy snapshot) — 0 usages в коде. SQL-аудит ai_usage_log показал только 2 исторические записи за всё время (Feb 25 + Apr 6 2026), последняя неделю назад. Удаление безопасно, т.к. pricing Sonnet 4.5 и 4.6 идентичны, а tolerant walk-back lookup в `getModelEntry` резолвит устаревшие `claude-sonnet-4-5-*` ID через `claude-sonnet` alias → `claude-sonnet-4-6` (historical cost остаётся корректным)
+
+### Changed
+
+- [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts) — 3 entry удалены, вместо них inline-комментарии с обоснованием удаления и пояснением зачем оставшиеся aliases живые
+- [lib/ai/task-assignments.ts:139](lib/ai/task-assignments.ts#L139) — удалено устаревшее упоминание «artifact-model» из комментария
+
+### Kept (важное архитектурное разграничение)
+
+`claude-sonnet`, `claude-haiku`, `claude-opus` — **живые aliases**, 10+ usages в UI-слое:
+- `components/dev-panel/dev-panel-footer.tsx`, `components/dev-panel/sections/model-section.tsx` — DevPanel label mappings
+- `components/projects/task-chat.tsx` — `selectedModelId="claude-sonnet"`
+- `components/input/input-context.tsx`, `components/input/compact-input.tsx` — `defaultModelId`
+- `components/service-chat/configs/{ben,project-creation,project-manager,briefing-onboarding}.ts` — service chat configs
+- `components/service-chat/types.ts` — type `model: "claude-haiku" | "claude-sonnet"`
+
+**Это не tech debt, а валидный паттерн:**
+- `task-assignments.ts` использует физические snapshot IDs (`claude-sonnet-4-6`) для cost precision и cache invalidation
+- UI-слой использует семантические aliases (`claude-sonnet`) для изоляции от snapshot version changes — при выкате Sonnet 4.7 нужно поправить одну строку (target alias-а), UI трогать не надо
+
+### Verified
+
+- `npx tsc --noEmit` — 0 ошибок
+- `npm run build` — успешно
+- Grep `"title-model"|"artifact-model"|"claude-sonnet-4-5-20250929"` — 0 matches в *.ts/*.tsx
+- SQL-аудит `ai_usage_log` подтвердил 2 записи legacy Sonnet 4.5 (не блокируют удаление из-за walk-back + identical pricing)
+
+### Итоговое состояние Anthropic в каталоге
+
+**Было:** 4 physical + 5 alias = 9 записей
+**Стало:** 3 physical + 3 alias = 6 записей
+Чистое разделение: `{sonnet, haiku, opus} × {physical id, semantic alias}`
+
+---
+
 ## [3.87.4] — 2026-04-14 — Model Catalog Document Flags (ТЗ-ModelCatalogDocumentFlags)
 
 Структурированные данные о поддержке документов в каталоге моделей. Будущий universal document router будет читать эти флаги для принятия решения о fallback.

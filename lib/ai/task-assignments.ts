@@ -136,7 +136,7 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "util:project-summary":       "claude-haiku-4-5-20251001",
   "util:artifact-suggestions":  "claude-sonnet-4-6",
 
-  // Artifact generation — все 5 типов используют Sonnet (совпадает с прежним "artifact-model" алиасом)
+  // Artifact generation — все 5 типов используют Sonnet
   "artifact:text":              "claude-sonnet-4-6",
   "artifact:markdown":          "claude-sonnet-4-6",
   "artifact:excel":             "claude-sonnet-4-6",

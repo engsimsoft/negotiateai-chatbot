@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.87.4
+**Версия:** 3.87.5
 **Дата:** 2026-04-14
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -337,6 +337,51 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-AnthropicAliasCleanup: Удаление мёртвых catalog entries — ✅ ЗАВЕРШЁН (v3.87.5)
+
+**Контекст:** при работе над TZ_ModelCatalogDocumentFlags (v3.87.4) пользователь обратил внимание на 9 Anthropic-записей в каталоге и задал вопрос «почему так много и почему дубликаты». Разведка кодовой базы + SQL-аудит показали, что 3 из 9 записей — dead code, оставшийся после миграции на ТЗ-1 CoreRegistry (v3.83.0).
+
+**Что обнаружено:**
+- **`title-model`** — 0 usages в коде, задача `util:title` ссылается прямо на `claude-haiku-4-5-20251001`
+- **`artifact-model`** — 0 usages в коде (только упоминание в комментарии task-assignments.ts), все 5 artifact задач ссылаются прямо на `claude-sonnet-4-6`
+- **`claude-sonnet-4-5-20250929`** (legacy snapshot) — 0 usages в коде, только 2 исторических записи в `ai_usage_log`:
+
+  ```sql
+  SELECT "modelId", COUNT(*), MIN("createdAt"), MAX("createdAt")
+  FROM ai_usage_log WHERE "modelId" LIKE '%sonnet-4-5%' GROUP BY "modelId";
+  ```
+
+  | modelId | count | first | last |
+  |---|---|---|---|
+  | claude-sonnet-4-5-20250929 | 2 | 2026-02-25 | 2026-04-06 |
+
+**Что ОСТАВЛЕНО (и почему):**
+Alias'ы `claude-sonnet`, `claude-haiku`, `claude-opus` — **живые**, 10+ usages в UI-слое: service-chat configs (ben, project-creation, project-manager, briefing-onboarding), DevPanel label mappings, `selectedModelId` в task-chat, `defaultModelId` в input-context и compact-input, тип `ServiceChatConfig.model`. Это **валидный паттерн**, не tech debt:
+- task-assignments использует физические snapshot IDs (`claude-sonnet-4-6`) для cost precision и cache invalidation при smена provider snapshot
+- UI-слой использует семантические aliases (`claude-sonnet`) — при выкате Sonnet 4.7 в каталоге надо поправить одну строку (target alias-а), UI трогать не нужно
+
+Оба слоя оправданы, архитектурное обоснование закреплено в комментариях каталога.
+
+**Безопасность удаления `claude-sonnet-4-5-20250929`:**
+- Pricing `claude-sonnet-4-5-20250929` (`$3/$15/$0.3/$3.75`) **идентичен** `claude-sonnet-4-6`
+- `getModelEntry` в [model-catalog.ts](lib/ai/model-catalog.ts) имеет tolerant walk-back loop: `claude-sonnet-4-5-20250929` → strip `-20250929` → `claude-sonnet-4-5` → strip `-4-5` → `claude-sonnet` (alias) → resolve → `claude-sonnet-4-6` → тот же pricing
+- Те 2 исторических записи продолжат корректно считать cost через walk-back fallback
+
+**Что сделано:**
+- [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts) — удалены 3 entry, вместо них комментарии с обоснованием удаления и архитектурным пояснением зачем живые alias'ы остались
+- [lib/ai/task-assignments.ts:139](lib/ai/task-assignments.ts#L139) — убрано устаревшее упоминание «artifact-model» из комментария
+- 6 Anthropic entries → 3 physical + 3 alias (было: 4 physical + 5 alias)
+
+**Валидация:**
+- `npx tsc --noEmit` — 0 ошибок
+- `npm run build` — успешно
+- Grep `"title-model"|"artifact-model"|"claude-sonnet-4-5-20250929"` — 0 matches
+- SQL-аудит ai_usage_log подтвердил отсутствие активного использования
+
+**Key insight: разведка до кода.** Перед удалением запись grep по всей кодовой базе + SQL-аудит БД — две независимые проверки. Если бы я не проверил UI-слой, мог бы ошибочно удалить живые `claude-sonnet`/`claude-haiku` alias'ы (10+ usages) → сломать service-chat, DevPanel, default model selection. SQL на БД показал реальные, а не теоретические usage patterns для legacy snapshot.
+
+---
 
 ### ТЗ-ModelCatalogDocumentFlags: Структурные флаги поддержки документов в каталоге моделей — ✅ ЗАВЕРШЁН (v3.87.4)
 
