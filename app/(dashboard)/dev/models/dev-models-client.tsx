@@ -67,8 +67,11 @@ function shortenCatalogId(id: string): string {
 // Capability badges
 // ---------------------------------------------------------------------------
 
+// Boolean capabilities — простой набор флагов, рендерим map'ом.
+type BooleanCapKey = "vision" | "tools" | "thinking" | "streaming" | "embeddings";
+
 interface CapabilityConfig {
-  key: keyof ModelCapabilities;
+  key: BooleanCapKey;
   label: string;
   icon: typeof Sparkles;
 }
@@ -78,9 +81,54 @@ const CAPABILITIES: CapabilityConfig[] = [
   { key: "tools",     label: "tools",     icon: Wrench },
   { key: "thinking",  label: "thinking",  icon: Sparkles },
   { key: "streaming", label: "streaming", icon: Zap },
-  { key: "documents", label: "docs",      icon: FileText },
   { key: "embeddings",label: "embed",     icon: Layers },
 ];
+
+/**
+ * Document support badge — отдельный компонент, потому что `documentSupport`
+ * это discriminated union (не boolean). Иконка active при `supported: true`,
+ * tooltip показывает method + лимиты или reason. Files-api модели визуально
+ * отличаются от native (для будущей дифференциации в роутере).
+ */
+function DocumentSupportBadge({ support }: { support: ModelCapabilities["documentSupport"] }) {
+  const supported = support.supported;
+  // native = обычный foreground, files-api = чуть приглушённый (требует доп. интеграции),
+  // not supported = muted.
+  const colorClass = !supported
+    ? "text-muted-foreground/30"
+    : support.method === "files-api"
+      ? "text-amber-500"
+      : "text-foreground";
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={`inline-flex size-4 items-center justify-center ${colorClass}`}>
+          <FileText className="size-3" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        {supported ? (
+          <div className="space-y-0.5">
+            <div className="font-medium">docs: {support.method}</div>
+            {support.maxPages !== undefined && (
+              <div>max {support.maxPages} pages</div>
+            )}
+            {support.maxSizeMb !== undefined && (
+              <div>max {support.maxSizeMb} MB</div>
+            )}
+            {support.notes && <div className="text-xs opacity-80">{support.notes}</div>}
+          </div>
+        ) : (
+          <div className="space-y-0.5">
+            <div className="font-medium">docs: no</div>
+            <div className="text-xs opacity-80">{support.reason}</div>
+          </div>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 function CapabilityBadges({ caps }: { caps: ModelCapabilities }) {
   return (
@@ -105,6 +153,7 @@ function CapabilityBadges({ caps }: { caps: ModelCapabilities }) {
           </Tooltip>
         );
       })}
+      <DocumentSupportBadge support={caps.documentSupport} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 # Simply — Текущее состояние проекта
 
-**Версия:** 3.87.3
+**Версия:** 3.87.4
 **Дата:** 2026-04-14
 **Статус:** Active development
 **Production URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
@@ -24,7 +24,7 @@
 
 | Особенность | Описание | Статус |
 |-------------|----------|--------|
-| **Simply Chat** | Persistent чат: MiniMax M2.7 (текст, 12 tools) + Gemini 3 Flash (vision) + Sonnet (думать, 14 tools), Extract-on-compression | ✅ v3.79.0 |
+| **Simply Chat** | Persistent чат: MiniMax M2.7 (текст, 12 tools) + Claude Haiku 4.5 (фото/PDF через `simply-chat-vision`, native PDF до 100 стр.) + Sonnet (думать, 14 tools), Extract-on-compression | ✅ v3.79.0 |
 | **Мой контекст** | Dashboard MIND Memory — 7 категорий, Opus-профиль | ✅ v3.74.0 |
 | **Универсальный AI-чат** | Один мощный чат со всеми инструментами | ✅ |
 | **Проекты** | Изолированные рабочие пространства с Профессором, Менеджером, утверждением плана, картой задач, чатом с Экспертом, завершением задач и управлением контекстом | ✅ v3.18.0 |
@@ -337,6 +337,49 @@ components/projects/
 ---
 
 ## План развития
+
+### ТЗ-ModelCatalogDocumentFlags: Структурные флаги поддержки документов в каталоге моделей — ✅ ЗАВЕРШЁН (v3.87.4)
+
+**Проблема:** булевое `capabilities.documents: boolean` в [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts) было слишком грубым для будущего universal document router. `false` могло означать три разных вещи: «провайдер не умеет», «провайдер умеет но мы не интегрировали», «модель не для текста». Плюс в CLAUDE.md и SIMPLY_STATUS.md была устаревшая запись про Gemini 3 Flash Preview для Simply Chat — реально в коде используется Claude Haiku 4.5.
+
+**Что обнаружено в разведке:**
+- `capabilities.documents` — **0 consumers** в проде → безопасна полная замена
+- Simply Chat роутинг документов **уже работает**: [chat/route.ts:598-608](app/(chat)/api/chat/route.ts#L598) — `simply-chat-vision` taskId → Claude Haiku 4.5 (native PDF до 100 страниц), НЕ Gemini как было задокументировано
+- Для chatMode `expertise`/`create` (Grok/MiniMax) fallback для документов отсутствует — silent fail. Вне scope этого ТЗ, отдельный backlog
+
+**Что сделано:**
+- **Новый тип `DocumentSupport`** — discriminated union: `{ supported: false, reason }` или `{ supported: true, method: "native"|"files-api", maxPages?, maxSizeMb?, notes? }`. TS не даёт указать `method` без `supported: true`
+- **`ModelCapabilities.documents: boolean` → `documentSupport: DocumentSupport`** — все 28 записей каталога обновлены
+- **Preset-inheritance + targeted overrides:** 5 presets несут дефолт (CAPS_CLAUDE = native 600/32, CAPS_MINIMAX = false «Anthropic-compat не поддерживает», и т.д.), override применён только где значение отличается — 4 Claude 200K (override `CAPS_CLAUDE_200K_DOCS` с maxPages=100) и 6 non-LLM individual
+- **DevPanel `/dev/models`:** новый `DocumentSupportBadge` с tooltip (method, maxPages, maxSizeMb, notes/reason) и визуальной дифференциацией: native = foreground, files-api = amber-500, not supported = muted
+- **CLAUDE.md + SIMPLY_STATUS.md** — устаревшая запись про Gemini 3 Flash Preview заменена на Claude Haiku 4.5 с ссылкой на chat/route.ts
+
+**Ошибки исходного ТЗ (исправлены через WebFetch официальных docs):**
+
+| Параметр | ТЗ говорил | Реальность |
+|---|---|---|
+| Anthropic maxPages | 100 для всех | **600** для 1M-моделей (Sonnet 4.6, Opus 4.6), 100 для 200K (Haiku 4.5, Sonnet 4.5) |
+| Grok Files API флаг | `true` / files-api для reasoning | **`false`** — xAI умеет, но Simply не интегрирует (реальная vs декларативная истина) |
+| Gemini модель для PDF в Simply | `gemini-2.5-flash-preview-tts` | **TTS-модель** — не принимает документы. Реально используется Claude Haiku 4.5 |
+
+**Key decisions:**
+- **Семантика = реальная поддержка Simply, не декларативная у провайдера.** xAI Files API существует и работает для agentic-моделей, но в Simply нет кода для upload → file_id → input_file. Флаг `false`, пока не реализуем. Это нужно чтобы будущий document router не врал
+- **Discriminated union** — не flat поля. TS гарантирует валидность комбинаций
+- **Preset-inheritance** — 28 записей не инлайн. Смена preset = обновление всех наследующих одной правкой
+- **Perplexity sonar-pro → false для нашего use case**, хотя API поддерживает `file_url`. В Simply sonar-pro вызывается ТОЛЬКО через tool `deepResearch` — туда файлы не передаются
+
+**Валидация:**
+- `npx tsc --noEmit` — 0 ошибок
+- `npm run build` (включая `tsx lib/db/migrate`) — успешно, /dev/models 9.8 kB
+- Sanity check: 18 occurrences `documentSupport:`, 0 occurrences old `documents:` (кроме JSDoc)
+- Гранулярная разведка кодовой базы перед кодом — grep `capabilities.documents` (0 consumers → безопасно удалять), grep `stripMediaPartsForTextModel` (нашёл actual роутер в chat/route.ts), task-assignments.ts (нашёл `simply-chat-vision` = Haiku)
+
+**Backlog (отложено в Unreleased секции CHANGELOG):**
+- Universal document router для `chatMode=expertise`/`create` — fallback на модель с `documentSupport.supported=true`
+- xAI Files API integration — реализовать upload/file_id/input_file flow для Grok reasoning
+- Alias entries refactor — устранить дублирование pricing/capabilities в 5 alias через `aliasOf` резолв
+
+---
 
 ### ТЗ-CreateSnapshotAudit: Удаление мёртвой фичи createSnapshot + ADR 052 — ✅ ЗАВЕРШЁН (v3.87.3)
 

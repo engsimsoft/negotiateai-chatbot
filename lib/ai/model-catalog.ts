@@ -26,11 +26,45 @@ export type ProviderId =
   | "voyage"
   | "deepgram";
 
+/**
+ * Document input support — discriminated union по `supported`.
+ *
+ * Заменил булевый `documents: boolean` (TZ_ModelCatalogDocumentFlags, 2026-04-14).
+ * Прежний флаг был слишком грубым для роутера: `false` мог означать «провайдер
+ * не умеет», «провайдер умеет но мы не интегрировали», «модель не для текста»
+ * — три разных решения для роутера.
+ *
+ * Семантика — РЕАЛЬНАЯ поддержка в Simply, не декларативная у провайдера.
+ * Если xAI умеет PDF через Files API, но мы не интегрировали — `supported: false`.
+ * Это нужно чтобы будущий document router не направлял PDF в модель,
+ * которая фактически не сможет его обработать в нашей кодовой базе.
+ *
+ * `method`:
+ *  - "native" — PDF передаётся inline в messages (base64 или URL)
+ *  - "files-api" — нужен предварительный upload через Files API провайдера
+ */
+export type DocumentSupport =
+  | {
+      supported: false;
+      /** Почему `false` — для DevPanel и для будущих решений (поднять флаг или нет). */
+      reason: string;
+    }
+  | {
+      supported: true;
+      method: "native" | "files-api";
+      /** Лимит страниц на запрос. Зависит от context window для Claude. */
+      maxPages?: number;
+      /** Лимит размера запроса/файла в мегабайтах. */
+      maxSizeMb?: number;
+      /** Дополнительные оговорки или зависимости. */
+      notes?: string;
+    };
+
 export interface ModelCapabilities {
   streaming: boolean;
   tools: boolean;
   vision: boolean;
-  documents: boolean;
+  documentSupport: DocumentSupport;
   thinking: boolean;
   embeddings: boolean;
   /**
@@ -82,11 +116,20 @@ export interface ModelEntry {
 // ---------------------------------------------------------------------------
 
 // Sonnet/Opus 4+ support Anthropic Compaction API.
+// documentSupport дефолт = native PDF, лимит страниц 600 (для 1M-моделей Sonnet 4.6/Opus 4.6).
+// Модели с 200K context (Haiku 4.5, Sonnet 4.5 legacy) override на maxPages: 100 — это
+// official Anthropic limit (см. ANALYSIS.md, источник platform.claude.com/.../pdf-support).
 const CAPS_CLAUDE: ModelCapabilities = {
   streaming: true,
   tools: true,
   vision: true,
-  documents: true,
+  documentSupport: {
+    supported: true,
+    method: "native",
+    maxPages: 600,
+    maxSizeMb: 32,
+    notes: "PDF inline base64/URL/Files API. 600 страниц для 1M-моделей, 100 для 200K (см. override).",
+  },
   thinking: true,
   embeddings: false,
   supportsCompaction: true,
@@ -96,7 +139,10 @@ const CAPS_MINIMAX: ModelCapabilities = {
   streaming: true,
   tools: true,
   vision: false,
-  documents: false,
+  documentSupport: {
+    supported: false,
+    reason: "Anthropic-compat endpoint не поддерживает image/document inputs (verified 2026-04-13)",
+  },
   thinking: true,
   embeddings: false,
   supportsCompaction: false,
@@ -106,7 +152,15 @@ const CAPS_GROK: ModelCapabilities = {
   streaming: true,
   tools: true,
   vision: true,
-  documents: false,
+  documentSupport: {
+    supported: false,
+    // xAI Files API существует и работает для agentic-моделей (grok-4, grok-4.20,
+    // grok-4-fast), но в Simply мы не реализовали интеграцию upload → file_id →
+    // input_file content type. Декларативная истина (провайдер умеет) ≠ фактическая
+    // (Simply не интегрирует). Будущее ТЗ-XAIFilesIntegration поднимет флаг для
+    // reasoning вариантов.
+    reason: "xAI Files API не интегрирован в Simply (требует upload + input_file content type)",
+  },
   thinking: true,
   embeddings: false,
   supportsCompaction: false,
@@ -116,23 +170,40 @@ const CAPS_OPENROUTER_TEXT: ModelCapabilities = {
   streaming: true,
   tools: true,
   vision: false,
-  documents: false,
+  documentSupport: {
+    supported: false,
+    reason: "OpenRouter proxy — document support не валидирован, не для production",
+  },
   thinking: false,
   embeddings: false,
   supportsCompaction: false,
 };
 
 // Vision-capable OpenRouter models (GLM V-series and similar multimodal).
-// Documents stay false — OpenRouter v1 doesn't route PDFs through these models
+// Documents stay unsupported — OpenRouter v1 doesn't route PDFs through these models
 // directly; images/video are the supported media types.
 const CAPS_OPENROUTER_VISION: ModelCapabilities = {
   streaming: true,
   tools: true,
   vision: true,
-  documents: false,
+  documentSupport: {
+    supported: false,
+    reason: "OpenRouter proxy — vision модели обрабатывают image/video, не PDF",
+  },
   thinking: false,
   embeddings: false,
   supportsCompaction: false,
+};
+
+// Override для Claude моделей с 200K context (Haiku 4.5, Sonnet 4.5 legacy).
+// Anthropic docs: 100 страниц для 200K-моделей, 600 — для 1M-моделей.
+// Используется через spread: `{ ...CAPS_CLAUDE, documentSupport: CAPS_CLAUDE_200K_DOCS }`.
+const CAPS_CLAUDE_200K_DOCS: DocumentSupport = {
+  supported: true,
+  method: "native",
+  maxPages: 100,
+  maxSizeMb: 32,
+  notes: "PDF inline base64/URL/Files API. 200K context → 100 страниц лимит.",
 };
 
 // ---------------------------------------------------------------------------
@@ -163,7 +234,12 @@ const ENTRIES: ModelEntry[] = [
     // but we keep thinking:false as a deliberate cost-control choice — enabling
     // thinking on Haiku would increase token usage without clear benefit for
     // the utility tasks it handles (title gen, file analysis, OCR, snapshots).
-    capabilities: { ...CAPS_CLAUDE, thinking: false, supportsCompaction: false },
+    capabilities: {
+      ...CAPS_CLAUDE,
+      thinking: false,
+      supportsCompaction: false,
+      documentSupport: CAPS_CLAUDE_200K_DOCS,
+    },
     contextWindow: 200_000,
     maxOutput: 64_000,
   },
@@ -184,7 +260,8 @@ const ENTRIES: ModelEntry[] = [
     modelId: "claude-sonnet-4-5-20250929",
     displayName: "Claude Sonnet 4.5",
     pricing: { input: 3, output: 15, cachedInput: 0.3, cacheWrite: 3.75 },
-    capabilities: CAPS_CLAUDE,
+    // 200K context (legacy snapshot до Sonnet 4.6 с 1M) → 100 страниц лимит для PDF.
+    capabilities: { ...CAPS_CLAUDE, documentSupport: CAPS_CLAUDE_200K_DOCS },
     contextWindow: 200_000,
     maxOutput: 64_000,
     notes: "Legacy snapshot; kept for historical ai_usage_log cost calc",
@@ -211,7 +288,12 @@ const ENTRIES: ModelEntry[] = [
     modelId: "claude-haiku-4-5-20251001",
     displayName: "Claude Haiku",
     pricing: { input: 1, output: 5, cachedInput: 0.1, cacheWrite: 1.25 },
-    capabilities: { ...CAPS_CLAUDE, thinking: false, supportsCompaction: false },
+    capabilities: {
+      ...CAPS_CLAUDE,
+      thinking: false,
+      supportsCompaction: false,
+      documentSupport: CAPS_CLAUDE_200K_DOCS,
+    },
     contextWindow: 200_000,
     maxOutput: 64_000,
     aliasOf: "claude-haiku-4-5-20251001",
@@ -233,7 +315,12 @@ const ENTRIES: ModelEntry[] = [
     modelId: "claude-haiku-4-5-20251001",
     displayName: "Title Model (Haiku)",
     pricing: { input: 1, output: 5, cachedInput: 0.1, cacheWrite: 1.25 },
-    capabilities: { ...CAPS_CLAUDE, thinking: false, supportsCompaction: false },
+    capabilities: {
+      ...CAPS_CLAUDE,
+      thinking: false,
+      supportsCompaction: false,
+      documentSupport: CAPS_CLAUDE_200K_DOCS,
+    },
     contextWindow: 200_000,
     maxOutput: 64_000,
     aliasOf: "claude-haiku-4-5-20251001",
@@ -426,7 +513,8 @@ const ENTRIES: ModelEntry[] = [
     pricing: { input: 0.06, output: 0, cachedInput: 0, cacheWrite: 0 },
     capabilities: {
       streaming: false, tools: false, vision: false,
-      documents: false, thinking: false, embeddings: true,
+      documentSupport: { supported: false, reason: "Embedding model" },
+      thinking: false, embeddings: true,
       supportsCompaction: false,
     },
     contextWindow: 32_000,
@@ -440,7 +528,8 @@ const ENTRIES: ModelEntry[] = [
     pricing: { input: 0.02, output: 0, cachedInput: 0, cacheWrite: 0 },
     capabilities: {
       streaming: false, tools: false, vision: false,
-      documents: false, thinking: false, embeddings: true,
+      documentSupport: { supported: false, reason: "Embedding model" },
+      thinking: false, embeddings: true,
       supportsCompaction: false,
     },
     contextWindow: 32_000,
@@ -454,7 +543,15 @@ const ENTRIES: ModelEntry[] = [
     pricing: { input: 3, output: 15, cachedInput: 0, cacheWrite: 0 },
     capabilities: {
       streaming: false, tools: false, vision: false,
-      documents: false, thinking: false, embeddings: false,
+      // Perplexity API сам по себе поддерживает file_url (PDF/DOC/DOCX/TXT/RTF до 50MB),
+      // но в Simply мы зовём sonar-pro ТОЛЬКО через tool deepResearch — это поисковый
+      // инструмент, файлы туда не передаются. Если будущий refactor добавит file inputs
+      // в deepResearch — поднимем флаг.
+      documentSupport: {
+        supported: false,
+        reason: "Используется только через tool deepResearch — файлы не передаются в текущей интеграции",
+      },
+      thinking: false, embeddings: false,
       supportsCompaction: false,
     },
     contextWindow: 200_000,
@@ -469,7 +566,11 @@ const ENTRIES: ModelEntry[] = [
     pricing: { input: 2, output: 8, cachedInput: 0, cacheWrite: 0 },
     capabilities: {
       streaming: false, tools: false, vision: false,
-      documents: false, thinking: true, embeddings: false,
+      documentSupport: {
+        supported: false,
+        reason: "Deep Research agent — не используется для прямых файловых запросов в Simply",
+      },
+      thinking: true, embeddings: false,
       supportsCompaction: false,
     },
     contextWindow: 200_000,
@@ -483,7 +584,8 @@ const ENTRIES: ModelEntry[] = [
     pricing: { input: 0, output: 0, cachedInput: 0, cacheWrite: 0 },
     capabilities: {
       streaming: false, tools: false, vision: false,
-      documents: false, thinking: false, embeddings: false,
+      documentSupport: { supported: false, reason: "Audio transcription — input is audio, not text/documents" },
+      thinking: false, embeddings: false,
       supportsCompaction: false,
     },
     contextWindow: 0,
@@ -498,7 +600,8 @@ const ENTRIES: ModelEntry[] = [
     pricing: { input: 0, output: 0, cachedInput: 0, cacheWrite: 0 },
     capabilities: {
       streaming: false, tools: false, vision: false,
-      documents: false, thinking: false, embeddings: false,
+      documentSupport: { supported: false, reason: "TTS model — generates audio from text, not document analysis" },
+      thinking: false, embeddings: false,
       supportsCompaction: false,
     },
     contextWindow: 0,

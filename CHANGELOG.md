@@ -10,6 +10,67 @@
 ### Planned (Next Steps)
 - RAG-4: Библиотека MVP (загрузка документов + search)
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
+- Universal document router для chatMode `expertise`/`create` — fallback на модель с `documentSupport.supported=true` когда пользователь шлёт PDF в Grok/MiniMax
+- xAI Files API integration — поднять флаги `documentSupport` для Grok reasoning-моделей
+- Alias entries refactor — устранить дублирование `pricing`/`capabilities` в alias через резолв через `aliasOf`
+
+---
+
+## [3.87.4] — 2026-04-14 — Model Catalog Document Flags (ТЗ-ModelCatalogDocumentFlags)
+
+Структурированные данные о поддержке документов в каталоге моделей. Будущий universal document router будет читать эти флаги для принятия решения о fallback.
+
+### Контекст находки
+
+До этого patch'а каталог содержал булевое `capabilities.documents: boolean` — недостаточно для роутера: `false` мог означать «провайдер не умеет», «провайдер умеет но мы не интегрировали», «модель не для текста» — три разных решения для роутера. Грубой истины типа boolean было мало.
+
+Дополнительно в CLAUDE.md была устаревшая запись о Simply Chat: «фото/PDF → Gemini 3 Flash Preview», хотя в коде (`task-assignments.ts` + [chat/route.ts:598](app/(chat)/api/chat/route.ts#L598)) реально идёт на Claude Haiku 4.5 через `simply-chat-vision` taskId.
+
+### Added
+
+- **Тип `DocumentSupport`** ([lib/ai/model-catalog.ts](lib/ai/model-catalog.ts)) — discriminated union:
+  - `{ supported: false, reason: string }`
+  - `{ supported: true, method: "native" | "files-api", maxPages?, maxSizeMb?, notes? }`
+- **Helper `CAPS_CLAUDE_200K_DOCS`** — override для 200K Claude-моделей (100 страниц вместо 600 для 1M-моделей)
+- **Компонент `DocumentSupportBadge`** ([app/(dashboard)/dev/models/dev-models-client.tsx](app/(dashboard)/dev/models/dev-models-client.tsx)) — иконка 📄 на /dev/models с tooltip (method, maxPages, maxSizeMb, notes/reason). Визуальная дифференциация: native = foreground, files-api = amber, not supported = muted
+- **ANALYSIS.md** в папке ТЗ — верификация всех 28 записей против официальных docs провайдеров (Anthropic PDF, xAI Files, Perplexity Files, MiniMax Anthropic-compat)
+
+### Changed
+
+- **`ModelCapabilities.documents: boolean` → `documentSupport: DocumentSupport`** — поле переименовано и структурировано. 0 consumers в проде до правки (grep по `capabilities.documents` / `caps.documents` → ничего), замена безопасна
+- **Все 5 capability presets обновлены:** `CAPS_CLAUDE` (native, 600 pages, 32 MB), `CAPS_MINIMAX` (false, «Anthropic-compat endpoint не поддерживает image/document inputs»), `CAPS_GROK` (false, «xAI Files API не интегрирован в Simply»), `CAPS_OPENROUTER_TEXT` (false, «proxy не для production»), `CAPS_OPENROUTER_VISION` (false, «vision модели обрабатывают image/video, не PDF»)
+- **4 override для 200K Claude** — Haiku 4.5 phys, Sonnet 4.5 legacy phys, `claude-haiku` alias, `title-model` alias: override `documentSupport: CAPS_CLAUDE_200K_DOCS` (100 pages vs 600)
+- **6 индивидуальных capabilities обновлены:** voyage-4/voyage-4-lite, sonar-pro, sonar-deep-research, deepgram-nova-3, gemini-2.5-flash-preview-tts — все `supported: false` с конкретными reason
+- **CLAUDE.md Simply Chat section** — устаревшая запись «фото/PDF → Gemini 3 Flash Preview» заменена на «фото/PDF → Claude Haiku 4.5 через `simply-chat-vision` taskId», добавлена ссылка на chat/route.ts
+
+### Key Decisions
+
+- **Семантика флагов = реальная поддержка в Simply, не декларативная у провайдера.** xAI умеет PDF через Files API для agentic-моделей (grok-4, grok-4.20, grok-4-fast) — но в Simply нет интеграции upload → file_id → input_file. Флаг стоит `false` до тех пор, пока интеграция не реализована. Декларативная истина ≠ фактическая — выбрали вторую, чтобы будущий document router не врал
+- **Discriminated union, а не flat поля.** TS не даст указать `method` без `supported: true`, и структура естественно расширяется (`maxPages`, `maxSizeMb`, `notes`). Flat поля (`supportsDocumentInput: boolean` + `documentMethod: string`) открывали бы возможность невалидных комбинаций
+- **Preset-inheritance, а не 28 inline-значений.** Большинство записей получают `documentSupport` через наследование от preset (`CAPS_CLAUDE`, `CAPS_MINIMAX`, и т.д.). Override применён только там, где значение отличается от preset — 4 Claude 200K и 6 non-LLM. Смена preset-значения = обновление всех наследующих записей одной правкой
+- **Perplexity `sonar-pro` → false для нашего use case,** хотя API провайдера поддерживает `file_url`. Обоснование: мы зовём `sonar-pro` **только** через tool `deepResearch` в Sonnet-контексте. Это поисковый инструмент, файлы туда не передаются. Если будущий refactor добавит file inputs в deepResearch — поднимем флаг
+
+### Исправления vs ТЗ (ошибки оригинального исследования)
+
+| Параметр | ТЗ указывал | Реальность (verified через WebFetch официальных docs) |
+|---|---|---|
+| Anthropic PDF maxPages | 100 для всех Claude | **600** для 1M-моделей (Sonnet 4.6, Opus 4.6), 100 для 200K-моделей (Haiku 4.5, Sonnet 4.5 legacy) — 6× разница |
+| Grok Files API флаг | `true` / `"files-api"` для reasoning | **`false`** — декларативно провайдер умеет, но Simply не интегрирует Files API |
+| Gemini Flash для документов в Simply | `gemini-2.5-flash-preview-tts` | **Это TTS-модель** (text-to-speech, не для документов). Реально PDF в Simply идёт на Claude Haiku 4.5 |
+| Perplexity Sonar Deep Research | «было true/native» | Уже было `documents: false` в каталоге до правки — ТЗ работал относительно фантомной версии |
+
+### Verified
+
+- `npx tsc --noEmit` — 0 ошибок
+- `npm run build` (включая `tsx lib/db/migrate`) — успешно, /dev/models 9.8 kB
+- Sanity check каталога: 18 occurrences `documentSupport:` в model-catalog.ts, 0 occurrences old `documents:` (кроме комментария в JSDoc)
+
+### Out of Scope (следующие ТЗ)
+
+- Universal document router для chatMode `expertise`/`create` — сейчас silent fail если пользователь шлёт PDF в Grok/MiniMax. Флаги готовы к использованию, логика не меняется в этом patch'е
+- xAI Files API integration — реализовать upload → file_id → input_file для Grok reasoning
+- Gemini 3 Flash Preview в каталог — если решим использовать как multimodal fallback (сейчас не зовётся в коде Simply Chat)
+- Alias entries refactor — устранить дублирование `pricing`/`capabilities` в alias через `aliasOf` резолв
 
 ---
 
