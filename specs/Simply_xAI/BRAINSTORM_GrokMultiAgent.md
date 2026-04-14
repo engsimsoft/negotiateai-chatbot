@@ -242,10 +242,12 @@ xAI → финальный синтез лидера → стрим обратн
 | Context window (все Grok 4.x) | `2 000 000` tokens (декларативно) | В нашем каталоге — консервативные значения (256K / 128K) до эмпирического подтверждения |
 | Лидер + sub-агенты | Абстрактное описание, **без имён и ролей** | *«A designated leader agent is responsible for synthesizing the discussion... When you send a request, multiple agents are launched to discuss and collaborate»* |
 
+> ⚠️ **Коррекция 2026-04-14 (empirical):** утверждение ниже про «reasoning-варианты принимают `reasoning.effort`» — **неверное**. Эмпирический тест через `@ai-sdk/xai` показал что ОБА варианта (reasoning и non-reasoning) `grok-4-1-fast` возвращают `Bad Request` при передаче `providerOptions.xai.reasoningEffort`. Формулировка docs.x.ai «reasoning_effort не поддерживается grok-4.20 или grok-4-1-fast» означала целые семейства. Подробности и таблица с verified параметрами — см. [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) запись «2026-04-14 — Verified Grok parameter reference».
+
 ### 10.2 ❌ Опровергнуто (НЕ использовать в ТЗ)
 
 - **Имена агентов «Harper / Benjamin / Lucas / Grok-капитан» с жёсткими ролями (креатив / аналитика / проверка ошибок / синтез)** — **в официальной документации xAI таких имён и ролей нет**. Агенты описаны только абстрактно: «leader agent» и «sub-agents, each contributing its own perspective». Это галлюцинация Grok-ответа. В документах Simply и в ТЗ это упоминать нельзя.
-- **«Grok 4.20 и Grok 4.1 Fast не принимают `reasoning.effort` и будут падать с ошибкой»** — неверно. Reasoning-варианты этих моделей (`grok-4.20-0309-reasoning`, `grok-4-1-fast-reasoning`) используют `reasoning.effort` так же, как другие reasoning-модели (low/medium/high) для контроля глубины рассуждения. Только **non-reasoning** варианты не принимают этот параметр.
+- **«Grok 4.20 и Grok 4.1 Fast не принимают `reasoning.effort` и будут падать с ошибкой»** — ~~неверно. Reasoning-варианты этих моделей (`grok-4.20-0309-reasoning`, `grok-4-1-fast-reasoning`) используют `reasoning.effort` так же, как другие reasoning-модели (low/medium/high) для контроля глубины рассуждения. Только **non-reasoning** варианты не принимают этот параметр.~~ **[Опровергнуто эмпирически 2026-04-14]** — см. баннер выше §10.2.
 - **Рекомендация `presence_penalty = 0.1` для KITT / `frequency_penalty = 0.2` для Создать** — некорректна: оба параметра **не поддерживаются reasoning-моделями**. Если режим использует reasoning-вариант Grok — эти параметры будут проигнорированы или вызовут ошибку.
 - **`max_tokens` до 30 000** — число не подтверждено. Параметр `max_tokens` deprecated, актуальный — `max_completion_tokens`. Реальный потолок output для Grok 4.20 в нашем каталоге стоит **16K**, 30K — нужна проверка перед использованием.
 

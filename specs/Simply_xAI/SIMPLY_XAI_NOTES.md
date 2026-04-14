@@ -2,6 +2,113 @@
 
 > Append-only лог. Новые записи добавляются сверху. Старые не редактируются.
 
+**Соседние документы серии:**
+- [SIMPLY_XAI_ROADMAP.md](SIMPLY_XAI_ROADMAP.md) — что планируем
+- [SIMPLY_XAI_CHANGELOG.md](SIMPLY_XAI_CHANGELOG.md) — что реально сделано (append-only факт-лист)
+- Этот файл — почему приняли такие решения
+
+---
+
+## 2026-04-14 — Workflow серии: три документа вместо шести локальных CHANGELOG
+
+Владимир: предложил один CHANGELOG на всю серию миграции вместо локальных `CHANGELOG.md` внутри каждой папки `TZ_xai_N/`. Для одиночных ТЗ локальный changelog избыточен (есть глобальный проектный), а для серии из 6 ТЗ ценность факт-листа высока: передача смены, оформление документации, аудит без перебора commit history.
+
+**Принятое решение:** три документа на всю серию, не на каждое ТЗ:
+- `SIMPLY_XAI_ROADMAP.md` — forward-looking план (живой)
+- `SIMPLY_XAI_CHANGELOG.md` — что реально сделано per ТЗ (append-only факт-лист) ← **новый**
+- `SIMPLY_XAI_NOTES.md` — почему решили так (append-only лог решений)
+
+Локальных `CHANGELOG.md` внутри `TZ_xai_N/` папок **не создаём** — дублирование ухудшает читаемость серии. В папке ТЗ остаются только SPEC / ANALYSIS / ROADMAP.
+
+**Это нарушение стандартного шаблона `specs/_template/`** (там есть `CHANGELOG.md` и `HANDOFF.md` на каждое ТЗ) — но для серии эти файлы агрегируются вверх. Стандартный шаблон применяется к одиночным ТЗ без изменений.
+
+**Workflow будущего Claude Code при входе в серию:**
+1. `SIMPLY_XAI_CHANGELOG.md` (5 сек → знает что уже сделано)
+2. `SIMPLY_XAI_ROADMAP.md` прогресс-таблица (5 сек → знает что следующее)
+3. `SIMPLY_XAI_NOTES.md` последние 2-3 записи (30 сек → понимает контекст)
+4. `TZ_xai_N/ANALYSIS.md` + `ROADMAP.md` текущего ТЗ (1 мин → детали)
+
+---
+
+## 2026-04-14 — Кнопка «Думать» в Simply Chat — продуктовая семантика
+
+Владимир уточнил смысл кнопки «Думать» — я был неправ в своём последнем объяснении, когда интерпретировал её как «переключение reasoning режима той же модели».
+
+**Правильное понимание:**
+- **Без кнопки** → дефолтная модель (после миграции: `grok-4-1-fast-non-reasoning`, $0.20/$0.50 per 1M)
+- **С кнопкой** → сильная модель (после миграции: Grok 4.20, $2/$6 per 1M — в 10 раз дороже, заметно сильнее)
+
+Это **тировый апгрейд модели**, не технический reasoning mode. Имя «Думать» — продуктовая метафора для пользователя («используй умную модель»).
+
+**Зачем так:** пользователь сразу видит разницу в качестве ответа, value proposition кнопки очевиден.
+
+**Открытый вопрос (решим при старте ТЗ-XAI-5):** какой вариант Grok 4.20 для кнопки «Думать»?
+- **A. `grok-4.20-0309-non-reasoning`** — чистый tier upgrade, быстрый ответ, только input/output токены
+- **B. `grok-4.20-0309-reasoning`** — tier upgrade + физическое чувство паузы на reasoning, дополнительно тратит reasoning tokens (по ставке output, $6/1M)
+
+Оба стоят одинаково за input/output. Разница в дополнительных reasoning tokens у варианта B + в UX (пользователь видит задержку «модель думает» у B, практически мгновенный ответ у A).
+
+**Зафиксировано в памяти:** `project_think_button_semantics.md` — чтобы будущий Claude Code не интерпретировал кнопку как reasoning toggle.
+
+---
+
+## 2026-04-14 — Verified Grok parameter reference (источник правды для всех ТЗ серии)
+
+Сводка проверенных параметров xAI Grok моделей. Используем как SSOT при планировании и реализации любого ТЗ серии Simply_xAI. Опровергнутые утверждения (в том числе из внешних AI-консультаций и брейнсторма) помечены явно.
+
+### Семейства моделей и их варианты
+
+| Family | Reasoning variant | Non-reasoning variant | Multi-agent variant |
+|---|---|---|---|
+| Grok 4.20 | `grok-4.20-0309-reasoning` | `grok-4.20-0309-non-reasoning` | `grok-4.20-multi-agent-0309` |
+| Grok 4.1 Fast | `grok-4-1-fast-reasoning` | `grok-4-1-fast-non-reasoning` | — |
+
+### providerOptions для AI SDK v6 `@ai-sdk/xai`
+
+| Параметр | Reasoning variant | Non-reasoning variant | Multi-agent variant |
+|---|---|---|---|
+| `xai.reasoningEffort: "low" \| "high"` | ❌ **Bad Request** (empirical 2026-04-14) | ❌ **Bad Request** (empirical 2026-04-14) | ✅ Принимает `low/medium/high/xhigh` — управляет числом агентов (low/medium = 4, high/xhigh = 16) |
+| `temperature` (0–2) | ✅ | ✅ | ✅ |
+| `top_p` | ✅ | ✅ | ✅ |
+| `presence_penalty` | ❌ не поддерживается reasoning-моделями | ✅ | ❌ |
+| `frequency_penalty` | ❌ не поддерживается reasoning-моделями | ✅ | ❌ |
+| Автоматические reasoning tokens в `usage.outputTokenDetails.reasoningTokens` | ✅ emitted без конфигурации (empirical: ~93 tokens на простом тесте) | `0` | ✅ |
+
+### Эмпирический тест 2026-04-14 (через @ai-sdk/xai напрямую)
+
+Скрипт `scripts/test-grok-reasoning-effort.ts` (удалён после, одноразовый). 4 вызова × минимальный промпт «2+2=?»:
+
+```
+1. grok-4-1-fast-reasoning     БЕЗ reasoningEffort  → ✅ text="4", in=166, out=94, reasoning=93
+2. grok-4-1-fast-reasoning     С reasoningEffort    → ❌ Bad Request
+3. grok-4-1-fast-non-reasoning БЕЗ reasoningEffort  → ✅ text="4", in=178, out=1,  reasoning=0
+4. grok-4-1-fast-non-reasoning С reasoningEffort    → ❌ Bad Request
+```
+
+**Заключение:** формулировка docs.x.ai «`reasoning_effort` is not supported by `grok-4.20` or `grok-4-1-fast`» означает **целые семейства** (оба варианта). Чтобы настроить глубину reasoning — **нет способа** для этих моделей. Либо принимаешь автоматический reasoning, либо берёшь non-reasoning variant.
+
+### Опровергнутые утверждения
+
+| Источник | Утверждение | Реальность |
+|---|---|---|
+| BRAINSTORM_GrokMultiAgent.md §10.1 | «Reasoning-варианты grok-4.20 и grok-4.1 Fast принимают `reasoning.effort: low/medium/high`» | ❌ Empirical: оба варианта возвращают Bad Request |
+| Внешняя AI-консультация | «`presence_penalty = 0.1` для KITT / `frequency_penalty = 0.2` для «Создать»» | ❌ Для reasoning-моделей параметры не работают. Для non-reasoning работают, но эмпирический эффект не проверен |
+| Внешняя AI-консультация | «Имена агентов Harper/Benjamin/Lucas/Grok-капитан с ролями креатив/аналитика/проверка/синтез» | ❌ Галлюцинация. В docs.x.ai таких имён и ролей нет — только абстрактные «leader agent» и «sub-agents» |
+| BRAINSTORM §10.1 | «`max_tokens` до 30 000 для Grok 4.20» | ❌ Не подтверждено. `max_tokens` deprecated → `max_completion_tokens`. Потолок в docs.x.ai не раскрыт. Каталог держит 16K как консервативный дефолт |
+
+### Следствия для ТЗ серии
+
+- **ТЗ-XAI-2 (MIND → grok-4-1-fast-non-reasoning):** не передавать `reasoningEffort`, `presence_penalty` и `frequency_penalty` можем использовать но незачем
+- **ТЗ-XAI-3 (KITT + Think):** simply-chat → non-reasoning, simply-chat-think → reasoning; в обоих случаях **не передавать** `reasoningEffort` — кнопка «Думать» просто использует reasoning-variant, глубина reasoning'а автоматическая
+- **ТЗ-XAI-5 (Create/Expertise):** та же история — не передаём `reasoningEffort`
+- **ТЗ-XAI-MA-1 (будущее):** multi-agent variant — единственное место где `reasoningEffort` валиден; `low/medium` = 4 агента, `high/xhigh` = 16
+
+### Уроки методологии
+
+1. **Брейнсторм от AI-модели — черновик**, не спецификация. Даже если в нём есть секция «verified against docs» с цитатами — цитаты могут быть вырваны из двусмысленного контекста
+2. **Эмпирический тест за $0.01 спасает недели** неправильного ТЗ. 30 секунд в терминале > долгий спор с документацией
+3. **Ирония:** брейнсторм в §10.2 корректно разоблачил галлюцинации про имена агентов и `presence_penalty`, но в §10.1 допустил аналогичную ошибку про reasoning-варианты. Никто не застрахован от собственных blind spots
+
 ---
 
 ## 2026-04-14 — ТЗ-XAI-1 завершён (v3.88.0)
