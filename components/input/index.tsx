@@ -39,7 +39,6 @@ export {
 export { InputTextarea } from "./input-textarea";
 export { InputVoiceButton } from "./input-voice-button";
 export { InputVoiceModeButton } from "./input-voice-mode-button";
-export { InputModelSelector } from "./input-model-selector";
 export { InputAttachments } from "./input-attachments";
 export { InputSubmitButton } from "./input-submit-button";
 
