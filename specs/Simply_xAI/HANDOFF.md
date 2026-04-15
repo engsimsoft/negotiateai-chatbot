@@ -1,73 +1,78 @@
 # HANDOFF — Серия Simply_xAI миграции
 
-**Последнее обновление:** 2026-04-15 (вечер, конец сессии v3.90.1 + v3.90.2 + SSOT архитектурного документа)
-**Текущая версия проекта:** 3.90.2
+**Последнее обновление:** 2026-04-16 (конец сессии — v3.91.0 + hygiene cleanup + регистрация нового хвоста)
+**Текущая версия проекта:** 3.91.0
 **Последние коммиты локального master:**
+- `f6dbedd` docs(backlog): add TZ_SimplyContextUsageWidget — UI виджет контекста показывает не ту шкалу
+- `6e6867b` chore(backlog): archive TZ_ATTACH_1 after v3.91.0 — hygiene cleanup
+- `dbe6bdf` release(v3.91.0): TZ_ATTACH_1 — PDF text extraction при upload + fix project files v1→v2 legacy call
+- `b46c5d1` docs(xai-migration): HANDOFF после v3.90.2 + SSOT архитектурного документа
 - `59eb33a` release(v3.90.2): TZ_SimplyReadDocumentTool + R-6 correction через SSOT
-- `516d600` release(v3.90.1): TZ_SimplyChatModeInjection — `<current_mode>`/`<current_model>` через SSOT
-- `86de8ad` docs(xai-migration): HANDOFF после ТЗ-XAI-3 + Stage 1 ErrorRecoveryUI
-- `fc8a995` fix(error-recovery): TZ_ErrorRecoveryUI Stage 1
-- `8dfac7f` release(v3.90.0): ТЗ-XAI-3 — KITT + Think на Grok + R-6 cleanup
 
-Этот документ — **мост между сессиями**, не замена ROADMAP. За детальными задачами всегда иди в `TZ_xai_N/ROADMAP.md` или `SIMPLY_XAI_CHANGELOG.md`.
+Этот документ — **мост между сессиями**, не замена ROADMAP. За детальными задачами всегда иди в карточку ТЗ или `SIMPLY_XAI_CHANGELOG.md`.
 
 ---
 
 ## ⛔ Правило №0 перед любой работой: «Семь раз отмерь — один раз отрежь»
 
-**Это закон, не рекомендация.** Нарушение = процессный провал, и урок из этой сессии показывает что цена высокая.
+**Это закон, не рекомендация.** Нарушение стоит $1 лишнего ТЗ и +1 смены контекста (доказано на двух последних сессиях).
 
 **Перед любой реализацией:**
 
 1. **Изучить официальную документацию** внешних технологий — WebSearch + WebFetch актуальной документации SDK/API/библиотек. Knowledge cutoff = май 2025, всё новое (xAI, Grok, AI SDK v6, провайдеры моделей) **обязательно** читать заново. Не полагаться на локальный README в `node_modules/` — только first-party docs
-2. **Изучить лучшие практики** — WebSearch на «best practices for X», GitHub issues, Stack Overflow для современных решений
+2. **Изучить лучшие практики** — WebSearch на «best practices for X», GitHub issues, Stack Overflow для современных решений 2026
 3. **ANALYSIS против реального кода** — прочитать все файлы зоны работы, свериться с SSOT документами (SIMPLY_ATTACHMENT_ARCHITECTURE.md, MIND_ARCHITECTURE.md, model-catalog.ts, CLAUDE.md)
 4. **Только потом** — план, код, тесты
 
-**Процессный урок этой сессии (2026-04-15):** при ТЗ-XAI-3 я удалил `stripMediaPartsForTextModel` с обоснованием «Grok умеет vision». Это **не было верифицировано** через эмпирический тест с PDF. В ROADMAP серии ([SIMPLY_XAI_ROADMAP.md:96](SIMPLY_XAI_ROADMAP.md#L96)) было явное предупреждение «НЕ полагаться на маршрутизацию, убирать причину, а не симптом». Я понял его неправильно и пропустил разделение `capabilities.vision` vs `documentSupport.supported`. Через сутки pre-existing bug вылез на реальном тесте → потребовался v3.90.2 patch. **Цена: +1 ТЗ, +1 смены контекста, +1 сессия**.
+**Процессные уроки двух последних сессий (2026-04-15 и 2026-04-16):**
 
-**Вывод:** ANALYSIS против кода ≠ поверхностное чтение. Если в коде есть функция которая что-то делает хрупкое — 99% случаев она делает это **зачем-то**. Удаление без замены через SSOT — антипаттерн. Правило закреплено в SIMPLY_XAI_NOTES.md и в памяти.
+- **v3.90.2 patch** — я удалил `stripMediaPartsForTextModel` в ТЗ-XAI-3 с обоснованием «Grok умеет vision». Это не было верифицировано тестом. Pre-existing bug вылез через сутки → v3.90.2 hotfix. Стоимость: +1 ТЗ.
+- **v3.91.0 serverExternalPackages эпопея** — я сделал `import { PDFParse } from "pdf-parse"` top-level. Build прошёл, crash случился в runtime при первом запросе. Переделал на dynamic import внутри функции (паттерн mammoth/xlsx) — **та же ошибка**. Оба подхода не работают для ESM-first пакетов с worker-dependencies. **Единственное** решение — `serverExternalPackages: ["pdf-parse"]`. Стоимость: 2 итерации + stale cache регрессия с DevPanel.
+
+**Вывод:** ANALYSIS ≠ поверхностное чтение. Если в коде есть функция которая делает что-то «хрупкое» — 99% случаев она делает это **зачем-то**. Если существующий прецедент (projects/[id]/files/route.ts) использует `require("pdf-parse")` с `// eslint-disable no-require-imports` — это означает что top-level `import` **уже** пробовали и он не работает. Нужно читать existing workarounds как documented trade-offs.
 
 ---
 
 ## Прогресс серии
 
-- [x] **ТЗ-XAI-1** — Фундамент (v3.88.0) — удалён `grok-4`, notes про multi-agent, архитектура защиты контекста зафиксирована
-- [x] **ТЗ-XAI-2** — MIND pipeline → Grok (v3.89.0) — 5 memory-задач на xAI split-стратегией, native `generateObject`, MIND_ARCHITECTURE.md
-- [x] **ТЗ-XAI-3** — KITT + Think → Grok (v3.90.0) — `simply-chat` → Grok 4.1 Fast, `simply-chat-think` → Grok 4.20, R-6 cleanup (неполный — см. v3.90.2)
-- [x] **ТЗ-SimplyChatModeInjection** (вне серии, v3.90.1) — плейсхолдеры `<current_mode>`/`<current_model>` через SSOT model-catalog
-- [x] **ТЗ-SimplyReadDocumentTool + R-6 correction** (v3.90.2) — `adaptHistoryToCapabilities` через SSOT + удаление dead `readDocument` tool
-- [ ] **ТЗ-ATTACH-1** — PDF text extraction при upload (**СЛЕДУЮЩИЙ**) ← приоритет из нового архитектурного документа
-- [ ] ТЗ-XAI-4 — Utility/Pipeline batch миграция (briefing, podcast, meeting, professor, title)
+- [x] **ТЗ-XAI-1** — Фундамент (v3.88.0)
+- [x] **ТЗ-XAI-2** — MIND pipeline → Grok (v3.89.0)
+- [x] **ТЗ-XAI-3** — KITT + Think → Grok (v3.90.0, R-6 cleanup неполный → v3.90.2 correction)
+- [x] **ТЗ-SimplyChatModeInjection** (вне серии, v3.90.1) — плейсхолдеры через SSOT model-catalog
+- [x] **ТЗ-SimplyReadDocumentTool + R-6 correction** (v3.90.2) — `adaptHistoryToCapabilities` через SSOT
+- [x] **ТЗ-ATTACH-1** — PDF text extraction при upload (v3.91.0) — **только что закрыт**
+- [ ] **ТЗ-XAI-4** — Utility/Pipeline batch миграция (briefing, podcast, meeting, professor, title) ← **СЛЕДУЮЩИЙ**
 - [ ] ТЗ-XAI-5 — Create/Expertise → Grok 4.20 (+ R-5 expertise single-agent)
 - [ ] ТЗ-XAI-6 — Очистка MiniMax/OpenRouter
 - [ ] ТЗ-XAI-COL-1 — Collections API для Библиотеки (после серии)
 
+**Архитектурное состояние:** после v3.90.2 + v3.91.0 **capability-agnostic через SSOT** работает для всей attachment зоны:
+- v3.90.2 закрыл history adaptation через `adaptHistoryToCapabilities` (Decision 3 архитектурного документа)
+- v3.91.0 закрыл upload extraction через Слой 0 (Decision 4)
+- Обе реализации читают `capabilities`/`documentSupport` из `model-catalog.ts` как SSOT, не знают про конкретные провайдеры
+
+Следующее место где SSOT нужен — **routing layer** (`simply-chat` vs `simply-chat-vision` taskId selection) — там ещё есть хардкод на `mediaType.startsWith("image")`. Это может быть частью ТЗ-XAI-5 или отдельной чистки.
+
 ---
 
-## 🎯 Главный новый SSOT документ серии — прочитать ПЕРВЫМ
+## 🎯 Главный SSOT документ серии — прочитать ПЕРВЫМ
 
-**[specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md](SIMPLY_ATTACHMENT_ARCHITECTURE.md)** — утверждённый 2026-04-15 архитектурный стандарт обработки вложений в Simply. Составлен Владимиром с архитекторами.
+**[specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md](SIMPLY_ATTACHMENT_ARCHITECTURE.md)** — утверждённый 2026-04-15 архитектурный стандарт обработки вложений в Simply.
 
 **Ключевой принцип:** «Максимум работы при загрузке файла, минимум при разговоре».
 
 **Три слоя обработки:**
-- **Слой 0** — серверное извлечение при upload ($0, без AI, миллисекунды). DOCX/XLSX/TXT/MD/CSV уже работают. **PDF — запланировано в ТЗ-ATTACH-1**
-- **Слой 1** — KITT routing: текст → Grok, изображения/PDF → Haiku (гибрид без sticky)
+- **Слой 0** — серверное извлечение при upload ($0, без AI, миллисекунды). DOCX/XLSX/TXT/MD/CSV + **PDF (v3.91.0)** ✅
+- **Слой 1** — KITT routing: текст → Grok, изображения/сканы PDF → Haiku
 - **Слой 2** — Экспертиза (глубокий анализ с tools)
-- **Слой 3** — Библиотека (RAG: MIND сейчас + Collections в будущем)
+- **Слой 3** — Библиотека (RAG: MIND сейчас + Collections в будущем — ТЗ-XAI-COL-1)
 
-**5 принятых решений, не пересматриваются до завершения миграции:**
-
-1. Гибрид Grok + Haiku для KITT
-2. Haiku отвечает напрямую при вложении (один вызов, не двухшаговый)
-3. **`adaptHistoryToCapabilities` через SSOT model-catalog — единственный механизм адаптации истории.** Никаких хардкодных strip-функций. Реализовано в v3.90.2
-4. PDF text extraction при upload — приоритетное улучшение (ТЗ-ATTACH-1), не блокирует миграцию xAI
-5. Пороги размеров — эмпирически, не с потолка
-
-**Почему этот документ критичен для следующей сессии:** ТЗ-ATTACH-1 — прямая реализация Слоя 0 для PDF из этого документа. Всё что ты будешь делать должно сверяться с принятыми решениями. Документ помечен как «архитектурный стандарт... изменения только при пересмотре архитектуры, не при каждом ТЗ».
-
-Ссылка на документ уже добавлена в [CLAUDE.md](../../CLAUDE.md) секцию «Техническая (AI) — архитектурные стандарты» как обязательное чтение. Загружается автоматически в каждой сессии.
+**5 принятых решений — статус реализации:**
+1. ✅ Гибрид Grok + Haiku для KITT (v3.90.0)
+2. ✅ Haiku отвечает напрямую при вложении (не двухшаговый)
+3. ✅ `adaptHistoryToCapabilities` через SSOT (v3.90.2)
+4. ✅ PDF text extraction при upload (v3.91.0) ← **только что**
+5. 🟡 Пороги размеров — эмпирически, продолжается калибровка (логирование `[PDF Extract] avgCharsPerPage` для empirical tuning, TZ_SimplyContextUsageWidget новый хвост связан)
 
 ---
 
@@ -78,205 +83,240 @@
 Порядок важен — от общего к частному:
 
 1. **[SIMPLY_ATTACHMENT_ARCHITECTURE.md](SIMPLY_ATTACHMENT_ARCHITECTURE.md)** — SSOT для всей attachment работы (10 минут)
-2. **[SIMPLY_XAI_ROADMAP.md](SIMPLY_XAI_ROADMAP.md)** — карточка ТЗ-ATTACH-1 (строки 108+), обновлённая прогресс-таблица
-3. **[specs/_backlog/TZ_ATTACH_PdfExtractionAtUpload.md](../_backlog/TZ_ATTACH_PdfExtractionAtUpload.md)** — детальный scope следующего ТЗ с открытыми вопросами
-4. **[SIMPLY_XAI_CHANGELOG.md](SIMPLY_XAI_CHANGELOG.md)** — записи v3.90.1, v3.90.2, XAI-3 наверху
-5. **[SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md)** — уроки сессии
-6. **[MIND_ARCHITECTURE.md](MIND_ARCHITECTURE.md)** — только если правки памяти (в ATTACH-1 не должно быть)
+2. **[SIMPLY_XAI_ROADMAP.md](SIMPLY_XAI_ROADMAP.md)** — актуальная карточка ТЗ-XAI-4 с открытыми вопросами
+3. **[SIMPLY_XAI_CHANGELOG.md](SIMPLY_XAI_CHANGELOG.md)** — записи v3.91.0, v3.90.2, v3.90.1 наверху (не забывай что главный CHANGELOG = корневой)
+4. **[SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md)** — уроки серии, особенно запись от 2026-04-16 про 3 webpack ESM мины
+5. **[specs/_backlog/README.md](../_backlog/README.md)** — обзор открытых хвостов перед большим ТЗ (4 хвоста: ErrorRecoveryUI, SimplyContextUsageWidget, PromptsDeadCodeCleanup, SimplyChatRaceCondition)
+6. **[MIND_ARCHITECTURE.md](MIND_ARCHITECTURE.md)** — только если правки памяти
 
 ### Что запустить до работы
 
 ```bash
-# Проверить что всё компилится (версия 3.90.2, 9 коммитов в master ahead of origin)
+# Проверить что всё компилится (версия 3.91.0, 13 коммитов ahead of origin)
 npx tsc --noEmit
 
-# Поднять dev server в фоне (предыдущий остановлен в конце сессии после коммита)
+# Поднять dev server в фоне
 npm run dev
 
 # Проверить dev overrides — должно быть только expertise + create (область XAI-5)
 cat .simply-dev-overrides.json
 # Ожидается: {"expertise":"grok-4.20-0309-reasoning","create":"claude-haiku-4-5-20251001"}
 
-# Проверить что ATTACH-1 backlog stub на месте
-ls -la specs/_backlog/TZ_ATTACH_PdfExtractionAtUpload.md
+# Git state
+git log --oneline -5
+# Должен быть f6dbedd на top, версия в package.json = 3.91.0
 ```
 
 ### Memory refresh
 
-`~/.claude/projects/-Users-mactm-Projects-NegotiateAI-Chatbot/memory/MEMORY.md` — прочитать полностью в начале. Критичные записи:
+`~/.claude/projects/-Users-mactm-Projects-NegotiateAI-Chatbot/memory/MEMORY.md` — прочитать полностью в начале. Критичные новые записи:
 
-- **`project_simply_chat_persistent.md`** — Simply Chat один persistent на userId. **Никогда** не писать «новый Simply чат», «в том же Simply чате» и т.п. Владимир напоминал 12+ раз
+- **`feedback_backlog_russian_term.md`** (новая) — `_backlog/` по-русски «хвосты». В разговоре/HANDOFF/NOTES используем «хвост», в путях и commits — английский `backlog`. Владимир использует этот slang
+- **`project_simply_chat_persistent.md`** — Simply Chat один persistent на userId. **Никогда** не писать «новый Simply чат», «в том же Simply чате»
 - **`feedback_official_docs_first.md`** — Правило №0 выше
 - **`feedback_no_external_architect.md`** — ANALYSIS против кода > ТЗ от стороннего архитектора
 - **`project_simply_xai_migration.md`** — активная серия, не отвлекаться
 
 ---
 
-## 🥇 Рекомендованный следующий шаг — ТЗ-ATTACH-1
+## 🥇 Рекомендованный следующий шаг — ТЗ-XAI-4
 
-### Почему это приоритет из архитектурного документа
+### Что это
 
-Текущее состояние (после v3.90.2):
-- PDF при загрузке → файл как `application/pdf` в Vercel Blob → роутинг `simply-chat-vision` → Haiku 4.5 обрабатывает нативно
-- **Каждый** вопрос про PDF стоит токенов Haiku ($0.80/$4 per 1M) даже если PDF чисто текстовый
-- Grok 4.1 Fast ($0.20/$0.50) мог бы обрабатывать текстовый PDF в 4-8× дешевле, но он не принимает PDF file parts (xAI Files API не интегрирован)
+Batch миграция utility/pipeline call sites на Grok/Anthropic с MiniMax/OpenRouter. Цель — закрыть основное тело миграции до того как пойдём в XAI-5 (Create/Expertise) и XAI-6 (финальная чистка).
 
-Целевое состояние (после ТЗ-ATTACH-1):
-- PDF при загрузке → сервер извлекает текст библиотекой → если `>30 chars/page` → конверт в `text/plain` → маршрут `simply-chat` (Grok 4.1 Fast inline)
-- Сканированные PDF (мало текста) → остаются как `application/pdf` → Haiku (как сейчас)
-- Один механизм, SSOT, **capability-agnostic через документ**
+Ориентировочный scope (~12 call sites):
+- **Briefing pipeline** — `lib/briefing/*` (generate, refresh-section, save-profile, simply-news)
+- **Podcast pipeline** — `lib/podcast/*`
+- **Meeting recorder** — `lib/meeting/*`
+- **Professor pipeline** — `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` (Opus-based, важное решение)
+- **Title generation** — `app/(chat)/api/chat/[id]/generate-title/route.ts`
+- **Service chats** — `app/(chat)/api/service-chat/route.ts` (возможно в scope, возможно отдельно)
 
-### Scope из backlog stub
+### Открытые вопросы — адресовать до ROADMAP
 
-Полный scope в **[specs/_backlog/TZ_ATTACH_PdfExtractionAtUpload.md](../_backlog/TZ_ATTACH_PdfExtractionAtUpload.md)**. Краткая версия:
+**Q1: Professor pipeline — Opus vs Grok 4.20?**
+Professor сейчас жжёт Opus (~$15/$75 per 1M). Grok 4.20 (~$2/$6) даёт 5-10x экономию. Но Professor — самая дорогая точка в Simply, именно там пользователи хотят «максимум мозгов». Может быть решение «Opus остаётся, все остальные pipelines переезжают на Grok 4.20». Нужен Владимир-ответ.
 
-1. **Выбор PDF library** — проверить что уже в `node_modules/` (`pdfjs-dist`, `pdf-parse`, `unpdf`). Свериться с [lib/ai/vision-ocr.ts](../../lib/ai/vision-ocr.ts) (`extractTextFromPDF`) — какая библиотека уже используется для Claude Vision PDF. Критерии: работает на Vercel serverless, без нативных зависимостей, корректно с кириллицей
-2. **Эвристика scan detection** — `avgCharsPerPage = text.length / pageCount`. Стартовый порог 30 chars/page, уточнить эмпирически на реальных PDF Владимира
-3. **Интеграция в [app/(chat)/api/files/upload/route.ts](../../app/(chat)/api/files/upload/route.ts)** — добавить PDF branch рядом с существующими DOCX (мамот)/XLSX (xlsx) ветками на строках 96-140
-4. **Обновить analyze-document SKILL** — теперь PDF inline как DOCX
-5. **Adapter в `adaptHistoryToCapabilities`** — оставить PDF placeholder branch (мёртвый но безвредный fallback для сканированных PDF после conversion/Haiku в истории)
+**Q2: Service chats — в scope XAI-4 или отдельно?**
+`/api/service-chat` используется для KITT's onboarding, Ben intro, и т.д. Scope может раздуться, если Service chats тянут за собой agent prompt system. Альтернатива — отдельный маленький ТЗ.
 
-### Первые действия
+**Q3: Briefing — variant Grok 4.1 Fast или 4.20?**
+Briefing pipelines не time-critical (раз в день через cron), но должны давать хорошее качество. Grok 4.1 Fast достаточно для title generation, Briefing может требовать 4.20.
+
+**Q4: MiniMax catalog audit — делать в XAI-4 или отдельно?**
+В памяти `project_minimax_catalog_audit.md` — каталог содержит только M2.7+long, в docs 8 моделей. Для XAI-6 (MiniMax cleanup) нужно знать что именно удалять. Возможно audit попутно в XAI-4.
+
+### Первые действия (по правилу №0)
 
 ```
-1. Прочитать SIMPLY_ATTACHMENT_ARCHITECTURE.md (10 мин)
-2. Прочитать backlog stub TZ_ATTACH_PdfExtractionAtUpload.md (5 мин)
-3. Прочитать upload route.ts (существующая DOCX/XLSX логика, 5 мин)
-4. Прочитать lib/ai/vision-ocr.ts (что используется для Haiku PDF, 5 мин)
-5. ls node_modules/ — что из PDF библиотек уже есть, чтобы не тянуть новое
-6. WebSearch документацию выбранной библиотеки (правило №0!) — best practices, Vercel serverless compatibility, cyrillic support
-7. Создать specs/TZ_ATTACH_1_PdfUpload/ с ANALYSIS.md
-8. Задать Владимиру открытые вопросы перед ROADMAP:
-   - Q1: Какая PDF library? (ответ через аудит node_modules + WebSearch)
-   - Q2: Порог scan detection? (рекомендовать 30 chars/page как старт)
-   - Q3: Ограничение на размер PDF? (есть в документе — «большие документы → Экспертиза», пороги эмпирически — решить стартовые)
-   - Q4: Handling encrypted PDF? (graceful fallback на Haiku при ошибке)
-9. После ответов Владимира — ROADMAP → поэтапно код → мануальный тест → commit
+1. Прочитать SIMPLY_XAI_ROADMAP.md секцию ТЗ-XAI-4 (10 мин)
+2. Задать Владимиру Q1-Q4 перед началом работы
+3. Audit call sites — grep "getModel(" в lib/briefing/, lib/podcast/, lib/meeting/
+4. Прочитать task-assignments.ts — какие сейчас taskId у этих pipelines
+5. Проверить модели в model-catalog — pricing сверка с docs.x.ai / docs.anthropic.com (правило №0!)
+6. Создать specs/TZ_XAI_4_UtilityPipelines/ с ANALYSIS.md (открытые вопросы + таблица call sites + target mapping)
+7. После ответов Владимира — ROADMAP → поэтапно код → мануальный тест → commit
 ```
 
-**Эстимейт:** 1-2 сессии. Потенциально одна если выбор библиотеки очевиден и Vladimir отвечает быстро.
+**Эстимейт:** 1-2 сессии (много call sites, но каждый простой — getModel taskId change).
 
 ---
 
-## Альтернативы (если ATTACH-1 откладывается)
+## Альтернативы (если XAI-4 откладывается)
 
-### 🥈 Вариант B — ТЗ-XAI-4 (основной путь серии)
-Utility/Pipeline batch миграция ~12 call sites. Описан в [SIMPLY_XAI_ROADMAP.md:132+](SIMPLY_XAI_ROADMAP.md). Открытые вопросы:
-- Q1: Opus vs Grok 4.20 для Professor pipeline
-- Q2: Service chats в scope или отдельно
-- Q3: Briefing pipeline variant Grok
+### 🥈 Вариант B — TZ_SimplyContextUsageWidget (новый хвост, Medium impact)
+Находка сессии 2026-04-16. UI виджет контекста в /simply показывает ложные 55% потому что делит на `contextWindow` модели (128K — возможно ошибка в model-catalog) вместо `SIMPLY_CONTEXT_LIMIT` (200K). Backend работает корректно, это UX-обман. **1 сессия.** Карточка: [specs/_backlog/TZ_SimplyContextUsageWidget.md](../_backlog/TZ_SimplyContextUsageWidget.md).
 
-### 🥉 Вариант C — TZ_SimplyChatRaceCondition (долг из сессии)
-Partial unique index + `onConflictDoNothing` для `getOrCreateSimplyChat`. 0.5 сессии. См. [specs/_backlog/TZ_SimplyChatRaceCondition.md](../_backlog/TZ_SimplyChatRaceCondition.md). ⚠️ **Миграция на prod БД требует аудита дубликатов ДО применения.**
+### 🥉 Вариант C — TZ_ErrorRecoveryUI Stage 2 (High impact)
+Root cause через useChat state recovery. Долг из прошлой серии, 0.5 сессии.
 
-### Вариант D — TZ_ErrorRecoveryUI Stage 2
-Root cause через useChat state recovery. Не блокер, давний долг.
+### Вариант D — TZ_SimplyChatRaceCondition (Medium)
+Partial unique index для `getOrCreateSimplyChat`. 0.5 сессии, но **миграция на prod БД требует аудита дубликатов ДО применения** (см. [TZ_SimplyChatRaceCondition.md](../_backlog/TZ_SimplyChatRaceCondition.md)).
+
+### Вариант E — TZ_PromptsDeadCodeCleanup (Medium)
+Чистка мёртвого кода в `lib/ai/prompts.ts`. 0.5 сессии, безрисковое.
 
 ---
 
 ## Архитектурные константы серии (не забыть)
 
-1. **Защита контекста не привязана к размеру провайдерского окна.** Sliding window (140K) + Extract-on-compression независимы. Compaction API живёт для Haiku vision через capability-check
-2. **Simply Chat «Думать» = tier upgrade.** `simply-chat` = Grok 4.1 Fast ($0.20/$0.50), `simply-chat-think` = Grok 4.20 non-reasoning ($2/$6). Variant non-reasoning подтверждён smoke-тестом как продуктовое решение. Reasoning вариант доступен через `/dev/models`
-3. **`reasoningEffort` не передавать** в Grok 4.1 Fast / 4.20 (reasoning и non-reasoning варианты) — эмпирически падает `Bad Request`. Только multi-agent принимает
-4. **`adaptHistoryToCapabilities` через SSOT model-catalog** — единственный механизм адаптации истории. Живёт в [chat/route.ts:252-344](../../app/(chat)/api/chat/route.ts#L252), читает `effectiveCatalogEntry?.capabilities`. Не изобретать новых strip-функций
-5. **Simply Chat = один persistent чат на пользователя** (после MIND/RAG). Новые «диалоги» только в /expertise /create /projects. Все тесты в Simply — **в** persistent чате, не «в новом» и не «в том же»
-6. **`capabilities.vision` ≠ `documentSupport.supported`.** Первое про изображения (image/*), второе про PDF (application/pdf). Grok 4.1 Fast: vision=true, documentSupport.supported=false. Путать — антипаттерн
+1. **Защита контекста не привязана к размеру провайдерского окна.** Sliding window (140K) + Extract-on-compression (SIMPLY_CONTEXT_LIMIT 200K, SOFT 60%, HARD 80%) независимы. Compaction API живёт для Haiku vision через capability-check.
+2. **Simply Chat «Думать» = tier upgrade.** `simply-chat` = Grok 4.1 Fast ($0.20/$0.50), `simply-chat-think` = Grok 4.20 non-reasoning ($2/$6). Reasoning вариант доступен через `/dev/models`.
+3. **`reasoningEffort` не передавать** в Grok 4.1 Fast / 4.20 (reasoning и non-reasoning варианты) — эмпирически падает `Bad Request`. Только multi-agent принимает.
+4. **`adaptHistoryToCapabilities` через SSOT model-catalog** — единственный механизм адаптации истории. Живёт в [chat/route.ts:252-344](../../app/(chat)/api/chat/route.ts#L252). Не изобретать новых strip-функций.
+5. **Simply Chat = один persistent чат на пользователя** (после MIND/RAG). Все тесты **в** persistent чате, не «в новом» и не «в том же».
+6. **`capabilities.vision` ≠ `documentSupport.supported`.** Grok 4.1 Fast: vision=true, documentSupport.supported=false. Путать — антипаттерн. Баг из-за этого в v3.90.2.
+7. **`serverExternalPackages` для ESM-first пакетов с worker dependencies.** `lamejs` и теперь `pdf-parse` — оба требуют external declaration в `next.config.ts`. Паттерн `mammoth`/`xlsx` dynamic import работает **только** для CJS или ESM-lite пакетов. Для полноценных ESM — только external. Новое правило из v3.91.0.
+8. **После изменения `next.config.ts` — чистый rebuild обязателен.** HMR не пересобирает `serverExternalPackages`/`env`/`outputFileTracingIncludes` секции чисто, оставляет скрытый state drift. Симптом — DevPanel пропал после serverExternalPackages change в v3.91.0 сессии. Фикс: `rm -rf .next && npm run dev`.
+9. **«Хвосты» = `_backlog/`.** Русский жаргон для backlog items. В разговоре/HANDOFF/NOTES говорим «хвост», в путях и commits — английский `backlog`. Владимир использует этот slang.
 
 ---
 
 ## Критичное состояние для следующей сессии
 
 ### Dev-сервер в фоне
-- В конце сессии закрыт (два рестарта в ходе сессии, последний `bcoqbg9od`)
-- На старте следующей сессии — `npm run dev` в background + проверить что HMR пересобирает чисто
-- Если внезапные `ConnectTimeoutError` при DB запросах — hard restart (stale Neon connection pool)
+
+В конце сессии работал task `b3edlz59a` (clean rebuild после stale cache инцидента). Скорее всего остановится когда закроется эта сессия. На старте следующей сессии — `npm run dev` в background + проверка `http://localhost:3000 → HTTP 307`.
 
 ### Активные dev overrides
+
 ```json
 {"expertise":"grok-4.20-0309-reasoning","create":"claude-haiku-4-5-20251001"}
 ```
-Область ТЗ-XAI-5. `simply-chat` / `simply-chat-think` — без overrides, дефолты честно указывают на Grok.
+Область ТЗ-XAI-5. `simply-chat` / `simply-chat-think` — без overrides, дефолты честно указывают на Grok 4.1 Fast / 4.20 non-reasoning.
+
+### MCP postgres сервер — отключился во время сессии
+
+**К концу сессии `mcp__postgres__query` tool стал недоступен** (вместе со множеством других MCP-инструментов — GitHub, Gmail, Calendar, Drive). Для SQL-проверок в следующей сессии — либо reconnect MCP server, либо использовать `psql` через Bash, либо Drizzle Studio.
 
 ### Git state
-**9 коммитов ahead of origin/master.** Все локально, не отпушены. Push — отдельная команда Владимира когда будет готов.
+
+**13 коммитов ahead of origin/master.** Все локально, не отпушены. Push — отдельная команда Владимира.
 
 ```
-59eb33a  release(v3.90.2): TZ_SimplyReadDocumentTool + R-6 correction через SSOT
-516d600  release(v3.90.1): TZ_SimplyChatModeInjection — <current_mode>/<current_model> через SSOT
-86de8ad  docs(xai-migration): HANDOFF после ТЗ-XAI-3 + Stage 1 ErrorRecoveryUI
-fc8a995  fix(error-recovery): TZ_ErrorRecoveryUI Stage 1
-8dfac7f  release(v3.90.0): ТЗ-XAI-3 — KITT + Think на Grok + R-6 cleanup
-2272e67  docs(xai-migration): HANDOFF после ТЗ-XAI-2 для следующей сессии
-1481141  release(v3.89.0): ТЗ-XAI-2 — MIND pipeline миграция на Grok
-6fd1fbb  docs(xai-migration): CHANGELOG серии + verified Grok params
-ba9e928  release(v3.88.0): ТЗ-XAI-1 — фундамент миграции на xAI
+f6dbedd docs(backlog): add TZ_SimplyContextUsageWidget — UI виджет контекста показывает не ту шкалу
+6e6867b chore(backlog): archive TZ_ATTACH_1 after v3.91.0 — hygiene cleanup
+dbe6bdf release(v3.91.0): TZ_ATTACH_1 — PDF text extraction при upload + fix project files v1→v2 legacy call
+b46c5d1 docs(xai-migration): HANDOFF после v3.90.2 + SSOT архитектурного документа
+59eb33a release(v3.90.2): TZ_SimplyReadDocumentTool + R-6 correction через SSOT
+516d600 release(v3.90.1): TZ_SimplyChatModeInjection — <current_mode>/<current_model> через SSOT
+86de8ad docs(xai-migration): HANDOFF после ТЗ-XAI-3 + Stage 1 ErrorRecoveryUI
+fc8a995 fix(error-recovery): TZ_ErrorRecoveryUI Stage 1
+8dfac7f release(v3.90.0): ТЗ-XAI-3 — KITT + Think на Grok + R-6 cleanup
+2272e67 docs(xai-migration): HANDOFF после ТЗ-XAI-2 для следующей сессии
+1481141 release(v3.89.0): ТЗ-XAI-2 — MIND pipeline миграция на Grok
+6fd1fbb docs(xai-migration): CHANGELOG серии + verified Grok params
+ba9e928 release(v3.88.0): ТЗ-XAI-1 — фундамент миграции на xAI
 ```
 
-### Pre-existing untracked файлы (НЕ ТРОГАТЬ без команды)
+### Pre-existing untracked файл (НЕ ТРОГАТЬ без команды)
+
 ```
-?? specs/TZ_RAG_SimplyRAG/AUDIT_REPORT.md   # Был untracked ещё до этой сессии
+?? specs/TZ_RAG_SimplyRAG/AUDIT_REPORT.md   # Был untracked ещё до серии
 ```
 
 ---
 
-## Что сделано в этой сессии (2026-04-15, v3.90.1 + v3.90.2 + SSOT anchors)
+## Что сделано в этой сессии (2026-04-16)
 
-**Одна плотная сессия закрыла два долга + зафиксировала новый архитектурный стандарт.**
+**Одна плотная сессия закрыла ТЗ-ATTACH-1 + зарегистрировала новый хвост + hygiene cleanup закрытого ТЗ.**
 
-### ТЗ-SimplyChatModeInjection (v3.90.1, commit `516d600`)
-Плейсхолдеры `<current_mode>` и `<current_model>` в [lib/prompts/chat/simply-chat.md](../../lib/prompts/chat/simply-chat.md) подменяются композером через SSOT model-catalog (displayName из `getModelEntry(getModelIdForTask(activeTaskId))`). Было: два легаси-`modelMap` с Claude-псевдонимами эпохи до xAI/MiniMax. `activeTaskId` computation поднят в [chat/route.ts](../../app/(chat)/api/chat/route.ts) до prompt-building. `buildChatPrompt/Expertise/Create` принимают опциональный `activeTaskId`. Regex-replace вместо точного match — дефолты в .md безопасно редактируются.
+### ТЗ-ATTACH-1 (v3.91.0, commit `dbe6bdf`)
 
-**Валидация:** 5/5 мануальных тестов (simply/think/vision/expertise-override/create-override). Бонус-подтверждение `.txt` attachment не регрессировал.
+**Реализация Слоя 0 из SIMPLY_ATTACHMENT_ARCHITECTURE.md для PDF.** 10 файлов, +523/-18 строк.
 
-### ТЗ-SimplyReadDocumentTool + R-6 correction (v3.90.2, commit `59eb33a`)
+**Added:**
+- [lib/pdf/extract-pdf-text.ts](../../lib/pdf/extract-pdf-text.ts) (45 строк) — shared helper через pdf-parse v2 API (`new PDFParse({data}).getText()` возвращает `{text, total, pages}`, один вызов даёт и текст и pageCount). Эвристика scan detection: `pageCount >= 2 ? avgCharsPerPage < 30 : text.length < 100` (special case для 1-page). Логирование `[PDF Extract]` для empirical tuning.
+- PDF branch в [upload route](../../app/(chat)/api/files/upload/route.ts) после `isDocumentFile` — rename `.pdf` → `.txt`, contentType `text/plain`, truncate 50K chars с маркером (**только** при реальном обрезании, Владимир явно требовал «не пугать на 90% документов»), graceful catch → fall-through на native upload для encrypted/corrupt/scan.
 
-**Объединённый cleanup двух связанных проблем одним коммитом.** 20 файлов, +1071/-420.
+**Fixed (side-effect finding в том же коммите):**
+- [projects/[id]/files/route.ts](../../app/(chat)/api/projects/[id]/files/route.ts) использовал **v1 legacy API** (`pdfParse(buffer)` function call) на установленном v2 package → silent catch месяцами возвращал `undefined` → `metadata.extractedContent` в БД project files **никогда не заполнялся**. Переключён на shared helper `extractPdfText`. Связанный scope (Q5 = A), один коммит вместо двух.
 
-**(1) Dead readDocument tool удалён:**
-- Git audit (`62540ff` cleanup 2.0.0) показал что папка `knowledge/` удалена ещё в v2.0.0 «cleanup: remove old MIR.TRADE files» (126 файлов). Tool жёстко привязан к этой папке через security check — всегда возвращал `Access denied` в любом режиме
-- Удалён [lib/ai/tools/read-document.ts](../../lib/ai/tools/read-document.ts) (243 строки), render block в [components/message.tsx](../../components/message.tsx) (52 строки), 4 места в [lib/ai/tools/chat-tools.ts](../../lib/ai/tools/chat-tools.ts), упоминания в 3 промптах
-- `analyze-document` SKILL переписан под modern pipeline (inline text + parseExcel)
+**Infra:**
+- [next.config.ts](../../next.config.ts): `serverExternalPackages: ["lamejs", "pdf-parse"]`. **3 попытки webpack/ESM interop провалились** — top-level static import, dynamic import в функции (паттерн mammoth/xlsx), все ломались на `Object.defineProperty called on non-object`. Единственное рабочее решение — объявить pdf-parse external, Next резолвит через Node `require` на runtime. **Паттерн зеркалит `lamejs`** который уже там по той же причине.
 
-**(2) R-6 correction через `adaptHistoryToCapabilities`:**
-- **Pre-existing bug:** в ТЗ-XAI-3 я удалил `stripMediaPartsForTextModel` с обоснованием «Grok умеет vision → логика умирает». Это было **ошибочное упрощение** — я смешал `capabilities.vision` (image/*) и `documentSupport.supported` (application/pdf). Grok 4.1 Fast vision=true но documentSupport=false (xAI Files API не интегрирован). Результат: любой follow-up текстового сообщения после PDF attachment → Grok crash с `AI_UnsupportedFunctionalityError`
-- **Правильная реализация:** новая функция `adaptHistoryToCapabilities(messages, capabilities)` в [chat/route.ts:252-344](../../app/(chat)/api/chat/route.ts#L252). Читает `effectiveCatalogEntry.capabilities` из SSOT model-catalog, заменяет `image/*` без vision и `application/pdf` без documentSupport на текстовые placeholder-ы. Интеграция в preparedHistory pipeline через gate на `chatMode === "simply"`
-- **Буквальная реализация принятого решения №3** из утверждённого 2026-04-15 архитектурного документа SIMPLY_ATTACHMENT_ARCHITECTURE.md
+**Validation:**
+- ✅ `npx tsc --noEmit` → 0 ошибок после каждого из 3 этапов
+- ✅ `npm run build` → v3.91.0 compiled в 9.8s
+- ✅ **Реальные тесты:**
+  - Текстовый PDF (GDI_Калибровка 20 стр, 45K chars): Grok 4.1 Fast inline, без маркера
+  - Большой PDF (LPS-3000 110 стр, 3.7 MB, 112K chars): truncate до 50K + маркер, Grok inline ответил
+  - **Multi-PDF в одном сообщении** — тоже работает
+- ✅ **Автотесты** (temporary `scripts/test-pdf-extract-scenarios.ts`, удалён после валидации):
+  - Scan PDF (synthetic 1-page/0-text): `isLikelyScan=true`
+  - Corrupt PDF (random bytes): `Invalid PDF structure` throw → graceful fallback
 
-**(3) SSOT anchor-ы для архитектурного документа:**
-- [SIMPLY_XAI_ROADMAP.md](SIMPLY_XAI_ROADMAP.md) — добавлена секция «Архитектурные стандарты» + новый этап ТЗ-ATTACH-1 между XAI-3 и XAI-4
-- [CLAUDE.md](../../CLAUDE.md) — документ в навигации как обязательное чтение при работе с attachments
-- [specs/_backlog/TZ_ATTACH_PdfExtractionAtUpload.md](../_backlog/TZ_ATTACH_PdfExtractionAtUpload.md) — stub следующего ТЗ
-- [specs/_backlog/README.md](../_backlog/README.md) — реструктурирован (High/Medium impact)
+### Hygiene cleanup (commit `6e6867b`)
 
-**Валидация:** 6/6 мануальных тестов в Simply Chat. **Главный тест:** текстовый follow-up после PDF в истории → Grok отвечает через placeholder, нет crash. **Бонус — cross-model continuity:** продолжение разговора после того как описание PDF сделано Haiku → follow-up идёт на Grok через placeholder → работает бесшовно. Это именно то что документ называет «общая память между моделями».
+ТЗ-ATTACH-1 закрыт в v3.91.0, но backlog-учёт не был обновлён в том же коммите. Отдельный атомарный patch:
+- `specs/TZ_ATTACH_1_PdfUpload/` → `_archive/TZ_ATTACH_1_PdfUpload/` (git mv)
+- `specs/_backlog/TZ_ATTACH_PdfExtractionAtUpload.md` удалён (-144 строк)
+- `specs/_backlog/README.md`: убрана строка High impact
+- `_archive/BACKLOG_CLOSED.md`: добавлена запись
 
-### Процессный урок сессии (зафиксирован в памяти)
+**Урок:** при закрытии ТЗ hygiene backlog должен быть **частью** того же release commit, не отдельной post-факто уборкой. В следующем ТЗ применять это правило.
 
-Владимир подготовил с архитекторами SIMPLY_ATTACHMENT_ARCHITECTURE.md **после** того как я начал v3.90.2 hotfix для pre-existing bug. При сверке оказалось что моя реализация **уже соответствует** принятому решению №3 документа буквально — именно функция `adaptHistoryToCapabilities` через SSOT. То есть документ валидировал мой подход. Но также выявил что в ТЗ-XAI-3 я нарушил правило «убирать причину через SSOT, не симптом» — удалил strip-функции без замены.
+### Новый хвост TZ_SimplyContextUsageWidget (commit `f6dbedd`)
 
-**Уроки:**
-1. **ANALYSIS против кода должен быть глубоким, не поверхностным.** Если функция делает что-то «хрупкое» — она делает это зачем-то. Удаление без замены через SSOT = антипаттерн
-2. **Capabilities ≠ один флаг.** Два разных capability (vision и documentSupport) — это два разных concept. Унифицировать через discriminated union в каталоге — единственный правильный путь
-3. **Scope consolidation бывает правильным.** readDocument cleanup и R-6 correction — оба про capability-agnostic cleanup. Разделение удвоило бы тесты без пользы. Один коммит, связный scope
+Найден Владимиром после закрытия ATTACH-1 во время обсуждения Extract-on-compression триггеров.
+
+**Проблема:** модальный виджет в /simply показывает `70 347 / 128 000 — 55% окна модели` → ложная тревога «вот-вот предел». Реально `70K / SIMPLY_CONTEXT_LIMIT 200K = 35%`, до SOFT (120K) ещё 50K запаса.
+
+**Два бага в одном виджете:**
+1. Знаменатель привязан к `contextWindow` модели вместо `SIMPLY_CONTEXT_LIMIT`. Нарушает правило «защита контекста не привязана к провайдерскому окну». Плюс 128K для Grok 4.1 Fast подозрительное — возможно ошибка в [model-catalog.ts](../../lib/ai/model-catalog.ts), нужен audit против docs.x.ai
+2. «Расход за сессию» без определения термина «сессия» — с открытия страницы? С последнего extract? Без определения числа не интерпретируются
+
+**Приоритет:** Medium. Backend работает корректно, это UX-обман не блокер. Но виджет был разработан специально, ложное «55%» обесценивает работу. Карточка: [specs/_backlog/TZ_SimplyContextUsageWidget.md](../_backlog/TZ_SimplyContextUsageWidget.md), 138 строк.
+
+### Stale .next cache регрессия (починена в сессии)
+
+Во время валидации после `serverExternalPackages` change + серии kill/restart dev server, Владимир заметил **DevPanel footer перестал показываться** под новыми сообщениями (старые сохраняли footer из localStorage). Server отвечал 200 OK, emit через dataStream работал, но client parser не запускался или крашился тихо.
+
+**Root cause:** stale webpack chunks в `.next/`. Серия restart с изменяющимся config оставила частично невалидные manifests. Client bundle был частично pre-changes, серверный — post.
+
+**Фикс:** `rm -rf .next && npm run dev` + hard reload в браузере. Multi-PDF тест после этого подтвердил что всё работает.
+
+**Зафиксировано** как архитектурная константа №8 + в [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) запись от 2026-04-16.
 
 ### Memory обновления
 
-- `project_simply_chat_persistent.md` — усилен раздел «терминология». Фразы «в том же Simply чате», «в этом Simply чате», «новый Simply чат» **запрещены**. Владимир повторял это 12+ раз — больше не забывать
+- `feedback_backlog_russian_term.md` (новая) — «хвосты» как русский slang для backlog. Владимир использует это слово в общении, зафиксировано чтобы будущие сессии понимали терминологию
+- `MEMORY.md` индекс — строка про backlog terminology
 
 ---
 
 ## Блокеры / Открытые вопросы
 
-- [ ] **ТЗ-ATTACH-1 открытые вопросы** — адресовать до ROADMAP (см. раздел «Следующий шаг» выше):
-  - Выбор PDF library (через аудит node_modules + WebSearch)
-  - Порог scan detection (стартовое 30 chars/page, уточнять эмпирически)
-  - Ограничение на размер PDF (из документа «большие документы → Экспертиза», пороги эмпирически)
-  - Handling encrypted PDF (graceful fallback на Haiku при ошибке)
-- [ ] **Opus vs Grok 4.20 для Professor pipeline** — вопрос для ТЗ-XAI-4, не этой сессии
-- [ ] **Service chats в scope XAI-4?** — вопрос для ТЗ-XAI-4, не этой сессии
-- [ ] **TZ_SimplyChatRaceCondition** — долг из миграционной сессии, в backlog, ждёт приоритизации
+- [ ] **ТЗ-XAI-4 открытые вопросы** (адресовать до ROADMAP):
+  - Q1: Opus vs Grok 4.20 для Professor pipeline
+  - Q2: Service chats — в scope или отдельно
+  - Q3: Briefing variant Grok 4.1 Fast или 4.20
+  - Q4: MiniMax catalog audit попутно или отдельно
+- [ ] **TZ_SimplyContextUsageWidget** — новый хвост, не блокер, Medium приоритет
+- [ ] **TZ_SimplyChatRaceCondition** — долг из миграционной сессии, в backlog
 - [ ] **TZ_ErrorRecoveryUI Stage 2** — root cause, в backlog
+- [ ] **MCP servers disconnected** — postgres/github/gmail/calendar/drive tools недоступны. Если для следующей сессии нужны SQL-проверки — либо reconnect MCP, либо psql через Bash
 
 ---
 
@@ -285,36 +325,45 @@ ba9e928  release(v3.88.0): ТЗ-XAI-1 — фундамент миграции н
 ```bash
 # Типы и билд
 npx tsc --noEmit
-npm run build
+npm run build  # ⚠ auto-runs migrations — предупреждать владельца ДО запуска
 
 # Dev server
 curl -s -o /dev/null -w "%{http_code}" http://localhost:3000
 
 # Git log
-git log --oneline -12
+git log --oneline -13  # 13 локальных коммитов ahead of origin
 
 # Live xAI модели в task-assignments
 grep -E "grok|Grok" lib/ai/task-assignments.ts
 
-# Sanity-check архитектурный документ присутствует
-ls -la specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md
+# Sanity-check новых файлов
+ls -la lib/pdf/extract-pdf-text.ts
+ls -la _archive/TZ_ATTACH_1_PdfUpload/
+ls -la specs/_backlog/TZ_SimplyContextUsageWidget.md
+
+# Verify pdf-parse в serverExternalPackages
+grep "serverExternalPackages" next.config.ts
+# Ожидается: serverExternalPackages: ["lamejs", "pdf-parse"],
 ```
 
 ---
 
 ## Накопленный опыт серии
 
-1. **Правило №0 — семь раз отмерь.** Официальная документация + лучшие практики + ANALYSIS против кода **до** любой реализации. Цена нарушения в этой сессии: v3.90.2 patch через сутки после XAI-3
-2. **Эмпирический smoke test перед рефакторингом — обязателен.** Трижды в серии спасал от неверных решений (reasoningEffort в XAI-1, generateObject в XAI-2, convertTextFilesInAllMessages dup в XAI-3)
-3. **ANALYSIS против реального кода > ТЗ от внешнего архитектора.** SPEC/ROADMAP писать самостоятельно после чтения кода — быстрее и точнее
-4. **`/dev/models` switchboard снимает давление.** Defaults — стартовые точки, финальный выбор через override
-5. **Живые документы серии > локальные HANDOFF/CHANGELOG per ТЗ.** ROADMAP + CHANGELOG + NOTES + MIND_ARCHITECTURE + **SIMPLY_ATTACHMENT_ARCHITECTURE** дают полную картину
-6. **Side-effects от тестирования → backlog, не фикс сразу.** Исключение — если side-effect это системный bug связанный с текущим scope (v3.90.2 case)
-7. **Grep before writing helper.** При добавлении функции в большой файл — grep типовых имён + diagnostic hints про `"declared but never used"` часто указывают на готовый код
-8. **Процессная дисциплина backlog.** Повторяющаяся не-блокер-проблема = немедленно в backlog. Устное «потом починим» без записи = сигнал к записи
-9. **Scope consolidation — правильный паттерн** когда две проблемы часть одного клубка legacy. Разделение на два коммита удвоит тесты без выигрыша
-10. **SSOT через model-catalog capabilities.** Никаких хардкодных флагов `isSimplyNonAnthropicModel`, никаких strip-функций через имя провайдера. Adapter через capabilities = единственный способ
-11. **Simply Chat = один persistent чат.** Терминология «в том же», «в этом», «новый» — запрещена. Владимир 12+ раз повторял
+1. **Правило №0 — семь раз отмерь.** Цена нарушения в v3.90.2: +1 ТЗ. Цена нарушения в v3.91.0: +2 итерации webpack interop + stale cache регрессия.
+2. **Эмпирический smoke test перед рефакторингом — обязателен.** Трижды в серии спасал от неверных решений.
+3. **ANALYSIS против реального кода > ТЗ от внешнего архитектора.** SPEC/ROADMAP писать самостоятельно после чтения кода.
+4. **`/dev/models` switchboard снимает давление.** Defaults — стартовые точки, финальный выбор через override.
+5. **Живые документы серии > локальные HANDOFF/CHANGELOG per ТЗ.** ROADMAP + CHANGELOG + NOTES + MIND_ARCHITECTURE + SIMPLY_ATTACHMENT_ARCHITECTURE дают полную картину.
+6. **Side-effects от тестирования → backlog, не фикс сразу.** Исключение — если side-effect это системный bug связанный с текущим scope (v3.90.2 + v3.91.0 case).
+7. **Grep before writing helper.** При добавлении функции в большой файл — grep типовых имён часто указывают на готовый код.
+8. **Процессная дисциплина backlog.** Повторяющаяся не-блокер-проблема = немедленно в backlog. Устное «потом починим» без записи = сигнал к записи. **Hygiene cleanup закрытых ТЗ = часть release commit, не отдельная уборка.**
+9. **Scope consolidation — правильный паттерн** когда две проблемы часть одного клубка legacy (v3.90.2 dead readDocument + R-6, v3.91.0 new PDF extract + fix v1 legacy).
+10. **SSOT через model-catalog capabilities.** Никаких хардкодных флагов, никаких strip-функций через имя провайдера. Adapter через capabilities = единственный способ.
+11. **Simply Chat = один persistent чат.** Терминология «в том же», «в этом», «новый» — запрещена.
+12. **`serverExternalPackages` для ESM пакетов с workers.** pdf-parse и lamejs — оба требуют external declaration. Паттерн mammoth/xlsx dynamic import работает только для CJS или ESM-lite.
+13. **После `next.config.ts` изменений — чистый rebuild.** HMR не пересобирает эти секции чисто. `rm -rf .next && npm run dev`.
+14. **«Хвосты» = `_backlog/`.** Русский slang, в разговоре используем, в путях оставляем английское.
 
 ---
 
@@ -322,15 +371,15 @@ ls -la specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md
 
 ```
 1. Прочитать этот HANDOFF (5-10 мин)
-2. Прочитать SIMPLY_ATTACHMENT_ARCHITECTURE.md (10 мин) — SSOT для всей работы
+2. Прочитать SIMPLY_ATTACHMENT_ARCHITECTURE.md (10 мин)
 3. Прочитать memory/MEMORY.md целиком (2 мин)
 4. npm run dev в background + проверить http://localhost:3000
-5. Прочитать backlog stub TZ_ATTACH_PdfExtractionAtUpload.md
-6. ls node_modules/ на PDF libraries (pdf-parse, pdfjs-dist, unpdf)
-7. WebSearch актуальной документации найденной библиотеки (правило №0!)
-8. Создать specs/TZ_ATTACH_1_PdfUpload/ANALYSIS.md
-9. Задать Владимиру 4 открытых вопроса
+5. Прочитать специфично раздел ТЗ-XAI-4 в SIMPLY_XAI_ROADMAP.md
+6. Audit call sites — grep "getModel(" в lib/briefing/, lib/podcast/, lib/meeting/, professor pipeline
+7. WebSearch актуальных docs.x.ai / docs.anthropic.com pricing (правило №0!)
+8. Создать specs/TZ_XAI_4_UtilityPipelines/ANALYSIS.md
+9. Задать Владимиру Q1-Q4 открытые вопросы
 10. После ответов — ROADMAP → поэтапно код → тест → commit → архив
 ```
 
-Эта сессия завершена. Следующему Claude Code — удачной работы. **Семь раз отмерь, один раз отрежь.**
+Эта сессия завершена. Следующему Claude Code — удачной работы. **Семь раз отмерь, один раз отрежь.** И после любой правки `next.config.ts` — `rm -rf .next && npm run dev`.
