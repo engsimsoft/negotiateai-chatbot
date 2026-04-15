@@ -119,17 +119,16 @@ ROADMAP тщательно составляется при планирован�
 | Документ | Что проверять | Против какого кода |
 |----------|--------------|-------------------|
 | `docs/ai-providers.md` → Реестр конфигураций | Модель, temperature, providerOptions, maxTokens | `lib/ai/providers.ts`, все `route.ts`, clerks, pipelines |
-| `docs/ai-chats-map.md` → Быстрый обзор | Модель каждого чата | `api/service-chat/route.ts`, `chat-mode-config.ts`, `model-tiers.ts` |
-| `docs/ai-chats-map.md` → Конфигурация провайдеров | Код-блок myProvider | `lib/ai/providers.ts` (скопировать реальный код) |
-| `CLAUDE.md` → Структура кода | Пути файлов, описания | Реальная файловая структура (`ls`, `Glob`) |
+| `docs/ai-chats-map.md` → Главная таблица + таблица моделей | Каждая модель и taskId | **SSOT:** `lib/ai/task-assignments.ts` (taskId → catalogId) + `lib/ai/model-catalog.ts` (pricing, capabilities). Никакого myProvider больше нет. |
+| `docs/architecture.md` → Модули и слои | Пути файлов, описания | Реальная файловая структура (`ls`, `Glob`) |
 
 **Быстрая проверка (команды для копирования):**
 ```bash
-# Все модели в providers.ts
-grep -n "anthropic\|google\|model" lib/ai/providers.ts
+# Все default-модели для taskId (SSOT)
+grep -n '"[a-z][a-z0-9-]*":\s*"' lib/ai/task-assignments.ts
 
-# Все модели в service-chat
-grep -n "modelId\|model:" app/(chat)/api/service-chat/route.ts
+# Все catalog entries (pricing + capabilities)
+grep -n '^\s*id:' lib/ai/model-catalog.ts
 
 # Все providerOptions в проекте
 grep -rn "providerOptions\|thinkingConfig\|thinking" lib/ app/
@@ -606,12 +605,12 @@ WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = 'ИмяТаблиц
 
 **3. Документация (по чеклисту [DOCUMENTATION_GUIDE.md](../DOCUMENTATION_GUIDE.md)):**
 - ⛔ **Прочитать DOCUMENTATION_GUIDE.md** — пройти по каждому пункту
-- Перенести `CHANGELOG.md` → главный `CHANGELOG.md`
+- Перенести `CHANGELOG.md` → главный `CHANGELOG.md` (история ТЗ живёт здесь)
 - Обновить `SIMPLY_STATUS.md`
-- Обновить `CLAUDE.md`
+- ⛔ **`CLAUDE.md` — НЕ редактировать.** Запустить `wc -l CLAUDE.md`. Если > 220 — STOP и доложить владельцу. История ТЗ → `CHANGELOG.md`. Пофайловая карта → `docs/architecture.md`. Править CLAUDE.md только если добавлен принципиально новый архитектурный слой (новая папка `lib/*/`, новый тип агента) — одна строка со ссылкой.
 - Обновить `package.json` (версия)
-- Обновить `docs/ai-chats-map.md` (если затронуты AI-модели, чаты, провайдеры)
-- Обновить `docs/architecture.md` (если новые модули, таблицы, сервисы)
+- ⛔ **`docs/ai-chats-map.md`** — **ОБЯЗАТЕЛЬНО** если в diff ТЗ есть изменения `lib/ai/task-assignments.ts` или `lib/ai/model-catalog.ts`. Это не «если затронуты» (размытая формулировка, уже приводила к регрессиям) — **если любая из этих двух файлов в git diff — ОБНОВИТЬ**. Привязка к конкретным файлам-триггерам. Проверка на правду: каждый catalogId в `ai-chats-map.md` должен существовать в `model-catalog.ts`, каждый taskId — в `task-assignments.ts`. **Причина правила:** этот документ — SSOT карта для людей и AI, документ деградирует быстрее других (каждый ТЗ про AI меняет модели), и если его не обновлять при каждом изменении — он начинает врать и становится опасным (AI-ассистент читает враньё как правду). См. урок 2026-04-15 (TZ_DocsCleanup).
+- Обновить `docs/architecture.md` (если новые модули, таблицы, сервисы — **это место для пофайловой карты, не CLAUDE.md**)
 - Создать ADR в `docs/decisions/` (если значимое архитектурное решение)
 - Обновить другие docs/ по чеклисту DOCUMENTATION_GUIDE.md
 
@@ -628,12 +627,13 @@ WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = 'ИмяТаблиц
 - **Если ТЗ затрагивает UI, компоненты, страницы:**
   1. Открыть `docs/design-system.md` → карта страниц
   2. Проверить что новые страницы/компоненты добавлены
-  3. Проверить `CLAUDE.md` → секция "Структура кода"
+  3. Проверить `docs/architecture.md` → модули и слои (пофайловая карта живёт здесь, **не** в CLAUDE.md)
 
-- **Для ЛЮБОГО ТЗ:**
-  1. Открыть `docs/ai-chats-map.md` → код-блок myProvider
-  2. Сравнить с реальным `lib/ai/providers.ts`
-  3. Если отличается — обновить
+- **Если в ТЗ изменился `lib/ai/task-assignments.ts` или `lib/ai/model-catalog.ts`:**
+  1. Открыть `docs/ai-chats-map.md` → главная таблица чатов + таблица моделей
+  2. Сверить **каждую** строку с `task-assignments.ts` (точный taskId → модель) и `model-catalog.ts` (pricing)
+  3. Обновить при расхождении. **Никакого старого `myProvider` — он удалён при Core Registry миграции.**
+  4. Grep-тест: `grep -oE '\b(claude|grok|MiniMax|gemini)[a-zA-Z0-9.\-]*' docs/ai-chats-map.md` → все упомянутые модели должны существовать в `model-catalog.ts`.
 
 - Переместить папку: `mv specs/TZ_XX/ _archive/`
 
@@ -680,15 +680,15 @@ WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = 'ИмяТаблиц
 - [ ] **Пользователь:** Мануальное тестирование пройдено
 - [ ] **`FINDINGS.md` обработан** (Правило 8): значимые находки оформлены как follow-up ТЗ (`specs/TZ_XX_Followup_*`), пользователю показан список
 - [ ] ⛔ **Прочитан DOCUMENTATION_GUIDE.md** — чеклист документации
-- [ ] `CHANGELOG.md` → главный CHANGELOG
+- [ ] `CHANGELOG.md` → главный CHANGELOG (запись о ТЗ живёт здесь)
 - [ ] Обновлён `SIMPLY_STATUS.md`
-- [ ] Обновлён `CLAUDE.md`
+- [ ] ⛔ `CLAUDE.md` — НЕ редактировать. `wc -l CLAUDE.md` ≤ 220 (иначе STOP + доложить владельцу)
 - [ ] Обновлён `package.json` (версия)
 - [ ] Обновлены docs/ по чеклисту DOCUMENTATION_GUIDE.md (ai-chats-map, architecture, ADR и др.)
 - [ ] ⛔ **Верификация docs против кода** (Правило 6):
   - [ ] `ai-providers.md` → Реестр конфигураций сверен с grep-ом по коду
-  - [ ] `ai-chats-map.md` → код-блок myProvider совпадает с `providers.ts`
-  - [ ] `CLAUDE.md` → пути файлов и описания актуальны
+  - [ ] ⛔ `ai-chats-map.md` — если в diff ТЗ есть `lib/ai/task-assignments.ts` или `lib/ai/model-catalog.ts` → ОБЯЗАТЕЛЬНО сверить главную таблицу и таблицу моделей построчно. Все catalogId / taskId должны существовать в коде.
+  - [ ] `docs/architecture.md` → пофайловая карта актуальна (слои, модули)
 - [ ] Папка перемещена в `_archive/`
 
 ---

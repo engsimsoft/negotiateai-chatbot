@@ -2,61 +2,56 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-04-11
+**Обновлено:** 2026-04-15
 
 ---
 
 ## Быстрый обзор
 
-> **v3.83.0 (ТЗ-1 Core Registry):** Все 39 AI-точек резолвят модель через единый `getModel(taskId)`. SSOT — [task-assignments.ts](../lib/ai/task-assignments.ts) (taskId → catalogId), [model-catalog.ts](../lib/ai/model-catalog.ts) (pricing + capabilities), [getModel.ts](../lib/ai/getModel.ts) (resolver). Смена модели для любой задачи = одна строка. Удалены `myProvider`, прямые экспорты `claudeHaiku/Sonnet/Opus`, `minimaxM27`, env-overrides (PROFESSOR_MODEL и т.д.). Добавлен `ai_usage_log.provider` column. См. [ADR 047](decisions/047-core-model-registry.md) и [ai-providers.md](ai-providers.md#core-registry-v3830-тз-1).
->
-> **v3.43.0:** Podcast Engine — генерация подкастов из брифингов (Gemini 2.5 Flash скрипт + Gemini 2.5 Flash TTS озвучка, multi-speaker, MP3 → Vercel Blob).
->
-> **v3.30.0:** Briefing Onboarding — AI-собеседование для настройки брифинга (Claude Sonnet 4.6, split layout, deepResearch, edit mode).
->
-> **v3.80.0:** Briefing Filter + Author → MiniMax M2.7 (из Gemini Flash + Claude Sonnet). Убрана геоблокировка Google API.
-> **v3.38.0:** Briefing Author → Claude Sonnet 4.6 (из Gemini). Effort для профессора и ревьюера.
->
-> **v3.26.0:** Morning Briefing Backend — двухэтапный AI-пайплайн (Gemini Flash фильтр + Claude Sonnet автор) для генерации новостных сводок.
->
-> **v3.24.0:** Дашборд V2 — три режима чатов (chat/expertise/create), удалены помощники, ListDetailPage.
->
-> **v3.23.0:** Все AI-модели переключены с Google Gemini на Anthropic Claude через `@ai-sdk/anthropic`.
+Все AI-точки приложения резолвят модель через единый `getModel(taskId)`. SSOT — [task-assignments.ts](../lib/ai/task-assignments.ts) (taskId → catalogId), [model-catalog.ts](../lib/ai/model-catalog.ts) (pricing + capabilities), [getModel.ts](../lib/ai/getModel.ts) (resolver). Смена модели для любой задачи = одна строка в task-assignments.ts. Детали — [ai-providers.md](ai-providers.md#core-registry) и [ADR 047](decisions/047-core-model-registry.md).
 
-> **⚠️ Важно для разработчиков:** Этот документ описывает **чаты и UI**. Модели в таблицах ниже — **актуальный снимок на дату документа**, реальный источник правды — `task-assignments.ts`. Если эта таблица расходится с task-assignments.ts — правда в коде.
+**Активные AI-провайдеры:** Anthropic Claude (Haiku 4.5 / Sonnet 4.6 / Opus 4.6), xAI Grok (4.1 Fast / 4.20 / 4.20 Multi-Agent), MiniMax M2.7, Google Gemini (vision-ocr, Podcast TTS), Deepgram Nova-3 (voice input + meeting transcription), Perplexity Sonar (deepResearch tool).
 
-| Чат | Модель | Статус | Назначение |
-|-----|--------|--------|-----------|
-| **Simply Chat (chatMode=simply)** | MiniMax M2.7 (12 tools) / Gemini 3 Flash Preview (vision) / Sonnet (think, 14 tools) | ✅ Работает | Persistent чат, маршрутизация по контенту, tools v3.79 |
-| **Чат (chatMode=chat)** | Claude Haiku | ✅ Работает | Обычный чат |
-| **Экспертиза (chatMode=expertise)** | Claude Sonnet | ✅ Работает | Точные ответы с проверкой фактов |
-| **Создание (chatMode=create)** | Claude Sonnet | ✅ Работает | Презентации, отчёты, изображения |
-| **Проект: Исполнитель** | Claude Haiku | ✅ Работает | Быстрые простые задачи |
-| **Проект: Эксперт** | Claude Sonnet | ✅ Работает | Баланс качества и скорости (DEFAULT) |
-| **Проект: Профессор** | Claude Opus | ✅ Работает | Сложные задачи |
-| **Бен** | Claude Haiku | ✅ Работает | Помощник по платформе |
-| **Создание проекта** | Claude Sonnet | ✅ Работает | Секретарь — AI-интервью для создания проекта |
-| **Менеджер проекта** | Claude Haiku | ✅ Работает | Живой AI-диалог, управление проектом |
-| **Профессор планирования** | Claude Opus | ✅ Работает | Генерация плана задач проекта (v3.14) |
-| **Эксперт по задаче** | Claude Sonnet | ✅ Работает | AI-диалог по конкретной задаче проекта (v3.16) |
-| **Суммаризатор задач** | Claude Haiku | ✅ Работает | Клерк — суммаризация результатов задачи (v3.17) |
-| **Ревьюер задач** | Claude Opus | ✅ Работает | Профессор — ревью завершённой задачи (v3.17) |
-| **Клерк-анализатор** | Claude Haiku | ✅ Работает | Автоматический анализ файлов проекта |
-| **Briefing: Онбординг** | Claude Sonnet 4.6 | ✅ Работает | AI-интервью для настройки брифинга (v3.30, v3.53 — save via UI) |
-| **Briefing: Фильтр** | MiniMax M2.7 | ✅ Работает | Фильтрация и дедупликация новостей (v3.26→v3.80) |
-| **Briefing: Автор** | MiniMax M2.7 | ✅ Работает | Генерация статьи из отфильтрованных новостей (v3.31→v3.80, монолит) |
-| **Podcast: Скрипт** | MiniMax M2.7 | ✅ Работает | Генерация диалогового сценария из секции брифинга (v3.43→v3.81) |
-| **Podcast: TTS** | Gemini 2.5 Flash TTS | ✅ Работает | Озвучка сценария (multi-speaker: Host + Expert) (v3.43, revert v3.82) |
-| **Meeting: Транскрипция** | Deepgram Nova-3 | ✅ Работает | Batch transcription аудио встреч (русский, diarize) (v3.61) |
-| **Meeting: Суммаризация** | Claude Sonnet 4.6 | ✅ Работает | Генерация структурированного резюме встречи (3 уровня) (v3.61) |
-| **Artifact handlers** | Claude Sonnet 4.6 | ✅ Работает | Генерация/обновление артефактов (text, markdown, excel, reveal, pptx), chatMode: `artifact:*` (v3.69) |
-| **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники |
+> **⚠️ Важно для разработчиков:** Этот документ описывает **чаты и UI**, а не является реестром моделей. Единственный источник правды по моделям — [`task-assignments.ts`](../lib/ai/task-assignments.ts). Если таблицы в этом документе расходятся с `task-assignments.ts` — **правда в коде**, а документ устарел и требует обновления.
+
+| Чат / Точка | Модель | Статус | Назначение |
+|---|---|---|---|
+| **Simply Chat** (default text) | Grok 4.1 Fast (`simply-chat`) | ✅ Работает | Дворецкий KITT — быстрый дешёвый основной чат |
+| **Simply Chat** — кнопка «Думать» | Grok 4.20 (`simply-chat-think`) | ✅ Работает | Tier upgrade на сильную модель |
+| **Simply Chat** — vision (image/PDF) | Claude Haiku 4.5 (`simply-chat-vision`) | ✅ Работает | Маршрутизация вложений — Haiku поддерживает native PDF |
+| **Экспертиза** (chatMode=expertise) | Grok 4.20 Multi-Agent (`expertise`) | ✅ Работает | Точные ответы, разовые экспертные запросы |
+| **Создание** (chatMode=create) | MiniMax M2.7 (`create`) | ✅ Работает | Презентации, отчёты, длинные тексты |
+| **Проект: Исполнитель** | Claude Haiku 4.5 (`project:expert:haiku`) | ✅ Работает | Быстрые простые задачи |
+| **Проект: Эксперт** (DEFAULT) | Claude Sonnet 4.6 (`project:expert:sonnet`) | ✅ Работает | Баланс качества и скорости |
+| **Проект: Профессор** | Claude Opus 4.6 (`project:expert:opus`) | ✅ Работает | Сложные задачи |
+| **Бен** (помощник по платформе) | Claude Haiku 4.5 (`service-chat:ben`) | ✅ Работает | Floating modal, онбординг |
+| **Секретарь** (создание проекта) | Claude Sonnet 4.6 (`service-chat:project-creation`) | ✅ Работает | AI-интервью для создания проекта |
+| **Менеджер проекта** | Claude Haiku 4.5 (`service-chat:project-manager`) | ✅ Работает | Живой AI-диалог, управление проектом |
+| **Профессор планирования** | Claude Opus 4.6 (`professor:planning`) | ✅ Работает | Генерация плана задач проекта |
+| **Ревьюер задач** | Claude Opus 4.6 (`professor:review`) | ✅ Работает | Ревью завершённой задачи проекта |
+| **Суммаризатор задач** (Клерк) | Claude Haiku 4.5 (`clerk:task-summary`) | ✅ Работает | Суммаризация результатов задачи |
+| **Клерк-анализатор** файлов | Claude Haiku 4.5 (`clerk:file-analyzer`) | ✅ Работает | Автоматический анализ загруженных файлов |
+| **Briefing: Онбординг** | Claude Sonnet 4.6 (`service-chat:briefing-onboarding`) | ✅ Работает | AI-интервью для настройки брифинга |
+| **Briefing: Фильтр** | MiniMax M2.7 long (`briefing:filter`) | ✅ Работает | Фильтрация и дедупликация новостей |
+| **Briefing: Автор** | MiniMax M2.7 long (`briefing:author`) | ✅ Работает | Генерация статьи из отфильтрованных новостей |
+| **Briefing: Refresh секции** | MiniMax M2.7 long (`briefing:section`) | ✅ Работает | Per-section refresh |
+| **Podcast: Скрипт** | MiniMax M2.7 (`briefing:podcast-script`) | ✅ Работает | Генерация диалогового сценария |
+| **Podcast: TTS** | Gemini 2.5 Flash TTS (native `@google/genai`) | ✅ Работает | Озвучка (multi-speaker: Host=Kore + Expert=Iapetus) |
+| **Meeting: Транскрипция** | Deepgram Nova-3 (native SDK) | ✅ Работает | Batch transcription аудио (русский, diarize) |
+| **Meeting: Суммаризация** | Claude Sonnet 4.6 (`meeting:summary`) | ✅ Работает | Структурированное резюме встречи |
+| **Artifact handlers** | Claude Sonnet 4.6 (`artifact:text\|markdown\|excel\|pptx\|reveal`) | ✅ Работает | Генерация/обновление артефактов в холсте |
+| **MIND Memory: extract** | Grok 4.20 (`memory:extract`) | ✅ Работает | Mission-critical извлечение фактов из диалогов |
+| **MIND Memory: batch/consolidate/profile/dedup** | Grok 4.1 Fast (`memory:*`) | ✅ Работает | Механические задачи MIND pipeline |
+| **Vision OCR** | Claude Haiku 4.5 (`vision:ocr`) | ✅ Работает | OCR-экстракция текста из изображений |
+| **Title / Project summary** | Claude Haiku 4.5 (`util:*`) | ✅ Работает | Автонейминг чатов, суммаризация проектов |
+| **Artifact suggestions** | Claude Sonnet 4.6 (`util:artifact-suggestions`) | ✅ Работает | `request-suggestions` tool |
+| **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники (не подключены) |
 
 ---
 
 ## ✅ Работающие чаты (детали)
 
-### Сервисные чаты (ServiceChat v3.8)
+### Сервисные чаты (ServiceChat)
 
 > **Архитектура:** Все сервисные чаты используют единую систему `components/service-chat/`.
 
@@ -84,7 +79,7 @@ components/service-chat/configs/project-creation.ts # Конфигурация
 app/(chat)/api/service-chat/route.ts                # API (context: project-creation)
 ```
 
-#### Менеджер проекта (v3.13 — живой AI-диалог)
+#### Менеджер проекта — живой AI-диалог
 **Где:** Кнопка "👤 Менеджер" в header страницы проекта `/projects/[id]`
 
 | Параметр | Значение |
@@ -103,8 +98,8 @@ app/(chat)/api/service-chat/route.ts                # API (context: project-crea
 
 **Mode injection по phase:**
 - `first_contact` (phase: setup/documents) — полный режим знакомства + план Профессора (если есть) через `<professor_plan>` XML-блок
-- `plan_presentation` (phase: approved) — taskStatuses XML в system prompt (ТЗ-B2)
-- `navigation` (phase: execution) — taskStatuses XML в system prompt (ТЗ-B2)
+- `plan_presentation` (phase: approved) — taskStatuses XML в system prompt
+- `navigation` (phase: execution) — taskStatuses XML в system prompt
 
 **Файлы:**
 ```
@@ -116,7 +111,7 @@ app/(chat)/api/service-chat/route.ts                 # API (context: project-man
 lib/db/queries.ts                                    # getOrCreateManagerChat, findManagerChat
 ```
 
-#### Профессор планирования (v3.14)
+#### Профессор планирования
 **Где:** Автоматически вызывается при нажатии "Начать планирование" на странице проекта
 
 | Параметр | Значение |
@@ -149,7 +144,7 @@ components/projects/project-pulse.tsx                # Превью плана �
 app/(chat)/api/service-chat/route.ts                # Manager с план-контекстом
 ```
 
-#### Эксперт по задаче (ExpertTaskChat v3.16)
+#### Эксперт по задаче (ExpertTaskChat)
 **Где:** Клик по задаче в Пульсе или ApprovedState → `/projects/[id]/tasks/[taskId]`
 
 | Параметр | Значение |
@@ -170,12 +165,12 @@ app/(chat)/api/service-chat/route.ts                # Manager с план-кон
 6. System prompt включает: контекст проекта, описание задачи, результаты завершённых задач, manifest
 7. TaskSidebar позволяет переключаться между задачами
 
-**Context Management (v3.73.0, обновлено v3.87.3):**
+**Context Management:**
 1. Для проектных задач активирован **Anthropic Compaction API** (`providerOptions.anthropic.contextManagement`) — сжимает старые сообщения на стороне провайдера прозрачно для нас
 2. Sliding window safety cap (180K токенов) — жёсткий потолок
-3. Сняты: `createSnapshot` tool, `SnapshotCard` UI, `ContextIndicator`, `snapshot-creator` клерк (v3.87.3). Подробности — [ADR 052](decisions/052-context-management-strategy-per-provider.md)
+3. `createSnapshot` tool, `SnapshotCard` UI, `ContextIndicator`, `snapshot-creator` клерк сняты. Подробности — [ADR 052](decisions/052-context-management-strategy-per-provider.md)
 
-**Завершение задачи (v3.17):**
+**Завершение задачи:**
 1. Кнопка «Завершить задачу» в header → AlertDialog подтверждения → spinner
 2. `POST .../complete` → суммаризатор (Flash) → ревьюер (Pro, если needsReview) → сохранение
 3. Completion card: success (зелёная), issues (жёлтая), critical (красная)
@@ -184,8 +179,7 @@ app/(chat)/api/service-chat/route.ts                # Manager с план-кон
 
 **UI компоненты:**
 - **TaskChat** — полноценный чат: Messages, Artifact, MultimodalInput, DataStreamHandler, кнопка завершения
-- **TaskCompletionCard** — карточка результата с кнопками навигации (v3.17)
-- **TaskSidebar** — навигация: список задач с иконками статусов, сворачивание, «← К проекту»
+- **TaskCompletionCard** — карточка результата с кнопками навигации- **TaskSidebar** — навигация: список задач с иконками статусов, сворачивание, «← К проекту»
 
 **Файлы:**
 ```
@@ -193,19 +187,14 @@ app/(task)/layout.tsx                                    # Layout (SWRProvider +
 app/(task)/projects/[id]/tasks/[taskId]/page.tsx          # Server Component (auth + guards + startTask)
 app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts # Streaming endpoint
 app/(chat)/api/projects/[id]/tasks/[taskId]/unlock/route.ts # Unlock locked → pending
-app/(chat)/api/projects/[id]/tasks/[taskId]/complete/route.ts # Завершение задачи (v3.17)
-app/(chat)/api/projects/[id]/tasks/[taskId]/reopen/route.ts  # Доработка (v3.17)
-app/(chat)/api/projects/[id]/tasks/[taskId]/accept/route.ts  # Принятие (v3.17)
-components/projects/task-chat.tsx                         # Клиент чата + кнопка завершения
-components/projects/task-completion-card.tsx              # Карточка результата (v3.17)
-components/projects/task-sidebar.tsx                      # Навигация по задачам
+app/(chat)/api/projects/[id]/tasks/[taskId]/complete/route.ts # Завершение задачиapp/(chat)/api/projects/[id]/tasks/[taskId]/reopen/route.ts  # Доработкаapp/(chat)/api/projects/[id]/tasks/[taskId]/accept/route.ts  # Принятиеcomponents/projects/task-chat.tsx                         # Клиент чата + кнопка завершения
+components/projects/task-completion-card.tsx              # Карточка результатаcomponents/projects/task-sidebar.tsx                      # Навигация по задачам
 lib/ai/tools/chat-tools.ts                               # Shared tools (getStandardTools)
-lib/ai/tools/read-project-file.ts                        # Чтение файлов проекта (v3.17)
-lib/prompts/experts/task-expert.md                        # Промпт Эксперта
+lib/ai/tools/read-project-file.ts                        # Чтение файлов проектаlib/prompts/experts/task-expert.md                        # Промпт Эксперта
 lib/prompts/build-task-expert-prompt.ts                   # Prompt builder
 ```
 
-#### Клерк-анализатор файлов (v3.13)
+#### Клерк-анализатор файлов
 **Где:** Автоматически вызывается после upload файла в проект
 
 | Параметр | Значение |
@@ -235,7 +224,7 @@ components/projects/project-files-card.tsx            # UI (auto-analyze + feedb
 lib/db/queries.ts                                    # rebuildProjectManifest
 ```
 
-#### Суммаризатор задач (Клерк v3.17)
+#### Суммаризатор задач (Клерк)
 **Где:** Автоматически вызывается при завершении задачи (`POST .../complete`)
 
 | Параметр | Значение |
@@ -257,7 +246,7 @@ lib/ai/task-completion-types.ts           # taskSummarySchema
 lib/prompts/clerks/task-summarizer.md     # Промпт
 ```
 
-#### Ревьюер задач (Профессор v3.17)
+#### Ревьюер задач (Профессор)
 **Где:** Автоматически вызывается при завершении задачи с `needsReview=true`
 
 | Параметр | Значение |
@@ -280,7 +269,7 @@ lib/ai/task-completion-types.ts           # professorVerdictSchema
 lib/prompts/professors/task-review.md     # Промпт
 ```
 
-#### Briefing Onboarding (ТЗ-A2, v3.30)
+#### Briefing Onboarding
 **Где:** `/briefing/setup` (split layout: preview + chat)
 
 | Параметр | Значение |
@@ -295,11 +284,10 @@ lib/prompts/professors/task-review.md     # Промпт
 1. Server Component определяет mode (create/edit), загружает userProfile + topics/sources
 2. AI проводит интервью: узнаёт интересы, ищет источники через deepResearch
 3. `updateBriefingPreview` обновляет live preview в реальном времени
-4. Пользователь нажимает «Сохранить» → `POST /api/briefing/save-profile` (v3.53.0, ранее — AI tool `saveBriefingProfile`)
+4. Пользователь нажимает «Сохранить» → `POST /api/briefing/save-profile`
 5. Success card с кнопкой "Сгенерировать первый брифинг"
 6. Edit mode: загружает сохранённый профиль, greeting адаптирован
-7. Unsaved changes guard: AlertDialog при попытке уйти без сохранения (v3.53.0)
-
+7. Unsaved changes guard: AlertDialog при попытке уйти без сохранения
 **Файлы:**
 ```
 app/(dashboard)/briefing/setup/page.tsx                    # Server Component (auth, mode, profile)
@@ -308,15 +296,10 @@ app/(dashboard)/briefing/setup/components/                  # Preview + chat pan
 components/service-chat/configs/briefing-onboarding.ts      # Reference config
 lib/prompts/service-chats/briefing-onboarding.md            # Промпт
 app/(chat)/api/service-chat/route.ts                        # API (context: briefing-onboarding, Guardian bypass)
-app/(chat)/api/briefing/save-profile/route.ts               # POST API сохранения профиля (v3.53.0)
-lib/briefing/save-briefing-profile.ts                       # Логика сохранения (v3.53.0)
-```
+app/(chat)/api/briefing/save-profile/route.ts               # POST API сохранения профиляlib/briefing/save-briefing-profile.ts                       # Логика сохранения```
 
-#### Briefing: AI-пайплайн (v3.26)
+#### Briefing: AI-пайплайн
 **Где:** `POST /api/briefing/generate` (backend-only, без интерактивного UI)
-
-> **v3.80.0 (ТЗ-Briefing-1):** Filter и Author переведены на MiniMax M2.7 (с Gemini 2.0 Flash и Claude Sonnet 4.6). Цена: $0.074 → $0.011 за брифинг (6.6×).
-> **v3.82.0 (ТЗ-MapReduce):** Map-Reduce подход для Author отклонён — sequential streamText вызывает socket reuse bug в MiniMax. Монолит стабилен на 26K+ input tokens. См. [ADR 046](decisions/046-podcast-tts-revert-and-briefing-stability.md).
 
 **Этап 1 — Фильтр:**
 
@@ -359,10 +342,8 @@ lib/briefing/source-fetchers/telegram-fetcher.ts # Telegram через cheerio
 lib/briefing/source-fetchers/web-fetcher.ts  # Web через Readability + jsdom
 ```
 
-#### Podcast Engine (ТЗ-Б1, v3.43; финальная архитектура v3.82)
+#### Podcast Engine
 **Где:** `POST /api/briefing/podcast/generate` (backend-only, streaming)
-
-> **v3.81.0 → v3.82.0:** TTS попытались мигрировать на MiniMax Speech 2.8 HD — откат из-за худшего качества русского и цены $1+ за подкаст (vs $0.014 у Gemini). Script остался на M2.7 (диалоги интереснее). См. [ADR 046](decisions/046-podcast-tts-revert-and-briefing-stability.md).
 
 **Этап 1 — Скрипт (MiniMax M2.7):**
 
@@ -420,34 +401,36 @@ lib/prompts/briefing/briefing-scriptwriter.md       # Промпт скрипт�
 
 ---
 
-## 1. Чаты по режимам (chatMode v3.24)
+## 1. Чаты по режимам (chatMode)
 
-**Где:** Главная страница (`/chat`), `/expertise`, `/create`, `/chats`
+**Где:** `/simply` (Simply Chat — основной persistent чат), `/expertise` (разовые экспертные запросы), `/create` (разовые задания на создание)
 
-> **v3.24.0:** Модель определяется на сервере по chatMode. Убран UI-селектор модели.
+> Модель определяется на сервере по chatMode + route. Нет UI-селектора модели. Детали резолва — через `getModel(taskId)`, где taskId вычисляется в API-роутах по chatMode.
 
 ### chatMode routing
 
-| chatMode | Модель | Страница | Описание |
-|----------|--------|----------|----------|
-| `chat` | Claude Haiku | `/chats` | Обычный чат (по умолчанию) |
-| `expertise` | Claude Sonnet | `/expertise` | Точные ответы с проверкой фактов |
-| `create` | Claude Sonnet | `/create` | Презентации, отчёты, изображения |
-
-**Создание чата:** `/chat?mode=expertise` → чат с chatMode=expertise, модель Sonnet.
+| chatMode | taskId | Модель | Страница | Описание |
+|---|---|---|---|---|
+| `simply` (text) | `simply-chat` | Grok 4.1 Fast | `/simply` | Дворецкий KITT — persistent чат |
+| `simply` (think) | `simply-chat-think` | Grok 4.20 | `/simply` (кнопка «Думать») | Tier upgrade на сильную модель |
+| `simply` (vision) | `simply-chat-vision` | Claude Haiku 4.5 | `/simply` (при загрузке image/PDF) | Vision/native PDF |
+| `expertise` | `expertise` | Grok 4.20 Multi-Agent | `/expertise/[id]` | Точные ответы с проверкой фактов |
+| `create` | `create` | MiniMax M2.7 | `/create/[id]` | Презентации, отчёты, длинные тексты |
 
 **Особенности:**
-- Полная поддержка инструментов (search, deepResearch, fetchUrl, documents, excel)
-- Skills-based routing
-- Персонализация (профиль + память)
+- Полная поддержка инструментов (search, deepResearch, fetchUrl, documents, excel, readTelegramChannel)
+- Skills-based routing через prompt builder
+- Персонализация (профиль + MIND memory retrieve)
 - Стриминг ответов
 
 **Файлы:**
 ```
-app/(chat)/api/chat/route.ts          # API endpoint (chatMode routing)
-lib/ai/chat-mode-config.ts           # Конфиг: chatMode → модель, tools
-lib/ai/providers.ts                   # Конфигурация Anthropic Claude
-lib/prompts/builder/index.ts          # buildChatPrompt, buildExpertisePrompt, buildCreatePrompt
+app/(chat)/simply/page.tsx             # Simply Chat (Server Component)
+app/(chat)/api/chat/route.ts           # API endpoint (chatMode routing, taskId resolve)
+lib/ai/chat-mode-config.ts             # Тонкая обёртка chatMode → taskId
+lib/ai/getModel.ts                     # SSOT резолва модели по taskId
+lib/ai/task-assignments.ts             # taskId → catalogId (SSOT default модели)
+lib/prompts/builder/index.ts           # buildChatPrompt, buildExpertisePrompt, buildCreatePrompt
 ```
 
 ---
@@ -457,8 +440,6 @@ lib/prompts/builder/index.ts          # buildChatPrompt, buildExpertisePrompt, b
 **Где:** `/projects/[id]/chat`
 
 **Провайдер:** Anthropic Claude через `@ai-sdk/anthropic`
-
-> **v3.23.0:** Переключены с Gemini на Claude через `@ai-sdk/anthropic` (прямое подключение).
 
 ### 2.1 Исполнитель (Executor)
 
@@ -526,7 +507,7 @@ lib/ai/professor-pipeline.ts          # Multi-step pipeline
 - `isFirstTime: true` — онбординг для новых пользователей
 - `isFirstTime: false` — краткая помощь для существующих
 
-**Файлы (ServiceChat v3.8):**
+**Файлы:**
 ```
 components/service-chat/service-chat-floating.tsx  # Floating modal
 components/service-chat/service-chat-trigger.tsx   # Кнопка ❓
@@ -541,9 +522,9 @@ lib/prompts/agents/ben/AGENT.md                    # Промпт с frontmatter
 
 ## Конфигурация провайдеров
 
-### Core Registry (v3.83.0+)
+### Core Registry
 
-С версии 3.83.0 модели резолвятся через единую функцию `getModel(taskId)`. Старая конфигурация (`myProvider`, `createAnthropic` напрямую) удалена из `providers.ts`.
+Модели резолвятся через единую функцию `getModel(taskId)`. Все провайдеры подключены через `createProviderRegistry` из AI SDK v6.
 
 ```typescript
 // lib/ai/registry.ts
@@ -565,7 +546,7 @@ export const registry = createProviderRegistry({
 ```typescript
 // lib/ai/getModel.ts
 export function getModel(taskId: TaskId, context?: GetModelContext): LanguageModel {
-  // 1. test mocks → 2. overrides (stub, ТЗ-2) → 3. task-assignments → 4. catalog → 5. registry
+  // 1. test mocks → 2. dev overrides → 3. task-assignments → 4. catalog → 5. registry
 }
 ```
 
@@ -599,18 +580,23 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
 
 ---
 
-## Таблица цен
+## Таблица моделей и где используются
 
-| Модель | Input | Output | Контекст | Используется в |
-|--------|-------|--------|----------|---------------|
-| Claude Sonnet 4.6 (`claude-sonnet-4-6`) | $3 | $15 | 200K | Основной чат (DEFAULT), Секретарь, Эксперт, артефакты, Briefing (онбординг, автор, секция) |
-| Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | $1 | $5 | 200K | Бен, Менеджер, Исполнитель, Клерки (анализатор, суммаризатор) |
-| Claude Opus 4.6 (`claude-opus-4-6`) | $5 | $25 | 200K | Профессоры (планирование, ревью задач) |
-| Gemini 2.0 Flash (`gemini-2.0-flash`) | ~$0.10 | ~$0.40 | 1M | Briefing: фильтрация и дедупликация (v3.26) |
-| Gemini 2.5 Flash (`gemini-2.5-flash`) | — | — | 1M | Vision OCR: image + PDF, Podcast: скрипт |
-| Gemini 2.5 Flash TTS (`gemini-2.5-flash-preview-tts`) | — | — | — | Podcast: озвучка (multi-speaker) |
+> **SSOT pricing:** [lib/ai/model-catalog.ts](../lib/ai/model-catalog.ts). Этот документ ссылается на catalogId, но не дублирует цены — они могут меняться. Для актуальных чисел — [model-catalog-ops.md](model-catalog-ops.md) или сам каталог.
 
-*Цены за 1M токенов*
+| Модель | catalogId | Input / Output (USD/1M) | Контекст | Где используется |
+|---|---|---|---|---|
+| **Grok 4.1 Fast** (non-reasoning) | `grok-4-1-fast-non-reasoning` | $0.20 / $0.50 | 128K | Simply Chat (default text), MIND memory (extract-batch, consolidate, profile, dedup-verify) |
+| **Grok 4.20** (non-reasoning) | `grok-4.20-0309-non-reasoning` | $2 / $6 | 256K | Simply Chat (кнопка «Думать»), MIND memory (extract — mission-critical) |
+| **Grok 4.20 Multi-Agent** | `grok-4.20-multi-agent-0309` | $2 / $6 | 256K | Экспертиза (chatMode=expertise) |
+| **Claude Sonnet 4.6** | `claude-sonnet-4-6` | $3 / $15 | 200K (1M beta) | project:expert:sonnet (DEFAULT), Секретарь, Briefing Onboarding, Meeting summary, Artifact handlers (5 типов), util:artifact-suggestions |
+| **Claude Haiku 4.5** | `claude-haiku-4-5-20251001` | $1 / $5 | 200K | Simply Chat vision, project:expert:haiku, Бен, Менеджер, Клерки (file-analyzer, task-summary, snapshot), util (title, project-summary), vision:ocr, professor:pipeline-execute |
+| **Claude Opus 4.6** | `claude-opus-4-6` | $5 / $25 | 200K (1M beta) | project:expert:opus, Профессор (planning, review, pipeline-analyze, pipeline-synthesize) |
+| **MiniMax M2.7** | `MiniMax-M2.7` | $0.30 / $1.20 | 200K | Создание (chatMode=create), Podcast: Script |
+| **MiniMax M2.7** (long timeout) | `MiniMax-M2.7-long` | $0.30 / $1.20 | 200K | Briefing pipeline (filter, author, section refresh) — alias с 180s fetch timeout |
+| **Gemini 2.5 Flash TTS** | `gemini-2.5-flash-preview-tts` | — | — | Podcast: TTS озвучка (multi-speaker Host + Expert), через native `@google/genai` SDK |
+| **Deepgram Nova-3** | — (raw API) | $0.0043 / минута | — | Voice input (Simply Chat диктовка), Meeting transcription (batch, diarize, русский) |
+| **Perplexity Sonar Pro / Deep** | — (raw API) | варьируется | — | `deepResearch` tool — вызывается из expertise / create / project chats |
 
 ---
 
@@ -630,19 +616,12 @@ lib/prompts/
 │   └── ben/AGENT.md       # Конфиг Бена
 ├── skills/
 │   └── document/          # Skills для документов
-├── professors/            # Промпты профессоров (v3.14+)
-│   ├── planning.md        # Профессор планирования
-│   └── task-review.md     # Профессор-ревьюер задач (v3.17)
-├── experts/               # Промпты экспертов (v3.16)
-│   └── task-expert.md     # Эксперт по задаче
-├── clerks/                # Промпты клерков (v3.13+)
-│   ├── file-analyzer.md   # Клерк-анализатор файлов
-│   └── task-summarizer.md # Клерк-суммаризатор задач (v3.17)
-├── service-chats/         # Промпты сервисных чатов (v3.11+)
-│   ├── project-creation.md # Промпт Секретаря
+├── professors/            # Промпты профессоров│   ├── planning.md        # Профессор планирования
+│   └── task-review.md     # Профессор-ревьюер задач├── experts/               # Промпты экспертов│   └── task-expert.md     # Эксперт по задаче
+├── clerks/                # Промпты клерков│   ├── file-analyzer.md   # Клерк-анализатор файлов
+│   └── task-summarizer.md # Клерк-суммаризатор задач├── service-chats/         # Промпты сервисных чатов│   ├── project-creation.md # Промпт Секретаря
 │   ├── project-manager.md  # Промпт Менеджера
-│   ├── briefing-onboarding.md # Промпт Briefing Onboarding (v3.30)
-│   └── briefing-onboarding-mode-injection.md # Справочный документ для edit mode
+│   ├── briefing-onboarding.md # Промпт Briefing Onboarding│   └── briefing-onboarding-mode-injection.md # Справочный документ для edit mode
 ├── core/
 │   ├── base.md            # Базовый промпт
 │   ├── safety.md          # Безопасность
@@ -653,7 +632,7 @@ lib/prompts/
     ├── user-profile.ts    # Профиль пользователя
     └── chat-memory.ts     # Память чата
 
-components/service-chat/   # ServiceChat система (v3.8)
+components/service-chat/   # ServiceChat система
 ├── service-chat-core.tsx      # Ядро (messages, streaming)
 ├── service-chat-floating.tsx  # Floating modal
 ├── service-chat-drawer.tsx    # Drawer справа
@@ -664,8 +643,7 @@ components/service-chat/   # ServiceChat система (v3.8)
     ├── ben.ts                 # Конфиг Бена
     ├── project-creation.ts    # Конфиг создания проекта
     ├── project-manager.ts     # Конфиг менеджера
-    └── briefing-onboarding.ts # Конфиг Briefing Onboarding (v3.30)
-```
+    └── briefing-onboarding.ts # Конфиг Briefing Onboarding```
 
 ---
 
