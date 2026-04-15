@@ -5,6 +5,7 @@ import { auth } from "@/app/(auth)/auth";
 import { getMeetingRecordById, saveMeetingRecord } from "@/lib/db/queries";
 import { summarizeTranscript } from "@/lib/meeting/meeting-pipeline";
 import type { SummaryLevel } from "@/lib/meeting/meeting-types";
+import { getModelIdForTask } from "@/lib/ai/getModel";
 
 export const maxDuration = 120;
 
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
       userInstructions: trimmedInstructions,
       originalRecordId: rootId,
       metadata: {
-        modelId: "claude-sonnet-4-6",
+        modelId: getModelIdForTask("meeting:summary"),
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         regeneratedFrom: recordId,

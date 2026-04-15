@@ -25,11 +25,11 @@
 export type TaskId =
   // Simply Chat (основной чат продукта)
   | "simply-chat"           // default text → Grok 4.1 Fast (non-reasoning)
-  | "simply-chat-think"     // кнопка «Думать» = tier upgrade → Grok 4.20 (non-reasoning)
+  | "simply-chat-think"     // кнопка «Думать» = tier upgrade → Grok 4.20 (reasoning)
   | "simply-chat-vision"    // attachments (image/pdf) → Claude Haiku 4.5
-  // Экспертиза и Создание — разовые ветки (ТЗ-LegacyChatCleanup)
-  | "expertise"             // chatMode=expertise → Grok 4.20 Multi-Agent
-  | "create"                // chatMode=create → MiniMax M2.7
+  // Экспертиза и Создание — разовые ветки
+  | "expertise"             // chatMode=expertise → Grok 4.20 (reasoning)
+  | "create"                // chatMode=create → Grok 4.20 (reasoning)
   // Проект — экспертный чат по задаче
   | "project:expert:haiku"
   | "project:expert:sonnet"
@@ -82,21 +82,27 @@ export type TaskId =
  * change one line here. Nothing else in the app needs updating.
  */
 export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
-  // Simply Chat (ТЗ-XAI-3 2026-04-15)
+  // Simply Chat (ТЗ-XAI-4 2026-04-16)
   // simply-chat — дворецкий KITT на Grok 4.1 Fast non-reasoning (быстро, дёшево,
   // не тратит токены на reasoning overhead). Кнопка «Думать» = продуктовая
-  // метафора «используй умную модель» — tier upgrade на Grok 4.20 non-reasoning
-  // ($2/$6 vs $0.20/$0.50, ×10 дороже input, заметно сильнее). Variant
-  // reasoning/non-reasoning для Think — стартовая точка, переключается через
-  // /dev/models без коммита. Vision остаётся на Haiku — проверенное решение,
-  // Claude vision конкурентен Grok'овскому, один провайдер уже в проекте (Opus).
+  // метафора «используй умную модель» — tier upgrade на Grok 4.20 reasoning
+  // ($2/$6 vs $0.20/$0.50). У grok-4.20 reasoning включён автоматически,
+  // параметр reasoning_effort передавать нельзя. Vision остаётся на Haiku —
+  // проверенное решение, Claude vision конкурентен Grok'овскому, один провайдер
+  // уже в проекте (Opus).
   "simply-chat":              "grok-4-1-fast-non-reasoning",
-  "simply-chat-think":        "grok-4.20-0309-non-reasoning",
+  "simply-chat-think":        "grok-4.20-0309-reasoning",
   "simply-chat-vision":       "claude-haiku-4-5-20251001",
 
-  // Экспертиза и Создание (ТЗ-LegacyChatCleanup)
-  "expertise":                "grok-4.20-multi-agent-0309",
-  "create":                   "MiniMax-M2.7",
+  // Экспертиза и Создание (ТЗ-XAI-4 2026-04-16)
+  // Обе ветки переведены на Grok 4.20 reasoning — это «зал», пользователь видит
+  // результат в реальном времени, качество важнее экономии. Multi-agent variant
+  // снят с expertise: через Chat Completions он работает как обычный grok-4.20
+  // (built-in tools игнорируют наши function calls). Multi-agent через Responses
+  // API + MCP — отдельная ветка ТЗ-XAI-MA-1. MiniMax снят с create — остаётся
+  // только в «кухне» (briefing pipeline).
+  "expertise":                "grok-4.20-0309-reasoning",
+  "create":                   "grok-4.20-0309-reasoning",
 
   // Проект — экспертный чат (tier)
   "project:expert:haiku":     "claude-haiku-4-5-20251001",
@@ -121,15 +127,14 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "clerk:snapshot":           "claude-haiku-4-5-20251001",
   "clerk:file-analyzer":      "grok-4-1-fast-non-reasoning",
 
-  // Memory (ТЗ-XAI-2 2026-04-14)
-  // memory:extract — mission-critical задача извлечения фактов из диалогов.
-  // Оставлена на сильной модели Grok 4.20 (non-reasoning variant — задача
-  // структурированная Zod-схемой, reasoning tokens не нужны). Остальные 4
-  // memory-задачи — механические (batch, dedup, consolidate, profile), им
-  // достаточно рабочей лошадки Grok 4.1 Fast. Любой defaults можно
-  // переключить через /dev/models dev switchboard без правки кода — это
-  // стартовые точки, не финальный выбор.
-  "memory:extract":           "grok-4.20-0309-non-reasoning",
+  // Memory (ТЗ-XAI-4 2026-04-16)
+  // memory:extract — mission-critical задача извлечения фактов из диалогов,
+  // единственный MIND-вызов на сильной модели Grok 4.20 (reasoning variant —
+  // нужен интеллект для извлечения фактов из произвольного диалога). Остальные
+  // 4 memory-задачи — механические (batch, dedup, consolidate, profile), им
+  // достаточно рабочей лошадки Grok 4.1 Fast. Любой default можно переключить
+  // через /dev/models dev switchboard без правки кода.
+  "memory:extract":           "grok-4.20-0309-reasoning",
   "memory:extract-batch":     "grok-4-1-fast-non-reasoning",
   "memory:consolidate":       "grok-4-1-fast-non-reasoning",
   "memory:profile":           "grok-4-1-fast-non-reasoning",
@@ -147,8 +152,11 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "briefing:section":         "MiniMax-M2.7-long",
   "briefing:podcast-script":  "MiniMax-M2.7",
 
-  // Meeting
-  "meeting:summary":          "claude-sonnet-4-6",
+  // Meeting (ТЗ-XAI-4 2026-04-16)
+  // Длинные транскрипты встреч → нужна качественная суммаризация. Переведён
+  // с Sonnet 4.6 на Grok 4.20 reasoning. Это «зал» — результат показывается
+  // пользователю как итоговый артефакт встречи.
+  "meeting:summary":          "grok-4.20-0309-reasoning",
 
   // Service chats — defaults mirror service-chat/route.ts getModelId() + ben/route.ts
   "service-chat:ben":                 "claude-haiku-4-5-20251001",

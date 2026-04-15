@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-04-15
+**Обновлено:** 2026-04-16
 
 ---
 
@@ -17,10 +17,10 @@
 | Чат / Точка | Модель | Статус | Назначение |
 |---|---|---|---|
 | **Simply Chat** (default text) | Grok 4.1 Fast (`simply-chat`) | ✅ Работает | Дворецкий KITT — быстрый дешёвый основной чат |
-| **Simply Chat** — кнопка «Думать» | Grok 4.20 (`simply-chat-think`) | ✅ Работает | Tier upgrade на сильную модель |
+| **Simply Chat** — кнопка «Думать» | Grok 4.20 reasoning (`simply-chat-think`) | ✅ Работает | Tier upgrade на сильную модель |
 | **Simply Chat** — vision (image/PDF) | Claude Haiku 4.5 (`simply-chat-vision`) | ✅ Работает | Маршрутизация вложений — Haiku поддерживает native PDF |
-| **Экспертиза** (chatMode=expertise) | Grok 4.20 Multi-Agent (`expertise`) | ✅ Работает | Точные ответы, разовые экспертные запросы |
-| **Создание** (chatMode=create) | MiniMax M2.7 (`create`) | ✅ Работает | Презентации, отчёты, длинные тексты |
+| **Экспертиза** (chatMode=expertise) | Grok 4.20 reasoning (`expertise`) | ✅ Работает | Точные ответы, разовые экспертные запросы |
+| **Создание** (chatMode=create) | Grok 4.20 reasoning (`create`) | ✅ Работает | Презентации, отчёты, длинные тексты |
 | **Проект: Исполнитель** | Claude Haiku 4.5 (`project:expert:haiku`) | ✅ Работает | Быстрые простые задачи |
 | **Проект: Эксперт** (DEFAULT) | Claude Sonnet 4.6 (`project:expert:sonnet`) | ✅ Работает | Баланс качества и скорости |
 | **Проект: Профессор** | Claude Opus 4.6 (`project:expert:opus`) | ✅ Работает | Сложные задачи |
@@ -38,9 +38,9 @@
 | **Podcast: Скрипт** | MiniMax M2.7 (`briefing:podcast-script`) | ✅ Работает | Генерация диалогового сценария |
 | **Podcast: TTS** | Gemini 2.5 Flash TTS (native `@google/genai`) | ✅ Работает | Озвучка (multi-speaker: Host=Kore + Expert=Iapetus) |
 | **Meeting: Транскрипция** | Deepgram Nova-3 (native SDK) | ✅ Работает | Batch transcription аудио (русский, diarize) |
-| **Meeting: Суммаризация** | Claude Sonnet 4.6 (`meeting:summary`) | ✅ Работает | Структурированное резюме встречи |
+| **Meeting: Суммаризация** | Grok 4.20 reasoning (`meeting:summary`) | ✅ Работает | Структурированное резюме встречи |
 | **Artifact handlers** | Claude Sonnet 4.6 (`artifact:text\|markdown\|excel\|pptx\|reveal`) | ✅ Работает | Генерация/обновление артефактов в холсте |
-| **MIND Memory: extract** | Grok 4.20 (`memory:extract`) | ✅ Работает | Mission-critical извлечение фактов из диалогов |
+| **MIND Memory: extract** | Grok 4.20 reasoning (`memory:extract`) | ✅ Работает | Mission-critical извлечение фактов из диалогов |
 | **MIND Memory: batch/consolidate/profile/dedup** | Grok 4.1 Fast (`memory:*`) | ✅ Работает | Механические задачи MIND pipeline |
 | **Vision OCR** | Claude Haiku 4.5 (`vision:ocr`) | ✅ Работает | OCR-экстракция текста из изображений |
 | **Title / Project summary** | Grok 4.1 Fast (`util:title`, `util:project-summary`) | ✅ Работает | Автонейминг чатов, суммаризация проектов |
@@ -412,10 +412,10 @@ lib/prompts/briefing/briefing-scriptwriter.md       # Промпт скрипт�
 | chatMode | taskId | Модель | Страница | Описание |
 |---|---|---|---|---|
 | `simply` (text) | `simply-chat` | Grok 4.1 Fast | `/simply` | Дворецкий KITT — persistent чат |
-| `simply` (think) | `simply-chat-think` | Grok 4.20 | `/simply` (кнопка «Думать») | Tier upgrade на сильную модель |
+| `simply` (think) | `simply-chat-think` | Grok 4.20 reasoning | `/simply` (кнопка «Думать») | Tier upgrade на сильную модель |
 | `simply` (vision) | `simply-chat-vision` | Claude Haiku 4.5 | `/simply` (при загрузке image/PDF) | Vision/native PDF |
-| `expertise` | `expertise` | Grok 4.20 Multi-Agent | `/expertise/[id]` | Точные ответы с проверкой фактов |
-| `create` | `create` | MiniMax M2.7 | `/create/[id]` | Презентации, отчёты, длинные тексты |
+| `expertise` | `expertise` | Grok 4.20 reasoning | `/expertise/[id]` | Точные ответы с проверкой фактов |
+| `create` | `create` | Grok 4.20 reasoning | `/create/[id]` | Презентации, отчёты, длинные тексты |
 
 **Особенности:**
 - Полная поддержка инструментов (search, deepResearch, fetchUrl, documents, excel, readTelegramChannel)
@@ -587,12 +587,12 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
 | Модель | catalogId | Input / Output (USD/1M) | Контекст | Где используется |
 |---|---|---|---|---|
 | **Grok 4.1 Fast** (non-reasoning) | `grok-4-1-fast-non-reasoning` | $0.20 / $0.50 | 128K | Simply Chat (default text), MIND memory (extract-batch, consolidate, profile, dedup-verify), Briefing filter, Clerks (task-summary, file-analyzer), util (title, project-summary, artifact-suggestions) |
-| **Grok 4.20** (non-reasoning) | `grok-4.20-0309-non-reasoning` | $2 / $6 | 256K | Simply Chat (кнопка «Думать»), MIND memory (extract — mission-critical) |
-| **Grok 4.20 Multi-Agent** | `grok-4.20-multi-agent-0309` | $2 / $6 | 256K | Экспертиза (chatMode=expertise) |
-| **Claude Sonnet 4.6** | `claude-sonnet-4-6` | $3 / $15 | 200K (1M beta) | project:expert:sonnet (DEFAULT), Секретарь, Briefing Onboarding, Meeting summary, Artifact handlers (5 типов) |
+| **Grok 4.20** (reasoning) | `grok-4.20-0309-reasoning` | $2 / $6 | 256K | Simply Chat (кнопка «Думать»), Экспертиза (chatMode=expertise), Создание (chatMode=create), Meeting summary, MIND memory (extract — mission-critical) |
+| **Grok 4.20 Multi-Agent** | `grok-4.20-multi-agent-0309` | $2 / $6 | 256K | ⚠ Не используется (см. note в каталоге) — отдельная ветка ТЗ-XAI-MA-1 |
+| **Claude Sonnet 4.6** | `claude-sonnet-4-6` | $3 / $15 | 200K (1M beta) | project:expert:sonnet (DEFAULT), Секретарь, Briefing Onboarding, Artifact handlers (5 типов) |
 | **Claude Haiku 4.5** | `claude-haiku-4-5-20251001` | $1 / $5 | 200K | Simply Chat vision, project:expert:haiku, Бен, Менеджер, Клерки (snapshot — dead code per ADR 052), vision:ocr, professor:pipeline-execute |
 | **Claude Opus 4.6** | `claude-opus-4-6` | $5 / $25 | 200K (1M beta) | project:expert:opus, Профессор (planning, review, pipeline-analyze, pipeline-synthesize) |
-| **MiniMax M2.7** | `MiniMax-M2.7` | $0.30 / $1.20 | 200K | Создание (chatMode=create), Podcast: Script |
+| **MiniMax M2.7** | `MiniMax-M2.7` | $0.30 / $1.20 | 200K | Podcast: Script |
 | **MiniMax M2.7** (long timeout) | `MiniMax-M2.7-long` | $0.30 / $1.20 | 200K | Briefing pipeline (author, section refresh) — alias с 180s fetch timeout |
 | **Gemini 2.5 Flash TTS** | `gemini-2.5-flash-preview-tts` | — | — | Podcast: TTS озвучка (multi-speaker Host + Expert), через native `@google/genai` SDK |
 | **Deepgram Nova-3** | — (raw API) | $0.0043 / минута | — | Voice input (Simply Chat диктовка), Meeting transcription (batch, diarize, русский) |

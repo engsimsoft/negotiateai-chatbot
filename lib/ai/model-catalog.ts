@@ -381,7 +381,7 @@ const ENTRIES: ModelEntry[] = [
     capabilities: CAPS_GROK,
     contextWindow: 256_000,
     maxOutput: 16_000,
-    notes: "Multi-agent variant НЕ поддерживает client-side function calling через Chat Completions — только built-in tools (web_search, x_search) и remote MCP (docs.x.ai/developers/model-capabilities/text/multi-agent). Текущее назначение expertise → этой модели фактически работает как обычный grok-4.20 (ai_usage_log: 1 вызов за историю, tools игнорируются). ТЗ-XAI-5 переключит expertise на grok-4.20-0309-non-reasoning. Multi-agent через Responses API + MCP server будет отдельной веткой ТЗ-XAI-MA-1.",
+    notes: "Multi-agent variant НЕ поддерживает client-side function calling через Chat Completions — только built-in tools (web_search, x_search) и remote MCP (docs.x.ai/developers/model-capabilities/text/multi-agent). С ТЗ-XAI-4 (2026-04-16) expertise переведён на grok-4.20-0309-reasoning — каноничный «зал», качество мышления важнее экономии. Multi-agent через Responses API + MCP server — отдельная ветка ТЗ-XAI-MA-1. Сама запись каталога остаётся для аудита прошлых ai_usage_log записей.",
   },
   {
     id: "grok-4-1-fast-reasoning",

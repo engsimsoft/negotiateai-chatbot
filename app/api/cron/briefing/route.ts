@@ -17,6 +17,11 @@ import { autoRepairInvalidDeliveryState } from "@/lib/briefing/delivery-service"
 import { deliverBriefingToTelegram } from "@/lib/telegram/briefing-delivery";
 import type { BriefingArticle } from "@/lib/briefing/briefing-types";
 import pLimit from "p-limit";
+// Side-effect import: регистрирует reader `.simply-dev-overrides.json`. Без
+// этого импорта dev-panel overrides для briefing:* taskIds игнорируются в
+// cron execution. В production overrides не действуют (SIMPLY_DEV_MODE off),
+// но для локального тестирования cron-триггеров через /dev/models — нужен.
+import "@/lib/ai/model-overrides-node";
 
 // Next.js requires literal values for segment config (no imported constants)
 export const maxDuration = 240;
