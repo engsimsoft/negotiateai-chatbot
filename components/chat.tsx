@@ -338,10 +338,15 @@ export function Chat({
           setShowCreditCardAlert(true);
         } else {
           const category = categorizeClientError(error);
+          // TZ_ErrorRecoveryUI Stage 1 (2026-04-15): при падении стрима useChat
+          // state может залипнуть — инпут не реагирует на submit. Пока root
+          // cause не вылечен (Stage 2), показываем пользователю явный workaround
+          // в том же тост-сообщении, чтобы не сидел в тупике.
           toast({
             type: "error",
             description:
-              clientErrorMessages[category] ?? error.message,
+              (clientErrorMessages[category] ?? error.message) +
+              " Чтобы продолжить, перезагрузите страницу: Cmd+R (Mac) или Ctrl+R (Windows).",
           });
         }
         setDelayState("normal");
@@ -359,7 +364,8 @@ export function Chat({
         setDelayState("timeout");
         toast({
           type: "error",
-          description: "Запрос занял слишком много времени. Попробуйте снова.",
+          description:
+            "Запрос занял слишком много времени. Попробуйте снова. Если инпут заблокирован — перезагрузите страницу: Cmd+R (Mac) или Ctrl+R (Windows).",
         });
         stop();
       }, 60_000);
