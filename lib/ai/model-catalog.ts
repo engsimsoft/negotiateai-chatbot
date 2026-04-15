@@ -381,7 +381,7 @@ const ENTRIES: ModelEntry[] = [
     capabilities: CAPS_GROK,
     contextWindow: 256_000,
     maxOutput: 16_000,
-    notes: "Multi-agent variant НЕ поддерживает client-side function calling через Chat Completions — только built-in tools (web_search, x_search) и remote MCP (docs.x.ai/developers/model-capabilities/text/multi-agent). С ТЗ-XAI-4 (2026-04-16) expertise переведён на grok-4.20-0309-reasoning — каноничный «зал», качество мышления важнее экономии. Multi-agent через Responses API + MCP server — отдельная ветка ТЗ-XAI-MA-1. Сама запись каталога остаётся для аудита прошлых ai_usage_log записей.",
+    notes: "Multi-agent variant НЕ поддерживает client-side function calling через Chat Completions — только built-in tools (web_search, x_search) и remote MCP (docs.x.ai/developers/model-capabilities/text/multi-agent). С ТЗ-XAI-4 (2026-04-16) обычная expertise переведена на grok-4.20-0309-reasoning. Эта запись каталога RESERVED под taskId `expertise-multi-agent` (placeholder в task-assignments.ts) — Premium-режим «Команда агентов» рядом с обычной Экспертизой, toggle в UI по паттерну кнопки «Думать». Реализация в отдельной ветке ТЗ-XAI-MA-1: Responses API + MCP сервер для наших tools, auth layer, observability адаптер, UI прогресса агентов. Полное обоснование архитектуры — specs/Simply_xAI/BRAINSTORM_GrokMultiAgent.md.",
   },
   {
     id: "grok-4-1-fast-reasoning",

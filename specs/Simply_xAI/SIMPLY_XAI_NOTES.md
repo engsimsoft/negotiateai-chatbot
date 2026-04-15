@@ -9,6 +9,46 @@
 
 ---
 
+## 2026-04-16 — Multi-agent reservation correction + dead code cleanup (post-2ca1ac5 follow-up)
+
+**Контекст:** Короткая follow-up сессия после `2ca1ac5` (HANDOFF после Этапов 2+3). Владелец ревью текущего state SSOT и нашёл одну ошибку фрейминга, плюс попросил почистить мёртвые константы.
+
+### Multi-agent НЕ deprecated, а RESERVED
+
+В `2ca1ac5` я (предыдущая итерация Claude Code) после переключения `expertise → grok-4.20-0309-reasoning` пометил запись `grok-4.20-multi-agent-0309` в каталоге и `docs/ai-chats-map.md` как **«⚠ Не используется»**. Это была **архитектурная ошибка фрейминга** — Владелец указал:
+
+> Multi-agent — это **не замена** expertise, а **отдельный premium-режим** рядом с ним. Toggle «Команда агентов» по паттерну кнопки «Думать». Через Responses API, не через Chat Completions. Реализация — отдельная большая работа (MCP сервер, auth layer, observability адаптер, UI прогресса агентов). Полностью расписано в `BRAINSTORM_GrokMultiAgent.md` и в ROADMAP как ТЗ-XAI-MA-1.
+
+**Решение:** зарезервировать `expertise-multi-agent` как taskId placeholder в task-assignments.ts. Это:
+1. Type-системой закрепляет имя — никто не сможет случайно переиспользовать
+2. Делает namespace видимым в SSOT — будущему разработчику сразу понятно что место занято
+3. Связывает запись каталога `grok-4.20-multi-agent-0309` с конкретным taskId, а не оставляет её «висеть в воздухе»
+4. Соответствует архитектурному принципу — когда фича запланирована и оформлена в BRAINSTORM, её следы должны быть в SSOT, не только в документах
+
+**Реализованные правки:**
+- [lib/ai/task-assignments.ts](../../lib/ai/task-assignments.ts) — `| "expertise-multi-agent"` в TaskId union + `"expertise-multi-agent": "grok-4.20-multi-agent-0309"` в `DEFAULT_TASK_MODELS` с подробным RESERVED-комментарием
+- [lib/ai/model-catalog.ts](../../lib/ai/model-catalog.ts) — переписан `notes` на записи multi-agent: вместо «expertise переведён, запись остаётся для аудита» теперь «RESERVED под taskId expertise-multi-agent, реализация в ТЗ-XAI-MA-1»
+- [docs/ai-chats-map.md](../../docs/ai-chats-map.md) — добавлен row в overview-таблицу + chatMode routing + исправлен row в таблице моделей: 🔒 Reserved вместо ⚠ Не используется
+- Cross-reference в ROADMAP под ТЗ-XAI-MA-1
+
+**Валидация:** `getModel("expertise-multi-agent")` сейчас зарезолвится в каталог через registry — ничего не ломается. Call sites нет, никто не вызывает. Регистрация типа — pure documentation gesture.
+
+**Урок:** При снятии модели с активного использования различать **«deprecated» (удалить когда чисто)** vs **«reserved» (намеренно зарезервировано под будущую фичу)**. Эти два состояния выглядят одинаково в коде (запись в каталоге без активного call site), но семантически разные. Reserved нужно явно маркировать в SSOT через placeholder taskId + комментарий, чтобы будущая сессия не пометила как мёртвый код.
+
+### Dead briefing constants cleanup
+
+Параллельно: в [lib/briefing/briefing-config.ts](../../lib/briefing/briefing-config.ts) удалены `FILTER_MODEL` и `AUTHOR_MODEL` — наследие от ТЗ-Briefing-1. После миграции `briefing:filter` на Grok 4.1 Fast (commit `ceadd17`) эти константы перестали импортироваться (грэп подтвердил 0 ссылок в `lib/` и `app/`), но дезинформировали будущего читателя. Удалены без последствий — `npx tsc --noEmit` 0 ошибок.
+
+### Audit metadata bug — уже починен в 2ca1ac5
+
+При сверке нашёл, что `app/(chat)/api/meeting/regenerate/route.ts:91` использовал хардкод `modelId: "claude-sonnet-4-6"` в audit metadata. После моего переключения `meeting:summary → Grok 4.20 reasoning` это начало бы писать лживое значение в БД. **Хорошая новость:** этот фикс уже применён в HEAD (676d50d / 2ca1ac5), мой Edit в этой сессии оказался noop. Note для будущих сессий: при переключении модели `taskId X` — обязательно грэпать на хардкод `claude-sonnet-4-6` / любой target-modelId по audit metadata блокам и заменять на `getModelIdForTask("X")`.
+
+### DevPanel display labels для Grok моделей
+
+В трёх компонентах ([model-section.tsx](../../components/dev-panel/sections/model-section.tsx), [dev-panel-footer.tsx](../../components/dev-panel/dev-panel-footer.tsx), [timeline-section.tsx](../../components/dev-panel/sections/timeline-section.tsx)) у `MODEL_DISPLAY` map'а не было записей для Grok моделей — fallback показывал raw modelId типа `grok-4.20-0309-reasoning`. Добавлены красивые лейблы для всех 5 Grok вариантов + MiniMax-long. Косметика, но прямо в scope текущей миграции — после переключения 11 taskId на Grok DevPanel становится главным интерфейсом наблюдения за реальной маршрутизацией для Владельца.
+
+---
+
 ## 2026-04-16 — ТЗ-XAI-4 Этапы 2+3 + scope expansion + 4 hot-fixes
 
 **Контекст:** Одна плотная сессия, закрывшая Этап 2 (6 taskId подсобки на Grok 4.1 Fast), Этап 3 (meeting:summary на Grok 4.20), + неожиданное расширение scope решениями Владимира в IDE по empirical-данным из тестов.

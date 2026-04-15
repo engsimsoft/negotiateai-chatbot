@@ -24,14 +24,6 @@ export const ROUTE_MAX_DURATION = 90;
 /** Jina Reader API timeout (ms) */
 export const JINA_READER_TIMEOUT = 10_000;
 
-// --- AI Models ---
-
-/** Stage 1: Filter — cheap & fast (MiniMax M2.7, ТЗ-Briefing-1) */
-export const FILTER_MODEL = "MiniMax-M2.7";
-
-/** Stage 2: Author — article generation (MiniMax M2.7, ТЗ-Briefing-1) */
-export const AUTHOR_MODEL = "MiniMax-M2.7";
-
 // --- Cron ---
 
 /** ТЗ-TG4a: Cron interval in minutes (Vercel Cron schedule) */

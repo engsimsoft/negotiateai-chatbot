@@ -8,6 +8,13 @@ const MODEL_SHORT: Record<string, string> = {
   "claude-haiku-4-5-20251001": "Haiku",
   "claude-sonnet-4-6": "Sonnet",
   "claude-opus-4-6": "Opus",
+  "grok-4-1-fast-non-reasoning": "Grok 4.1F",
+  "grok-4-1-fast-reasoning": "Grok 4.1F·R",
+  "grok-4.20-0309-reasoning": "Grok 4.20·R",
+  "grok-4.20-0309-non-reasoning": "Grok 4.20",
+  "grok-4.20-multi-agent-0309": "Grok 4.20·MA",
+  "MiniMax-M2.7": "MiniMax",
+  "MiniMax-M2.7-long": "MiniMax·L",
 };
 
 export function TimelineSection({ data }: { data: DevPanelMessageData }) {

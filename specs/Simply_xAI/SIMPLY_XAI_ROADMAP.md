@@ -201,7 +201,7 @@
 
 | ID | Название | Зависимости | Описание |
 |---|---|---|---|
-| ТЗ-XAI-MA-1 | Multi-Agent Экспертиза | ТЗ-XAI-5 + A/B тест | Responses API + MCP сервер для custom tools в режиме multi-agent |
+| ТЗ-XAI-MA-1 | Multi-Agent Экспертиза | ТЗ-XAI-5 + A/B тест | Responses API + MCP сервер для custom tools в режиме multi-agent. **TaskId `expertise-multi-agent` зарезервирован в [task-assignments.ts](../../lib/ai/task-assignments.ts) с 2026-04-16** (placeholder, call sites нет). Полное обоснование архитектуры — [BRAINSTORM_GrokMultiAgent.md](BRAINSTORM_GrokMultiAgent.md) |
 | ТЗ-XAI-COL-1 | Collections (Библиотека) | ТЗ-XAI-1 | Grok Collections API для RAG документов пользователя |
 | ТЗ-XAI-VOICE-1 | Voice Agent | — | Grok Voice Agent API для голосового режима |
 

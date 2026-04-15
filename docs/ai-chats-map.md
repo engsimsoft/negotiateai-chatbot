@@ -20,6 +20,7 @@
 | **Simply Chat** — кнопка «Думать» | Grok 4.20 reasoning (`simply-chat-think`) | ✅ Работает | Tier upgrade на сильную модель |
 | **Simply Chat** — vision (image/PDF) | Claude Haiku 4.5 (`simply-chat-vision`) | ✅ Работает | Маршрутизация вложений — Haiku поддерживает native PDF |
 | **Экспертиза** (chatMode=expertise) | Grok 4.20 reasoning (`expertise`) | ✅ Работает | Точные ответы, разовые экспертные запросы |
+| **Экспертиза Premium** (toggle «Команда агентов») | Grok 4.20 Multi-Agent (`expertise-multi-agent`) | 🔒 Reserved (ТЗ-XAI-MA-1) | Premium-режим рядом с обычной expertise через Responses API + MCP. Placeholder taskId зарезервирован, реализация в отдельном ТЗ |
 | **Создание** (chatMode=create) | Grok 4.20 reasoning (`create`) | ✅ Работает | Презентации, отчёты, длинные тексты |
 | **Проект: Исполнитель** | Claude Haiku 4.5 (`project:expert:haiku`) | ✅ Работает | Быстрые простые задачи |
 | **Проект: Эксперт** (DEFAULT) | Claude Sonnet 4.6 (`project:expert:sonnet`) | ✅ Работает | Баланс качества и скорости |
@@ -415,6 +416,7 @@ lib/prompts/briefing/briefing-scriptwriter.md       # Промпт скрипт�
 | `simply` (think) | `simply-chat-think` | Grok 4.20 reasoning | `/simply` (кнопка «Думать») | Tier upgrade на сильную модель |
 | `simply` (vision) | `simply-chat-vision` | Claude Haiku 4.5 | `/simply` (при загрузке image/PDF) | Vision/native PDF |
 | `expertise` | `expertise` | Grok 4.20 reasoning | `/expertise/[id]` | Точные ответы с проверкой фактов |
+| `expertise` (Premium toggle) | `expertise-multi-agent` 🔒 | Grok 4.20 Multi-Agent | `/expertise/[id]` (toggle «Команда агентов», ТЗ-XAI-MA-1) | Premium-режим, пока reserved |
 | `create` | `create` | Grok 4.20 reasoning | `/create/[id]` | Презентации, отчёты, длинные тексты |
 
 **Особенности:**
@@ -588,7 +590,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
 |---|---|---|---|---|
 | **Grok 4.1 Fast** (non-reasoning) | `grok-4-1-fast-non-reasoning` | $0.20 / $0.50 | 128K | Simply Chat (default text), MIND memory (extract-batch, consolidate, profile, dedup-verify), Briefing filter, Clerks (task-summary, file-analyzer), util (title, project-summary, artifact-suggestions) |
 | **Grok 4.20** (reasoning) | `grok-4.20-0309-reasoning` | $2 / $6 | 256K | Simply Chat (кнопка «Думать»), Экспертиза (chatMode=expertise), Создание (chatMode=create), Meeting summary, MIND memory (extract — mission-critical) |
-| **Grok 4.20 Multi-Agent** | `grok-4.20-multi-agent-0309` | $2 / $6 | 256K | ⚠ Не используется (см. note в каталоге) — отдельная ветка ТЗ-XAI-MA-1 |
+| **Grok 4.20 Multi-Agent** | `grok-4.20-multi-agent-0309` | $2 / $6 | 256K | 🔒 Reserved для taskId `expertise-multi-agent` (placeholder, не вызывать). Реализация Premium «Команда агентов» через Responses API + MCP — отдельная ветка ТЗ-XAI-MA-1. Архитектура: [BRAINSTORM_GrokMultiAgent.md](../specs/Simply_xAI/BRAINSTORM_GrokMultiAgent.md) |
 | **Claude Sonnet 4.6** | `claude-sonnet-4-6` | $3 / $15 | 200K (1M beta) | project:expert:sonnet (DEFAULT), Секретарь, Briefing Onboarding, Artifact handlers (5 типов) |
 | **Claude Haiku 4.5** | `claude-haiku-4-5-20251001` | $1 / $5 | 200K | Simply Chat vision, project:expert:haiku, Бен, Менеджер, Клерки (snapshot — dead code per ADR 052), vision:ocr, professor:pipeline-execute |
 | **Claude Opus 4.6** | `claude-opus-4-6` | $5 / $25 | 200K (1M beta) | project:expert:opus, Профессор (planning, review, pipeline-analyze, pipeline-synthesize) |

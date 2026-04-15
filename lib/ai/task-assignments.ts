@@ -29,6 +29,7 @@ export type TaskId =
   | "simply-chat-vision"    // attachments (image/pdf) → Claude Haiku 4.5
   // Экспертиза и Создание — разовые ветки
   | "expertise"             // chatMode=expertise → Grok 4.20 (reasoning)
+  | "expertise-multi-agent" // RESERVED для ТЗ-XAI-MA-1 (Premium «Команда агентов»)
   | "create"                // chatMode=create → Grok 4.20 (reasoning)
   // Проект — экспертный чат по задаче
   | "project:expert:haiku"
@@ -97,11 +98,22 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   // Экспертиза и Создание (ТЗ-XAI-4 2026-04-16)
   // Обе ветки переведены на Grok 4.20 reasoning — это «зал», пользователь видит
   // результат в реальном времени, качество важнее экономии. Multi-agent variant
-  // снят с expertise: через Chat Completions он работает как обычный grok-4.20
-  // (built-in tools игнорируют наши function calls). Multi-agent через Responses
-  // API + MCP — отдельная ветка ТЗ-XAI-MA-1. MiniMax снят с create — остаётся
-  // только в «кухне» (briefing pipeline).
+  // снят с обычной expertise: через Chat Completions он работает как обычный
+  // grok-4.20 (built-in tools игнорируют наши function calls). MiniMax снят
+  // с create — остаётся только в «кухне» (briefing pipeline).
   "expertise":                "grok-4.20-0309-reasoning",
+
+  // ---- expertise-multi-agent: RESERVED placeholder — НЕ вызывать ----
+  // Premium-режим «Команда агентов» рядом с обычной expertise (toggle в UI по
+  // паттерну кнопки «Думать»). Через Responses API + MCP сервер для наших
+  // tools — multi-agent variant физически не работает через Chat Completions.
+  // Реализация — отдельный ТЗ-XAI-MA-1: MCP сервер, auth layer, observability
+  // адаптер, UI прогресса агентов. Полное обоснование — BRAINSTORM_GrokMultiAgent.md.
+  // Запись существует чтобы зарезервировать имя taskId в SSOT и предотвратить
+  // случайное переиспользование. На сегодня call sites нет — `getModel("expertise-multi-agent")`
+  // зарезолвится в каталог, но никто не вызывает.
+  "expertise-multi-agent":    "grok-4.20-multi-agent-0309",
+
   "create":                   "grok-4.20-0309-reasoning",
 
   // Проект — экспертный чат (tier)
