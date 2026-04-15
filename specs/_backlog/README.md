@@ -43,6 +43,7 @@
 
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
+| [TZ_SimplyContextUsageWidget](TZ_SimplyContextUsageWidget.md) | **UI виджет контекста в Simply показывает не ту шкалу** — знаменатель прогресс-бара привязан к `contextWindow` модели (128K), а не к `SIMPLY_CONTEXT_LIMIT` (200K). Даёт ложную тревогу («55% предела» когда реально 23% от наших порогов Extract-on-compression). Плюс — число 128K для Grok 4.1 Fast подозрительное, возможно ошибка в model-catalog. Плюс — «Расход за сессию» без определения термина «сессия». | 1 сессия | Владимир, 2026-04-16 после ТЗ-ATTACH-1 |
 | [TZ_PromptsDeadCodeCleanup](TZ_PromptsDeadCodeCleanup.md) | Удалить мёртвые экспорты из `lib/ai/prompts.ts` (`artifactsPrompt`, `regularPrompt`, `systemPrompt` deprecated, `buildUserContext` deprecated). 90% файла dead, только `updateDocumentPrompt` живой. Рассмотреть переименование в `lib/ai/artifact-prompts.ts`. | 0.5 сессии | TZ_DeadModelSelectors |
 | [TZ_SimplyChatRaceCondition](TZ_SimplyChatRaceCondition.md) | `getOrCreateSimplyChat` без partial unique index → race при первых параллельных запросах нового пользователя (SELECT + INSERT без транзакционной защиты). Partial unique index + `onConflictDoNothing`. | 0.5 сессии | ТЗ-XAI-2 smoke test |
 
