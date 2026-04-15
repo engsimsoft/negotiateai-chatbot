@@ -26,6 +26,13 @@ import {
   professorPlanJsonSchema,
   MVP_TOOLS_MANIFEST,
 } from "@/lib/ai/professor-types";
+// Side-effect import: регистрирует reader `.simply-dev-overrides.json` через
+// `registerOverridesReader`. Без этого импорта `getActiveOverrides()` вернёт
+// пусто и dev-panel overrides для `professor:planning` будут проигнорированы.
+// Найдено в сессии ТЗ-XAI-4 (2026-04-16): 3 попытки планирования игнорировали
+// override на Haiku, шли на Opus из task-assignments. Аналогичная проверка
+// нужна всем backend routes — отдельный хвост в _backlog.
+import "@/lib/ai/model-overrides-node";
 
 // Load professor prompt from .md file
 const PROFESSOR_PROMPT_PATH = path.join(
@@ -169,11 +176,24 @@ export async function POST(
     const supportsThinking = taskSupportsThinking("professor:planning");
 
     // Call Professor
+    // ТЗ-XAI-4 hot-fix (2026-04-16): явный maxOutputTokens:16000 обязателен
+    // потому что @ai-sdk/anthropic по умолчанию подставляет model maxOutput из
+    // catalog (для Opus 4.6 = 128_000 — это легальный capability, Anthropic
+    // поднял 2026-04-12). Но Anthropic требует streaming для max_tokens > 21333
+    // (см. docs.anthropic.com/en/api/errors#long-requests). Мы используем
+    // generateText (non-streaming) → при max_tokens 128K запрос не успевает
+    // вернуть response body за default fetch timeout (~60s) → socket closes →
+    // UND_ERR_SOCKET → 3× retry → 500. Потеряно ~9 минут в ТЗ-XAI-4 сессии.
+    // Правильный долгосрочный фикс — перевод на streamText с конкатенацией
+    // в text для парсинга plan_report/plan_json. Зафиксировано в backlog как
+    // TZ_ProfessorPlanStreaming. Сейчас 16K < 21333 → non-streaming safe zone,
+    // 16K более чем достаточно для plan_report (~3-8K) + plan_json.
     const result = await generateText({
       model: getModel("professor:planning"),
       system: PROFESSOR_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.2,
+      maxOutputTokens: 16000,
       // Adaptive thinking only if the resolved model supports it
       ...(supportsThinking
         ? {
