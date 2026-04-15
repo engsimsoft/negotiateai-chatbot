@@ -206,10 +206,6 @@ Partial unique index для `getOrCreateSimplyChat`. 0.5 сессии, но **м
 ```
 Область ТЗ-XAI-5. `simply-chat` / `simply-chat-think` — без overrides, дефолты честно указывают на Grok 4.1 Fast / 4.20 non-reasoning.
 
-### MCP postgres сервер — отключился во время сессии
-
-**К концу сессии `mcp__postgres__query` tool стал недоступен** (вместе со множеством других MCP-инструментов — GitHub, Gmail, Calendar, Drive). Для SQL-проверок в следующей сессии — либо reconnect MCP server, либо использовать `psql` через Bash, либо Drizzle Studio.
-
 ### Git state
 
 **13 коммитов ahead of origin/master.** Все локально, не отпушены. Push — отдельная команда Владимира.
@@ -316,7 +312,6 @@ ba9e928 release(v3.88.0): ТЗ-XAI-1 — фундамент миграции н�
 - [ ] **TZ_SimplyContextUsageWidget** — новый хвост, не блокер, Medium приоритет
 - [ ] **TZ_SimplyChatRaceCondition** — долг из миграционной сессии, в backlog
 - [ ] **TZ_ErrorRecoveryUI Stage 2** — root cause, в backlog
-- [ ] **MCP servers disconnected** — postgres/github/gmail/calendar/drive tools недоступны. Если для следующей сессии нужны SQL-проверки — либо reconnect MCP, либо psql через Bash
 
 ---
 

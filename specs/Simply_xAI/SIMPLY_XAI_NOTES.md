@@ -9,6 +9,60 @@
 
 ---
 
+## 2026-04-16 — ТЗ-XAI-4 Этап 1: streamObject smoke test PASSED (Grok 4.1 Fast)
+
+**Контекст:** В ANALYSIS обсуждения по ТЗ-XAI-4 вылез риск для `util:artifact-suggestions` — это единственная точка в scope ТЗ, которая использует **`streamObject` с `output: "array"` mode** ([lib/ai/tools/request-suggestions.ts:49](../../lib/ai/tools/request-suggestions.ts#L49)). docs.x.ai заявляет «structured outputs», но явно не специфицирует streamObject array mode в AI SDK v6. Решение — изолированный smoke test до любых правок task-assignments (Rule №0 «семь раз отмерь»).
+
+### Результат: PRIMARY PASS на первой попытке
+
+**Тест:** [scripts/test-grok-streamObject.ts](../../scripts/test-grok-streamObject.ts) (удалён после прохождения per паттерн v3.91.0)
+
+**Схема — копия реальной из requestSuggestions:**
+```ts
+z.object({
+  originalSentence: z.string(),
+  suggestedSentence: z.string(),
+  description: z.string(),
+})
+```
+
+**Prompt:** короткий текст с 4 грамматическими ошибками (grew/grown, has/have, is make/is to make, did/achieved).
+
+**Результат через `registry.languageModel("xai:grok-4-1-fast-non-reasoning")`:**
+- ✅ `elementStream` yielded **4 элемента**, все 4 — корректные исправления грамматики
+- ✅ Все элементы прошли Zod `safeParse` без ошибок
+- ✅ `usage` promise резолвится: `inputTokens: 405`, `outputTokens: 210`, `totalTokens: 615`
+- ✅ Duration: **3304ms** (приемлемо для UX streaming)
+
+### Бонусная находка: xAI делает prompt caching автоматически
+
+В usage resolved объекте увидели:
+```
+cachedInputTokens: 160
+inputTokenDetails: { noCacheTokens: 245, cacheReadTokens: 160 }
+```
+
+Из 405 input tokens **160 закэшированы автоматически** на стороне xAI — без каких-либо `providerOptions.xai.cacheControl` с нашей стороны. Это поведение сервера, не клиентская оптимизация. В `request-suggestions.ts` text документа + system prompt частично хитятся при последующих вызовах в пределах окна провайдера.
+
+**Следствие:** усилия на explicit caching для xAI в нашем коде — не нужны. Сервер сам кэширует повторяющийся system prompt. Заметно упрощает миграцию (не надо тянуть `cacheReadTokens` в `logUsage`, он просто доступен в usage объекте как есть).
+
+**TODO backlog:** возможно добавить логирование `cachedInputTokens` в `ai_usage_log` для xAI-моделей, чтобы `/admin/cost-audit` видел реальную стоимость с учётом caching. Это отдельная задача, вне scope ТЗ-XAI-4.
+
+### Решение для Этапа 2
+
+- `util:artifact-suggestions` → `grok-4-1-fast-non-reasoning` (**primary, не fallback**)
+- Q-A fallback (Вариант 3 — Grok 4.20) не потребовался
+- Scope ТЗ-XAI-4 остаётся 7 точек без изменений
+- Этап 2 можно запускать с confidence
+
+### Урок для серии
+
+**streamObject array mode на xAI работает out-of-the-box через AI SDK v6.** Для будущих ТЗ серии (XAI-5: create + expertise, XAI-6: cleanup) — аналогичные `streamObject` вызовы миграции не должны требовать smoke test. ТЗ-XAI-2 подтвердил `generateObject` (MIND pipeline), ТЗ-XAI-4 подтвердил `streamObject` (request-suggestions). Структурированные outputs через AI SDK v6 xAI provider — проверенный паттерн.
+
+**Memento:** если в будущем смотреть на docs.x.ai и видеть только «structured outputs» без упоминания `streamObject` — это нормально. AI SDK v6 xAI provider реализует весь spectrum structured output APIs (generateObject, streamObject с object/array modes) через base Chat Completions + JSON mode.
+
+---
+
 ## 2026-04-16 — ТЗ-ATTACH-1 завершён (v3.91.0)
 
 **Что сделано кратко:** Слой 0 из SIMPLY_ATTACHMENT_ARCHITECTURE.md реализован для PDF. Текстовые PDF извлекаются через pdf-parse v2 в `text/plain` при upload, сканы остаются как `application/pdf` → Haiku. Shared helper `lib/pdf/extract-pdf-text.ts` + интеграция в upload route + починка сломанного v1-API legacy call в project files route.

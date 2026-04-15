@@ -110,10 +110,16 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "professor:pipeline-execute":      "claude-haiku-4-5-20251001",
   "professor:pipeline-synthesize":   "claude-opus-4-6",
 
-  // Клерки
-  "clerk:task-summary":       "claude-haiku-4-5-20251001",
+  // Клерки (ТЗ-XAI-4 2026-04-16)
+  // task-summary и file-analyzer переведены с Haiku 4.5 на Grok 4.1 Fast — обе
+  // задачи механические (суммаризация завершённой задачи + анализ загруженного
+  // файла), используют generateText + JSON.parse + Zod workaround паттерн.
+  // Ценовая экономия ~4× input / ~8× output по сравнению с Haiku.
+  // clerk:snapshot остаётся на Haiku как мёртвый код per ADR 052 — удалится
+  // в ТЗ-XAI-6 cleanup.
+  "clerk:task-summary":       "grok-4-1-fast-non-reasoning",
   "clerk:snapshot":           "claude-haiku-4-5-20251001",
-  "clerk:file-analyzer":      "claude-haiku-4-5-20251001",
+  "clerk:file-analyzer":      "grok-4-1-fast-non-reasoning",
 
   // Memory (ТЗ-XAI-2 2026-04-14)
   // memory:extract — mission-critical задача извлечения фактов из диалогов.
@@ -129,9 +135,14 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "memory:profile":           "grok-4-1-fast-non-reasoning",
   "memory:dedup-verify":      "grok-4-1-fast-non-reasoning",
 
-  // Briefing (MiniMax long timeout — алиас указывает на ту же физическую модель,
-  // но через отдельный provider namespace с 180s fetch timeout)
-  "briefing:filter":          "MiniMax-M2.7-long",
+  // Briefing (ТЗ-XAI-4 2026-04-16)
+  // briefing:filter — механическая фильтрация/дедупликация новостей из потока —
+  // переведён с MiniMax M2.7-long на Grok 4.1 Fast (подсобка). Остальные три
+  // точки (author / section / podcast-script) остаются на MiniMax M2.7 —
+  // работают, проверены, в ~5× дешевле Grok 4.20 для длинных кухонных задач
+  // без пользовательского взаимодействия. author / section используют
+  // minimaxLong namespace (180s fetch timeout для больших промптов).
+  "briefing:filter":          "grok-4-1-fast-non-reasoning",
   "briefing:author":          "MiniMax-M2.7-long",
   "briefing:section":         "MiniMax-M2.7-long",
   "briefing:podcast-script":  "MiniMax-M2.7",
@@ -145,10 +156,15 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "service-chat:project-manager":     "claude-haiku-4-5-20251001",
   "service-chat:briefing-onboarding": "claude-sonnet-4-6",
 
-  // Утилиты
-  "util:title":                 "claude-haiku-4-5-20251001",
-  "util:project-summary":       "claude-haiku-4-5-20251001",
-  "util:artifact-suggestions":  "claude-sonnet-4-6",
+  // Утилиты (ТЗ-XAI-4 2026-04-16)
+  // Все три — короткие механические задачи (автонейминг чата, summary проекта,
+  // предложения правок к документу). Переведены с Haiku/Sonnet на Grok 4.1 Fast.
+  // util:artifact-suggestions использует streamObject с output:"array" +
+  // Zod schema — проверено smoke test'ом на Grok 4.1 Fast через AI SDK v6
+  // xAI provider. Подробности в SIMPLY_XAI_NOTES.md запись 2026-04-16.
+  "util:title":                 "grok-4-1-fast-non-reasoning",
+  "util:project-summary":       "grok-4-1-fast-non-reasoning",
+  "util:artifact-suggestions":  "grok-4-1-fast-non-reasoning",
 
   // Artifact generation — все 5 типов используют Sonnet
   "artifact:text":              "claude-sonnet-4-6",

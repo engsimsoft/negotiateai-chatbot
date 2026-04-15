@@ -29,10 +29,10 @@
 | **Менеджер проекта** | Claude Haiku 4.5 (`service-chat:project-manager`) | ✅ Работает | Живой AI-диалог, управление проектом |
 | **Профессор планирования** | Claude Opus 4.6 (`professor:planning`) | ✅ Работает | Генерация плана задач проекта |
 | **Ревьюер задач** | Claude Opus 4.6 (`professor:review`) | ✅ Работает | Ревью завершённой задачи проекта |
-| **Суммаризатор задач** (Клерк) | Claude Haiku 4.5 (`clerk:task-summary`) | ✅ Работает | Суммаризация результатов задачи |
-| **Клерк-анализатор** файлов | Claude Haiku 4.5 (`clerk:file-analyzer`) | ✅ Работает | Автоматический анализ загруженных файлов |
+| **Суммаризатор задач** (Клерк) | Grok 4.1 Fast (`clerk:task-summary`) | ✅ Работает | Суммаризация результатов задачи |
+| **Клерк-анализатор** файлов | Grok 4.1 Fast (`clerk:file-analyzer`) | ✅ Работает | Автоматический анализ загруженных файлов |
 | **Briefing: Онбординг** | Claude Sonnet 4.6 (`service-chat:briefing-onboarding`) | ✅ Работает | AI-интервью для настройки брифинга |
-| **Briefing: Фильтр** | MiniMax M2.7 long (`briefing:filter`) | ✅ Работает | Фильтрация и дедупликация новостей |
+| **Briefing: Фильтр** | Grok 4.1 Fast (`briefing:filter`) | ✅ Работает | Фильтрация и дедупликация новостей |
 | **Briefing: Автор** | MiniMax M2.7 long (`briefing:author`) | ✅ Работает | Генерация статьи из отфильтрованных новостей |
 | **Briefing: Refresh секции** | MiniMax M2.7 long (`briefing:section`) | ✅ Работает | Per-section refresh |
 | **Podcast: Скрипт** | MiniMax M2.7 (`briefing:podcast-script`) | ✅ Работает | Генерация диалогового сценария |
@@ -43,8 +43,8 @@
 | **MIND Memory: extract** | Grok 4.20 (`memory:extract`) | ✅ Работает | Mission-critical извлечение фактов из диалогов |
 | **MIND Memory: batch/consolidate/profile/dedup** | Grok 4.1 Fast (`memory:*`) | ✅ Работает | Механические задачи MIND pipeline |
 | **Vision OCR** | Claude Haiku 4.5 (`vision:ocr`) | ✅ Работает | OCR-экстракция текста из изображений |
-| **Title / Project summary** | Claude Haiku 4.5 (`util:*`) | ✅ Работает | Автонейминг чатов, суммаризация проектов |
-| **Artifact suggestions** | Claude Sonnet 4.6 (`util:artifact-suggestions`) | ✅ Работает | `request-suggestions` tool |
+| **Title / Project summary** | Grok 4.1 Fast (`util:title`, `util:project-summary`) | ✅ Работает | Автонейминг чатов, суммаризация проектов |
+| **Artifact suggestions** | Grok 4.1 Fast (`util:artifact-suggestions`) | ✅ Работает | `request-suggestions` tool — streamObject array mode |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники (не подключены) |
 
 ---
@@ -305,7 +305,7 @@ app/(chat)/api/briefing/save-profile/route.ts               # POST API сохр�
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | MiniMax M2.7 (task `briefing:filter` → registry `minimaxLong` namespace с 180s timeout) |
+| **Модель** | Grok 4.1 Fast (task `briefing:filter` → registry `xai:grok-4-1-fast-non-reasoning`, ТЗ-XAI-4 2026-04-16) |
 | **Тип** | Backend (внутренний вызов в generate/route.ts) |
 | **Вход** | ~200 RawContent[] из 3 фетчеров (RSS, Telegram, Web), content truncation 2K chars |
 | **Выход** | ~30 FilteredItem[] (дедуплицированные, с оценкой релевантности) |
@@ -586,14 +586,14 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
 
 | Модель | catalogId | Input / Output (USD/1M) | Контекст | Где используется |
 |---|---|---|---|---|
-| **Grok 4.1 Fast** (non-reasoning) | `grok-4-1-fast-non-reasoning` | $0.20 / $0.50 | 128K | Simply Chat (default text), MIND memory (extract-batch, consolidate, profile, dedup-verify) |
+| **Grok 4.1 Fast** (non-reasoning) | `grok-4-1-fast-non-reasoning` | $0.20 / $0.50 | 128K | Simply Chat (default text), MIND memory (extract-batch, consolidate, profile, dedup-verify), Briefing filter, Clerks (task-summary, file-analyzer), util (title, project-summary, artifact-suggestions) |
 | **Grok 4.20** (non-reasoning) | `grok-4.20-0309-non-reasoning` | $2 / $6 | 256K | Simply Chat (кнопка «Думать»), MIND memory (extract — mission-critical) |
 | **Grok 4.20 Multi-Agent** | `grok-4.20-multi-agent-0309` | $2 / $6 | 256K | Экспертиза (chatMode=expertise) |
-| **Claude Sonnet 4.6** | `claude-sonnet-4-6` | $3 / $15 | 200K (1M beta) | project:expert:sonnet (DEFAULT), Секретарь, Briefing Onboarding, Meeting summary, Artifact handlers (5 типов), util:artifact-suggestions |
-| **Claude Haiku 4.5** | `claude-haiku-4-5-20251001` | $1 / $5 | 200K | Simply Chat vision, project:expert:haiku, Бен, Менеджер, Клерки (file-analyzer, task-summary, snapshot), util (title, project-summary), vision:ocr, professor:pipeline-execute |
+| **Claude Sonnet 4.6** | `claude-sonnet-4-6` | $3 / $15 | 200K (1M beta) | project:expert:sonnet (DEFAULT), Секретарь, Briefing Onboarding, Meeting summary, Artifact handlers (5 типов) |
+| **Claude Haiku 4.5** | `claude-haiku-4-5-20251001` | $1 / $5 | 200K | Simply Chat vision, project:expert:haiku, Бен, Менеджер, Клерки (snapshot — dead code per ADR 052), vision:ocr, professor:pipeline-execute |
 | **Claude Opus 4.6** | `claude-opus-4-6` | $5 / $25 | 200K (1M beta) | project:expert:opus, Профессор (planning, review, pipeline-analyze, pipeline-synthesize) |
 | **MiniMax M2.7** | `MiniMax-M2.7` | $0.30 / $1.20 | 200K | Создание (chatMode=create), Podcast: Script |
-| **MiniMax M2.7** (long timeout) | `MiniMax-M2.7-long` | $0.30 / $1.20 | 200K | Briefing pipeline (filter, author, section refresh) — alias с 180s fetch timeout |
+| **MiniMax M2.7** (long timeout) | `MiniMax-M2.7-long` | $0.30 / $1.20 | 200K | Briefing pipeline (author, section refresh) — alias с 180s fetch timeout |
 | **Gemini 2.5 Flash TTS** | `gemini-2.5-flash-preview-tts` | — | — | Podcast: TTS озвучка (multi-speaker Host + Expert), через native `@google/genai` SDK |
 | **Deepgram Nova-3** | — (raw API) | $0.0043 / минута | — | Voice input (Simply Chat диктовка), Meeting transcription (batch, diarize, русский) |
 | **Perplexity Sonar Pro / Deep** | — (raw API) | варьируется | — | `deepResearch` tool — вызывается из expertise / create / project chats |
