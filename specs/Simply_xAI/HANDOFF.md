@@ -1,8 +1,10 @@
 # HANDOFF — Серия Simply_xAI миграции
 
-**Последнее обновление:** 2026-04-15
+**Последнее обновление:** 2026-04-15 (вечер, конец сессии XAI-3)
 **Текущая версия проекта:** 3.90.0
-**Последний коммит серии (ожидаемый):** release(v3.90.0): ТЗ-XAI-3 (commit hash появится после git commit)
+**Последние коммиты:**
+- `fc8a995` fix(error-recovery): TZ_ErrorRecoveryUI Stage 1 (post-release hotfix, не bump версии)
+- `8dfac7f` release(v3.90.0): ТЗ-XAI-3 — KITT + Think на Grok + R-6 cleanup
 
 Этот документ — **мост между сессиями**, не замена ROADMAP. За детальными задачами всегда иди в `TZ_xai_N/ROADMAP.md` или `SIMPLY_XAI_CHANGELOG.md`.
 
@@ -19,41 +21,170 @@
 
 ---
 
-## Следующая сессия: начни с
+## Следующая сессия: рекомендованный порядок
 
-1. **Прочитай в этом порядке (5 минут):**
-   - `specs/Simply_xAI/HANDOFF.md` (этот файл)
-   - `specs/Simply_xAI/SIMPLY_XAI_CHANGELOG.md` — что реально уже сделано (запись ТЗ-XAI-3 сверху)
-   - `specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md` — карточка ТЗ-XAI-4
-   - `specs/Simply_xAI/SIMPLY_XAI_NOTES.md` — запись 2026-04-15 «ТЗ-XAI-3 завершён» (уроки)
-   - `specs/Simply_xAI/MIND_ARCHITECTURE.md` — **только** если в ТЗ-XAI-4 будут правки касающиеся памяти
-2. **Проверь memory рефлексы:** `~/.claude/projects/-Users-mactm-Projects-NegotiateAI-Chatbot/memory/MEMORY.md` — возможно новая запись про дубликат функций / grep before writing helper
-3. **Первая задача ТЗ-XAI-4:** составить ANALYSIS переключения ~12 лёгких utility/pipeline вызовов на Grok. Подшаги: сначала utility (`util:title`, `util:project-summary`, `util:artifact-suggestions`), потом briefing pipeline (author, section, filter, podcast-script), потом professor/clerk с адаптацией `providerOptions.anthropic.thinking` (Grok reasoning автоматический — параметр убирается)
-4. **Не начинай код до ANALYSIS** — новая схема работы без внешнего архитектора требует ANALYSIS против реального кода + вопросы пользователю до SPEC/ROADMAP
+### Что читать на старте (5 минут)
+
+1. `specs/Simply_xAI/HANDOFF.md` (этот файл)
+2. `specs/Simply_xAI/SIMPLY_XAI_CHANGELOG.md` — записи ТЗ-XAI-3 (v3.90.0) и TZ_ErrorRecoveryUI Stage 1 наверху
+3. `specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md` — карточка ТЗ-XAI-4 (сужено от XAI-5 — Think больше не в scope)
+4. `specs/Simply_xAI/SIMPLY_XAI_NOTES.md` — запись 2026-04-15 «ТЗ-XAI-3 завершён» (уроки про дубликат функции, Grok 4.20 impressions, процессный урок про backlog)
+5. `specs/Simply_xAI/MIND_ARCHITECTURE.md` — **только** если в ТЗ-XAI-4 будут правки памяти (вряд ли)
+
+### Что запустить до работы
+
+```bash
+# Проверить что всё компилится (версия bumped до 3.90.0, 5 коммитов серии в master)
+npx tsc --noEmit
+
+# Поднять dev server (прошлая сессия закрыла его в процессе hard-restart debugging)
+npm run dev
+
+# Проверить `.simply-dev-overrides.json` — сейчас должно быть только expertise + create
+cat .simply-dev-overrides.json
+```
+
+### Проверь memory рефлексы
+
+`~/.claude/projects/-Users-mactm-Projects-NegotiateAI-Chatbot/memory/MEMORY.md` — возможно в конце сессии 2026-04-15 будет новая запись про **grep-before-write-helper** (урок XAI-3 про дубликат `inlineTextFileParts` vs уже существующий `convertTextFilesInAllMessages`).
 
 ---
 
-## Что сделано в последней сессии (2026-04-15, ТЗ-XAI-3)
+## Рекомендации по следующему шагу (по приоритету)
 
-Одна сессия закрыла третий ТЗ серии.
+### 🥇 Вариант A — ТЗ-XAI-4 Utility/Pipeline batch миграция (основной путь)
 
-**Основное:**
+**Это магистральная задача серии.** Самая большая по объёму (~12 call sites), но самая простая по риску — простые вызовы без providerOptions сложностей.
+
+**Почему стоит взять первым делом:**
+- Серия Simply_xAI должна завершиться, а каждое ТЗ держит инфраструктурное долго — чем быстрее дойдём до XAI-6, тем скорее сможем удалить MiniMax полностью
+- Утилитарные вызовы (`util:title`, `util:project-summary`, `util:artifact-suggestions`) переводятся тривиально — одна строка в `task-assignments.ts` на каждый
+- Briefing pipeline имеет больше движущихся частей но тоже предсказуем
+- Professor pipeline требует продуктового решения (Opus vs Grok 4.20) — лучше принять его сейчас
+
+**Первые действия:**
+1. Прочитать HANDOFF (этот файл) + SIMPLY_XAI_ROADMAP карточку XAI-4
+2. Провести полный аудит кода — найти все call sites: grep `getModel(` в [lib/](../../lib/), [app/](../../app/)
+3. Составить **ANALYSIS.md** в `specs/Simply_xAI/TZ_xai_4/` с разбивкой по группам (utility, briefing, clerk, professor, meeting, service-chat)
+4. **Задать Владимиру 2-3 критичных продуктовых вопроса** перед ROADMAP (см. «Открытые вопросы XAI-4» ниже)
+5. Согласовать ROADMAP → поэтапно реализовать → smoke test → коммит
+
+**Эстимейт:** 1-2 сессии. Может быть одна длинная если Владимир сразу ответит на все вопросы.
+
+### 🥈 Вариант B — TZ_ErrorRecoveryUI Stage 2 (root cause fix)
+
+Stage 1 закрыл боль тестирования (пользователь видит hint). Stage 2 — это фундаментальный fix через useChat state recovery. Не блокер миграции, но давний долг.
+
+**Scope:**
+- Выяснить почему `clearError()` из useChat не восстанавливает state для `AI_UnsupportedFunctionalityError` и аналогов
+- Возможно добавить auto-clearError после показа toast
+- Покрыть не-ChatSDKError ошибки в `onError` (сейчас `if (error instanceof ChatSDKError)` отсекает всё остальное)
+- Возможно добавить явную кнопку «Перезагрузить страницу» в DevPanel Errors секцию
+
+**Почему можно отложить:** Stage 1 разблокировал тестирование, пользователь знает что делать. Serie приоритетнее. Stage 2 — между миграционными ТЗ или после серии.
+
+### 🥉 Вариант C — TZ_SimplyReadDocumentTool
+
+Quality issue про `readDocument` tool путающий Grok на attached файлах. Средний приоритет. Простой фикс — один-два варианта: убрать tool из Simply active list, или правка промпта. Один час работы максимум.
+
+**Когда брать:** между большими ТЗ серии, когда захочется быстрой победы.
+
+---
+
+## Открытые продуктовые вопросы для ТЗ-XAI-4
+
+Собрать эти вопросы в ANALYSIS.md до начала написания ROADMAP:
+
+### Q1. Opus vs Grok 4.20 для Professor pipeline?
+
+`professor:planning`, `professor:review`, `professor:pipeline-synthesize`, `professor:pipeline-analyze` сейчас на **Claude Opus 4.6**. Это самая дорогая и качественная модель в проекте. Пользуется редко (только когда пользователь создаёт проект и использует Professor mode).
+
+**Три варианта:**
+- **A. Оставить Opus.** Качество planning важнее экономии, редкое использование оправдывает стоимость. Anthropic остаётся в проекте для Opus + Haiku vision
+- **B. Grok 4.20 non-reasoning.** В ~3× дешевле Opus, похожий уровень качества для structured planning, унифицирует стек на xAI
+- **C. Grok 4.20 reasoning.** Если planning выигрывает от reasoning tokens — может быть уместно. Но дороже из-за reasoning overhead
+
+**Моё предварительное мнение:** **A (оставить Opus)**. Причины: (1) Opus специально заточен под planning-типа задачи, (2) редкое использование, (3) Anthropic всё равно в проекте для Haiku vision — одной зависимостью меньше/больше не меняет стек. Но Владимир может захотеть унифицировать на xAI по идеологическим причинам.
+
+### Q2. Professor `thinking: { adaptive, effort: "high" }` provider option
+
+[lib/ai/professors/task-reviewer.ts:136](../../lib/ai/professors/task-reviewer.ts#L136) использует `providerOptions.anthropic.thinking`. Под Anthropic это включает extended thinking. Под xAI этот параметр не существует → упадёт `Bad Request`.
+
+**Что делать:**
+- Если Q1 = Опус → параметр остаётся, ничего не меняется
+- Если Q1 = Grok → параметр убирается (Grok рассуждает автоматически), комментарий в коде что параметр был для Anthropic
+
+### Q3. Service chats (ben, project-creation, project-manager, briefing-onboarding) — в scope XAI-4?
+
+Эти 4 сервисных чата сейчас на Haiku/Sonnet. В memory зафиксировано что **Бен будет deprecated** (не инвестировать время). Остальные три:
+- `project-creation` — помогает при создании проекта
+- `project-manager` — менеджер внутри проекта
+- `briefing-onboarding` — онбординг для брифинга
+
+**Вариант A.** Перевести на Grok 4.1 Fast — они короткие, не требуют тяжёлой модели. Унифицирует провайдер для UI-чатов.
+**Вариант B.** Отложить — service chats отдельная подсистема, миграцию можно сделать в XAI-6 или отдельном ТЗ после серии.
+
+**Моё мнение:** **A** — инкрементально, одна строка в task-assignments на каждый. Ben оставляем на Haiku (будет deprecated — зачем менять).
+
+### Q4. Briefing pipeline — какой variant Grok?
+
+`briefing:filter`, `briefing:author`, `briefing:section` сейчас на **MiniMax-M2.7-long** (180s timeout через namespace). MiniMax обрабатывает длинные статьи.
+
+**Вопрос:** Grok 4.1 Fast non-reasoning справится или нужен 4.20?
+
+**Мои размышления:** Briefing filter — это классификация/фильтрация списка новостей, задача простая → 4.1 Fast. Briefing author — генерация связного текста статьи на 800-1500 слов → тоже 4.1 Fast должен справиться (у Grok большой output window). Section refresh — ещё проще. Лучше принять 4.1 Fast как default, мониторить качество через `/dev/models` override доступен.
+
+### Q5. Podcast script — кэшинг перенос
+
+[lib/podcast/script-generator.ts:122](../../lib/podcast/script-generator.ts#L122) использует `cacheControl: ephemeral` напрямую — это Anthropic-специфичная конфигурация которая сломает Grok. Надо обернуть в провайдер-проверку **ИЛИ** просто убрать (xAI implicit caching работает без настройки, что мы видели на MIND тестах XAI-3).
+
+---
+
+## Блокеры / Риски которые надо держать в голове
+
+- **TZ_ErrorRecoveryUI Stage 2** — не блокер, но если в середине XAI-4 снова вылезет error state и заблокирует тесты — Stage 1 подсказка сработает и спасёт
+- **Neon connection pool stale** — если в ходе работы будут внезапные `ConnectTimeoutError` при DB запросах, это может быть stale connection pool в Node. Решение: hard restart dev server (kill -9 если надо). Зафиксировано как наблюдение из этой сессии, не баг
+- **Service chats в scope?** — Q3 выше, решение Владимира нужно до ROADMAP
+- **Opus vs Grok 4.20 для Professor?** — Q1, решение Владимира нужно до ROADMAP
+
+---
+
+## Что сделано в последней сессии (2026-04-15, ТЗ-XAI-3 + TZ_ErrorRecoveryUI Stage 1)
+
+Одна плотная сессия закрыла третий ТЗ серии **и** додела Stage 1 TZ_ErrorRecoveryUI поверх.
+
+### ТЗ-XAI-3 (v3.90.0, commit `8dfac7f`)
+
 - `simply-chat` default `MiniMax-M2.7` → `grok-4-1-fast-non-reasoning`
 - `simply-chat-think` default `claude-sonnet-4-6` → `grok-4.20-0309-non-reasoning` (расширение scope — Владимир поймал что Sonnet на переходный период = жечь деньги)
 - R-6 cleanup: удалены `stripMediaPartsForTextModel` (28 строк), `stripLegacyOpenAICompatToolParts` (40 строк, SQL-аудит: 0 legacy parts), флаг `isSimplyNonAnthropicModel`, упрощён `preparedHistory`, temperature `chatMode === "simply" ? 0.7 : 1.0`
-- **Pre-existing bug найден и починен:** `saveMessages` сохраняла оригинальные `message.parts` вместо `processedMessage.parts` → на следующем запросе БД возвращала file parts → Grok падал с `AI_UnsupportedFunctionalityError`. Фикс: использовать `processedMessage.parts` + `convertTextFilesInAllMessages` вместо самодельного дубликата
-- Backlog: [TZ_ErrorRecoveryUI.md](../_backlog/TZ_ErrorRecoveryUI.md) (после 9-кратного упрёка от Владимира) + [TZ_SimplyReadDocumentTool.md](../_backlog/TZ_SimplyReadDocumentTool.md) (quality issue tool-selection)
+- **Pre-existing bug найден и починен:** `saveMessages` сохраняла оригинальные `message.parts` вместо `processedMessage.parts` → на следующем запросе БД возвращала file parts → Grok падал с `AI_UnsupportedFunctionalityError`. Фикс: использовать `processedMessage.parts` + `convertTextFilesInAllMessages` вместо самодельного дубликата `inlineTextFileParts` (который я сам же в сессии создал и потом удалил — урок про grep перед написанием helper'а)
+- Backlog создан: [TZ_ErrorRecoveryUI.md](../_backlog/TZ_ErrorRecoveryUI.md) (после 9-кратного упрёка от Владимира) + [TZ_SimplyReadDocumentTool.md](../_backlog/TZ_SimplyReadDocumentTool.md) (quality issue tool-selection `readDocument`)
 
-**Smoke test 6 сценариев:** все ✅ после фикса регрессии. Владимир подтвердил «разница с Think невероятно крутая» — tier upgrade вариант A (non-reasoning) работает продуктово.
+**Smoke test 6 сценариев:** все ✅ после фикса регрессии (1. Grok 4.1 Fast текст, 2. function calling, 3. vision → Haiku, 4. text/plain inline, 5. Think → Grok 4.20, 6. MIND retrieve 5/5 injected). Владимир подтвердил «разница с Think невероятно крутая» — tier upgrade вариант A (non-reasoning) работает продуктово. MIND retrieve показал бонус: xAI implicit caching эмитит `cached_tokens` без нашей конфигурации → экономия на длинных диалогах.
+
+### TZ_ErrorRecoveryUI Stage 1 (hotfix на v3.90.0, commit `fc8a995`)
+
+Минимальный фикс — 2 string concat в [components/chat.tsx](../../components/chat.tsx):
+- `onError` useChat callback — дописан hint «Чтобы продолжить, перезагрузите страницу: Cmd+R (Mac) или Ctrl+R (Windows).»
+- 60s timeout timer — аналогичный hint
+
+**Live-проверено через WiFi off trigger:** Владимир специально отключил WiFi → NeonDB timeout → `onError` сработал → новый текст появился в красном toast. Stale connection pool после восстановления WiFi рассосался сам за минуту.
+
+**Не закрыто Stage 2:** root cause через useChat state recovery остаётся в backlog. Не блокер — Stage 1 даёт пользователю workaround (знает что делать — перезагрузить страницу).
+
+### Процессный урок сессии
+
+Владимир поднял **9-кратный** упрёк про error-state проблему. Системный фейл: проблема откладывалась устно без backlog-записи → забывалась → повторялась. Исправлено прямо в сессии: backlog создан до технического фикса регрессии. Правило зафиксировано в ROADMAP/NOTES: повторяющаяся не-блокер-проблема = немедленно в backlog, устное «потом починим» = сигнал к записи.
 
 ---
 
 ## Критическое состояние для следующей сессии
 
 ### Dev-сервер в фоне
-- Процесс `buf187m9t` — `npm run dev` на `http://localhost:3000`
-- Если сессия восстанавливается — проверь жив ли сервер через `tail /tmp/claude-501/.../tasks/buf187m9t.output` или `curl http://localhost:3000`
-- Если мёртв — запускать заново `npm run dev` в background
+- **Умер на конце сессии** в процессе hard-restart debugging stale connection pool. Task ID `b4pxr83ey` остановлен через TaskStop
+- На старте следующей сессии — `npm run dev` в background и проверка `curl http://localhost:3000` (должно быть 307)
+- `.simply-dev-overrides.json` — оставил только expertise/create (simply-chat и simply-chat-think снимались во время smoke-тестов XAI-3, новые defaults теперь честно указывают на Grok)
 
 ### Активные dev overrides
 Файл `.simply-dev-overrides.json` (в корне проекта, `.gitignore`):
@@ -163,11 +294,13 @@ grep -E "grok|Grok" lib/ai/task-assignments.ts
 ## История коммитов серии
 
 ```
-(TBD) release(v3.90.0): ТЗ-XAI-3 — KITT + Think на Grok + R-6 cleanup
+fc8a995  fix(error-recovery): TZ_ErrorRecoveryUI Stage 1 — hint о перезагрузке (post-release)
+8dfac7f  release(v3.90.0): ТЗ-XAI-3 — KITT + Think на Grok + R-6 cleanup
+2272e67  docs(xai-migration): HANDOFF после ТЗ-XAI-2 для следующей сессии
 1481141  release(v3.89.0): ТЗ-XAI-2 — MIND pipeline миграция на Grok
 6fd1fbb  docs(xai-migration): CHANGELOG серии + verified Grok params
 0ecc6fa  docs(xai-migration): синхронизация статусов после завершения ТЗ-XAI-1
 ba9e928  release(v3.88.0): ТЗ-XAI-1 — фундамент миграции на xAI
 ```
 
-Push никаких коммитов Владимир ещё не давал — остаются в локальном master, ahead of origin/master on 5+ commits после XAI-3 коммита.
+**Push не выполнялся** — все коммиты в локальном master, 7 ahead of origin/master. Push — отдельная команда Владимира когда будет готов публиковать серию в remote.
