@@ -1,6 +1,47 @@
 # Архитектура Simply
 
-Описание архитектуры платформы AI-агентов Simply.
+Описание архитектуры платформы AI-агентов Simply. **Пофайловая карта, куда CLAUDE.md перенаправляет за «где лежит код».**
+
+## Оглавление
+
+1. [⛔ UI — закон](#-ui--закон) — указатель на design-system.md (SSOT для компонентов)
+2. [Общая схема](#общая-схема) — ASCII-диаграмма трёх слоёв
+3. [Слои приложения](#слои-приложения) — Presentation / Auth / AI / Data
+4. [Карта фич (пофайлово)](#карта-фич-пофайлово) — маршрут → папки для каждой фичи
+5. [Streaming Pipeline & Observability](#streaming-pipeline--observability) — stream, Guardian, DevPanel, Switchboard, cron
+6. [Security](#security)
+7. [Почему такая архитектура](#почему-такая-архитектура)
+8. [Связанные документы](#связанные-документы)
+
+**SSOT-файлы для быстрого перехода (не дублируются здесь):**
+- UI компоненты и закон → [docs/design-system.md](design-system.md) ⭐
+- AI Tools детали → [docs/ai-tools.md](ai-tools.md)
+- AI-агенты и промпты → [docs/ai-agents.md](ai-agents.md)
+- Артефакты → [docs/ai-artifacts.md](ai-artifacts.md)
+- Карта моделей по taskId → [docs/ai-chats-map.md](ai-chats-map.md) ⭐
+- Провайдеры, цены → [docs/ai-providers.md](ai-providers.md)
+- Модели и маршрутизация (код) → [lib/ai/task-assignments.ts](../lib/ai/task-assignments.ts) + [lib/ai/model-catalog.ts](../lib/ai/model-catalog.ts)
+- Схема БД → [lib/db/schema.ts](../lib/db/schema.ts)
+
+---
+
+## ⛔ UI — закон
+
+> 🚨 **ПЕРЕД ЛЮБОЙ UI-РАБОТОЙ:** прочитать **[docs/design-system.md](design-system.md)**. Это единственный источник правды для цветов, шрифтов, layout-ов и **полного списка существующих компонентов**.
+
+**Ключевое правило:** **НЕ изобретать новые компоненты.** Они уже созданы — **SSOT = [design-system.md раздел 13](design-system.md#13-используемые-компоненты-ssot)**:
+
+- **13.1** — 25 shadcn/ui примитивов (`components/ui/`)
+- **13.2** — 17 AI-chat элементов (`components/elements/`)
+- **13.3** — кросс-фичевые (`components/shared/`)
+- **13.4** — фичевые папки (`components/<feature>/`)
+- **13.5** — top-level компоненты чата
+
+Протокол при новом UI (1. `ls` → 2. импорт существующего → 3. проп/вариант → 4. крайне редко новый файл) — тоже в [design-system.md раздел 13](design-system.md#13-используемые-компоненты-ssot).
+
+**architecture.md намеренно НЕ дублирует** список компонентов — он меняется, и единственное место его держать — design-system.md. Правило из [DOCUMENTATION_GUIDE.md](../DOCUMENTATION_GUIDE.md): SSOT = один источник, остальные ссылаются.
+
+---
 
 ## Общая схема
 
@@ -16,26 +57,33 @@
 │              Next.js Application (Vercel)                   │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  App Router (app/)                                   │  │
-│  │  ├── (auth)/           - Auth routes (NextAuth)      │  │
-│  │  ├── (chat)/           - Chat UI, Projects, Helpers  │  │
-│  │  ├── (dashboard)/      - Dashboard, Chats, Settings  │  │
-│  │  └── api/              - API endpoints               │  │
+│  │  ├── (auth)/           - Auth pages (NextAuth)       │  │
+│  │  ├── (chat)/           - Simply Chat + projects + api│  │
+│  │  ├── (dashboard)/      - Dashboard, Briefing, Meeting│  │
+│  │  │                       Groups, Projects, Settings  │  │
+│  │  │                       + expertise/create landings │  │
+│  │  ├── (expertise)/      - Expertise chat view [/id]   │  │
+│  │  ├── (create)/         - Creation chat view [/id]    │  │
+│  │  ├── (task)/           - Project task chat view      │  │
+│  │  └── api/              - Cron, admin, telegram, dev  │  │
 │  └──────────────────────────────────────────────────────┘  │
 │                            │                                │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  Business Logic (lib/)                               │  │
-│  │  ├── ai/getModel.ts       - SSOT getModel(taskId) (v3.83, ТЗ-1)  │
-│  │  ├── ai/task-assignments.ts - taskId → catalog id (v3.83) │
-│  │  ├── ai/model-catalog.ts  - Pricing/capabilities SSOT (v3.83) │
-│  │  ├── ai/registry.ts       - createProviderRegistry (v3.83) │
-│  │  ├── ai/providers.ts      - Pure cost/pricing utilities │
-│  │  ├── ai/pipeline-trace.ts - Pipeline trace (v3.58)    │  │
-│  │  ├── ai/retry-with-logging.ts - Retry wrapper with per-attempt logging (v3.69) │
+│  │  ├── ai/getModel.ts       - SSOT getModel(taskId)      │  │
+│  │  ├── ai/task-assignments.ts - taskId → catalog id      │  │
+│  │  ├── ai/model-catalog.ts  - Pricing/capabilities SSOT  │  │
+│  │  ├── ai/registry.ts       - createProviderRegistry     │  │
+│  │  ├── ai/providers.ts      - Pure cost/pricing utilities│  │
+│  │  ├── ai/pipeline-trace.ts - Pipeline trace              │  │
+│  │  ├── ai/retry-with-logging.ts - Retry wrapper (per-attempt) │
 │  │  ├── ai/tools/            - AI-инструменты              │  │
-│  │  ├── briefing/            - Briefing pipeline + types + research engine (v3.27, v3.52) │
-│  │  ├── podcast/             - Podcast Engine (v3.43)           │
+│  │  ├── briefing/            - Briefing pipeline + research engine │
+│  │  ├── podcast/             - Podcast Engine              │  │
+│  │  ├── meeting/             - Meeting recorder pipeline   │  │
 │  │  ├── prompts/             - Skills + Agents system      │  │
-│  │  ├── db/queries.ts        - Database queries (Neon HTTP driver, v3.83) │
+│  │  ├── telegram/            - Telegram bot + groups       │  │
+│  │  ├── db/queries.ts        - Database queries (Neon HTTP)│  │
 │  │  └── db/schema.ts         - Database schema             │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
@@ -44,8 +92,11 @@
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  External Services                                          │
-│  ├── AI Providers      - Anthropic Claude (@ai-sdk/anthropic) │
-│  ├── AI Providers      - Google Gemini (vision-ocr, Briefing, Podcast) │
+│  ├── xAI Grok          - Simply Chat + MIND extract +     │
+│  │                       Collections RAG (план ТЗ-XAI-COL-1)│
+│  ├── Anthropic Claude  - Expertise, vision, artifacts, clerks │
+│  ├── MiniMax           - create chatMode + briefing pipeline │
+│  ├── Google Gemini     - reserved (TTS / fallback)         │
 │  ├── Brave Search API  - Web search                        │
 │  ├── Deepgram          - Voice input (Nova-3)              │
 │  ├── CloudConvert API  - PPTX preview                      │
@@ -96,40 +147,32 @@
 
 **Папка:** `lib/ai/`
 
-#### Core Registry (v3.83.0+, ТЗ-1)
+#### Core Registry
 
 Все 39 AI-точек приложения получают модель через единую функцию `getModel(taskId)`.
 
-- **`getModel.ts`** — публичный API (`getModel`, `getModelIdForTask`, `getProviderForTask`, `taskSupportsThinking`). Порядок резолва: test mocks → overrides (stub, ТЗ-2) → task-assignments → catalog → registry.
+- **`getModel.ts`** — публичный API (`getModel`, `getModelIdForTask`, `getProviderForTask`, `taskSupportsThinking`). Порядок резолва: test mocks → dev overrides (`model-overrides-node.ts`) → task-assignments → catalog → registry.
 - **`task-assignments.ts`** — SSOT маппинга `TaskId → catalogId`. 39 taskId. Изменение default-модели для задачи = одна строка.
 - **`model-catalog.ts`** — SSOT физических моделей: pricing (USD/1M), capabilities (vision/tools/thinking), contextWindow, алиасы.
 - **`registry.ts`** — `createProviderRegistry` (AI SDK v6) с 5 namespace: `anthropic`, `minimax`, `minimaxLong` (180s timeout), `xai`, `openrouter`.
 - **`providers.ts`** — остался как **чистый pricing/cost utility module**: `calculateCostRub`, `calculateCostBreakdownRub`, `extractUsageForPricing`, `getContextWindow`, non-LLM cost helpers (Deepgram, Gemini TTS). Больше не содержит model resolution logic.
 
-**Детали и обоснование:** [ADR 047](decisions/047-core-model-registry.md), [ai-providers.md](ai-providers.md#core-registry-v3830-тз-1).
+**Детали и обоснование:** [ADR 047](decisions/047-core-model-registry.md), [ai-providers.md](ai-providers.md).
 
 #### AI SDK version
 - `ai@6.x` + `@ai-sdk/anthropic@3.x` + `@ai-sdk/google@3.x` + `@ai-sdk/xai@3.x` + `@ai-sdk/react@3.x`
 - `vercel-minimax-ai-provider@0.0.2` (Anthropic-compatible для MiniMax, прокси через `@ai-sdk/anthropic/internal`, ADR 049)
 - `@openrouter/ai-sdk-provider` (GLM, Qwen — зарезервировано)
 
-#### Prompt System (v3.3 — Skills + Agents)
-- `lib/prompts/` — Файловая система промптов
-- `lib/prompts/skills/` — Атомарные навыки (SKILL.md)
-- `lib/prompts/agents/` — Персонажи-агенты (AGENT.md + config.yaml)
-- `lib/prompts/builder/` — Модульная система сборки
+#### Prompt System
 
-**Детали:** [ai-agents.md](ai-agents.md)
+`lib/prompts/` — файловая система промптов (skills / agents / service-chats / professors / experts / clerks / briefing / core). Структура и детали — в [Карте фич → Prompt System](#prompt-system--skills--agents) ниже, полная документация → [ai-agents.md](ai-agents.md).
 
-#### tools/
-- `web-search.ts` — Brave Search API
-- `get-current-date.ts` — текущая дата
-- `get-weather.ts` — погода (Open-Meteo)
-- `presentation-reveal.ts` — веб-презентации
-- `presentation-pptx.ts` — PowerPoint
-- `excel/` — Excel tools (create, parse, edit)
+#### `lib/ai/tools/` — AI-инструменты
 
-**Детали:** [ai-tools.md](ai-tools.md)
+17 файлов в `lib/ai/tools/`, сгруппированы по пяти категориям: registration/infrastructure, web/research, artifacts/documents, context/files, utility.
+
+**SSOT = [ai-tools.md](ai-tools.md)** — полный список каждого tool-а с API, примерами использования, форматами, лимитами. При добавлении нового tool обновлять **там**, не здесь.
 
 ---
 
@@ -137,30 +180,53 @@
 
 **PostgreSQL (Neon) + Drizzle ORM**
 
-**Основные таблицы:**
+**Схема:** [lib/db/schema.ts](../lib/db/schema.ts) — **SSOT, всегда сверять здесь**. Список ниже = актуальный снимок; если в диффе новая `pgTable` — добавить сюда в том же коммите.
+
+#### Users / Auth
 - `User` — пользователи (displayName, pronouns, occupation, bio, theme, hasSeenBenIntro, lastSeenSimplyVersion)
+- NextAuth таблицы (`Account`, `Session`, `VerificationToken`)
+
+#### Chats / Messages / Artifacts
 - `Chat` — чаты (title, summary, isStarred, projectId, chatMode)
-- `Message_v2` — сообщения
-- `Document` — артефакты
+- `Message_v2` — сообщения (актуальная таблица)
+- `Message` — deprecated (оставлена для миграции, не писать)
+- `Vote_v2` — голосование за сообщения
+- `Vote` — deprecated
+- `Document` — артефакты (text, markdown, excel, reveal, pptx)
+- `Suggestion` — AI-suggestions к артефактам (`request-suggestions` tool)
+- `Stream` — streaming state (resumable streams)
+
+#### Projects
 - `Project` — проекты (изолированные рабочие пространства)
-- `ProjectFile` — файлы проектов
-- `ProjectTask` — задачи проекта
-- `BriefingSettings` — настройки брифинга (timezone, language, maxItems)
+- `ProjectFolder` — иерархические папки внутри проекта
+- `ProjectFile` — файлы проектов (v2 storage, Blob + metadata)
+- `ProjectTask` — задачи проекта (enum `project_task_status`)
+
+#### Briefing
+- `BriefingSettings` — настройки брифинга (timezone, language, maxItems, deliveryEnabled, format)
 - `BriefingSources` — источники новостей (topicId, sourceUrl, fetchMethod, tier)
-- `BriefingHistory` — история генераций (briefingJson, stats, status)
-- `SavedBriefingTopics` — сохранённые темы брифинга (topicId, topicName, emoji, content, sources, briefingGeneratedAt)
+- `BriefingTopics` — каталог тем (topicId, name, emoji, isDefault)
+- `BriefingHistory` — история генераций (briefingJson, stats, deliveryStatus)
+- `SavedBriefingTopics` — сохранённые темы брифинга (content, sources, briefingGeneratedAt)
+
+#### MIND Memory / RAG
+- `MemoryEntry` — извлечённые факты (userId, content, embedding, metadata, source chatId/messageId, consolidatedAt)
+- `MemorySettings` — пользовательские настройки MIND (enabled, extractionMode, retention)
+- `UserProfileSummary` — nightly narrative profile (userId PK, summary text, updatedAt)
+
+#### Telegram
 - `TelegramConnection` — связка Simply ↔ Telegram (userId unique, telegramUserId bigint unique, isActive)
 - `TelegramLinkToken` — эфемерные токены линковки (token PK, userId FK, expiresAt = +10 min)
 - `TelegramGroup` — группы Telegram (telegramChatId unique, title, type, isForum, ownerUserId FK, isActive)
 - `TelegramGroupTopic` — топики форумов (groupId FK, telegramTopicId, name, unique по groupId+telegramTopicId)
 - `TelegramMessage` — сообщения из групп (groupId FK, topicId FK, fromUserId, text, hasMedia, mediaType, sentAt; индексы: group+sentAt, group+topic+sentAt)
+
+#### Meeting
+- `MeetingRecord` — записи встреч (userId FK, title, durationSeconds, speakerCount, summaryLevel, transcript, summary, metadata JSONB, createdAt)
+
+#### Observability / Ops
 - `ai_usage_log` — учёт потребления AI (modelId, tokens, costUsd, chatMode, guardianFlags JSONB)
 - `CronRunLog` — forensics каждого cron run (cronName, startedAt, finishedAt, usersProcessed, usersSkipped, usersFailed, results JSONB, durationMs)
-- `Vote_v2` — голосование за сообщения
-- `MeetingRecord` — записи встреч (userId FK, title, durationSeconds, speakerCount, summaryLevel, transcript, summary, metadata JSONB, createdAt)
-- NextAuth таблицы (Account, Session, VerificationToken)
-
-**Схема:** `lib/db/schema.ts` (SSOT)
 
 **Vercel Blob Storage:**
 - Загруженные файлы
@@ -168,37 +234,133 @@
 
 ---
 
-## Система промптов (v3.3 — Skills + Agents)
+## Карта фич (пофайлово)
 
-### Архитектура
+> Для каждой крупной фичи — где её `app/` route, `lib/` pipeline, `components/` UI, БД-таблицы и тематический doc. **Первое место для поиска «где лежит код».** UI всегда переиспользует компоненты из `components/ui/` + `components/elements/` — см. [⛔ UI — закон](#-ui--закон-и-существующие-компоненты).
+
+### Simply Chat (persistent)
+- **Route:** `app/(chat)/simply/`, `app/(chat)/api/chat/route.ts` (streaming endpoint)
+- **Models:** `simply-chat` / `simply-chat-think` / `simply-chat-vision` → Grok 4.1 Fast / Grok 4.20 / Claude Haiku (через [lib/ai/task-assignments.ts](../lib/ai/task-assignments.ts))
+- **UI:** top-level `components/chat.tsx` + `components/messages.tsx` + `components/input/`
+- **БД:** `Chat` (chatMode='simply'), `Message_v2`
+- **Особенность:** ОДИН вечный чат на userId (нет операции «новый Simply чат»)
+
+### Expertise (одноразовые экспертные запросы)
+- **Route:** `app/(dashboard)/expertise/page.tsx` (landing) + `app/(expertise)/expertise/[id]/` (chat view)
+- **Model:** `expertise` → Grok 4.20 Multi-Agent
+- **UI:** переиспользует `components/chat.tsx`
+- **БД:** `Chat` (chatMode='expertise')
+
+### Create (одноразовые creation-чаты)
+- **Route:** `app/(dashboard)/create/page.tsx` (landing) + `app/(create)/create/[id]/`
+- **Model:** `create` → MiniMax M2.7
+- **UI:** переиспользует `components/chat.tsx`
+- **БД:** `Chat` (chatMode='create')
+
+### Projects
+- **Route:** `app/(dashboard)/projects/` (list, create, detail) + `app/(chat)/projects/` (project chat) + `app/(task)/projects/` (task-level chat)
+- **Pipeline:** `lib/ai/professor-pipeline.ts` (planning, review, synthesize), `lib/ai/professors/`, `lib/ai/clerks/`
+- **Tools:** `read-project-file.ts`, `create-document.ts`
+- **UI:** `components/projects/`, `components/tasks/`, `components/file-viewer/`
+- **БД:** `Project`, `ProjectFolder`, `ProjectFile`, `ProjectTask` (enum `project_task_status`)
+- **Models:** `project:expert:haiku|sonnet|opus` (tier), `professor:*`, `clerk:*`
+
+### Briefing
+- **Route:** `app/(dashboard)/briefing/`, `app/api/cron/briefing/` (Vercel Cron)
+- **Pipeline:** `lib/briefing/` (fetch sources → filter → author → sections)
+- **UI:** `components/briefing/` (settings, history, topic picker)
+- **БД:** `BriefingSettings`, `BriefingSources`, `BriefingTopics`, `BriefingHistory`, `SavedBriefingTopics`
+- **Models:** `briefing:filter|author|section` (MiniMax M2.7-long), `briefing:podcast-script` (MiniMax M2.7)
+- **Детали:** [ADR 026](decisions/026-background-briefing-architecture.md)
+
+### Podcast
+- **Pipeline:** `lib/podcast/` (script → TTS → blob storage)
+- **UI:** `components/briefing/podcast-*.tsx`
+- **Запуск:** как продолжение Briefing (`waitUntil(runPodcastPipeline)`, non-blocking)
+
+### Meeting Recorder
+- **Route:** `app/(dashboard)/meeting/`
+- **Pipeline:** `lib/meeting/` (Deepgram Nova-3 STT → summary)
+- **UI:** `components/meeting/`
+- **БД:** `MeetingRecord`
+- **Model:** `meeting:summary` → Claude Sonnet
+
+### Telegram Bot
+- **Route:** `app/api/telegram/` (webhook, commands)
+- **Pipeline:** `lib/telegram/` (bot, groups, messages ingestion)
+- **UI:** `components/groups/` (UI для Telegram groups)
+- **БД:** `TelegramConnection`, `TelegramLinkToken`, `TelegramGroup`, `TelegramGroupTopic`, `TelegramMessage`
+
+### База знаний (Слой 3 RAG) — MIND + Collections
+
+Два хранилища, один интерфейс `knowledge_search`. SSOT будущей архитектуры → [specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md § Слой 3](../specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md).
+
+#### MIND (Voyage AI + pgvector) — ✅ работает
+
+Автоматическое извлечение фактов из разговоров. Пользователь говорит — Simply запоминает. Embeddings для semantic retrieval.
+
+- **Pipeline:** `lib/ai/memory/` (extract, retrieve, consolidate, profile, voyage-client)
+- **БД:** `MemoryEntry` (vector embeddings), `MemorySettings`, `UserProfileSummary`
+- **Models:** `memory:extract` (Grok 4.20), `memory:extract-batch|consolidate|profile|dedup-verify` (Grok 4.1 Fast)
+- **External:** Voyage AI для embeddings
+- **Архитектура:** [specs/Simply_xAI/MIND_ARCHITECTURE.md](../specs/Simply_xAI/MIND_ARCHITECTURE.md)
+
+#### Collections (xAI Grok native) — 📋 планируется (ТЗ-XAI-COL-1)
+
+Явная загрузка документов пользователем в Библиотеку. xAI индексирует, хранит, ищет фрагменты «из коробки» — **никакой собственной векторной инфраструктуры не строим**.
+
+- **Status:** в коде ничего нет, формально в [SIMPLY_XAI_ROADMAP.md](../specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md) как ТЗ-XAI-COL-1
+- **Provider API:** Grok Collections API (`collections_search` / `file_search`)
+- **Стоимость:** ~$2.50 / 1000 поисков + storage
+- **UI:** пользователь явно загружает документ в «Библиотеку», не автоматически как MIND
+- **Взаимодействие:** любая модель находит нужный кусок через единый `knowledge_search` tool
+- **Принцип:** для персональной памяти (разговоры) → Voyage. Для документов-знаний → берём из коробки у xAI, не изобретаем.
+
+### Service Chats (Ben, project-creation, project-manager, briefing-onboarding)
+- **Route:** `app/(chat)/api/service-chat/route.ts` + `app/(chat)/api/ben/route.ts`
+- **Pipeline:** `lib/prompts/agents/` (Ben), `lib/prompts/service-chats/`
+- **UI:** `components/service-chat/`
+- **Models:** `service-chat:ben|project-creation|project-manager|briefing-onboarding` (Claude Haiku/Sonnet)
+
+### Artifacts
+- **Pipeline:** `artifacts/` (корневая папка + handlers: text, markdown, excel, presentation-reveal, presentation-pptx)
+- **Tools:** `create-document.ts`, `update-document.ts`, `request-suggestions.ts`
+- **UI:** top-level `components/artifact.tsx`, `components/artifact-*.tsx`, `components/create-artifact.tsx`
+- **БД:** `Document`, `Suggestion`, `Stream`
+- **Модели:** `artifact:text|markdown|excel|pptx|reveal` → Claude Sonnet
+- **Детали:** [ai-artifacts.md](ai-artifacts.md)
+
+### Dev Switchboard
+- **Route:** `app/(dashboard)/dev/models/`, `app/api/dev/`
+- **Pipeline:** `lib/ai/model-overrides.ts` + `lib/ai/model-overrides-node.ts` (server-only fs)
+- **UI:** `components/dev-panel/`
+- **Gate:** `NEXT_PUBLIC_SIMPLY_DEV_MODE` + triple dev-gate
+- **Детали:** [ADR 048](decisions/048-dev-switchboard-ui.md), [model-catalog-ops.md](model-catalog-ops.md)
+
+### Prompt System — Skills + Agents
 
 ```
 lib/prompts/
 ├── server.ts         - Server-only экспорты
 ├── index.ts          - Client-safe экспорты
 ├── builder/          - Система сборки промптов
-│   ├── registry.ts   - Сканирование skills/agents
-│   ├── skill-loader.ts
-│   ├── agent-loader.ts
-│   └── composer.ts
-├── skills/           - Атомарные навыки (SKILL.md)
-│   ├── document/     - create-presentation, create-spreadsheet, etc.
-│   ├── research/     - web-research
-│   └── utility/      - prompt-helper
-├── agents/           - Персонажи-агенты
-│   └── ben/          - AGENT.md + config.yaml + references/
-└── core/             - Базовые блоки (.md)
-    ├── base.md
-    ├── safety.md
-    ├── formatting.md
-    └── russian-market.md
+├── skills/           - Атомарные навыки (SKILL.md, на запрос через load-skill tool)
+├── agents/           - Персонажи-агенты (AGENT.md + config.yaml)
+│   └── ben/
+├── service-chats/    - Промпты сервисных чатов
+├── professors/       - Промпты профессорского pipeline
+├── experts/          - Промпты экспертов
+├── clerks/           - Промпты клерков
+├── briefing/         - Промпты briefing pipeline
+├── contexts/         - Контекстные блоки
+└── core/             - Базовые блоки (base, safety, formatting, russian-market)
 ```
 
 **Детали:** [ai-agents.md](ai-agents.md)
 
 ---
 
-### 5. Streaming Pipeline
+## Streaming Pipeline & Observability
 
 **Файлы:** `app/(chat)/api/chat/route.ts`, `app/(chat)/api/service-chat/route.ts`
 
@@ -227,7 +389,7 @@ createUIMessageStream → JsonToSseTransformStream → Response (SSE)
     └── onFinish: saveMessages + autoNameChat + saveAiUsageLog(guardianFlags)
 ```
 
-**Developer Panel (v3.57.0):**
+**Developer Panel:**
 - `lib/ai/debug-events.ts` — 4 типа events: `data-debug-step`, `data-debug-finish`, `data-debug-guardian`, `data-debug-prompt`
 - Эмитятся через `dataStream.write()` в `onStepFinish`, `onFinish`, Guardian analyze, stream start
 - Server guard: `isSimplyDevMode` в каждой emit function (no-op в production)
@@ -235,7 +397,7 @@ createUIMessageStream → JsonToSseTransformStream → Response (SSE)
 - Client guard: `NEXT_PUBLIC_SIMPLY_DEV_MODE` early bailout в Provider
 - **ADR:** [029-developer-panel](decisions/029-developer-panel.md)
 
-**Dev Switchboard (v3.84.0 — ТЗ-2):**
+**Dev Switchboard:**
 - `/dev/models` — полная карта 39 задач + каталог моделей + ENV-статусы 8 провайдеров
 - File-based overrides: `.simply-dev-overrides.json` → `model-overrides-node.ts` (server-only fs) → `lookupOverride()` в `getModel.ts`
 - Per-message switcher в DevPanel drawer (`switchboard-section.tsx`)
@@ -244,19 +406,19 @@ createUIMessageStream → JsonToSseTransformStream → Response (SSE)
 - Workflow: [docs/model-catalog-ops.md](model-catalog-ops.md) — аудит цен, capabilities, добавление моделей
 - **ADR:** [048-dev-switchboard-ui](decisions/048-dev-switchboard-ui.md)
 
-**Tool Call Guardian (v3.50.0 + v3.51.0):**
+**Tool Call Guardian:**
 - `lib/ai/tool-call-guardian.ts` — детектор галлюцинаций tool calls
-- **Phase 1 (v3.50.0):** detection + logging. Observer в instrumentedStream
-- **Phase 2 (v3.51.0):** полная буферизация text events per step. На finish-step: flush (clean) или block (hallucination). 2+ blocks → error message. Все 3 routes (chat, service-chat, tasks/chat)
+- Observer в instrumentedStream: полная буферизация text events per step
+- На finish-step: flush (clean) или block (hallucination). 2+ blocks → error message. Все 3 routes (chat, service-chat, tasks/chat)
 - Записывает результаты в `ai_usage_log.guardianFlags` (JSONB)
 - **ADR:** [022-tool-call-guardian](decisions/022-tool-call-guardian.md), [023-guardian-blocking-strategy](decisions/023-guardian-blocking-strategy.md)
 
-**Usage Logging (v3.46.0):**
+**Usage Logging:**
 - `ai_usage_log` — таблица учёта потребления (per-request)
 - Fire-and-forget паттерн (не блокирует стриминг)
 - **ADR:** [019-usage-logging-architecture](decisions/019-usage-logging-architecture.md)
 
-**Background Briefing Generation (v3.54.0):**
+**Background Briefing Generation:**
 
 Автоматическая генерация брифингов по расписанию без участия браузера.
 
@@ -289,24 +451,8 @@ p-limit(3) concurrent processing
 - **Concurrency:** p-limit(3) users processed in parallel
 - **Idempotency:** skip if a `ready` briefing exists for today (UTC)
 - **Podcast:** non-blocking via `waitUntil()` (@vercel/functions)
-- **Delivery:** text ready → `deliveryStatus='pending'`. Actual Telegram sending — future ТЗ-TG4b
+- **Delivery:** text ready → `deliveryStatus='pending'`. Actual Telegram sending — отдельный pipeline.
 - **ADR:** [026-background-briefing-architecture](decisions/026-background-briefing-architecture.md)
-
----
-
-## Smart Routing (план)
-
-Автоматический выбор модели для экономии:
-
-| Сложность | Модель | Примерная цена |
-|-----------|--------|----------------|
-| Простой вопрос | Gemini Flash / GPT-4o-mini | ~$0.10/1M |
-| Средняя задача | Gemini Pro / GPT-4o | ~$2-5/1M |
-| Сложный анализ | Claude Sonnet | ~$3-15/1M |
-| Максимум качества | Claude Opus | ~$15-60/1M |
-
-**Текущее:** Ручной выбор или auto (Gemini 3 Pro/2.5 Flash)
-**План:** Интеллектуальный роутинг на основе анализа запроса
 
 ---
 
@@ -339,10 +485,12 @@ p-limit(3) concurrent processing
 - Built-in API routes
 - Легкий деплой на Vercel
 
-**Anthropic Claude (основной — v3.23.0+):**
-- Три модели: Haiku (быстрый), Sonnet (баланс), Opus (качество)
-- Прямое подключение через @ai-sdk/anthropic
-- Google Gemini — vision-ocr + Briefing pipeline + Podcast Engine ([ADR 016](decisions/016-briefing-backend-architecture.md))
+**Мультипровайдерная маршрутизация:**
+- **xAI Grok** — Simply Chat (4.1 Fast / 4.20), MIND memory, Экспертиза Multi-Agent
+- **Anthropic Claude** — Haiku (vision OCR, утилиты, клерки), Sonnet (создание артефактов, meeting summary), Opus (профессор, project expert tier)
+- **MiniMax** — create chatMode + briefing pipeline (filter / author / section / podcast-script, long timeout алиас)
+- SSOT резолва — `lib/ai/task-assignments.ts` + `lib/ai/model-catalog.ts`
+- Детали: [ai-chats-map.md](ai-chats-map.md), [ai-providers.md](ai-providers.md)
 
 **PostgreSQL + Drizzle:**
 - Type-safe queries
@@ -353,14 +501,19 @@ p-limit(3) concurrent processing
 
 ## Связанные документы
 
+- [design-system.md](design-system.md) ⭐ — **закон для UI**, компоненты, цвета, шрифты, hover-паттерны
+- [ai-chats-map.md](ai-chats-map.md) ⭐ — карта всех чатов и моделей (taskId → модель)
+- [ai-providers.md](ai-providers.md) — провайдеры, цены, namespace-ы registry
+- [ai-agents.md](ai-agents.md) — Система промптов (Skills + Agents)
+- [ai-artifacts.md](ai-artifacts.md) — Артефакты (5 типов)
+- [ai-tools.md](ai-tools.md) — AI-инструменты (17 файлов в `lib/ai/tools/`)
+- [model-catalog-ops.md](model-catalog-ops.md) — workflow каталога моделей
 - [setup.md](setup.md) — Установка
 - [deployment.md](deployment.md) — Деплой
-- [ai-agents.md](ai-agents.md) — Система промптов (Skills + Agents)
-- [ai-artifacts.md](ai-artifacts.md) — Артефакты
-- [ai-tools.md](ai-tools.md) — Инструменты
-- [ai-providers.md](ai-providers.md) — AI провайдеры и модели
-- [ADR](decisions/) — Архитектурные решения
+- [troubleshooting.md](troubleshooting.md) — Частые проблемы
+- [mcp-tools.md](mcp-tools.md) — MCP-инструменты
+- [decisions/](decisions/) — ADR (архитектурные решения)
 
 ---
 
-**Обновлено:** 2026-04-12 (v3.84.0 — Dev Switchboard UI)
+**Обновлено:** 2026-04-15 (TZ_DocsCleanup Этап 2 — trim тегов + пофайловая карта фич + UI SSOT блок)

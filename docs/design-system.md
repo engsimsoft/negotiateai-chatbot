@@ -335,19 +335,108 @@ import {
 
 ---
 
-## 13. Используемые UI-примитивы (shadcn/ui)
+## 13. Используемые компоненты (SSOT)
 
-Компоненты из `components/ui/` — shadcn/ui примитивы. При установке нового — зарегистрировать здесь.
+> 🚨 **ЭТО ЕДИНСТВЕННЫЙ СПИСОК КОМПОНЕНТОВ В ПРОЕКТЕ.** Перед созданием нового UI — **СНАЧАЛА ИСКАТЬ ЗДЕСЬ**. Новые компоненты добавлять сюда же (разделы 13.1 и 13.2).
+>
+> **Правило при новой UI-работе:**
+> 1. `ls components/ui/` + `ls components/elements/` + `ls components/<feature>/`
+> 2. Если подходящий компонент есть — импортировать его.
+> 3. Если нужен вариант — добавить проп/вариант к существующему, **не новый файл**.
+> 4. Новый компонент в `components/ui/` — только если это новый shadcn-примитив (крайне редко).
+
+### 13.1 shadcn/ui примитивы (`components/ui/`)
+
+Базовые кирпичи. Ничего не рисуем «с нуля» вручную — берём отсюда. При установке нового примитива — зарегистрировать в таблице.
 
 | Компонент | Файл | Где используется |
 |-----------|------|-----------------|
+| AlertDialog | `components/ui/alert-dialog.tsx` | Подтверждения деструктивных действий |
+| Avatar | `components/ui/avatar.tsx` | User menu, sidebar nav |
+| Badge | `components/ui/badge.tsx` | Метки, статусы, счётчики |
 | Button | `components/ui/button.tsx` | Повсеместно |
-| Dialog / AlertDialog | `components/ui/dialog.tsx`, `alert-dialog.tsx` | Модалки, подтверждения (sidebar delete) |
-| Tooltip | `components/ui/tooltip.tsx` | Icon-кнопки (см. раздел 6) |
-| Popover | `components/ui/popover.tsx` | PodcastButton (выбор тем для генерации) |
-| Checkbox | `components/ui/checkbox.tsx` | PodcastButton (чекбоксы выбора тем) |
-| Sheet | `components/ui/sheet.tsx` | Mobile sidebar (BriefingSidebarMobile) |
+| Card | `components/ui/card.tsx` | Списки, landing-страницы, проекты |
+| Carousel | `components/ui/carousel.tsx` | Галереи, примеры |
+| Checkbox | `components/ui/checkbox.tsx` | Формы, PodcastButton (выбор тем) |
 | Collapsible | `components/ui/collapsible.tsx` | Источники в статье, sidebar folders |
+| Dialog | `components/ui/dialog.tsx` | Модалки |
+| DropdownMenu | `components/ui/dropdown-menu.tsx` | User menu, контекстные меню |
+| HoverCard | `components/ui/hover-card.tsx` | Preview при hover |
+| Input | `components/ui/input.tsx` | Формы, auth, settings |
+| Label | `components/ui/label.tsx` | Подписи в формах |
+| Popover | `components/ui/popover.tsx` | PodcastButton, выборы |
+| Progress | `components/ui/progress.tsx` | Индикаторы прогресса |
+| RadioGroup | `components/ui/radio-group.tsx` | Формы (single-choice) |
+| ScrollArea | `components/ui/scroll-area.tsx` | Списки с ограниченной высотой |
+| Select | `components/ui/select.tsx` | Dropdowns в формах |
+| Separator | `components/ui/separator.tsx` | Визуальное разделение |
+| Sheet | `components/ui/sheet.tsx` | Mobile sidebar (BriefingSidebarMobile) |
+| Sidebar | `components/ui/sidebar.tsx` | Chat sidebar (коллапсируемый) |
+| Skeleton | `components/ui/skeleton.tsx` | Loading states |
+| Switch | `components/ui/switch.tsx` | Toggle в settings |
+| Textarea | `components/ui/textarea.tsx` | Multiline ввод |
+| Tooltip | `components/ui/tooltip.tsx` | Icon-кнопки (см. раздел 6) |
+
+### 13.2 AI-chat элементы (`components/elements/`)
+
+Building blocks для AI-интерфейса (паттерн Vercel AI SDK UI). Переиспользовать во всех чатах — Simply / Expertise / Create / Project task / Service chats. **НЕ дублировать в фичевых папках.**
+
+| Компонент | Файл | Назначение |
+|-----------|------|-----------|
+| Actions | `components/elements/actions.tsx` | Кнопки действий над сообщением (copy, regenerate, vote) |
+| Branch | `components/elements/branch.tsx` | Ветвление разговора (edit alternatives) |
+| CodeBlock | `components/elements/code-block.tsx` | Синтакс-подсветка кода в сообщениях |
+| Context | `components/elements/context.tsx` | Контекст запроса (вложения, ссылки) |
+| Conversation | `components/elements/conversation.tsx` | Контейнер разговора + auto-scroll |
+| Image | `components/elements/image.tsx` | Картинки в сообщениях |
+| InlineCitation | `components/elements/inline-citation.tsx` | Inline-ссылки на источники |
+| Loader | `components/elements/loader.tsx` | Индикатор ожидания ответа |
+| Message | `components/elements/message.tsx` | Пузырь сообщения (user/assistant) |
+| PromptInput | `components/elements/prompt-input.tsx` | Поле ввода + прикреплённые файлы |
+| Reasoning | `components/elements/reasoning.tsx` | Отображение reasoning блоков |
+| Response | `components/elements/response.tsx` | Markdown-рендер ответа ассистента |
+| Source | `components/elements/source.tsx` | Карточка источника (web search result) |
+| Suggestion | `components/elements/suggestion.tsx` | Предложения (suggested actions) |
+| Task | `components/elements/task.tsx` | Task/todo элемент в ответе |
+| Tool | `components/elements/tool.tsx` | Отображение tool-call с результатом |
+| WebPreview | `components/elements/web-preview.tsx` | Preview карточка URL |
+
+### 13.3 Кросс-фичевые (`components/shared/`)
+
+Разделяемые между несколькими фичами. Сейчас:
+
+| Компонент | Файл | Назначение |
+|-----------|------|-----------|
+| ModelSelect | `components/shared/model-select.tsx` | Выбор модели из каталога (общий для всех чатов) |
+
+### 13.4 Фичевые папки в `components/`
+
+Каждая крупная фича держит свои компоненты в собственной папке. **Не создавай параллельные реализации в других папках.**
+
+| Папка | Фича | Примеры |
+|-------|------|---------|
+| `components/briefing/` | Briefing + Podcast | briefing-view, podcast-*, topic-picker |
+| `components/chats/` | История чатов | chat list, filters |
+| `components/context/` | Context bar / widget | context-usage |
+| `components/dev-panel/` | Dev Switchboard | switchboard-section, drawer, debug views |
+| `components/file-viewer/` | Просмотр файлов проекта | PDF / image viewer |
+| `components/glavnaya/` | Главная страница | glavnaya-header, landing |
+| `components/groups/` | Telegram groups | group list, message view |
+| `components/input/` | Multimodal input | attachment picker, voice button |
+| `components/list-detail/` | List + detail layout | общий паттерн |
+| `components/meeting/` | Meeting recorder | recorder UI, transcript view |
+| `components/projects/` | Проекты | project list, card, detail |
+| `components/service-chat/` | Service chats | Ben, project-creation UI |
+| `components/settings/` | Settings page | settings sections |
+| `components/tasks/` | Project tasks | task list, expert chat UI |
+
+### 13.5 Top-level компоненты (`components/*.tsx`)
+
+Глобальные компоненты чата и артефактов, используемые **многими** фичами:
+
+`chat.tsx`, `message.tsx`, `messages.tsx`, `multimodal-input.tsx`, `artifact.tsx`, `artifact-*.tsx`, `create-artifact.tsx`, `chat-sidebar.tsx`, `chat-header.tsx`, `sidebar-history.tsx`, `sidebar-layout.tsx`, `user-menu.tsx`, `toolbar.tsx`, `greeting.tsx`, `suggested-actions.tsx`, `data-stream-*.tsx`, `theme-provider.tsx`, `swr-provider.tsx`.
+
+**Эти тоже переиспользовать, не дублировать.** Если нужен вариант — проп/вариант к существующему.
 
 ---
 

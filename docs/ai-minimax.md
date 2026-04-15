@@ -1,11 +1,26 @@
 # MiniMax M2.7 — Интеграция в Simply
 
-**Статус:** ✅ В production через официальный Anthropic-compatible режим
-**Версия проекта:** 3.85.0 (после ТЗ-CacheAudit)
-**Дата последнего аудита:** 2026-04-13
+> ⛔ **Документ частично устарел — не весь контент ниже отражает текущее состояние проекта.**
+>
+> После серии **Simply_xAI** (миграция на xAI Grok + Anthropic) MiniMax убран из:
+> - **Simply Chat** (все 3 variant: default text, «Думать», vision) → Grok 4.1 Fast / Grok 4.20 + Claude Haiku 4.5
+> - **MIND Memory / RAG** (extract, batch, consolidate, profile, dedup) → Grok 4.20 + Grok 4.1 Fast
+>
+> MiniMax **всё ещё активен** для двух задач:
+> - **Create chatMode** — `create` taskId → MiniMax M2.7
+> - **Briefing pipeline** — `briefing:filter` / `briefing:author` / `briefing:section` (через long-timeout namespace) + `briefing:podcast-script` → MiniMax M2.7 / M2.7-long
+>
+> **Актуальные источники правды:**
+> - Карта моделей по taskId → [docs/ai-chats-map.md](ai-chats-map.md) ⭐
+> - Текущее состояние проекта → [SIMPLY_STATUS.md](../SIMPLY_STATUS.md)
+> - Архитектура RAG (MIND + Collections) → [SIMPLY_ATTACHMENT_ARCHITECTURE.md § Слой 3](../specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md)
+> - История миграции → [CHANGELOG.md](../CHANGELOG.md)
+>
+> Содержимое ниже сохранено для технических деталей MiniMax (pricing, Anthropic-compatible режим, long-timeout namespace), которые всё ещё применимы для оставшихся двух задач.
 
-> Этот документ — единственный источник правды по MiniMax M2.7 в Simply.
-> Актуальные ADR: [043-minimax-simply-routing.md](decisions/043-minimax-simply-routing.md), [046-podcast-tts-revert-and-briefing-stability.md](decisions/046-podcast-tts-revert-and-briefing-stability.md), [049-minimax-anthropic-compat-mode.md](decisions/049-minimax-anthropic-compat-mode.md).
+**Назначение документа:** технические детали MiniMax M2.7 — API, pricing, Anthropic-compatible mode, long-timeout namespace.
+
+**Актуальные ADR по MiniMax:** [043-minimax-simply-routing.md](decisions/043-minimax-simply-routing.md), [046-podcast-tts-revert-and-briefing-stability.md](decisions/046-podcast-tts-revert-and-briefing-stability.md), [049-minimax-anthropic-compat-mode.md](decisions/049-minimax-anthropic-compat-mode.md).
 
 ---
 

@@ -24,6 +24,32 @@
 
 ---
 
+### Docs / Chore — 2026-04-15 — TZ_DocsCleanup (5 этапов)
+
+**Продолжение CLAUDE.md cleanup: закрыли оставшиеся «врущие» документы, расширили процессную защиту на все 13 docs/ файлов, исправили SSOT-нарушения собственного рефакторинга после чтения DOCUMENTATION_GUIDE.md.**
+
+- **Этап 1 — [`docs/ai-chats-map.md`](docs/ai-chats-map.md) (676 → 654 строки, commit `889f017`):** полная перезапись. Убраны 62 версионных тега + 8 ТЗ-пометок + 3 исторических blockquote. Simply Chat корректно показан на Grok 4.1 Fast / 4.20 / Claude Haiku 4.5 (было ошибочно MiniMax). Экспертиза → Grok 4.20 Multi-Agent. Создание → MiniMax M2.7. Все данные сверены с `task-assignments.ts` / `model-catalog.ts` как SSOT. **Mini-extension** — процессная защита в `WORKFLOW.md`: жёсткие триггеры обновления, grep-тест правдивости, memory-правило `feedback_ai_chats_map_sync.md`.
+
+- **Этап 2 — [`docs/architecture.md`](docs/architecture.md) (366 → 519) + [`docs/design-system.md`](docs/design-system.md) (362 → 450):** architecture.md переделан как **пофайловая карта фич + SSOT указатели**. Удалены 21 версионный тег + 5 ТЗ-пометок. Новое: оглавление, громкий ⛔ UI-блок, **H2 «Карта фич (пофайлово)» на 13 фич** (route + pipeline + tools + UI + БД + модели + ADR), Data Layer 19 → **29 таблиц** (добавлены пропущенные MIND `MemoryEntry/MemorySettings/UserProfileSummary`, `ProjectFolder`, `BriefingTopics`, `Suggestion`, `Stream`). Удалена фантазийная «Smart Routing (план)». Сломанная иерархия H3 Streaming Pipeline под H2 «Система промптов» исправлена. **SSOT-фикс после чтения DOCUMENTATION_GUIDE.md:** обнаружил собственные нарушения (дубли 25 shadcn + 17 tools в architecture.md), исправил: design-system.md § 13 переделан с 7 до **25 shadcn примитивов** + новый § 13.2 на **17 AI-chat элементов** (`components/elements/`) + § 13.3 shared + § 13.4 фичевые папки + § 13.5 top-level. architecture.md оставил только указатели. Memory-правило `feedback_ssot_before_list.md`.
+
+- **RAG-split фикс (пост-ревью):** Владимир поймал недочёт — MIND описан в отрыве от umbrella «База знаний (Слой 3 RAG)» из [SIMPLY_ATTACHMENT_ARCHITECTURE.md](specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md). Раздел переделан: **MIND ✅** (Voyage + pgvector, автоматическая память) + **Collections 📋** (xAI Grok native, ТЗ-XAI-COL-1, явная загрузка документов, **без своего вектор-стека**). Один интерфейс `knowledge_search`. SIMPLY_STATUS.md таблица компонентов разделена на 2 строки. Memory-правило `feedback_check_arch_ssot_before_describing.md`.
+
+- **Этап 3 — [`SIMPLY_STATUS.md`](SIMPLY_STATUS.md) (2323 → 166 строк, **−93%**):** полная перезапись как snapshot. Удалено: «Унаследовано от FAA», «Система промптов v3.3», «Проекты v3.2.0», «Профиль пользователя», «AI-инструменты» (всё дублировало тематические docs), «План развития» (фантазия), «Статистика» (отставала 18 версий — v3.73 при реальной 3.91), 40+ archive-ссылок. Новая структура: таблица компонентов (17 строк ✅/⚠️/📋 + модели с триггером обновления), активная серия Simply_xAI, три уровня персонализации, инфраструктура, метрики с указателями на SSOT-файлы каждой цифры, известные проблемы (4 backlog), навигация.
+
+- **Этап 4 — [`specs/WORKFLOW.md`](specs/WORKFLOW.md) (746 → 791):** Правило 6 таблица расширена с 3 до **13 строк** — все docs/ файлы с конкретными файлами-триггерами в git diff. Центральный справочник триггеров. Финализация ТЗ: чек-лист расширен с 2 до 13 docs с explicit triggers. Grep-тесты правдивости (модели, компоненты, tools). Механизм: `git diff --stat master...HEAD` → для каждого файла-триггера найти строку в таблице → обновить соответствующий docs/. Закрывает root cause «файл не в чеклисте → не обновляется».
+
+- **Этап 5 — [`docs/ai-minimax.md`](docs/ai-minimax.md) banner:** добавлен ⛔-блок сверху «документ частично устарел». Явно: MiniMax убран из Simply Chat / MIND, остался в Create chatMode + Briefing pipeline. Ссылки на актуальные SSOT (ai-chats-map, SIMPLY_STATUS, SIMPLY_ATTACHMENT_ARCHITECTURE). Содержимое не удалено — сохранено для технических деталей (pricing, Anthropic-compat, long-timeout namespace) которые применимы для оставшихся задач.
+
+**Защита от регрессии:**
+1. Memory `feedback_ai_chats_map_sync.md` (Сессия 1) — триггер обновления ai-chats-map
+2. Memory `feedback_ssot_before_list.md` (Сессия 2) — SSOT-проверка перед любым списком в doc
+3. Memory `feedback_check_arch_ssot_before_describing.md` (Сессия 2) — читать архитектурные SSOT активной серии ТЗ
+4. WORKFLOW.md Правило 6 таблица на 13 docs/ файлов — процессная защита
+
+**Версию не поднимаем** (docs/chore). Папка `specs/TZ_DocsCleanup/` → `_archive/TZ_DocsCleanup/`.
+
+---
+
 ### Planned (Next Steps)
 - **Simply_xAI миграция** (активная серия, XAI-1, XAI-2, XAI-3 ✅ завершены + ATTACH-1 ✅ завершён, следующий XAI-4 — Utility/Pipeline batch миграция briefing/podcast/meeting/professor/title): уход с MiniMax + OpenRouter на xAI Grok + Anthropic
 - **TZ_ErrorRecoveryUI Stage 2** ([specs/_backlog/](specs/_backlog/TZ_ErrorRecoveryUI.md)) — root cause fix через useChat state recovery. Stage 1 ✅ сделан в v3.90.0+

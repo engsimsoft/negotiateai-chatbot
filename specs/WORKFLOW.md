@@ -116,11 +116,29 @@ ROADMAP тщательно составляется при планирован�
 
 **Ключевые документы и что в них верифицировать:**
 
-| Документ | Что проверять | Против какого кода |
-|----------|--------------|-------------------|
-| `docs/ai-providers.md` → Реестр конфигураций | Модель, temperature, providerOptions, maxTokens | `lib/ai/providers.ts`, все `route.ts`, clerks, pipelines |
-| `docs/ai-chats-map.md` → Главная таблица + таблица моделей | Каждая модель и taskId | **SSOT:** `lib/ai/task-assignments.ts` (taskId → catalogId) + `lib/ai/model-catalog.ts` (pricing, capabilities). Никакого myProvider больше нет. |
-| `docs/architecture.md` → Модули и слои | Пути файлов, описания | Реальная файловая структура (`ls`, `Glob`) |
+Таблица ниже — **центральный справочник триггеров**. Принцип: каждый docs/ файл обновляется ТОЛЬКО когда в diff ТЗ есть **конкретные файлы-триггеры**. Размытое «если затронуто» не работает — проверено на серии ТЗ-XAI-1/2/3. Если ни один файл-триггер не в diff → документ можно не трогать.
+
+| Документ | Файл(ы)-триггер в git diff | Что проверять / обновлять | SSOT-код |
+|---|---|---|---|
+| **`docs/ai-chats-map.md`** ⭐ | `lib/ai/task-assignments.ts` · `lib/ai/model-catalog.ts` | Главная таблица + таблица моделей. Каждый catalogId / taskId должен существовать в коде | `task-assignments.ts` + `model-catalog.ts` |
+| **`docs/design-system.md`** ⭐ | `components/ui/*` · `components/elements/*` · новый layout в `app/` · новый route group | Раздел 13 (список компонентов) — 13.1 shadcn, 13.2 elements; раздел 1.2 карта страниц | `ls components/ui/` · `ls components/elements/` · `ls app/` |
+| `docs/ai-providers.md` | `lib/ai/providers.ts` · `lib/ai/registry.ts` · `lib/ai/model-catalog.ts` (pricing) | Реестр провайдеров, namespace-ы, pricing | `providers.ts` · `registry.ts` · `model-catalog.ts` |
+| `docs/architecture.md` | Новая папка в `lib/*/` · новая route group в `app/*/` · новая таблица `pgTable` в `lib/db/schema.ts` · новый крупный модуль | Слои, Карта фич (пофайлово), Data Layer таблицы | `ls app/` · `ls lib/` · `grep pgTable schema.ts` |
+| `docs/ai-tools.md` | `lib/ai/tools/*.ts` (новый или изменённый tool) | Список tools, API, форматы, лимиты | `ls lib/ai/tools/` |
+| `docs/ai-agents.md` | `lib/prompts/agents/*` · `lib/prompts/skills/*` · `lib/prompts/service-chats/*` · `lib/prompts/professors/*` · `lib/prompts/experts/*` · `lib/prompts/clerks/*` | Список агентов/skills, промпты, модели | `ls lib/prompts/` |
+| `docs/ai-artifacts.md` | `artifacts/*` · `lib/ai/tools/create-document.ts` · `lib/ai/tools/update-document.ts` · `lib/ai/tools/request-suggestions.ts` | Типы артефактов, tool API, DataStream протокол, схема `Document`/`Suggestion` | `ls artifacts/` · `schema.ts → document/suggestion` |
+| `docs/setup.md` | `.env.example` · `next.config.ts` · `package.json` (новая prereq зависимость) · `drizzle.config.ts` | Prerequisites, env переменные, настройка БД | `.env.example` · реальные steps установки |
+| `docs/deployment.md` | Vercel config · env vars (production) · `lib/db/migrations/*` (новая миграция) · cron конфиг | Production env vars, cron schedule, миграция процесс | Vercel dashboard · `migrations/` |
+| `docs/model-catalog-ops.md` | Workflow каталога изменился (как добавляются/аудируются модели) | Процесс добавления моделей, аудит pricing | — (процессный doc) |
+| `docs/mcp-tools.md` | `.mcp.json` · новый MCP server | Список MCP серверов, их назначение | `.mcp.json` |
+| `docs/troubleshooting.md` | Нет формального триггера — обновляется при разборе incident-ов | Частые ошибки, решения | — (incident-driven) |
+| `docs/ai-minimax.md` | 🗄️ **архивный** после серии Simply_xAI — не обновлять, banner сверху указывает на актуальные источники | — | — |
+
+**Правило применения таблицы:**
+
+1. **В Фазе 2 (ANALYSIS) / Фазе 3 (работа):** держать таблицу перед глазами. Знать какие docs/ будут затронуты **заранее**.
+2. **В Фазе 4 (Финализация):** `git diff --stat master...HEAD` → для каждого изменённого файла найти строку в таблице где он указан как файл-триггер → обновить соответствующий docs/.
+3. **Если триггер сработал, но обновить лень:** записать в `FINDINGS.md` со статусом high и в backlog — нельзя просто проигнорировать.
 
 **Быстрая проверка (команды для копирования):**
 ```bash
@@ -606,34 +624,47 @@ WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = 'ИмяТаблиц
 **3. Документация (по чеклисту [DOCUMENTATION_GUIDE.md](../DOCUMENTATION_GUIDE.md)):**
 - ⛔ **Прочитать DOCUMENTATION_GUIDE.md** — пройти по каждому пункту
 - Перенести `CHANGELOG.md` → главный `CHANGELOG.md` (история ТЗ живёт здесь)
-- Обновить `SIMPLY_STATUS.md`
+- Обновить `SIMPLY_STATUS.md` (snapshot, **не дописывать историю** — таблица компонентов + метрики + известные проблемы)
 - ⛔ **`CLAUDE.md` — НЕ редактировать.** Запустить `wc -l CLAUDE.md`. Если > 220 — STOP и доложить владельцу. История ТЗ → `CHANGELOG.md`. Пофайловая карта → `docs/architecture.md`. Править CLAUDE.md только если добавлен принципиально новый архитектурный слой (новая папка `lib/*/`, новый тип агента) — одна строка со ссылкой.
 - Обновить `package.json` (версия)
-- ⛔ **`docs/ai-chats-map.md`** — **ОБЯЗАТЕЛЬНО** если в diff ТЗ есть изменения `lib/ai/task-assignments.ts` или `lib/ai/model-catalog.ts`. Это не «если затронуты» (размытая формулировка, уже приводила к регрессиям) — **если любая из этих двух файлов в git diff — ОБНОВИТЬ**. Привязка к конкретным файлам-триггерам. Проверка на правду: каждый catalogId в `ai-chats-map.md` должен существовать в `model-catalog.ts`, каждый taskId — в `task-assignments.ts`. **Причина правила:** этот документ — SSOT карта для людей и AI, документ деградирует быстрее других (каждый ТЗ про AI меняет модели), и если его не обновлять при каждом изменении — он начинает врать и становится опасным (AI-ассистент читает враньё как правду). См. урок 2026-04-15 (TZ_DocsCleanup).
-- Обновить `docs/architecture.md` (если новые модули, таблицы, сервисы — **это место для пофайловой карты, не CLAUDE.md**)
 - Создать ADR в `docs/decisions/` (если значимое архитектурное решение)
-- Обновить другие docs/ по чеклисту DOCUMENTATION_GUIDE.md
+- ⛔ **Обновление docs/ — по Правилу 6 таблице** (см. секцию «Правило 6» выше): `git diff --stat master...HEAD` → для каждого изменённого файла найти строку в таблице где он указан как файл-триггер → обновить соответствующий docs/. Этот механизм закрывает 13 docs/ файлов explicit triggers-ами. **Не полагаться на «если затронуто» — только конкретные файлы-триггеры.**
+  - Обязательные проверки для трёх «живых» документов (наиболее часто меняются):
+    - ⭐ `docs/ai-chats-map.md` — если `task-assignments.ts` или `model-catalog.ts` в diff
+    - ⭐ `docs/design-system.md` — если `components/ui/*`, `components/elements/*` или новый layout/route group в diff
+    - `docs/architecture.md` — если новая папка `lib/*/`, route group, или `pgTable` в diff
 
 **4. ⛔ Верификация документации против кода (Правило 6):**
 
 > **Не пропускай этот шаг!** Именно здесь ловятся расхождения между docs и реальностью.
 
-- **Если ТЗ затрагивает AI-модели, промпты, настройки:**
-  1. Открыть `docs/ai-providers.md` → секция "Реестр конфигураций"
-  2. Запустить grep-команды из Правила 5 (models, providerOptions, temperature)
-  3. Сверить КАЖДУЮ строку Реестра с реальным кодом
-  4. Обновить Реестр при расхождении
+**Процедура (единая для всех ТЗ):**
 
-- **Если ТЗ затрагивает UI, компоненты, страницы:**
-  1. Открыть `docs/design-system.md` → карта страниц
-  2. Проверить что новые страницы/компоненты добавлены
-  3. Проверить `docs/architecture.md` → модули и слои (пофайловая карта живёт здесь, **не** в CLAUDE.md)
+1. `git diff --stat master...HEAD` — посмотреть все изменённые файлы.
+2. Открыть таблицу Правила 6 (секция выше). Для каждой строки проверить: есть ли в diff хоть один файл-триггер из колонки «Файл(ы)-триггер»?
+3. Если ДА — открыть соответствующий `docs/*.md` и обновить указанные разделы. Сверить каждую строку с SSOT-кодом из колонки «SSOT-код».
+4. Если НЕТ — документ можно не трогать (нет изменений, которые бы его задевали).
 
-- **Если в ТЗ изменился `lib/ai/task-assignments.ts` или `lib/ai/model-catalog.ts`:**
-  1. Открыть `docs/ai-chats-map.md` → главная таблица чатов + таблица моделей
-  2. Сверить **каждую** строку с `task-assignments.ts` (точный taskId → модель) и `model-catalog.ts` (pricing)
-  3. Обновить при расхождении. **Никакого старого `myProvider` — он удалён при Core Registry миграции.**
-  4. Grep-тест: `grep -oE '\b(claude|grok|MiniMax|gemini)[a-zA-Z0-9.\-]*' docs/ai-chats-map.md` → все упомянутые модели должны существовать в `model-catalog.ts`.
+**Grep-тесты (правдивость моделей):**
+```bash
+# Все модели в ai-chats-map должны существовать в каталоге
+grep -oE '\b(claude|grok|MiniMax|gemini)[a-zA-Z0-9.\-]*' docs/ai-chats-map.md | sort -u
+grep -E '^\s*id:' lib/ai/model-catalog.ts
+
+# Все компоненты в design-system 13.1/13.2 должны реально существовать
+ls components/ui/ components/elements/
+
+# Все tools в ai-tools.md должны реально существовать
+ls lib/ai/tools/
+```
+
+**Grep-тест «доковые файлы упомянуты в WORKFLOW»:**
+```bash
+# Должно вернуть все 13 docs/ файлов с их триггерами
+for f in ai-chats-map design-system ai-providers architecture ai-tools ai-agents ai-artifacts setup deployment model-catalog-ops mcp-tools troubleshooting ai-minimax; do
+  grep -q "docs/$f.md" specs/WORKFLOW.md && echo "✅ $f" || echo "❌ $f"
+done
+```
 
 - Переместить папку: `mv specs/TZ_XX/ _archive/`
 
@@ -678,17 +709,31 @@ WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = 'ИмяТаблиц
 - [ ] Все этапы ROADMAP выполнены
 - [ ] **Claude:** SQL-проверка БД (таблицы, колонки, FK)
 - [ ] **Пользователь:** Мануальное тестирование пройдено
-- [ ] **`FINDINGS.md` обработан** (Правило 8): значимые находки оформлены как follow-up ТЗ (`specs/TZ_XX_Followup_*`), пользователю показан список
+- [ ] **`FINDINGS.md` обработан** (Правило 8): значимые находки оформлены как follow-up ТЗ в `specs/_backlog/`
 - [ ] ⛔ **Прочитан DOCUMENTATION_GUIDE.md** — чеклист документации
 - [ ] `CHANGELOG.md` → главный CHANGELOG (запись о ТЗ живёт здесь)
-- [ ] Обновлён `SIMPLY_STATUS.md`
+- [ ] Обновлён `SIMPLY_STATUS.md` (snapshot, не история)
 - [ ] ⛔ `CLAUDE.md` — НЕ редактировать. `wc -l CLAUDE.md` ≤ 220 (иначе STOP + доложить владельцу)
 - [ ] Обновлён `package.json` (версия)
-- [ ] Обновлены docs/ по чеклисту DOCUMENTATION_GUIDE.md (ai-chats-map, architecture, ADR и др.)
-- [ ] ⛔ **Верификация docs против кода** (Правило 6):
-  - [ ] `ai-providers.md` → Реестр конфигураций сверен с grep-ом по коду
-  - [ ] ⛔ `ai-chats-map.md` — если в diff ТЗ есть `lib/ai/task-assignments.ts` или `lib/ai/model-catalog.ts` → ОБЯЗАТЕЛЬНО сверить главную таблицу и таблицу моделей построчно. Все catalogId / taskId должны существовать в коде.
-  - [ ] `docs/architecture.md` → пофайловая карта актуальна (слои, модули)
+- [ ] ADR в `docs/decisions/` (если значимое архитектурное решение)
+- [ ] ⛔ **Обновление docs/ по Правилу 6 таблице.** `git diff --stat master...HEAD` → для каждого файла-триггера найти строку в таблице Правила 6 → обновить соответствующий `docs/*.md`:
+  - [ ] `docs/ai-chats-map.md` — триггер `lib/ai/task-assignments.ts` или `lib/ai/model-catalog.ts`
+  - [ ] `docs/design-system.md` — триггер `components/ui/*`, `components/elements/*`, новый layout/route group
+  - [ ] `docs/ai-providers.md` — триггер `lib/ai/providers.ts`, `lib/ai/registry.ts`, pricing в catalog
+  - [ ] `docs/architecture.md` — триггер новая папка `lib/*/`, route group, `pgTable`
+  - [ ] `docs/ai-tools.md` — триггер `lib/ai/tools/*.ts`
+  - [ ] `docs/ai-agents.md` — триггер `lib/prompts/agents|skills|service-chats|professors|experts|clerks/*`
+  - [ ] `docs/ai-artifacts.md` — триггер `artifacts/*`, `create-document.ts`, `update-document.ts`, `request-suggestions.ts`
+  - [ ] `docs/setup.md` — триггер `.env.example`, `next.config.ts`, `drizzle.config.ts`
+  - [ ] `docs/deployment.md` — триггер Vercel config, production env, новая миграция
+  - [ ] `docs/model-catalog-ops.md` — триггер изменение workflow каталога
+  - [ ] `docs/mcp-tools.md` — триггер `.mcp.json`, новый MCP server
+  - [ ] `docs/troubleshooting.md` — если был разобран incident в рамках ТЗ
+  - [ ] `docs/ai-minimax.md` — **не трогать** (архивный)
+- [ ] ⛔ **Верификация docs против кода** (Правило 6, grep-тесты):
+  - [ ] `ai-chats-map.md` — каждый catalogId/taskId существует в `model-catalog.ts` / `task-assignments.ts`
+  - [ ] `design-system.md § 13.1-13.2` — каждый компонент существует в `components/ui/` / `components/elements/`
+  - [ ] `ai-tools.md` — каждый tool существует в `lib/ai/tools/`
 - [ ] Папка перемещена в `_archive/`
 
 ---
