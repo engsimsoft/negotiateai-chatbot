@@ -9,6 +9,7 @@ import {
   saveProjectFile,
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
+import { extractPdfText } from "@/lib/pdf/extract-pdf-text";
 import { generateUUID } from "@/lib/utils";
 
 // File validation schema - 50MB limit for project files
@@ -29,12 +30,6 @@ const getMammoth = async () => {
 const getXLSX = async () => {
   const xlsx = await import("xlsx");
   return xlsx;
-};
-
-const getPdfParse = async () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse");
-  return pdfParse;
 };
 
 // Determine file category
@@ -83,12 +78,16 @@ async function extractContent(
       return result.value;
     }
 
-    // PDF files
+    // PDF files — use shared utility (pdf-parse v2 API).
+    // For scanned PDFs we return undefined so the file is still stored as application/pdf
+    // and the vision-capable model can process it via native PDF support.
     if (extension === "pdf" || mimeType === "application/pdf") {
       try {
-        const pdfParse = await getPdfParse();
-        const data = await pdfParse(Buffer.from(fileBuffer));
-        return data.text;
+        const pdfResult = await extractPdfText(Buffer.from(fileBuffer));
+        if (pdfResult.isLikelyScan || pdfResult.text.length === 0) {
+          return undefined;
+        }
+        return pdfResult.text;
       } catch (error) {
         console.warn("[ProjectFiles] PDF parsing failed:", error);
         return undefined;

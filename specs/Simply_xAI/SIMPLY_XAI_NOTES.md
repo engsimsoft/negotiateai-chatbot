@@ -9,6 +9,58 @@
 
 ---
 
+## 2026-04-16 — ТЗ-ATTACH-1 завершён (v3.91.0)
+
+**Что сделано кратко:** Слой 0 из SIMPLY_ATTACHMENT_ARCHITECTURE.md реализован для PDF. Текстовые PDF извлекаются через pdf-parse v2 в `text/plain` при upload, сканы остаются как `application/pdf` → Haiku. Shared helper `lib/pdf/extract-pdf-text.ts` + интеграция в upload route + починка сломанного v1-API legacy call в project files route.
+
+### Решения по 5 открытым вопросам (все ответы от Владимира в один шаг)
+
+Q1 pdf-parse v2 — уже установлена, mehmet-kozan pure TS rewrite с breaking API change от v1 → v2 (`new PDFParse({data}).getText()`). Prior к этому ТЗ [projects/[id]/files/route.ts:86-96](../../app/(chat)/api/projects/[id]/files/route.ts#L86) использовала **v1 signature на v2 package** → `pdfParse(buffer)` как function call на класс → throw → silent catch → `metadata.extractedContent` всегда undefined → **месяцы молчаливой деградации**. Нашлось во время ANALYSIS, починено в том же коммите (Q5 решение = A).
+
+Q2 эвристика — `pageCount >= 2 ? avgCharsPerPage < 30 : text.length < 100`. Специальный случай для 1-page потому что avg на одной странице ненадёжен. Порог 30 chars/page как старт, логирование для эмпирической калибровки.
+
+Q3 truncate — 200 KB (~50K chars) симметрично project files cap. **Маркер обрезания показывается только если реально обрезали** — Владимир прямо указал «не пугать пользователя на 90% документов». 45K документ проходит без маркера, 110K — с ним.
+
+Q4 encrypted/corrupt — graceful catch → fall-through на native PDF upload → Haiku нативно. Без red errors в UX.
+
+Q5 чинить project files в этом же ТЗ — Владимир выбрал A (связанный scope). Обоснование: обе проблемы (новая PDF extraction + сломанный v1 call) — один клубок «capability-agnostic PDF upload», разделение на два коммита удвоило бы тесты без пользы.
+
+### Серия багов в процессе реализации — три разных webpack/ESM мины
+
+**Мина 1: `import { PDFParse } from "pdf-parse"` top-level → crash.** pdf-parse v2 `type: "module"` ESM-first. Next.js RSC webpack bundler пытается статически проанализировать named imports и падает с `Object.defineProperty called on non-object` при eval модуля на первом запросе. Dev server не красный флажок на build, ломается только в runtime первой загрузки.
+
+**Мина 2: `await import("pdf-parse")` dynamic import тоже crash.** Переделал helper на паттерн проекта (mammoth/xlsx style): dynamic import внутри async функции. Логика: webpack не бандлит статически → резолвит на runtime. **Не помогло.** Webpack всё равно пытается включить pdf-parse в bundle даже через dynamic import и ломается на тех же internals. Ошибка та же, но теперь поймана try/catch в upload route → graceful fallback на Haiku → **вылез Second Hand Crash**.
+
+**Мина 3 (уже pre-existing, не моя):** graceful fallback отправил PDF на Haiku как native → Haiku API `A maximum of 100 PDF pages may be provided` → AI_APICallError → стрим onError → UI висяк без ошибки. Pre-existing gap в UX защите для больших scan-PDF. Не блокер v3.91.0, но зафиксирован как edge case в NOTES: 100+ page scan PDF → Haiku crash. Защита добавляется либо cap в upload route, либо `adaptHistoryToCapabilities` check на page count в Haiku branch — отдельный stage/ТЗ.
+
+### Правильный фикс — `serverExternalPackages`
+
+Решение — добавить `"pdf-parse"` в `serverExternalPackages` в `next.config.ts` рядом с `lamejs` (который уже там по той же причине). Это говорит Next **не бандлить вовсе**, резолвить через Node `require` на runtime. После этого **top-level static import снова работает** — webpack видит package external, пропускает.
+
+**Урок:** `mammoth`/`xlsx` паттерн «dynamic import внутри функции» работает только для CJS packages или ESM-lite. Для полноценных ESM packages с worker-dependencies (как pdf-parse v2 который тянет `pdfjs-dist/legacy`) — нужен именно `serverExternalPackages`. Я потратил одну итерацию на неверное предположение что dynamic import универсален.
+
+### Stale .next cache → DevPanel пропал
+
+После цикла правок next.config.ts + kill -9 dev server + restart, при тестах на уже рабочей реализации Владимир заметил что **DevPanel footer перестал показываться** под новыми сообщениями (старые сообщения сохраняли footer из localStorage). Симптом: visually DevPanel «исчез» после моих последних изменений.
+
+Root cause — **stale webpack chunks в `.next/`**. Серия restart с изменяющейся конфигурацией оставила в кэше частично невалидные manifests/chunks. Client bundle был частично pre-my-changes, серверный — post. В логах все Chat API calls были 200 OK, emit через dataStream тоже происходил, но client-side парсер batches либо не запускался, либо крашился тихо на десериализации, которую я не мог увидеть без F12.
+
+**Фикс:** `rm -rf .next/` + `npm run dev` с нуля + hard reload в браузере. Всё вернулось. Multi-PDF в одном сообщении тоже работает.
+
+**Урок:** после изменения `next.config.ts` (особенно `serverExternalPackages`, `env`, `outputFileTracingIncludes`) — **обязательно** чистый rebuild. Dev server HMR не пересобирает эти секции чисто, оставляет скрытый state drift. Правило в backlog не фиксирую как «блокер», но держу в голове как default при любой будущей next.config правке.
+
+**Анти-паттерн который я чуть не сделал:** в момент паники про пропавший DevPanel я начал читать client-side код `dev-panel-provider.tsx` → `parseBatches` → `debug-events.ts` в поиске регрессии моего кода. Ничего там не менялось, и грепы подтвердили что регрессии нет. **Правильная эскалация была простая** — `rm -rf .next && restart`, проверка 30 секунд, которая либо доказывает либо исключает cache. Сделал бы это первым — сэкономил бы шаг чтения кода.
+
+### Scope consolidation — правильный выбор (опять)
+
+Два разных бага в одном ТЗ (новая PDF extraction + фикс project files v1→v2) — скоуп-консолидация снова окупилась. Разделение: два коммита, два мануальных теста, два CHANGELOG-записи, разная user-invocation. Связанный скоуп: один helper, один commit, один тест, одна история. Паттерн работает когда обе задачи по сути одна инженерная идея (здесь — «все PDF идут через SSOT extractor»).
+
+### Связь с архитектурным документом
+
+v3.90.2 закрыл history adaptation через `adaptHistoryToCapabilities` (Decision 3). v3.91.0 закрыл upload extraction через Слой 0 (Decision 4). Вместе они дают **capability-agnostic через SSOT** для всей attachment зоны: и upload pipeline, и history pipeline читают capabilities из model-catalog и не знают про конкретные модели/провайдеры. Следующее место где SSOT нужен — routing layer (`simply-chat` vs `simply-chat-vision` taskId selection) — там всё ещё есть хардкод на типы. Но это уже ТЗ-XAI-5 или отдельное.
+
+---
+
 ## 2026-04-15 — ТЗ-XAI-3 завершён (v3.90.0)
 
 **Что сделано кратко:** KITT + Think перешли на xAI Grok (4.1 Fast + 4.20 соответственно), удалено 80 строк R-6 зоопарка strip-функций, зафиксированы два backlog-айтема (error recovery UI, readDocument tool quality).

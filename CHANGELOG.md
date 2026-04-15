@@ -8,15 +8,75 @@
 ## [Unreleased]
 
 ### Planned (Next Steps)
-- **Simply_xAI миграция** (активная серия, XAI-1, XAI-2, XAI-3 ✅ завершены, следующий XAI-4 — Utility/Pipeline batch миграция briefing/podcast/meeting/professor/title): уход с MiniMax + OpenRouter на xAI Grok + Anthropic
+- **Simply_xAI миграция** (активная серия, XAI-1, XAI-2, XAI-3 ✅ завершены + ATTACH-1 ✅ завершён, следующий XAI-4 — Utility/Pipeline batch миграция briefing/podcast/meeting/professor/title): уход с MiniMax + OpenRouter на xAI Grok + Anthropic
 - **TZ_ErrorRecoveryUI Stage 2** ([specs/_backlog/](specs/_backlog/TZ_ErrorRecoveryUI.md)) — root cause fix через useChat state recovery. Stage 1 ✅ сделан в v3.90.0+
-- **TZ_SimplyReadDocumentTool** ([specs/_backlog/](specs/_backlog/TZ_SimplyReadDocumentTool.md)) — Grok в Simply Chat ошибочно вызывает `readDocument` tool на attached файлах (tool предназначен только для knowledge/ директории). Рекомендация: убрать из active tools для simply
 - **TZ_SimplyChatRaceCondition** ([specs/_backlog/](specs/_backlog/TZ_SimplyChatRaceCondition.md)) — `getOrCreateSimplyChat` без partial unique index → race при первых параллельных запросах нового пользователя
 - RAG-4: Библиотека MVP (загрузка документов + search)
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
 - Universal document router для chatMode `expertise`/`create` — fallback на модель с `documentSupport.supported=true` когда пользователь шлёт PDF в Grok/MiniMax
 - xAI Files API integration — поднять флаги `documentSupport` для Grok reasoning-моделей
 - Alias entries refactor — устранить дублирование `pricing`/`capabilities` в alias через резолв через `aliasOf`
+
+---
+
+## [3.91.0] — 2026-04-16 — ТЗ-ATTACH-1 — PDF text extraction при upload (Слой 0 Layer-0)
+
+**Реализация Слоя 0 из утверждённого архитектурного документа** [SIMPLY_ATTACHMENT_ARCHITECTURE.md](specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md): текстовые PDF извлекаются в `text/plain` при загрузке → доступны любой модели как inline-текст. Сканированные PDF остаются как `application/pdf` и обрабатываются Haiku нативно. Один механизм, capability-agnostic, $0 AI cost, миллисекунды.
+
+Главный принцип документа — **«максимум работы при загрузке файла, минимум при разговоре»** — теперь реализован для PDF симметрично уже работающему DOCX/XLSX/TXT/MD/CSV pipeline.
+
+### Added
+
+- **[lib/pdf/extract-pdf-text.ts](lib/pdf/extract-pdf-text.ts)** (новый, 45 строк) — shared utility для серверного извлечения текста из PDF через pdf-parse v2 API (`new PDFParse({ data: buffer }).getText()`). Возвращает `{ text, pageCount, avgCharsPerPage, isLikelyScan }`. Эвристика scan detection:
+  - Для ≥2 страниц: `avgCharsPerPage < 30` → скан
+  - Для 1 страницы: `text.length < 100` → скан (на 1 странице avg ненадёжен)
+  - Логирует `[PDF Extract]` с метриками для эмпирической калибровки порогов
+  - `parser.destroy()` в `finally` для корректного cleanup PDF.js worker
+- **PDF branch в [app/(chat)/api/files/upload/route.ts](app/(chat)/api/files/upload/route.ts)** — после `isDocumentFile` блока:
+  - Текстовый PDF → extract → `text/plain` → rename `.pdf` → `.txt` → `put(..., { contentType: "text/plain" })` (симметрично DOCX/XLSX)
+  - Truncate при `text.length > 50000` с маркером `[содержимое обрезано, показаны первые 50000 символов из N, всего страниц: M]`. **Маркер показывается только при реальной обрезке** — для 90% обычных документов пользователь не видит никаких служебных строк
+  - Graceful fallback: try/catch вокруг extraction → при любой ошибке (encrypted / corrupt / extraction-failed / scan detected) fall-through на as-is upload → Haiku обработает нативно. Пользователь не видит ошибки
+  - Логирование результата: `[Upload API] PDF extracted as text: ... (N chars, M pages, truncated=true/false)` или `[Upload API] PDF detected as scan/empty, falling through to native PDF upload: ...`
+  - `fileExt` regex расширен до `(docx|txt|md|csv|xlsx|xls|xlsm|pdf)`
+
+### Fixed
+
+- **[app/(chat)/api/projects/[id]/files/route.ts](app/(chat)/api/projects/[id]/files/route.ts) — сломанный pdf-parse v1 legacy call.** До этого патча route использовал `const pdfParse = require("pdf-parse"); await pdfParse(Buffer.from(fileBuffer))` — это **v1 API**, но в `package.json` установлен `pdf-parse@^2.4.5` (mehmet-kozan, Pure TS rewrite с breaking API change: теперь `new PDFParse({data}).getText()`). Вызов v1 signature на v2 package выкидывал ошибку, которую `catch` блок тихо проглатывал → `extractedContent` всегда возвращался `undefined` → `metadata.extractedContent` в БД project files не содержал PDF-контента → AI контекст проектов **не видел содержимое загруженных PDF** (молчаливая деградация, без красного флажка в UX). Side-effect finding во время ANALYSIS ТЗ-ATTACH-1, починен в том же коммите (связанный scope «capability-agnostic PDF upload»). Переключён на shared utility `extractPdfText` — получает `isLikelyScan` → `undefined` для сканов (сохраняет прежнее поведение metadata для них), `result.text` для текстовых.
+
+### Changed
+
+- **[lib/prompts/skills/document/analyze-document/SKILL.md](lib/prompts/skills/document/analyze-document/SKILL.md):** таблица типов файлов обновлена — `.pdf (текстовый)` переехал в inline-строку (как DOCX/TXT/MD/CSV), `.pdf (сканированный)` остаётся в vision-строке. Добавлено замечание про маркер обрезания для больших PDF.
+
+### Why this matters
+
+До v3.91.0 каждый PDF вне зависимости от содержимого маршрутизировался на Claude Haiku 4.5 ($0.80/$4 per 1M tokens) через `simply-chat-vision` taskId. Это дорого для 90% обычных текстовых документов (контракты, руководства, отчёты) которые Grok 4.1 Fast ($0.20/$0.50) может прочитать в 4-8× дешевле если получит текст на вход. Но Grok не поддерживает `application/pdf` как file part (xAI Files API не интегрирован), поэтому единственный путь — **извлечь текст на сервере до отправки в модель**.
+
+После v3.91.0: текстовый PDF → Grok inline (дёшево и быстро), сканированный PDF → Haiku нативно (как раньше). Маршрутизация честно отражает содержимое файла, а не его MIME тип. Архитектурная последовательность: **capability-agnostic routing через `adaptHistoryToCapabilities` (v3.90.2) + capability-agnostic upload через Layer 0 extraction (v3.91.0) = SSOT через model-catalog capabilities для всех attachment операций.**
+
+Дополнительный эффект: сломанный project files PDF extractor тихо молчал месяцами. Находка во время ANALYSIS (а не при эксплуатации) — прямое следствие правила №0 из SIMPLY_XAI_NOTES.md: «ANALYSIS против реального кода обязательно, даже если задача кажется очевидной».
+
+### Fixed (in same patch — stale webpack bundler issue surfaced during validation)
+
+- **Webpack ESM interop для pdf-parse v2.** pdf-parse v2 это `type: "module"` ESM-first package. Три попытки import'а провалились: (1) top-level `import { PDFParse } from "pdf-parse"` → `Object.defineProperty called on non-object` при runtime eval модуля; (2) dynamic `await import("pdf-parse")` внутри helper функции (паттерн mammoth/xlsx) — та же ошибка, webpack всё равно пытается статически включить pdf-parse в RSC bundle; (3) **рабочее решение** — добавить `"pdf-parse"` в `serverExternalPackages` в [next.config.ts](next.config.ts) рядом с `lamejs` (который уже там по той же причине). Next webpack при этом **не бандлит** пакет вообще, резолвит через Node `require` на runtime. После этого top-level static import снова работает чисто.
+
+### Changed
+
+- **[next.config.ts](next.config.ts):** `serverExternalPackages: ["lamejs", "pdf-parse"]` — расширен список packages которые Next не должен бандлить. Паттерн зеркалит уже применённый к `lamejs` для точно той же ESM+worker-dependencies проблемы.
+
+### Validation
+
+- [x] `npx tsc --noEmit` → 0 ошибок после каждого из 3 этапов (shared utility → upload route → project files fix)
+- [x] `npm run build` → успешен, v3.91.0 compiled в 9.8s, 61 статическая страница, все routes собраны чисто
+- [x] **Мануальный тест 4/5 сценариев пройдены:**
+  1. ✅ **Текстовый PDF** — GDI_Калибровка_впрыска.pdf (20 страниц, 45072 chars): `[PDF Extract] pageCount=20 avgCharsPerPage=2253.6 isLikelyScan=false` → Grok 4.1 Fast inline, truncated=false (без маркера обрезания)
+  2. ✅ **Сканированный PDF** — автотест (synthetic 1-page PDF с 0 text через inline PDF 1.4 builder): `pageCount=1 textLength=16 isLikelyScan=true` — эвристика 1-page/<100 chars корректно детектит
+  3. ✅ **Большой текстовый PDF** — LPS-3000 dynamometer manual (110 страниц, 3.7 MB, 112375 chars): pdf-parse обработал 110 pages за ~1.8s → truncate до 50087 chars + маркер `[содержимое обрезано, показаны первые 50000 символов из 112375, всего страниц: 110]` → Grok 4.1 Fast inline читает и отвечает корректно. **Multi-PDF в одном сообщении тоже работает** — отдельная валидация от Владимира
+  4. ✅ **Corrupt PDF** — автотест (буфер из random non-PDF bytes): pdf-parse throws `Invalid PDF structure` → upload route catches → fall-through на as-is upload → Haiku обрабатывает нативно
+  5. 🟡 **Project files** — ретроспективный SQL аудит показал что PDF в `ProjectFile` таблице ни одного не было (раньше все тихо фейлили из-за v1 legacy API). Код переключён на shared helper `extractPdfText`, типы корректны, API эквивалентен upload route. Оставлено как post-commit validation — не блокер потому что код симметричен already-passed сценарию 1
+
+### Stale cache regression during validation — fixed, lesson to NOTES
+
+Во время мануального теста после serverExternalPackages change + серии kill/restart dev server, Владимир заметил что **DevPanel footer перестал показываться** под новыми сообщениями (старые сообщения сохраняли footer из localStorage). Сервер отвечал 200 OK, emit через dataStream работал, но client парсер batches либо не запускался либо крашился тихо. Root cause — **stale webpack chunks в `.next/`**: серия restart с изменяющимся config оставила частично невалидные manifests. Фикс — `rm -rf .next/` + `npm run dev` с нуля + hard reload в браузере. После этого DevPanel вернулся. Урок зафиксирован в [SIMPLY_XAI_NOTES.md](specs/Simply_xAI/SIMPLY_XAI_NOTES.md): **после изменения `next.config.ts` (особенно `serverExternalPackages`) — обязательно чистый rebuild**, HMR не пересобирает эти секции чисто и оставляет скрытый state drift. Регрессия не вылезала бы в CI/production build (`next build` с нуля), только в dev.
 
 ---
 

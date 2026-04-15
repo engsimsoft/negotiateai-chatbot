@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
+import { extractPdfText } from "@/lib/pdf/extract-pdf-text";
+
+const PDF_TEXT_MAX_CHARS = 50_000;
 
 // Use Blob instead of File since File is not available in Node.js environment
 const FileSchema = z.object({
@@ -81,7 +84,7 @@ export async function POST(request: Request) {
     const fileType = file.type;
 
     // Get file extension for better type detection
-    const fileExt = originalFilename.toLowerCase().match(/\.(docx|txt|md|csv|xlsx|xls|xlsm)$/)?.[1];
+    const fileExt = originalFilename.toLowerCase().match(/\.(docx|txt|md|csv|xlsx|xls|xlsm|pdf)$/)?.[1];
 
     try {
       // Check if it's an Excel file
@@ -171,7 +174,56 @@ export async function POST(request: Request) {
         });
       }
 
-      // For images and PDFs, upload as-is (they work with Claude multimodal API)
+      // PDF: attempt server-side text extraction (Layer 0 of SIMPLY_ATTACHMENT_ARCHITECTURE).
+      // Text-based PDFs become text/plain so any model (incl. Grok without documentSupport) can read them inline.
+      // Scanned PDFs (low avg chars/page) fall through to as-is upload → Haiku native PDF handling.
+      const isPdfFile = fileType === "application/pdf" || fileExt === "pdf";
+      if (isPdfFile) {
+        try {
+          const pdfResult = await extractPdfText(Buffer.from(fileBuffer));
+
+          if (!pdfResult.isLikelyScan && pdfResult.text.length > 0) {
+            const wasTruncated = pdfResult.text.length > PDF_TEXT_MAX_CHARS;
+            const extractedText = wasTruncated
+              ? `${pdfResult.text.slice(0, PDF_TEXT_MAX_CHARS)}\n...[содержимое обрезано, показаны первые ${PDF_TEXT_MAX_CHARS} символов из ${pdfResult.text.length}, всего страниц: ${pdfResult.pageCount}]`
+              : pdfResult.text;
+
+            const textFilename = originalFilename.replace(/\.pdf$/i, ".txt");
+            const textBuffer = Buffer.from(extractedText, "utf-8");
+
+            const data = await put(textFilename, textBuffer, {
+              access: "public",
+              contentType: "text/plain",
+            });
+
+            console.log(
+              `[Upload API] PDF extracted as text: ${originalFilename} → ${textFilename} (${extractedText.length} chars, ${pdfResult.pageCount} pages, truncated=${wasTruncated})`
+            );
+
+            return NextResponse.json({
+              ...data,
+              originalFilename,
+              originalContentType: "application/pdf",
+              processed: true,
+              fileType: "pdf-text",
+              pageCount: pdfResult.pageCount,
+            });
+          }
+
+          console.log(
+            `[Upload API] PDF detected as scan/empty, falling through to native PDF upload: ${originalFilename} (${pdfResult.pageCount} pages, ${pdfResult.text.length} chars)`
+          );
+        } catch (pdfError) {
+          console.warn(
+            `[Upload API] PDF extraction failed, falling back to native PDF upload: ${originalFilename}`,
+            pdfError instanceof Error ? pdfError.message : pdfError
+          );
+          // Graceful fallback — Haiku will handle the PDF natively
+        }
+      }
+
+      // For images and as-is PDFs (scan/encrypted/extraction-failed), upload as-is
+      // (they work with Claude multimodal API)
       const data = await put(originalFilename, fileBuffer, {
         access: "public",
         contentType: fileType,
