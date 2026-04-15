@@ -9,13 +9,62 @@
 
 ### Planned (Next Steps)
 - **Simply_xAI миграция** (активная серия, XAI-1, XAI-2, XAI-3 ✅ завершены, следующий XAI-4 — Utility/Pipeline batch миграция briefing/podcast/meeting/professor/title): уход с MiniMax + OpenRouter на xAI Grok + Anthropic
-- **TZ_ErrorRecoveryUI** ([specs/_backlog/](specs/_backlog/TZ_ErrorRecoveryUI.md)) — высокий приоритет: после stream error инпут Simply Chat блокируется, нужна перезагрузка страницы. Stage 1 — показать в красном флаге текст «перезагрузите страницу чтобы продолжить», Stage 2 — root cause fix через useChat state recovery
-- **TZ_SimplyReadDocumentTool** ([specs/_backlog/](specs/_backlog/TZ_SimplyReadDocumentTool.md)) — Grok в Simply Chat ошибочно вызывает `readDocument` tool на attached файлах (tool предназначен только для knowledge/ директории). Либо убрать из active tools для simply, либо правка промпта, либо научить tool различать контексты
+- **TZ_ErrorRecoveryUI Stage 2** ([specs/_backlog/](specs/_backlog/TZ_ErrorRecoveryUI.md)) — root cause fix через useChat state recovery. Stage 1 ✅ сделан в v3.90.0+
+- **TZ_SimplyReadDocumentTool** ([specs/_backlog/](specs/_backlog/TZ_SimplyReadDocumentTool.md)) — Grok в Simply Chat ошибочно вызывает `readDocument` tool на attached файлах (tool предназначен только для knowledge/ директории). Рекомендация: убрать из active tools для simply
+- **TZ_SimplyChatRaceCondition** ([specs/_backlog/](specs/_backlog/TZ_SimplyChatRaceCondition.md)) — `getOrCreateSimplyChat` без partial unique index → race при первых параллельных запросах нового пользователя
 - RAG-4: Библиотека MVP (загрузка документов + search)
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
 - Universal document router для chatMode `expertise`/`create` — fallback на модель с `documentSupport.supported=true` когда пользователь шлёт PDF в Grok/MiniMax
 - xAI Files API integration — поднять флаги `documentSupport` для Grok reasoning-моделей
 - Alias entries refactor — устранить дублирование `pricing`/`capabilities` в alias через резолв через `aliasOf`
+
+---
+
+## [3.90.1] — 2026-04-15 — ТЗ-SimplyChatModeInjection — плейсхолдеры `<current_mode>` / `<current_model>` через SSOT
+
+**Закрытие долга из backlog** — вне серии Simply_xAI. Патч после 9-кратного инцидента с «враньём модели про её собственное имя» (в промпте Simply Chat было зашито `<current_model>Haiku</current_model>` при реальной MiniMax M2.7 / Grok 4.1 Fast) и `<current_mode>chat</current_mode>` при удалённом ещё в v3.86.0 режиме `chat`.
+
+Первопричины цепочкой: (1) `buildChatPrompt` не пробрасывал `chatMode` в `composeChatPrompt` → дефолт `'chat'`; (2) локальный `modelMapForDisplay` в композере знал только Claude-псевдонимы эпохи до xAI/MiniMax; (3) `activeTaskId` вычислялся в `chat/route.ts` **после** prompt-building, так что композер физически не мог знать финальную модель.
+
+### Changed
+
+- **Composer SSOT для display name ([lib/prompts/builder/composer.ts](lib/prompts/builder/composer.ts)):**
+  - `composeChatPrompt(context, chatMode = 'simply', activeTaskId?)` — подпись расширена, дефолт `'chat'` → `'simply'`, тип параметра `string` → `ChatMode`
+  - `<current_model>` display name резолвится через `getModelEntry(getModelIdForTask(activeTaskId ?? getTaskIdForChatMode(chatMode)))?.displayName ?? 'AI'` — одна цепочка из SSOT (task-assignments + model-catalog)
+  - Удалены два легаси-маппинга: верхний `modelDisplayMap` + `modelMapForDisplay` (Claude-only) и нижний `modelMap` в return
+  - Замена точного `.replace('<current_mode>chat</current_mode>', ...)` на regex `<current_mode>[^<]*</current_mode>` — дефолты в simply-chat.md можно менять безопасно
+  - `ComposedPrompt.model` отмечен комментарием как dead field (runtime не читается — подтверждено grep-ом; единственное упоминание в коде — [app/(chat)/api/assistant/ben/route.ts:32](app/(chat)/api/assistant/ben/route.ts#L32) с комментарием «no longer used»). Полное удаление поля — в будущем `TZ_PromptsDeadCodeCleanup`
+- **Builder API ([lib/prompts/builder/index.ts](lib/prompts/builder/index.ts)):** `buildChatPrompt`, `buildExpertisePrompt`, `buildCreatePrompt` — второй опциональный параметр `activeTaskId?: TaskId`, проброс в композеры
+- **Chat route ([app/(chat)/api/chat/route.ts](app/(chat)/api/chat/route.ts)):**
+  - `activeTaskId` computation поднят до switch prompt-building. Было: builder вызывался без знания финальной модели, потом через 15 строк вычислялся `activeTaskId`. Стало: один `if/else` сразу после объявления переменной, три ветки (`project:expert:${tier}` / `simply-chat|simply-chat-think|simply-chat-vision` / `getTaskIdForChatMode(chatMode)`)
+  - Все 4 вызова builder-ов (project + switch) передают `activeTaskId` вторым аргументом
+  - Тип `let activeTaskId: TaskId | null = null` → `let activeTaskId: TaskId` (все ветки теперь всегда assigning). Downstream нарративные `?? undefined` и `? :` остались безопасными
+  - Дублирующий блок computation на конце switch удалён
+- **Simply Chat prompt ([lib/prompts/chat/simply-chat.md](lib/prompts/chat/simply-chat.md)):** fallback-значения плейсхолдеров обновлены: `<current_mode>chat</current_mode>` → `<current_mode>simply</current_mode>`, `<current_model>Haiku</current_model>` → `<current_model>AI</current_model>`. Комментарий обновлён на «инъекция через displayName из model-catalog (SSOT)»
+
+### Docs
+
+- **[SIMPLY_PROMPTS_AND_MODEL_CONFIG.md](specs/Simply_xAI/SIMPLY_PROMPTS_AND_MODEL_CONFIG.md):** в секцию «Как это всё собирается вместе» добавлена заметка про автоматический резолв `<current_mode>`/`<current_model>` через SSOT — смена модели в слое 2 (task-assignments) или через `/dev/models` override автоматически отражается в промпте, без правок composer-а
+
+### Why this matters
+
+Маркеры в промпте читаются моделью как info-теги (не condition для поведения), но на практике это важно по трём причинам: (1) Claude/Grok периодически ссылается на своё имя в ответе — с неправильным тегом получаешь «я, Haiku, не могу…» при работе на Grok 4.1 Fast; (2) отладка дампов system prompt в DevPanel требует доверия к тегам — иначе уходишь по ложному следу; (3) если в будущем появится conditional логика по `<current_mode>` (а обсуждали для жёсткого роутинга в экспертизу), она сейчас бы ссылалась на мертвый режим `chat`.
+
+### Validation
+
+5/5 мануальных тестов пройдены (DevPanel → Prompt section):
+1. `/simply` текстовое → `<current_mode>simply</current_mode>` + `<current_model>Grok 4.1 Fast</current_model>` ✅
+2. Simply + «Думать» → `<current_model>Grok 4.20</current_model>` ✅
+3. Simply + PNG/PDF → `<current_model>Claude Haiku 4.5</current_model>` ✅
+4. `/expertise` (override на `grok-4.20-0309-reasoning`) → `<current_mode>expertise</current_mode>` + `<current_model>Grok 4.20 (reasoning)</current_model>` ✅ — подтверждает что /dev/models override автоматически подхватывается композером
+5. `/create` (override на Haiku) → `<current_mode>create</current_mode>` + `<current_model>Claude Haiku 4.5</current_model>` ✅
+
+Бонус: Simply Chat с прикреплённым `.txt` отработал без регрессии — фикс `saveMessages` → `processedMessage.parts` из ТЗ-XAI-3 держится.
+
+### Notes
+
+- **Scope decision:** полное удаление dead field `ComposedPrompt.model` / `BuiltPrompt.model` / `ModelId` type union — намеренно вне scope этого патча. Уходит в будущий `TZ_PromptsDeadCodeCleanup` вместе с остальными legacy обёртками в [lib/prompts/](lib/prompts/)
+- **Процессный урок:** SPEC был написан 2026-04-15 как параллельная задача к ТЗ-XAI-3 («желательно катать вместе»), но фактически засел в backlog и был закрыт через сутки. Срок в 0.2 сессии подтверждён — композер + builder + route + тесты заняли меньше часа
 
 ---
 

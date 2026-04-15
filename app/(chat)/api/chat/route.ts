@@ -476,13 +476,29 @@ export async function POST(request: Request) {
         // ТЗ-2 Dev Switchboard: track the TaskId used for this request so
         // we can (a) emit it in debug events for the DevPanel switcher and
         // (b) reuse it in usage logging instead of re-deriving the routing.
-        let activeTaskId: TaskId | null = null;
+        // ТЗ-SimplyChatModeInjection: activeTaskId is now resolved BEFORE
+        // the prompt builder so composer can inject the real <current_model>
+        // display name via getModelEntry(getModelIdForTask(activeTaskId)).
+        let activeTaskId: TaskId;
+        if (isProjectChat && project) {
+          activeTaskId = `project:expert:${tier}` as TaskId;
+        } else if (chatMode === "simply") {
+          // Priority: think → Grok 4.20, attachments → Haiku 4.5 (vision), default → Grok 4.1 Fast
+          if (think) {
+            activeTaskId = "simply-chat-think";
+          } else if (hasAttachments(message.parts)) {
+            activeTaskId = "simply-chat-vision";
+          } else {
+            activeTaskId = "simply-chat";
+          }
+        } else {
+          activeTaskId = getTaskIdForChatMode(chatMode);
+        }
 
         if (isProjectChat && project) {
           // Project chat: use Claude model and project context
           const projectModelConfig = getProjectModel(tier);
           modelToUse = projectModelConfig.model;
-          activeTaskId = `project:expert:${tier}` as TaskId;
 
           // Diagnostic: log project files and their extractedContent status
           console.log(`[Project Chat] Files for project "${project.name}":`, {
@@ -502,7 +518,7 @@ export async function POST(request: Request) {
           });
 
           // Combine base prompt with project context
-          const builtPrompt = buildChatPrompt(promptContext);
+          const builtPrompt = buildChatPrompt(promptContext, activeTaskId);
           systemPromptText = `${builtPrompt.systemPrompt}\n\n${projectContext}`;
 
           console.log(`[Project Chat] Using ${projectModelConfig.name} (${tier}) for project ${project.name}`);
@@ -513,30 +529,17 @@ export async function POST(request: Request) {
           let builtPrompt;
           switch (chatMode) {
             case "expertise":
-              builtPrompt = buildExpertisePrompt(promptContext);
+              builtPrompt = buildExpertisePrompt(promptContext, activeTaskId);
               break;
             case "create":
-              builtPrompt = buildCreatePrompt(promptContext);
+              builtPrompt = buildCreatePrompt(promptContext, activeTaskId);
               break;
             case "simply":
-              builtPrompt = buildChatPrompt(promptContext);
+              builtPrompt = buildChatPrompt(promptContext, activeTaskId);
               break;
           }
           systemPromptText = builtPrompt.systemPrompt;
 
-          // ТЗ-MinimaxCleanup + ТЗ-1 CoreRegistry: Model routing for Simply Chat
-          // Priority: think → Sonnet, attachments → Haiku 4.5 (vision), default → MiniMax M2.7
-          if (chatMode === "simply") {
-            if (think) {
-              activeTaskId = "simply-chat-think";
-            } else if (hasAttachments(message.parts)) {
-              activeTaskId = "simply-chat-vision";
-            } else {
-              activeTaskId = "simply-chat";
-            }
-          } else {
-            activeTaskId = getTaskIdForChatMode(chatMode);
-          }
           modelToUse = getModel(activeTaskId);
           console.log(`[Chat API] Model selection: chatMode=${chatMode}, task=${activeTaskId}, model=${getModelIdForTask(activeTaskId)}`);
         }

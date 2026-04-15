@@ -6,6 +6,7 @@
  */
 
 import type { BuildContext, ModelId, BuiltPrompt } from '../types';
+import type { TaskId } from '@/lib/ai/task-assignments';
 import {
   getSkillsRegistry,
   getAgentsRegistry,
@@ -71,10 +72,13 @@ export {
  * @example
  * const result = buildChatPrompt({
  *   user: { displayName: 'Владимир', occupation: 'Маркетолог' },
- * });
+ * }, 'simply-chat-think');
  */
-export function buildChatPrompt(context: BuildContext = {}): BuiltPrompt {
-  const composed = composeChatPrompt(context);
+export function buildChatPrompt(
+  context: BuildContext = {},
+  activeTaskId?: TaskId,
+): BuiltPrompt {
+  const composed = composeChatPrompt(context, 'simply', activeTaskId);
 
   return {
     systemPrompt: composed.systemPrompt,
@@ -88,10 +92,13 @@ export function buildChatPrompt(context: BuildContext = {}): BuiltPrompt {
  * Build prompt for expertise chat mode
  *
  * @example
- * const result = buildExpertisePrompt({ user: { displayName: 'Владимир' } });
+ * const result = buildExpertisePrompt({ user: { displayName: 'Владимир' } }, 'expertise');
  */
-export function buildExpertisePrompt(context: BuildContext = {}): BuiltPrompt {
-  const composed = composeExpertisePrompt(context);
+export function buildExpertisePrompt(
+  context: BuildContext = {},
+  activeTaskId?: TaskId,
+): BuiltPrompt {
+  const composed = composeExpertisePrompt(context, activeTaskId);
 
   return {
     systemPrompt: composed.systemPrompt,
@@ -105,10 +112,13 @@ export function buildExpertisePrompt(context: BuildContext = {}): BuiltPrompt {
  * Build prompt for create chat mode
  *
  * @example
- * const result = buildCreatePrompt({ user: { displayName: 'Владимир' } });
+ * const result = buildCreatePrompt({ user: { displayName: 'Владимир' } }, 'create');
  */
-export function buildCreatePrompt(context: BuildContext = {}): BuiltPrompt {
-  const composed = composeCreatePrompt(context);
+export function buildCreatePrompt(
+  context: BuildContext = {},
+  activeTaskId?: TaskId,
+): BuiltPrompt {
+  const composed = composeCreatePrompt(context, activeTaskId);
 
   return {
     systemPrompt: composed.systemPrompt,

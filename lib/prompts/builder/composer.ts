@@ -16,6 +16,11 @@ import { buildSimpleMemoryContext } from '../contexts/chat-memory';
 import { getSkillsRegistry, type SkillMetadata } from './registry';
 import { loadAgent, type Agent } from './agent-loader';
 import { loadSkill, type Skill } from './skill-loader';
+import type { ChatMode } from '@/lib/ai/chat-mode-config';
+import { getTaskIdForChatMode } from '@/lib/ai/chat-mode-config';
+import type { TaskId } from '@/lib/ai/task-assignments';
+import { getModelIdForTask } from '@/lib/ai/getModel';
+import { getModelEntry } from '@/lib/ai/model-catalog';
 // =============================================================================
 // Types
 // =============================================================================
@@ -159,7 +164,11 @@ function combineContextBlocks(context: BuildContext): string {
  * - All skills metadata (for routing)
  * - Dev mode + dev_reminder (if SIMPLY_DEV_MODE=true)
  */
-export function composeChatPrompt(context: BuildContext = {}, chatMode: string = 'chat'): ComposedPrompt {
+export function composeChatPrompt(
+  context: BuildContext = {},
+  chatMode: ChatMode = 'simply',
+  activeTaskId?: TaskId,
+): ComposedPrompt {
   const parts: string[] = [];
 
   // Core blocks
@@ -170,22 +179,19 @@ export function composeChatPrompt(context: BuildContext = {}, chatMode: string =
   try {
     const chatPrompt = fs.readFileSync(chatPromptPath, 'utf-8').trim();
     if (chatPrompt) {
-      // Inject current_mode and current_model based on chatMode
-      const modelDisplayMap: Record<string, string> = {
-        'claude-haiku': 'Haiku',
-        'claude-sonnet': 'Sonnet',
-        'claude-opus': 'Opus',
-      };
-      const modelMapForDisplay: Record<string, string> = {
-        chat: 'claude-haiku',
-        expertise: 'claude-sonnet',
-        create: 'claude-sonnet',
-      };
-      const displayModel = modelDisplayMap[modelMapForDisplay[chatMode] || 'claude-haiku'] || 'Haiku';
+      // Display name read from SSOT (model-catalog). If activeTaskId is not
+      // provided, fall back to the default taskId for chatMode. This keeps
+      // <current_model> accurate even when Simply Chat routes to Grok/Haiku
+      // via think/vision overrides resolved in chat/route.ts.
+      const resolvedTaskId = activeTaskId ?? getTaskIdForChatMode(chatMode);
+      const modelId = getModelIdForTask(resolvedTaskId);
+      const displayModel = getModelEntry(modelId)?.displayName ?? 'AI';
 
+      // Regex replace is tolerant to whatever default the .md file holds —
+      // editing simply-chat.md's placeholder values never breaks injection.
       const promptWithInjections = chatPrompt
-        .replace('<current_mode>chat</current_mode>', `<current_mode>${chatMode}</current_mode>`)
-        .replace('<current_model>Haiku</current_model>', `<current_model>${displayModel}</current_model>`);
+        .replace(/<current_mode>[^<]*<\/current_mode>/, `<current_mode>${chatMode}</current_mode>`)
+        .replace(/<current_model>[^<]*<\/current_model>/, `<current_model>${displayModel}</current_model>`);
       parts.push('---\n\n' + promptWithInjections);
     }
   } catch (e) {
@@ -204,16 +210,13 @@ export function composeChatPrompt(context: BuildContext = {}, chatMode: string =
     parts.push('---\n\n' + buildSkillsMetadataBlock(skills));
   }
 
-  // Модель определяется chatMode
-  const modelMap: Record<string, ModelId> = {
-    chat: 'claude-haiku',
-    expertise: 'claude-sonnet',
-    create: 'claude-sonnet',
-  };
-
   return {
     systemPrompt: parts.join('\n\n'),
-    model: modelMap[chatMode] || 'claude-haiku',
+    // Dead field: `.model` on the builder result is not read at runtime
+    // (see app/(chat)/api/assistant/ben/route.ts:32 — "no longer used").
+    // Actual model resolution happens via getModel(taskId) in chat/route.ts.
+    // Field kept until TZ_PromptsDeadCodeCleanup removes ModelId type entirely.
+    model: 'claude-sonnet',
     greeting: 'Привет! Чем могу помочь?',
     toolAccess: null,
   };
@@ -223,22 +226,26 @@ export function composeChatPrompt(context: BuildContext = {}, chatMode: string =
  * Compose prompt for expertise chat mode
  *
  * Delegates to composeChatPrompt with chatMode='expertise'.
- * Model (Sonnet) determined by modelMap inside composeChatPrompt.
  * PE will replace with real expertise prompt later.
  */
-export function composeExpertisePrompt(context: BuildContext = {}): ComposedPrompt {
-  return composeChatPrompt(context, 'expertise');
+export function composeExpertisePrompt(
+  context: BuildContext = {},
+  activeTaskId?: TaskId,
+): ComposedPrompt {
+  return composeChatPrompt(context, 'expertise', activeTaskId);
 }
 
 /**
  * Compose prompt for create chat mode
  *
  * Delegates to composeChatPrompt with chatMode='create'.
- * Model (Sonnet) determined by modelMap inside composeChatPrompt.
  * PE will replace with real create prompt later.
  */
-export function composeCreatePrompt(context: BuildContext = {}): ComposedPrompt {
-  return composeChatPrompt(context, 'create');
+export function composeCreatePrompt(
+  context: BuildContext = {},
+  activeTaskId?: TaskId,
+): ComposedPrompt {
+  return composeChatPrompt(context, 'create', activeTaskId);
 }
 
 /**
