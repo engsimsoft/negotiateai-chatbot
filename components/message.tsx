@@ -487,58 +487,6 @@ const PurePreviewMessage = ({
               );
             }
 
-            // @ts-ignore - tool-readDocument is a custom tool not in AI SDK types
-            if (type === "tool-readDocument") {
-              const { toolCallId, state } = part as any;
-
-              return (
-                <Tool defaultOpen={true} key={toolCallId}>
-                  <ToolHeader state={state} type="tool-readDocument" />
-                  <ToolContent>
-                    {state === "input-available" && (
-                      <ToolInput input={(part as any).input} />
-                    )}
-                    {state === "output-available" && (
-                      <ToolOutput
-                        errorText={(part as any).output?.error}
-                        output={
-                          (part as any).output?.success ? (
-                            <div className="space-y-2 rounded border p-3 text-sm">
-                              <div className="flex items-center gap-2 text-muted-foreground">
-                                <span className="font-medium">📄 {(part as any).output.filepath}</span>
-                                <span className="text-xs">({(part as any).output.fileSizeKB} KB)</span>
-                                {(part as any).output.processingTimeMs && (
-                                  <span className="text-xs">
-                                    - {Math.round((part as any).output.processingTimeMs / 1000)}s
-                                  </span>
-                                )}
-                              </div>
-                              {(part as any).output.note && (
-                                <div className="text-muted-foreground text-xs">
-                                  {(part as any).output.note}
-                                </div>
-                              )}
-                              <div className="max-h-40 overflow-y-auto text-muted-foreground text-xs">
-                                {(part as any).output.content?.substring(0, 500)}
-                                {(part as any).output.content && (part as any).output.content.length > 500 && "..."}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="rounded border p-2 text-red-500 text-sm">
-                              Error: {(part as any).output?.error || "Unknown error"}
-                              {(part as any).output?.suggestion && (
-                                <div className="mt-1 text-xs">💡 {(part as any).output.suggestion}</div>
-                              )}
-                            </div>
-                          )
-                        }
-                      />
-                    )}
-                  </ToolContent>
-                </Tool>
-              );
-            }
-
             // ТЗ-07: Catch-all — tools with TOOL_ACTIVITY_CONFIG are rendered
             // grouped above (one indicator per toolName, not per toolCallId)
             if (typeof type === "string" && type.startsWith("tool-")) {

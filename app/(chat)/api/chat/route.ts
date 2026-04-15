@@ -24,7 +24,7 @@ import {
   getProviderForTask,
   isTaskOverridden,
 } from "@/lib/ai/getModel";
-import { getModelEntry } from "@/lib/ai/model-catalog";
+import { getModelEntry, type ModelCapabilities } from "@/lib/ai/model-catalog";
 // ТЗ-2: side-effect import installs the file-based overrides reader at
 // module-eval time. Without this import the client-safe stub (returns {})
 // stays active and getModel() never sees dev overrides.
@@ -247,6 +247,96 @@ function hasAttachments(parts: any[]): boolean {
     p.type === "image" ||
     (p.type === "file" && p.mediaType !== "text/plain")
   );
+}
+
+/**
+ * ТЗ-SimplyReadDocumentTool + R-6 correction (v3.90.2): Capability-aware history
+ * adaptation.
+ *
+ * When sending conversation history to any model, file parts present in the
+ * history may exceed what the target model can physically handle:
+ *
+ *   - image/png, image/jpeg, image/webp → need `capabilities.vision === true`
+ *   - application/pdf → need `capabilities.documentSupport.supported === true`
+ *   - text/plain → already inlined upstream by `convertTextFilesInAllMessages`
+ *
+ * When a file part exceeds target model capabilities, we replace it with a text
+ * placeholder describing what was there. The model "knows" a file was attached
+ * historically but can't re-read it. The user experience: if they ask follow-up
+ * questions about a PDF while routed to Grok (no documentSupport), Grok will
+ * say "ранее был прикреплён PDF '...', я не вижу его содержимое сейчас — могу
+ * работать с описанием, или прикрепи файл ещё раз".
+ *
+ * This is the correct implementation of R-6 from ТЗ-XAI-3 (see
+ * specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md line 96): "убирать причину, а не
+ * симптом, через SSOT capabilities". v3.90.0 erroneously removed
+ * `stripMediaPartsForTextModel` relying on "vision → Haiku routing will save
+ * us" — but routing only looks at the CURRENT message, so PDFs persisted in
+ * history would crash Grok on every follow-up. v3.90.2 restores correct
+ * behaviour via SSOT capabilities from model-catalog.ts.
+ */
+function adaptHistoryToCapabilities(
+  messages: ChatMessage[],
+  capabilities: ModelCapabilities | undefined,
+): ChatMessage[] {
+  // Conservative fallback: if we don't know capabilities, leave history as-is.
+  // The model will reject unsupported parts and StreamObservability will
+  // surface the error to DevPanel — better than silently stripping.
+  if (!capabilities) return messages;
+
+  const supportsVision = capabilities.vision === true;
+  const supportsPdf = capabilities.documentSupport?.supported === true;
+
+  return messages.map((message) => {
+    const adaptedParts = message.parts.map((part: any) => {
+      // AI SDK v6 canonical format: file part with mediaType
+      if (part.type === "file") {
+        const mediaType: string = part.mediaType ?? "";
+        const fileName: string =
+          part.name || part.url?.split("/").pop() || "файл";
+
+        // text/plain is handled upstream by convertTextFilesInAllMessages
+        if (mediaType === "text/plain") return part;
+
+        // Image file parts
+        if (mediaType.startsWith("image/")) {
+          if (supportsVision) return part;
+          return {
+            type: "text" as const,
+            text: `[Ранее было прикреплено изображение: ${fileName} — текущая модель не поддерживает изображения]`,
+          };
+        }
+
+        // PDF file parts
+        if (mediaType === "application/pdf") {
+          if (supportsPdf) return part;
+          return {
+            type: "text" as const,
+            text: `[Ранее был прикреплён PDF-документ: ${fileName} — текущая модель не поддерживает PDF через file part. Если нужен анализ содержимого, прикрепи файл повторно в этом сообщении.]`,
+          };
+        }
+
+        // Other file types (audio, video, unknown) — conservative placeholder
+        return {
+          type: "text" as const,
+          text: `[Ранее был прикреплён файл: ${fileName} (${mediaType})]`,
+        };
+      }
+
+      // Legacy "image" part type (older AI SDK format) — same vision check
+      if (part.type === "image") {
+        if (supportsVision) return part;
+        return {
+          type: "text" as const,
+          text: `[Ранее было прикреплено изображение — текущая модель не поддерживает изображения]`,
+        };
+      }
+
+      return part;
+    });
+
+    return { ...message, parts: adaptedParts } as ChatMessage;
+  });
 }
 
 export async function POST(request: Request) {
@@ -876,22 +966,36 @@ export async function POST(request: Request) {
           ? withCacheControlOnLastTool(standardTools)
           : standardTools;
 
-        // Очистка и конверсия истории сообщений.
-        // stripIncompleteToolParts — универсальный (все провайдеры).
-        // Для Simply: convertTextFilesInAllMessages — async helper который
-        // fetchit содержимое text/plain file parts по URL (Vercel Blob) и
-        // инлайнит как text. Применяется ко ВСЕЙ истории (не только к новому
-        // сообщению на L429) — нужно для legacy строк в БД от предыдущих
-        // провайдеров + для чатов где первое сообщение с файлом было
-        // сохранено в parts-оригинале (до фикса saveMessages ниже).
-        // Провайдер-агностично: Grok и Claude оба не принимают text/plain
-        // как file part — нужен text part. Fix для ТЗ-XAI-3 после регрессии
-        // 2026-04-15 (AI_UnsupportedFunctionalityError в @ai-sdk/xai).
+        // Очистка и конверсия истории сообщений. Три шага:
+        //
+        // 1. stripIncompleteToolParts — универсальный (все провайдеры)
+        // 2. convertTextFilesInAllMessages — async helper который fetchit
+        //    содержимое text/plain file parts по URL (Vercel Blob) и инлайнит
+        //    как text. Применяется ко ВСЕЙ истории (не только к новому
+        //    сообщению) — нужно для legacy строк в БД от предыдущих провайдеров
+        //    + для чатов где первое сообщение с файлом было сохранено в
+        //    parts-оригинале (до фикса saveMessages). Провайдер-агностично:
+        //    Grok и Claude оба не принимают text/plain как file part.
+        //    (fix ТЗ-XAI-3 после регрессии 2026-04-15)
+        // 3. adaptHistoryToCapabilities — provider-agnostic R-6 correction:
+        //    для каждого file part в истории проверяет capabilities целевой
+        //    модели (vision, documentSupport) из SSOT model-catalog и заменяет
+        //    неподдерживаемые типы на текстовые placeholder-ы. Gate на chatMode
+        //    simply: проектные чаты используют Claude с полным capability set,
+        //    expertise/create идут через собственные адаптеры если понадобится.
+        //    (v3.90.2 — ТЗ-SimplyReadDocumentTool + R-6 correction)
         const cleanedHistory = stripIncompleteToolParts(uiMessages);
-        const preparedHistory =
+        const textInlinedHistory =
           chatMode === "simply"
             ? await convertTextFilesInAllMessages(cleanedHistory)
             : cleanedHistory;
+        const preparedHistory =
+          chatMode === "simply"
+            ? adaptHistoryToCapabilities(
+                textInlinedHistory,
+                effectiveCatalogEntry?.capabilities,
+              )
+            : textInlinedHistory;
         const coreHistory = sanitizeCoreMessages(
           await convertToModelMessages(preparedHistory),
         );

@@ -1,11 +1,16 @@
 # Simply — Дорожная карта миграции на xAI
 
 **Создано:** 2026-04-14  
-**Обновлено:** 2026-04-14  
+**Обновлено:** 2026-04-15  
 **Статус:** В работе  
-**Серия:** ТЗ-XAI-1 → ТЗ-XAI-6 (+ будущие расширения)
+**Серия:** ТЗ-XAI-1 → ТЗ-XAI-6 (+ ТЗ-ATTACH-1 + будущие расширения)
 
 > Живой документ. Обновляется после завершения каждого ТЗ.
+
+## Архитектурные стандарты (обязательное чтение)
+
+- **[SIMPLY_ATTACHMENT_ARCHITECTURE.md](SIMPLY_ATTACHMENT_ARCHITECTURE.md)** — Архитектура обработки вложений. Утверждено 2026-04-15. SSOT для всех решений по file attachment routing, upload processing, history adaptation. Все принятые решения не пересматриваются до завершения миграции.
+- **[MIND_ARCHITECTURE.md](MIND_ARCHITECTURE.md)** — Архитектура MIND pipeline (extract, consolidate, profile, retrieve).
 
 ---
 
@@ -104,6 +109,34 @@
 
 ---
 
+### ТЗ-ATTACH-1 — PDF text extraction при upload
+**Статус:** 📋 Планируется (высокий приоритет)
+**Зависимости:** v3.90.2 (TZ_SimplyReadDocumentTool + R-6 correction)
+**Риск:** средний (нужен выбор библиотеки, проверка на Vercel serverless, эвристика text vs scan)
+**Ссылка:** [SIMPLY_ATTACHMENT_ARCHITECTURE.md — Слой 0](SIMPLY_ATTACHMENT_ARCHITECTURE.md), раздел «Серверное извлечение при загрузке»
+
+**Суть:** Реализовать серверное извлечение текста из PDF при upload (как уже работает для DOCX/XLSX). Текстовые PDF превращаются в `text/plain` на upload → читаются Grok inline без маршрутизации на Haiku. Сканированные PDF (эвристика по символам на страницу) остаются как `application/pdf` → маршрут на Haiku (нативный PDF support).
+
+**Что меняется:**
+- [app/(chat)/api/files/upload/route.ts](../../app/(chat)/api/files/upload/route.ts) — добавить PDF branch рядом с существующими DOCX/XLSX (строки 96-140)
+- Выбор PDF library: проверить что уже есть в node_modules (`pdfjs-dist`, `pdf-parse`, `unpdf`) — свериться с тем что Simply использует для Claude Vision PDF
+- Эвристика scan detection: `<30 chars/page` → оставить как PDF → Haiku; иначе → text/plain → Grok
+- Обновить analyze-document SKILL.md — теперь PDF обрабатывается как DOCX/XLSX
+- Удалить placeholder-сообщение про PDF из `adaptHistoryToCapabilities` (или оставить — мёртвый но безвредный fallback на edge case)
+
+**Что НЕ меняется:**
+- Сканированные PDF — остаются на Haiku как сейчас
+- Очень большие PDF (>N страниц) — KITT будет предлагать Экспертизу/Библиотеку (пороги эмпирически, возможно отдельный ТЗ)
+
+**Выгода:** избавляет от Haiku overhead на обычных текстовых PDF. Grok читает inline, дешевле, быстрее, Grok помнит содержимое в persistent chat без sticky routing.
+
+**Definition of Done:**
+- Текстовый PDF загружается → в `ai_usage_log` видно один вызов на `simply-chat` (Grok), не `simply-chat-vision` (Haiku)
+- Сканированный PDF → один вызов на `simply-chat-vision` (Haiku)
+- Follow-up вопрос о текстовом PDF → Grok отвечает из inline-содержимого, не из placeholder
+
+---
+
 ### ТЗ-XAI-4 — Utility/Pipeline → Grok
 **Статус:** 📋 Планируется  
 **Зависимости:** ТЗ-XAI-1  
@@ -198,7 +231,10 @@
 |---|---|---|---|---|
 | ТЗ-XAI-1 | ✅ Завершён | 2026-04-14 | 2026-04-14 | v3.88.0 — удалён grok-4, notes про multi-agent, зафиксирована архитектура защиты контекста |
 | ТЗ-XAI-2 | ✅ Завершён | 2026-04-14 | 2026-04-15 | v3.89.0 — 5 memory tasks → Grok (extract на 4.20, остальные на 4.1 Fast), native generateObject, создан MIND_ARCHITECTURE.md |
-| ТЗ-XAI-3 | ✅ Завершён | 2026-04-15 | 2026-04-15 | v3.90.0 — KITT → Grok 4.1 Fast, Think → Grok 4.20 (расширен scope), R-6 cleanup (80 строк strip-функций удалено), backlog [TZ_ErrorRecoveryUI](../../_backlog/TZ_ErrorRecoveryUI.md), [TZ_SimplyReadDocumentTool](../../_backlog/TZ_SimplyReadDocumentTool.md) |
+| ТЗ-XAI-3 | ✅ Завершён | 2026-04-15 | 2026-04-15 | v3.90.0 — KITT → Grok 4.1 Fast, Think → Grok 4.20 (расширен scope), R-6 cleanup (80 строк strip-функций удалено). **Note:** R-6 сделан неполно — восстановлен правильно в v3.90.2 через adaptHistoryToCapabilities |
+| ТЗ-SimplyChatModeInjection | ✅ Завершён | 2026-04-15 | 2026-04-15 | v3.90.1 — плейсхолдеры `<current_mode>`/`<current_model>` через SSOT model-catalog (hotfix из backlog вне серии xAI) |
+| ТЗ-SimplyReadDocumentTool + R-6 correction | 🔄 В работе | 2026-04-15 | — | v3.90.2 — удаление мёртвого readDocument tool + adaptHistoryToCapabilities через SSOT (правильная реализация R-6 из XAI-3 через capabilities каталога) |
+| ТЗ-ATTACH-1 | 📋 План (следующий) | — | — | PDF text extraction при upload — избавит от Haiku overhead для текстовых PDF. См. [SIMPLY_ATTACHMENT_ARCHITECTURE.md](SIMPLY_ATTACHMENT_ARCHITECTURE.md) |
 | ТЗ-XAI-4 | 📋 План | — | — | Utility/Pipeline batch миграция |
 | ТЗ-XAI-5 | 📋 План (сужено) | — | — | Create + Expertise + R-5 (Think уже на Grok 4.20 после XAI-3) |
 | ТЗ-XAI-6 | 📋 План | — | — | Очистка MiniMax/OpenRouter |

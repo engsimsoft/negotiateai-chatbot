@@ -517,7 +517,12 @@ vercel --prod            # Deploy на Vercel
 - [SIMPLY_STATUS.md](SIMPLY_STATUS.md) — Текущее состояние проекта
 - [CHANGELOG.md](CHANGELOG.md) — История изменений
 
-**Техническая (AI):**
+**Техническая (AI) — архитектурные стандарты (обязательное чтение):**
+- **[specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md](specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md)** — **Архитектура обработки вложений (SSOT, утверждено 2026-04-15).** Обязательное чтение при работе с file attachments, routing, adapters, upload processing. 5 принятых решений не пересматриваются до завершения миграции xAI.
+- [specs/Simply_xAI/MIND_ARCHITECTURE.md](specs/Simply_xAI/MIND_ARCHITECTURE.md) — Архитектура MIND pipeline (extract/consolidate/profile/retrieve)
+- [specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md](specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md) — Дорожная карта миграции xAI (активная серия)
+
+**Техническая (AI) — карты и справочники:**
 - [docs/ai-chats-map.md](docs/ai-chats-map.md) — **Карта всех чатов и моделей (SSOT)**
 - [docs/ai-providers.md](docs/ai-providers.md) — Провайдеры, модели, цены
 - [docs/model-catalog-ops.md](docs/model-catalog-ops.md) — **Workflow: аудит каталога, добавление моделей, кэширование**

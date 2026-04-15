@@ -11,7 +11,6 @@ import { createDocument } from "./create-document";
 import { parseExcel } from "./excel";
 import { getCurrentDate } from "./get-current-date";
 import { getWeather } from "./get-weather";
-import { readDocument } from "./read-document";
 import { readProjectFile } from "./read-project-file";
 import { requestSuggestions } from "./request-suggestions";
 import { updateDocument } from "./update-document";
@@ -36,9 +35,21 @@ interface GetStandardToolsParams {
 /**
  * Build the standard tools object for streamText().
  *
- * - readDocument is excluded for project chats (project documents are in context)
  * - readProjectFile is included only for project chats (needs projectId)
  * - createDocument/updateDocument/requestSuggestions need session + dataStream
+ *
+ * Attached file handling (non-project chats):
+ *  - DOCX/TXT/MD/CSV are converted to text/plain on upload ([app/(chat)/api/files/upload/route.ts])
+ *    and inlined into the prompt by `convertTextFilesInAllMessages` in chat/route.ts
+ *  - PDF/images flow through vision models directly (simply-chat-vision task → Claude Haiku 4.5)
+ *  - .xlsx/.xls/.csv structured data → `parseExcel` tool
+ *
+ * There is no file-system knowledge base in Simply — the legacy `readDocument`
+ * tool referencing `knowledge/` was removed in TZ_SimplyReadDocumentTool after
+ * audit confirmed the directory was deleted back in v2.0.0 ("cleanup: remove
+ * old MIR.TRADE files", commit 62540ff). If a knowledge-base feature returns
+ * in the future, it will be a separate pgvector-based path, not a filesystem
+ * reader.
  */
 export function getStandardTools({
   session,
@@ -52,7 +63,6 @@ export function getStandardTools({
   return {
     getCurrentDate,
     getWeather,
-    ...(isProjectChat ? {} : { readDocument: readDocument({ userId: session.user?.id ?? "" }) }),
     ...(isProjectChat && projectId
       ? { readProjectFile: readProjectFile({ projectId }) }
       : {}),
@@ -121,7 +131,6 @@ const ALL_TOOL_NAMES = [
   "requestSuggestions",
   "parseExcel",
   "loadSkill",
-  "readDocument",
   "readProjectFile",
   "readTelegramChannel",
 ] as const;
@@ -160,7 +169,6 @@ export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode, 
   const baseTools: ToolName[] = [
     "getCurrentDate",
     "getWeather",
-    "readDocument",
     "webSearch",
     "fetchUrl",
     "deepResearch",

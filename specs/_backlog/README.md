@@ -33,17 +33,19 @@
 
 ## Открытые долги
 
+### 🟥 High impact
+
+| ТЗ | Описание | Оценка | Источник |
+|---|---|---|---|
+| [TZ_ATTACH_PdfExtractionAtUpload](TZ_ATTACH_PdfExtractionAtUpload.md) | **PDF text extraction при upload** — реализация Слоя 0 из [SIMPLY_ATTACHMENT_ARCHITECTURE.md](../Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md). Текстовые PDF → text/plain на upload → Grok inline (избавит от Haiku overhead). Сканированные → остаются на Haiku. Эвристика scan detection эмпирически. | 1 сессия | SIMPLY_ATTACHMENT_ARCHITECTURE.md |
+| [TZ_ErrorRecoveryUI](TZ_ErrorRecoveryUI.md) | Stage 2 — root cause fix: useChat state recovery через правильную обработку `clearError` для не-ChatSDK ошибок. Stage 1 (hint в красном флаге) ✅ сделан в v3.90.0+. | 0.5 сессии | 9 эпизодов в разных ТЗ |
+
 ### 🟧 Medium impact
 
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
 | [TZ_PromptsDeadCodeCleanup](TZ_PromptsDeadCodeCleanup.md) | Удалить мёртвые экспорты из `lib/ai/prompts.ts` (`artifactsPrompt`, `regularPrompt`, `systemPrompt` deprecated, `buildUserContext` deprecated). 90% файла dead, только `updateDocumentPrompt` живой. Рассмотреть переименование в `lib/ai/artifact-prompts.ts`. | 0.5 сессии | TZ_DeadModelSelectors |
-
-### 🟩 Low impact
-
-| ТЗ | Описание | Оценка | Источник |
-|---|---|---|---|
-| [TZ_GrokContextWindowAudit](TZ_GrokContextWindowAudit.md) | Эмпирическая проверка реального context window для Grok 4.20 (каталог: 256K, docs.x.ai: 2M). Бинарный поиск через xAI API, обновить `model-catalog.ts` (Finding #1) | 0.5 сессии | TZ_LegacyChatCleanup |
+| [TZ_SimplyChatRaceCondition](TZ_SimplyChatRaceCondition.md) | `getOrCreateSimplyChat` без partial unique index → race при первых параллельных запросах нового пользователя (SELECT + INSERT без транзакционной защиты). Partial unique index + `onConflictDoNothing`. | 0.5 сессии | ТЗ-XAI-2 smoke test |
 
 ---
 

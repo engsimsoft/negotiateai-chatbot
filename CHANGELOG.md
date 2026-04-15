@@ -20,6 +20,74 @@
 
 ---
 
+## [3.90.2] — 2026-04-15 — ТЗ-SimplyReadDocumentTool + R-6 correction через SSOT capabilities
+
+**Объединённый cleanup:** удаление мёртвого `readDocument` tool + правильная реализация R-6 из ТЗ-XAI-3 через функцию `adaptHistoryToCapabilities`. Соответствует принятому решению №3 из утверждённого архитектурного стандарта [SIMPLY_ATTACHMENT_ARCHITECTURE.md](specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md) (2026-04-15).
+
+Двойной скоп оправдан тем, что обе проблемы — один клубок legacy дед-кода от pre-Simply эпохи: `readDocument` был привязан к папке `knowledge/` которая удалена ещё в v2.0.0 (commit `62540ff`, «cleanup: remove old MIR.TRADE files»), а `stripMediaPartsForTextModel` удалён в v3.90.0 без замены через SSOT capabilities. Обе правки возвращают код в соответствие документу.
+
+### Removed
+
+- **Dead `readDocument` tool:**
+  - Файл [lib/ai/tools/read-document.ts](lib/ai/tools/read-document.ts) (243 строки) удалён целиком. Tool жёстко привязан к чтению из папки `knowledge/` (security check на [L22](lib/ai/tools/read-document.ts#L22)), которая не существует ни локально, ни в git-дереве. Git history подтверждает: `62540ff cleanup: remove old MIR.TRADE files and documentation` — 126 файлов удалено в рамках v2.0.0 "Family AI Assistant launch" pivot
+  - 4 места в [lib/ai/tools/chat-tools.ts](lib/ai/tools/chat-tools.ts) — import, `getStandardTools`, `ALL_TOOL_NAMES`, `baseTools` в `getActiveToolNames`. Добавлен JSDoc блок описывающий modern attachment pipeline (DOCX/TXT/MD/CSV inline на upload, PDF/images через vision route, Excel через parseExcel) и почему `readDocument` больше не нужен
+  - Render block `tool-readDocument` в [components/message.tsx](components/message.tsx) (52 строки) — UI код который никогда не рендерился
+  - Упоминания в промптах: [lib/prompts/chat/simply-chat.md](lib/prompts/chat/simply-chat.md) (убрано из «Не пиши:» + example), [lib/prompts/agents/ben/references/features.md](lib/prompts/agents/ben/references/features.md) (убрана строка таблицы tools)
+  - Skill [lib/prompts/skills/document/analyze-document/SKILL.md](lib/prompts/skills/document/analyze-document/SKILL.md) переписан под modern pipeline: attached файлы inline/vision/parseExcel, никакого `readDocument({documentId: '...'})` которого никогда и не существовало
+
+### Changed
+
+- **R-6 correction через `adaptHistoryToCapabilities`** ([app/(chat)/api/chat/route.ts](app/(chat)/api/chat/route.ts)):
+  - Новая функция `adaptHistoryToCapabilities(messages, capabilities)` ([chat/route.ts:252-344](app/(chat)/api/chat/route.ts#L252)) — pure, conservative fallback, читает `capabilities.vision` и `capabilities.documentSupport?.supported` из SSOT model-catalog. Для каждого file part в истории:
+    - `text/plain` → as-is (обрабатывается раньше через `convertTextFilesInAllMessages`)
+    - `image/*` → если `vision === false`, заменяется на text placeholder `[Ранее было прикреплено изображение: <name> — текущая модель не поддерживает изображения]`
+    - `application/pdf` → если `documentSupport.supported !== true`, заменяется на text placeholder `[Ранее был прикреплён PDF-документ: <name> — текущая модель не поддерживает PDF через file part. Если нужен анализ содержимого, прикрепи файл повторно в этом сообщении.]`
+    - Прочие типы (audio/video/unknown) → conservative text placeholder
+    - Legacy `type: "image"` parts (older AI SDK format) — тот же vision check
+  - Интеграция в preparedHistory pipeline ([chat/route.ts:968-1000](app/(chat)/api/chat/route.ts#L968)): три шага — `stripIncompleteToolParts` → `convertTextFilesInAllMessages` → **`adaptHistoryToCapabilities`** → `sanitizeCoreMessages(convertToModelMessages(...))`. Adapter gate'ится на `chatMode === "simply"` — проектные чаты используют Claude с полным capability set, expertise/create остаются без изменений
+  - Импортирован тип `ModelCapabilities` из `lib/ai/model-catalog`. `effectiveCatalogEntry?.capabilities` переиспользуется (уже вычислено в ТЗ-2 Dev Switchboard на [chat/route.ts:644](app/(chat)/api/chat/route.ts#L644))
+
+### Fixed
+
+- **Pre-existing bug: PDF в истории крашит Grok на follow-up сообщении** — при hybrid routing (текст → Grok, вложения → Haiku), после того как пользователь прикрепил PDF (отправлен на Haiku, сохранён в БД как file part `application/pdf`), следующее текстовое сообщение маршрутизировалось на Grok, загружало историю и крашилось с `AI_UnsupportedFunctionalityError: 'file part media type application/pdf' functionality not supported`. Баг был замаскирован на MiniMax (который юзеры редко триггерили на PDF) и на Sonnet (который умел PDF). Проявился на Grok 4.1 Fast — `vision: true` но `documentSupport.supported: false` (xAI Files API не интегрирован). Теперь Grok видит text placeholder вместо PDF file part → отвечает корректно («ранее был прикреплён PDF X, могу работать с описанием»)
+- **Dead code путал Grok:** `readDocument` tool в toolbox приводил к тому что Grok наивно вызывал его по имени прикреплённого файла (`readDocument("test-valenok.txt")`) и получал `Access denied`. Ответ пользователю всё равно корректный (Grok использовал inline-содержимое), но DevPanel Tools секция засирается ошибками, и tool call — пустая трата токенов
+
+### Docs
+
+- **[specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md](specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md):**
+  - Добавлена секция «Архитектурные стандарты (обязательное чтение)» со ссылкой на [SIMPLY_ATTACHMENT_ARCHITECTURE.md](specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md) и [MIND_ARCHITECTURE.md](specs/Simply_xAI/MIND_ARCHITECTURE.md)
+  - Добавлен новый этап **ТЗ-ATTACH-1** — PDF text extraction при upload (следующий шаг, из архитектурного документа). Scope: pdf-parse library selection + эвристика text vs scan + интеграция в upload route
+  - Обновлена таблица прогресса серии: ТЗ-SimplyChatModeInjection (v3.90.1) + TZ_SimplyReadDocumentTool + R-6 correction (v3.90.2) + ТЗ-ATTACH-1 (📋 следующий)
+- **[CLAUDE.md](CLAUDE.md):** раздел «Навигация → Техническая (AI)» теперь начинается с секции «Архитектурные стандарты (обязательное чтение)» где `SIMPLY_ATTACHMENT_ARCHITECTURE.md` помечен как SSOT для всех решений по attachments. Это гарантирует что документ автоматически загружается в контекст каждой новой сессии Claude Code
+- **Backlog:** создан stub [TZ_ATTACH_PdfExtractionAtUpload.md](specs/_backlog/TZ_ATTACH_PdfExtractionAtUpload.md) с полным scope, critериями выбора PDF library, эвристикой scan detection и Definition of Done
+- **Backlog README:** открытые долги реструктурированы — High impact (TZ_ATTACH-1, TZ_ErrorRecoveryUI Stage 2), Medium impact (TZ_PromptsDeadCodeCleanup, TZ_SimplyChatRaceCondition)
+
+### Why this matters
+
+Весь этот patch — про **capability-agnostic архитектуру через SSOT**. До v3.90.2 routing и history adaptation полагались на хардкодные предположения («Grok умеет vision значит всё работает»). После — каждая модель описывает свои capabilities в [model-catalog.ts](lib/ai/model-catalog.ts), а adapter читает их честно. Смена модели через `/dev/models` override (или миграция через task-assignments) автоматически работает — не нужно править route.ts под каждую новую модель.
+
+Архитектурный документ [SIMPLY_ATTACHMENT_ARCHITECTURE.md](specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md) формализует эту стратегию для всех будущих работ с attachments. Главный принцип: «максимум работы при загрузке файла, минимум при разговоре». Три слоя (серверное извлечение → KITT routing → Экспертиза/Библиотека), 5 принятых решений не пересматриваемых до завершения миграции xAI.
+
+### Validation
+
+6/6 мануальных тестов пройдены в Simply Chat (persistent):
+1. ✅ **Критичный:** текстовый follow-up после PDF в истории → Grok 4.1 Fast отвечает через placeholder, нет `AI_UnsupportedFunctionalityError`
+2. ✅ Новый PDF → Haiku 4.5 обрабатывает нативно
+3. ✅ `.xlsx` → конверсия при upload → Grok inline
+4. ✅ `.txt` → convertTextFilesInAllMessages → Grok inline
+5. ✅ DevPanel → Prompt section → ноль упоминаний `readDocument`
+6. ✅ DevPanel → Tools section → `readDocument` отсутствует в списке
+
+**Бонус — cross-model continuity:** подтверждено что продолжение разговора после того как описание PDF сделано одной моделью (Haiku), а follow-up идёт на другую (Grok через placeholder) — работает бесшовно. Это именно то что архитектурный документ называет «общая память между моделями»: Grok не нужен file — ему нужен текстовый результат обработки file.
+
+### Notes
+
+- **Scope decision:** объединение readDocument cleanup + R-6 correction в один коммит обосновано тем что обе правки — один клубок legacy dead кода от pre-Simply эпохи, связанные общей темой «capability-agnostic cleanup через SSOT model-catalog». Разделение на два коммита удвоило бы тесты без пользы
+- **ТЗ-ATTACH-1 (PDF text extraction при upload)** — отдельный ТЗ, не в этом patch. Архитектурный документ явно позиционирует его как «приоритетное улучшение, но НЕ блокирует миграцию xAI». Реализация требует выбора библиотеки, эвристики scan detection, порогов — своя сессия
+- **Процессный урок:** при review ТЗ-XAI-3 я пропустил предупреждение в [SIMPLY_XAI_ROADMAP.md:96](specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md#L96) — «НЕ полагаться на маршрутизацию "vision → Haiku спасёт" — это хрупкая логика. Убирать причину, а не симптом.». ROADMAP говорил правильную вещь, но я реализовал R-6 неполно (удалил strip-функции без замены через SSOT). Смешал `capabilities.vision` (изображения) с `documentSupport.supported` (PDF) — это разные capability. Урок: при удалении «хрупкого» кода обязательно должна быть замена через SSOT, а не просто delete. Зафиксировано в ANALYSIS.md архива
+
+---
+
 ## [3.90.1] — 2026-04-15 — ТЗ-SimplyChatModeInjection — плейсхолдеры `<current_mode>` / `<current_model>` через SSOT
 
 **Закрытие долга из backlog** — вне серии Simply_xAI. Патч после 9-кратного инцидента с «враньём модели про её собственное имя» (в промпте Simply Chat было зашито `<current_model>Haiku</current_model>` при реальной MiniMax M2.7 / Grok 4.1 Fast) и `<current_mode>chat</current_mode>` при удалённом ещё в v3.86.0 режиме `chat`.

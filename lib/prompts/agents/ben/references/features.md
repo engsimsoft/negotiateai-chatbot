@@ -36,11 +36,10 @@
 | Инструмент | Назначение |
 |------------|------------|
 | webSearch | Поиск в интернете |
-| readDocument | Чтение загруженных документов |
+| fetchUrl | Чтение конкретных URL |
 | createDocument | Создание артефактов |
 | updateDocument | Редактирование артефактов |
 | parseExcel | Анализ Excel файлов |
-| exportDocument | Экспорт в DOCX |
 | getWeather | Погода |
 | getCurrentDate | Текущая дата |
 

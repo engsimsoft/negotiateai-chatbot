@@ -48,6 +48,52 @@
 
 ---
 
+## [TZ_SimplyReadDocumentTool + R-6 correction] 2026-04-15 — v3.90.2
+
+**Коммиты:** TBD (single release commit)
+
+**Продолжительность:** одна сессия (2026-04-15, после v3.90.1)
+
+**Контекст:** В ходе сессии Владимир подготовил с архитекторами утверждённый документ [SIMPLY_ATTACHMENT_ARCHITECTURE.md](SIMPLY_ATTACHMENT_ARCHITECTURE.md) — SSOT для всех решений по обработке вложений. Основная правка — закрытие двух долгов одним коммитом: (1) оригинальное TZ_SimplyReadDocumentTool (удалить readDocument tool из Simply активных tools), (2) исправление неполной реализации R-6 из ТЗ-XAI-3 через `adaptHistoryToCapabilities`. Обе правки связаны общей темой «capability-agnostic архитектура через SSOT model-catalog».
+
+**Что сделано:**
+
+1. **Dead readDocument tool полностью удалён:**
+   - Git audit (`62540ff`) подтвердил: папка `knowledge/` на которую завязан tool была удалена ещё в v2.0.0 «cleanup: remove old MIR.TRADE files» (126 файлов)
+   - Tool не работал **нигде**: всегда возвращал `Access denied: Only files in knowledge/ directory can be read` независимо от вызывающего режима
+   - Удалён файл [lib/ai/tools/read-document.ts](../../lib/ai/tools/read-document.ts) (243 строки)
+   - Убраны 4 места из [lib/ai/tools/chat-tools.ts](../../lib/ai/tools/chat-tools.ts), render block из [components/message.tsx](../../components/message.tsx) (52 строки), упоминания из simply-chat.md, analyze-document/SKILL.md, ben/references/features.md
+
+2. **R-6 correction через `adaptHistoryToCapabilities`:**
+   - В ТЗ-XAI-3 (v3.90.0) я удалил `stripMediaPartsForTextModel` с обоснованием «Grok 4.1 Fast умеет vision → логика умирает»
+   - **Ошибка:** смешал `capabilities.vision` (image/*) с `documentSupport.supported` (application/pdf). Grok 4.1 Fast принимает изображения, но НЕ принимает PDF file parts (xAI Files API не интегрирован)
+   - **Последствие:** любой follow-up текстового сообщения после PDF attachment → Grok крашится с `AI_UnsupportedFunctionalityError: 'file part media type application/pdf'`
+   - **Правильная реализация:** новая функция `adaptHistoryToCapabilities(messages, capabilities)` в [chat/route.ts:252-344](../../app/(chat)/api/chat/route.ts#L252). Читает `effectiveCatalogEntry.capabilities` из SSOT model-catalog, заменяет `image/*` без vision и `application/pdf` без documentSupport на текстовые placeholder-ы. Интеграция в preparedHistory pipeline через gate на `chatMode === "simply"`
+   - Соответствует буквальному описанию в SIMPLY_ATTACHMENT_ARCHITECTURE.md, принятое решение №3: «adaptHistoryToCapabilities — функция-адаптер... Работает через capabilities из model-catalog (SSOT)»
+
+3. **SSOT anchor-ы для архитектурного документа:**
+   - [SIMPLY_XAI_ROADMAP.md](SIMPLY_XAI_ROADMAP.md) — добавлена секция «Архитектурные стандарты» со ссылкой на SIMPLY_ATTACHMENT_ARCHITECTURE.md + новые ТЗ (ATTACH-1, XAI-COL-1)
+   - [CLAUDE.md](../../CLAUDE.md) — раздел «Техническая (AI) — архитектурные стандарты» теперь начинается с документа как обязательное чтение при работе с attachments
+   - [_backlog/TZ_ATTACH_PdfExtractionAtUpload.md](../_backlog/TZ_ATTACH_PdfExtractionAtUpload.md) — stub для следующего ТЗ (Слой 0 PDF extraction при upload)
+
+**Что НЕ сделано (намеренно вне scope):**
+- PDF text extraction при upload → **ТЗ-ATTACH-1** (следующий ТЗ). Документ явно позиционирует это как «приоритетное улучшение, но НЕ блокирует миграцию xAI»
+- Большие документы → KITT предлагает Экспертизу/Библиотеку (требует промпт-тюнинга, пороги эмпирически)
+- A/B тест Grok vision vs Haiku, двухшаговый подход для изображений, Collections API — все «после миграции xAI» по документу
+
+**Валидация:**
+- 6/6 мануальных тестов пройдены в Simply Chat (persistent, с PDF в истории от предыдущих тестов)
+- **Критичный тест ✅:** текстовый follow-up после PDF → Grok отвечает через placeholder, нет crash
+- **Бонус-подтверждение:** продолжение разговора после того как описание PDF сделано Haiku → follow-up идёт на Grok через placeholder → работает бесшовно («общая память между моделями» из документа)
+
+**Уроки:**
+- Процессный: **при удалении «хрупкого» кода обязательно должна быть замена через SSOT**, а не просто delete. Я удалил strip-функции в XAI-3 без замены → pre-existing bug вылез на Grok + persistent chat + PDF. ROADMAP XAI-3 явно предупреждал «убирать причину, а не симптом», но я понял это неправильно
+- Архитектурный: **capabilities ≠ одна флага.** Vision и documentSupport — разные capability. Adapter через discriminated union в каталоге — единственный способ корректно маршрутизировать file parts. Попытка «упростить» через одну проверку приводит к bug через 3 сессии
+
+**Следующий шаг:** **ТЗ-ATTACH-1** (PDF text extraction при upload) — высокий приоритет. Свериться с существующими PDF библиотеками в `node_modules`, интегрировать рядом с DOCX/XLSX в upload route, эвристика scan vs text, тестирование на реальных файлах Владимира.
+
+---
+
 ## [ТЗ-XAI-3] 2026-04-15 — KITT (Simply Chat) + Think → Grok + R-6 cleanup — v3.90.0
 
 **Коммиты:** TBD (single release commit планируется)
