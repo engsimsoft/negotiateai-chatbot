@@ -37,7 +37,6 @@
 
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
-| [TZ_ATTACH_PdfExtractionAtUpload](TZ_ATTACH_PdfExtractionAtUpload.md) | **PDF text extraction при upload** — реализация Слоя 0 из [SIMPLY_ATTACHMENT_ARCHITECTURE.md](../Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md). Текстовые PDF → text/plain на upload → Grok inline (избавит от Haiku overhead). Сканированные → остаются на Haiku. Эвристика scan detection эмпирически. | 1 сессия | SIMPLY_ATTACHMENT_ARCHITECTURE.md |
 | [TZ_ErrorRecoveryUI](TZ_ErrorRecoveryUI.md) | Stage 2 — root cause fix: useChat state recovery через правильную обработку `clearError` для не-ChatSDK ошибок. Stage 1 (hint в красном флаге) ✅ сделан в v3.90.0+. | 0.5 сессии | 9 эпизодов в разных ТЗ |
 
 ### 🟧 Medium impact
