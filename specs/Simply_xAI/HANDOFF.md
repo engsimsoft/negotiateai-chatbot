@@ -1,9 +1,11 @@
 # HANDOFF — Серия Simply_xAI миграции
 
-**Последнее обновление:** 2026-04-16 (конец плотной сессии — ТЗ-XAI-4 Этапы 2+3 + scope expansion + 4 hot-fixes + 4 новых backlog хвоста)
+**Последнее обновление:** 2026-04-16 (конец плотной сессии — ТЗ-XAI-4 Этапы 2+3 + scope expansion + 4 hot-fixes + 4 новых backlog хвоста + multi-agent reservation follow-up)
 **Текущая версия проекта:** 3.91.0 (Этап 4 — version bump до 3.92.0 в следующей сессии)
-**Git state:** локальный master, **18 коммитов ahead of origin**, не отпушено
+**Git state:** локальный master, **19 коммитов ahead of origin**, не отпушено
 **Последние коммиты локального master (сверху вниз):**
+- `2fbc50b` docs(xai-migration): expertise-multi-agent reservation + dead briefing constants + DevPanel Grok labels
+- `2ca1ac5` docs(xai-migration): HANDOFF после ТЗ-XAI-4 Этапов 2+3 + scope expansion
 - `676d50d` feat(xai-migration): TZ_XAI_4 Этапы 2+3 + scope expansion — 5 доп taskId на Grok 4.20 reasoning + briefing hot-fix + 4 backlog хвоста
 - `d1e2c12` docs(backlog): 2 новых хвоста — DevPanelFooterHidesSubCalls + TaskExpertChatInputMissingOnFirstOpen
 - `d9d3488` fix(professor): plan route maxOutputTokens cap + dev overrides import
@@ -12,7 +14,7 @@
 - `f6dbedd` docs(backlog): add TZ_SimplyContextUsageWidget
 - `dbe6bdf` release(v3.91.0): TZ_ATTACH_1 — PDF text extraction
 
-Этот документ — **мост между сессиями**, не замена ROADMAP. За детальными задачами всегда иди в карточку ТЗ или `SIMPLY_XAI_CHANGELOG.md`. Полная история решений сессии — в [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) запись 2026-04-16 «ТЗ-XAI-4 Этапы 2+3 + scope expansion + 4 hot-fixes».
+Этот документ — **мост между сессиями**, не замена ROADMAP. За детальными задачами всегда иди в карточку ТЗ или `SIMPLY_XAI_CHANGELOG.md`. Полная история решений сессии — в [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) две записи 2026-04-16: «ТЗ-XAI-4 Этапы 2+3 + scope expansion + 4 hot-fixes» и follow-up «Multi-agent reservation correction + dead code cleanup (post-2ca1ac5 follow-up)».
 
 ---
 
@@ -55,12 +57,14 @@
 
 ## 🎯 Что сделано в текущей сессии (2026-04-16)
 
-### Коммиты сессии (4 штуки)
+### Коммиты сессии (6 штук)
 
 1. **`ceadd17`** — ТЗ-XAI-4 Этап 2 (6 taskId подсобки → Grok 4.1 Fast)
 2. **`d9d3488`** — Hot-fix plan/route.ts (2 pre-existing бага: отсутствующий dev-overrides import + maxOutputTokens cap)
 3. **`d1e2c12`** — 2 новых backlog хвоста (DevPanelFooterHidesSubCalls + TaskExpertChatInputMissingOnFirstOpen)
 4. **`676d50d`** — session-closing batch: Этап 3 + scope expansion + briefing hot-fix + 2 новых backlog хвоста (BriefingAuthorUrlHallucination + ServiceChatNotOverridable) + SIMPLY_XAI_NOTES запись
+5. **`2ca1ac5`** — HANDOFF после ТЗ-XAI-4 Этапов 2+3 + scope expansion (первая версия передачи смены)
+6. **`2fbc50b`** — **follow-up** correction: `expertise-multi-agent` taskId **reservation** (не deprecated!) + dead briefing constants cleanup + DevPanel Grok display labels
 
 ### Scope ТЗ-XAI-4 финально (текущее состояние task-assignments.ts)
 
@@ -145,6 +149,28 @@ DevPanel Pipeline Trace показал **10 из 11 URL fabricated** в briefing
 
 - **`feedback_empirical_test_before_model_blame.md`** (новый файл) — правило empirical теста перед model-blame
 - `MEMORY.md` индекс обновлён — строка про empirical rule
+
+### Follow-up коммит `2fbc50b` — 3 correction'а после первого HANDOFF
+
+Короткая follow-up итерация после `2ca1ac5` с ревью state SSOT:
+
+**1. Multi-agent RESERVED (не deprecated) — архитектурная correction**
+
+Моя ошибка фрейминга в `2ca1ac5`: после переключения `expertise → grok-4.20-0309-reasoning` пометил запись `grok-4.20-multi-agent-0309` как «не используется». Владелец поправил: multi-agent — это **отдельный premium-режим** (ТЗ-XAI-MA-1, `BRAINSTORM_GrokMultiAgent.md`) через Responses API + MCP сервер, toggle «Команда агентов» аналогично кнопке «Думать». Это не deprecated — это **reserved под будущую фичу**.
+
+**Решение:** зарезервировать `expertise-multi-agent` как placeholder taskId в `task-assignments.ts` (type-system pinning), обновить notes в `model-catalog.ts`, отметить 🔒 Reserved в `docs/ai-chats-map.md` вместо ⚠ Не используется, cross-reference в `SIMPLY_XAI_ROADMAP.md`.
+
+**Урок для памяти:** При снятии модели с активного использования различать **«deprecated» (удалить)** vs **«reserved» (placeholder под будущую фичу)**. Эти два состояния выглядят одинаково в коде, но семантически разные. Reserved нужно явно маркировать через placeholder taskId + комментарий.
+
+**2. Dead briefing constants cleanup**
+
+Удалены `FILTER_MODEL` и `AUTHOR_MODEL` из `lib/briefing/briefing-config.ts` — наследие ТЗ-Briefing-1, 0 импортов после миграции (grep confirmed), дезинформировали будущего читателя. Безопасная уборка.
+
+**3. DevPanel Grok display labels**
+
+В трёх компонентах DevPanel (`model-section.tsx`, `dev-panel-footer.tsx`, `timeline-section.tsx`) `MODEL_DISPLAY` map не содержал записи для Grok моделей — fallback показывал raw modelId типа `grok-4.20-0309-reasoning`. Добавлены красивые лейблы для 5 Grok вариантов + MiniMax-long. Косметика, но критично для UX после переключения 11 taskId на Grok — DevPanel становится главным интерфейсом наблюдения.
+
+**Audit metadata bug уже исправлен в `2ca1ac5`** — во время follow-up ревью нашли hardcoded `modelId: "claude-sonnet-4-6"` в `meeting/regenerate/route.ts:91` audit metadata, но это уже было закоммичено в session batch через замену на `getModelIdForTask("meeting:summary")`. Noop. **Note для будущих сессий:** при переключении модели `taskId X` — обязательно grep на hardcoded `claude-sonnet-4-6` / target-modelId в audit metadata блоках и заменять на `getModelIdForTask("X")`.
 
 ---
 
@@ -287,6 +313,8 @@ ba9e928 release(v3.88.0): ТЗ-XAI-1
 12. **🆕 Empirical test перед model-blame.** Memory rule `feedback_empirical_test_before_model_blame.md`. Не диагностировать AI-output проблему как «weakness модели X» без теста на 2+ моделях. Prompt/architectural issues маскируются под model issues.
 13. **🆕 SSOT в коде > документация.** Добавлено в ai-chats-map.md header warning. Если таблицы в документе расходятся с task-assignments.ts — правда в коде.
 14. **🆕 xAI prompt caching автоматический.** Сервер кэширует system prompt без каких-либо `providerOptions.xai.cacheControl`. Ручная настройка не нужна.
+15. **🆕 Reserved vs deprecated семантика модели в каталоге.** Когда taskId снимается с активного использования, но запись каталога остаётся — различать «deprecated (удалить когда чисто)» и «reserved (placeholder под будущую фичу)». Reserved маркируется через placeholder taskId + подробный комментарий + cross-ref в ROADMAP, чтобы будущая сессия не пометила как dead code. Пример: `expertise-multi-agent` taskId → `grok-4.20-multi-agent-0309` запись под ТЗ-XAI-MA-1.
+16. **🆕 Audit metadata hardcoded modelId проверка при миграции taskId.** При переключении taskId X в task-assignments — обязательно grep на hardcoded имя старой модели в audit metadata блоках и заменять на `getModelIdForTask("X")`. Иначе в БД пишется лживое значение. Пример: `meeting/regenerate/route.ts:91` имел `"claude-sonnet-4-6"` hardcoded, после миграции meeting:summary → Grok 4.20 начал бы лгать в БД.
 
 ---
 
