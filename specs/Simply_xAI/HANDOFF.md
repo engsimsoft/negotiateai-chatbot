@@ -2,8 +2,9 @@
 
 **Последнее обновление:** 2026-04-16 (финализация ТЗ-XAI-4 + v3.92.0 release + archive)
 **Текущая версия проекта:** **3.92.0** (bumped с 3.91.0 коммитом `583ef03`)
-**Git state:** локальный `claude/angry-nobel` (worktree), **28 коммитов ahead of origin**, не отпушено
+**Git state:** локальный `claude/angry-nobel` (worktree), **29 коммитов ahead of origin**, не отпушено
 **Последние коммиты локального master (сверху вниз):**
+- `05c7cb5` docs(xai-migration): финальный HANDOFF после v3.92.0 + ТЗ-XAI-4 финализация (этот файл)
 - `fdfd03f` chore(xai-migration): archive TZ_xai_4_UtilityPipelines after v3.92.0
 - `583ef03` **release(v3.92.0)**: ТЗ-XAI-4 — 11 taskId на Grok + 2 hot-fixes + 3 новых backlog хвоста
 - `00b7f33` Merge branch 'claude/stoic-wu' (README.md + SIMPLY_PRODUCT_VISION.md rewrite)
@@ -133,9 +134,10 @@ Per memory `project_voyage_vpn.md`: Voyage блокирует финский VPN
 
 ### Git state
 
-**28 коммитов ahead of origin.** Все локальные на ветке `claude/angry-nobel`. Push — отдельная команда Владимира (не делать самому).
+**29 коммитов ahead of origin.** Все локальные на ветке `claude/angry-nobel`. Push — отдельная команда Владимира (не делать самому).
 
 ```
+05c7cb5 docs(xai-migration): финальный HANDOFF после v3.92.0
 fdfd03f chore(xai-migration): archive TZ_xai_4_UtilityPipelines after v3.92.0
 583ef03 release(v3.92.0): ТЗ-XAI-4 — 11 taskId на Grok + 2 hot-fixes + 3 новых backlog хвоста
 00b7f33 Merge branch 'claude/stoic-wu'
@@ -193,7 +195,7 @@ fc8a995 fix(error-recovery): TZ_ErrorRecoveryUI Stage 1
 1. Прочитать этот HANDOFF (5-10 мин)
 2. Прочитать SIMPLY_XAI_NOTES.md две записи 2026-04-16 (10 мин)
 3. Прочитать MEMORY.md целиком (2 мин) — особенно empirical-test-before-model-blame
-4. git log --oneline -10 — проверить что 28 коммитов ahead of origin, HEAD на fdfd03f
+4. git log --oneline -10 — проверить что 29 коммитов ahead of origin, HEAD на 05c7cb5
 5. cat package.json | grep version — проверить что 3.92.0
 6. ls .simply-dev-overrides.json — должно быть «нет такого файла» (чистое состояние)
 7. npm run dev в background + curl http://localhost:3000 → HTTP 307
@@ -207,7 +209,7 @@ fc8a995 fix(error-recovery): TZ_ErrorRecoveryUI Stage 1
 
 ---
 
-**ТЗ-XAI-4 завершена. v3.92.0 зарелижен локально. 28 коммитов ahead of origin, push — решение Владимира.**
+**ТЗ-XAI-4 завершена. v3.92.0 зарелижен локально. 29 коммитов ahead of origin, push — решение Владимира.**
 
 **Семь раз отмерь, один раз отрежь.** Rule №0.
 
