@@ -1,14 +1,18 @@
 # HANDOFF — Серия Simply_xAI миграции
 
-**Последнее обновление:** 2026-04-16 (**correction URL hallucination** — была metric bug, не архитектура. Commits `58d9d2e` + `eeba086` + финал этого HANDOFF)
-**Текущая версия проекта:** **3.92.0**
-**Git state:** локальный `claude/angry-nobel` (worktree), **32 коммита ahead of origin**, не отпушено
-**Последние коммиты локального master (сверху вниз):**
-- `<этот HANDOFF commit>` docs(xai-migration): HANDOFF update после metric bug correction + memory rule + root CHANGELOG
+**Последнее обновление:** 2026-04-16 (конец плотной сессии — серия Simply_xAI **закрыта**, Professor pipeline переведён на Grok, worktree merged в master, **передача смены**)
+**Текущая версия проекта:** **3.92.2**
+**Git state:** локальный `master` (worktree `angry-nobel` merged), **36 коммитов ahead of origin**, не отпушено — решение владельца
+**`.simply-dev-overrides.json`:** удалён (backup в `.simply-dev-overrides.json.bak.2026-04-16` — чистое состояние для новой сессии)
+**Последние коммиты локального master (сверху вниз, самые свежие вверху):**
+- `<next HANDOFF commit>` docs(xai-migration): финальная передача смены (этот файл)
+- `4165f68` **release(v3.92.2)**: Professor pipeline на Grok (4 точки, ~70% экономии)
+- `fae06d7` **release(v3.92.1)**: ТЗ-XAI-6 — финализация серии Simply_xAI
+- `5c0a22e` fix(briefing): закрытие хвостов briefing (TZ_ServiceChatNotOverridable) + correction scope ТЗ-XAI-6
+- `2b0b131` docs(xai-migration): HANDOFF update + root CHANGELOG post-correction
 - `eeba086` docs(xai-migration): correction URL hallucination diagnosis + archive superseded backlog
-- `58d9d2e` **fix(pipeline-trace)**: URL normalization в verifyArticleUrls — metric bug, не архитектурная галлюцинация
-- `2c9bcb3` docs(xai-migration): fix HANDOFF self-references
-- `05c7cb5` docs(xai-migration): финальный HANDOFF после v3.92.0 + ТЗ-XAI-4 финализация
+- `58d9d2e` **fix(pipeline-trace)**: URL normalization — metric bug, не архитектурная галлюцинация
+- `05c7cb5` docs(xai-migration): HANDOFF после v3.92.0 + ТЗ-XAI-4 финализация
 - `fdfd03f` chore(xai-migration): archive TZ_xai_4_UtilityPipelines after v3.92.0
 - `583ef03` **release(v3.92.0)**: ТЗ-XAI-4 — 11 taskId на Grok + 2 hot-fixes + 3 новых backlog хвоста
 - `00b7f33` Merge branch 'claude/stoic-wu' (README.md + SIMPLY_PRODUCT_VISION.md rewrite)
@@ -63,13 +67,84 @@
 
 ---
 
-## ⏭ Что дальше — варианты для следующей сессии
+## ⏭ Что делать в следующей сессии — технические задания (ТЗ)
 
-**ТЗ-XAI-4 закрыта** (включая scope expansion, покрывший XAI-5). **Блокер ТЗ-XAI-6 снят** после correction 2026-04-16 (commits `58d9d2e` + `eeba086`): «URL hallucination» оказалась metric bug (naive `Set.has()` без нормализации), а не architectural issue моделей. briefing:author на MiniMax работает корректно — миграция на Grok теперь вопрос cleanup, не качества.
+**Серия Simply_xAI ЗАКРЫТА.** Финальная архитектура: 4 роли · 3 production провайдера (Grok подсобка/зал + MiniMax кухня + Anthropic автор) · 1 dev-инструмент (OpenRouter). См. архитектурную константу №18.
 
-### Вариант A — ~~ТЗ-XAI-6~~ ✅ закрыт в v3.92.1
+**Версия на старте новой сессии:** 3.92.2. `.simply-dev-overrides.json` отсутствует (чистое состояние). 36 коммитов ahead of origin — решение владельца push'ить или нет.
 
-Серия Simply_xAI закрыта. Следующие варианты на выбор:
+### Фаза 2 — Приоритет 1 (рекомендую начать с этого)
+
+**1. Empirical smoke test v3.92.2** (30-45 минут)
+
+- Запустить `npm run dev` в main project
+- Открыть один проект через `/projects/[id]` → использовать pipeline-режим (Professor)
+- DevPanel footer должен показать: analyze/synthesize=`grok-4.20-0309-reasoning`, execute=`grok-4-1-fast-non-reasoning`
+- Оценить качество: сравнить с prior опытом на Opus
+- SQL-подтверждение через `mcp__postgres__query`: новые записи `ai_usage_log` с новыми `modelId` за последние 10 минут
+- Если regression по качеству — сделать `git revert 4165f68` (откат v3.92.2)
+
+**2. [TZ_DevOverridesSideEffectImportAudit](../_backlog/TZ_DevOverridesSideEffectImportAudit.md)** 🟥 **High impact** (0.5-1 сессия)
+
+5+ backend routes без side-effect `import "@/lib/ai/model-overrides-node"` → dev panel overrides молча игнорируются для их taskIds. Блокирует все будущие A/B тесты через `/dev/models`. **Логически следует сразу после smoke test** — без работающих overrides empirical тесты будущих миграций будут фейковыми.
+
+Рекомендованное решение: `instrumentation.ts` register-on-boot + ADR 048 update. Одна архитектурная точка вместо ~11 side-effect импортов.
+
+**3. [TZ_ErrorRecoveryUI Stage 2](../_backlog/TZ_ErrorRecoveryUI.md)** 🟥 **High impact** (0.5 сессии)
+
+useChat state recovery через правильную обработку `clearError` для не-ChatSDK ошибок. Stage 1 (hint в красном флаге) уже ✅ в v3.90.0+. Stage 2 — root cause fix.
+
+### Фаза 3 — Medium impact хвосты (в порядке приоритета «польза / время»)
+
+**4. [TZ_DevPanelFooterHidesSubCalls](../_backlog/TZ_DevPanelFooterHidesSubCalls.md)** (0.5-1 сессия)
+
+DevPanel footer скрывает nested AI-вызовы (artifacts, clerks, tools) — видно только parent chat cost. После миграции 15 taskIds на Grok это критично — владелец не видит реальную стоимость сложных сообщений. Backend `ai_usage_log` корректен, нужна только frontend aggregation.
+
+**5. [TZ_MaxOutputTokensAudit](../_backlog/TZ_MaxOutputTokensAudit.md)** (1 сессия)
+
+Явный `maxOutputTokens` для всех ~20 `generateText/streamText/generateObject/streamObject` call sites. Предотвращает повторение timeout-инцидента plan/route.ts (hot-fix d9d3488 сейчас tactical `16000`). Решение: `DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number>` + `getMaxOutputTokensForTask()` в task-assignments.ts.
+
+**6. [TZ_SimplyContextUsageWidget](../_backlog/TZ_SimplyContextUsageWidget.md)** (1 сессия)
+
+UI виджет контекста показывает шкалу от `contextWindow` модели (128K), а не от `SIMPLY_CONTEXT_LIMIT` (200K). Ложная тревога «55% предела» при реальных 23% от порогов Extract-on-compression. Плюс подозрительное 128K для Grok 4.1 Fast в каталоге (проверить).
+
+**7. [TZ_PromptsDeadCodeCleanup](../_backlog/TZ_PromptsDeadCodeCleanup.md)** (0.5 сессии)
+
+90% `lib/ai/prompts.ts` dead. Удалить `artifactsPrompt`, `regularPrompt`, `systemPrompt` deprecated exports, `buildUserContext` deprecated. Только `updateDocumentPrompt` живой — переименовать файл в `lib/ai/artifact-prompts.ts`. Плюс — убрать `SNAPSHOT_THRESHOLD` и `FALLBACK_MESSAGE_PAIRS` из [context-limits.ts:15,18](../../lib/ai/context-limits.ts#L15) (0 импортов после ТЗ-C1.5 / ADR 052, пропущены в ТЗ-XAI-6).
+
+**8. [TZ_TaskExpertChatInputMissingOnFirstOpen](../_backlog/TZ_TaskExpertChatInputMissingOnFirstOpen.md)** (0.5-1 сессия)
+
+`multimodal-input` не рендерится при входе в task expert chat из режима планирования. Hard reload лечит. useChat state / hydration order issue.
+
+**9. [TZ_SimplyChatRaceCondition](../_backlog/TZ_SimplyChatRaceCondition.md)** (0.5 сессии)
+
+`getOrCreateSimplyChat` без partial unique index → race при первых параллельных запросах нового пользователя. Partial unique index + `onConflictDoNothing`.
+
+**10. [TZ_UrlVerificationMetricNormalization](../_backlog/TZ_UrlVerificationMetricNormalization.md)** (0.5 сессии)
+
+Follow-up hardening после commit `58d9d2e` (основной фикс уже в production). Scope: unit test suite (регрессия-защита), audit tracking params regex (возможно упущены `from=`, `si=`, `amp=`), ADR/docs контракт.
+
+**11. [TZ_ProfessorPlanStreaming](../_backlog/TZ_ProfessorPlanStreaming.md)** (1-2 сессии)
+
+Long-term fix plan/route.ts timeout: переход `generateText` → `streamText`. Hot-fix `maxOutputTokens: 16000` tactical. Low urgency — работает.
+
+### Фаза 4 — Продуктовые направления (твой выбор когда)
+
+- **Оплата в рублях** (ЮKassa, Тинькофф, СБП) — отдельное ТЗ
+- **ТЗ-XAI-MA-1** — Multi-agent через Responses API + MCP. `expertise-multi-agent` taskId уже зарезервирован, карточка в [BRAINSTORM_GrokMultiAgent.md](BRAINSTORM_GrokMultiAgent.md)
+- **ТЗ-XAI-COL-1** — Библиотека через xAI Collections API (RAG для явно загруженных документов)
+- **ТЗ-XAI-VOICE-1** — Grok Voice Agent API для голосового режима
+
+---
+
+## Рекомендованная последовательность для следующей сессии
+
+1. Smoke test v3.92.2 (empirical проверка Professor pipeline на Grok) — **30-45 минут**
+2. TZ_DevOverridesSideEffectImportAudit — **0.5-1 сессия**
+3. Далее TZ_DevPanelFooterHidesSubCalls — **0.5-1 сессия** (критично для наблюдаемости cost)
+4. Дальше Medium хвосты по приоритету владельца
+
+После закрытия High-impact хвостов (#2, #3) можно спокойно двигаться к продуктовым фичам (Фаза 4).
 
 ### Вариант B (теперь основной) — TZ_DevOverridesSideEffectImportAudit 🟥 (0.5-1 сессия)
 
@@ -141,9 +216,16 @@ Per memory `project_voyage_vpn.md`: Voyage блокирует финский VPN
 
 ### Git state
 
-**29 коммитов ahead of origin.** Все локальные на ветке `claude/angry-nobel`. Push — отдельная команда Владимира (не делать самому).
+**36 коммитов ahead of origin.** Локальный `master` (worktree `claude/angry-nobel` merged через fast-forward 2026-04-16). Push — отдельная команда владельца (не делать самому).
 
 ```
+4165f68 release(v3.92.2): Professor pipeline на Grok (4 точки, ~70% экономии)
+fae06d7 release(v3.92.1): ТЗ-XAI-6 — финализация серии Simply_xAI
+5c0a22e fix(briefing): закрытие хвостов briefing (TZ_ServiceChatNotOverridable) + correction scope ТЗ-XAI-6
+2b0b131 docs(xai-migration): HANDOFF update + root CHANGELOG post-correction
+eeba086 docs(xai-migration): correction URL hallucination diagnosis + archive superseded backlog
+58d9d2e fix(pipeline-trace): URL normalization — metric bug, не архитектурная галлюцинация
+2c9bcb3 docs(xai-migration): fix HANDOFF self-references
 05c7cb5 docs(xai-migration): финальный HANDOFF после v3.92.0
 fdfd03f chore(xai-migration): archive TZ_xai_4_UtilityPipelines after v3.92.0
 583ef03 release(v3.92.0): ТЗ-XAI-4 — 11 taskId на Grok + 2 hot-fixes + 3 новых backlog хвоста
@@ -153,20 +235,15 @@ fdfd03f chore(xai-migration): archive TZ_xai_4_UtilityPipelines after v3.92.0
 2fbc50b docs(xai-migration): expertise-multi-agent reservation + dead briefing constants
 2ca1ac5 docs(xai-migration): HANDOFF после ТЗ-XAI-4 Этапов 2+3
 676d50d feat(xai-migration): TZ_XAI_4 Этапы 2+3 + scope expansion
-d1e2c12 docs(backlog): 2 новых хвоста
 d9d3488 fix(professor): plan route hot-fix
 ceadd17 feat(xai-migration): TZ_XAI_4 Этап 2
-1fc3603 docs(xai-migration): HANDOFF после v3.91.0
-f6dbedd docs(backlog): add TZ_SimplyContextUsageWidget
-6e6867b chore(backlog): archive TZ_ATTACH_1
 dbe6bdf release(v3.91.0): TZ_ATTACH_1
-b46c5d1 docs(xai-migration): HANDOFF после v3.90.2
 59eb33a release(v3.90.2): TZ_SimplyReadDocumentTool + R-6
 516d600 release(v3.90.1): TZ_SimplyChatModeInjection
-86de8ad docs(xai-migration): HANDOFF после ТЗ-XAI-3
-fc8a995 fix(error-recovery): TZ_ErrorRecoveryUI Stage 1
 8dfac7f release(v3.90.0): ТЗ-XAI-3
-... (ниже ТЗ-XAI-2 / 1 / AnthropicAliasCleanup / ModelCatalogDocumentFlags / ...)
+1481141 release(v3.89.0): ТЗ-XAI-2
+ba9e928 release(v3.88.0): ТЗ-XAI-1
+... (ниже AnthropicAliasCleanup / ModelCatalogDocumentFlags / ...)
 ```
 
 ### IDE контекст
@@ -201,27 +278,39 @@ fc8a995 fix(error-recovery): TZ_ErrorRecoveryUI Stage 1
 ## 🚀 Рекомендованный старт следующей сессии
 
 ```
-1. Прочитать этот HANDOFF (5-10 мин)
-2. Прочитать SIMPLY_XAI_NOTES.md 3 записи 2026-04-16 (15 мин) — особенно
-   «Correction: URL hallucination была не галлюцинацией» (верхняя)
-3. Прочитать MEMORY.md целиком (2 мин) — empirical-test-before-model-blame
-   усилено: валидируй саму метрику, не только 2 модели
-4. git log --oneline -12 — проверить что 32+ коммитов ahead of origin
-5. cat package.json | grep version — 3.92.0
-6. ls .simply-dev-overrides.json — «нет такого файла» (чистое состояние)
-7. npm run dev в background + curl http://localhost:3000 → HTTP 307
-8. Обсудить с Владимиром порядок:
-   - Рекомендованный: B → A → C (чистый путь)
-   - Быстрее: A → B (если хочется закрыть серию Simply_xAI сразу)
-   - A 📋 ТЗ-XAI-6 cleanup MiniMax/OpenRouter (1-2 сессии) — блокер снят
-   - B 🟥 TZ_DevOverridesSideEffectImportAudit (0.5-1 сессия)
-   - C 🟧 Medium-impact хвосты (9 штук, решает Владимир по приоритету)
-9. Запустить выбранный вариант по стандартному WORKFLOW (ANALYSIS → ROADMAP → код → финализация → архив)
+1. Прочитать этот HANDOFF (10 мин) — особенно секцию «Что делать в следующей сессии»
+2. Прочитать SIMPLY_XAI_NOTES.md 4 записи 2026-04-16 (15 мин)
+   — v3.92.2 Professor pipeline (самая верхняя)
+   — ТЗ-XAI-6 финализация + OpenRouter dev-инструмент
+   — Философия серии «4 роли, 3 провайдера» + briefing cleanup
+   — Correction URL hallucination = metric bug
+3. MEMORY.md целиком (2 мин) — особенно:
+   — feedback_cleanup_requires_full_context (новое правило этой сессии)
+   — feedback_empirical_test_before_model_blame (усилено)
+4. Проверки на старте:
+   — git log --oneline -5 — HEAD на 4165f68 (v3.92.2)
+   — git log --oneline origin/master..HEAD | wc -l — 36 коммитов ahead of origin
+   — cat package.json | grep version — должно быть 3.92.2
+   — ls .simply-dev-overrides.json — «нет такого файла» (чистое состояние)
+   — ls .simply-dev-overrides.json.bak.2026-04-16 — backup предыдущих overrides
+     (восстанавливать конкретный test override можно через /dev/models UI)
+5. npm run dev в main project (worktree angry-nobel можно удалить если мешает)
+6. Обсудить с владельцем приоритет по секции «Что делать в следующей сессии»:
+   — Фаза 2 (High): smoke test v3.92.2 → DevOverridesSideEffectImportAudit → ErrorRecoveryUI Stage 2
+   — Фаза 3 (Medium): 8 хвостов, ранжирование по польза/время в HANDOFF
+   — Фаза 4 (Product): оплата в рублях / Multi-agent / Collections / Voice
+7. Запустить выбранный ТЗ по стандартному WORKFLOW (ANALYSIS → ROADMAP → код → финализация → архив)
 ```
+
+**Важный процессный урок этой сессии:** коммиты короткие (индустриальный стандарт 5-15 строк), детали в CHANGELOG + NOTES. Не дублировать контент трижды.
 
 ---
 
-**ТЗ-XAI-4 завершена. v3.92.0 зарелижен локально. Блокер ТЗ-XAI-6 снят (URL hallucination оказалась metric bug). 32 коммита ahead of origin, push — решение Владимира.**
+**Серия Simply_xAI ЗАКРЫТА (v3.92.1). Professor pipeline переведён на Grok (v3.92.2, экономия ~70%). Worktree merged в master. 36 коммитов ahead of origin. Push — решение владельца.**
+
+**Финальная целевая архитектура:** 4 роли · 3 production провайдера (Grok подсобка/зал + MiniMax кухня + Anthropic автор) · 1 dev-инструмент (OpenRouter).
+
+**Следующий приоритет:** Фаза 2 — empirical smoke test v3.92.2 → TZ_DevOverridesSideEffectImportAudit → TZ_ErrorRecoveryUI Stage 2. См. секцию «Что делать в следующей сессии».
 
 **Семь раз отмерь, один раз отрежь + проверь сам метр.** Rule №0 усилено 2026-04-16.
 
