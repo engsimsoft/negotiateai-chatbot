@@ -122,7 +122,6 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). Сводка на с
 
 ### 🟧 Medium impact
 
-- **[TZ_ServiceChatNotOverridable](specs/_backlog/TZ_ServiceChatNotOverridable.md)** — 3 дыры: UI `/dev/models` не показывает service-chat selectors + `service-chat/route.ts` не импортирует reader + docs ai-chats-map не разделяет briefing-onboarding и pipeline.
 - **[TZ_DevPanelFooterHidesSubCalls](specs/_backlog/TZ_DevPanelFooterHidesSubCalls.md)** — DevPanel footer скрывает nested subcalls (artifacts, clerks, tools). Backend `ai_usage_log` корректен, только frontend aggregation.
 - **[TZ_TaskExpertChatInputMissingOnFirstOpen](specs/_backlog/TZ_TaskExpertChatInputMissingOnFirstOpen.md)** — `multimodal-input` не рендерится при входе в task expert chat из режима планирования. Hard reload лечит.
 - **[TZ_ProfessorPlanStreaming](specs/_backlog/TZ_ProfessorPlanStreaming.md)** — long-term fix plan/route.ts timeout: переход `generateText` → `streamText`. Hot-fix `maxOutputTokens: 16000` — tactical.

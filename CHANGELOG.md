@@ -98,7 +98,7 @@
 ### Removed (superseded)
 
 - **`specs/_backlog/TZ_BriefingAuthorUrlHallucination.md`** → `_backlog/_archive/` с SUPERSEDED banner. Содержимое сохранено как артефакт — демонстрация как ложная архитектурная гипотеза может выглядеть убедительно на 4 моделях подряд. Предложение из того хвоста (`generateObject` + `z.enum([...allowedUrls])`) **отменено** — оно бы force-matched метрику через схему, но реальной проблемы галлюцинации нет
-- **Блокер ТЗ-XAI-6** («briefing:author остаётся на MiniMax до закрытия URL hallucination») снят
+- **Мой же неверный блокер «briefing:author остаётся на MiniMax до закрытия URL hallucination»** — он никогда не был реальным блокером. Миграция briefing:author на Grok **не планировалась по целевой архитектуре** серии Simply_xAI — MiniMax «кухня» остаётся by design (4 роли, 3 провайдера). Подробности в NOTES записи 2026-04-16 «Философия серии». ТЗ-XAI-6 scope уточнён: только OpenRouter + dead code, НЕ MiniMax
 
 ### Added
 

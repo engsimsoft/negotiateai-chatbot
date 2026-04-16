@@ -1,9 +1,32 @@
+# ✅ CLOSED 2026-04-16 — 1 дыра из 3 починена, 2 оказались ложными
+
+> **Этот хвост закрыт.** Диагностика хвоста утверждала 3 дыры, но при реализации выяснилось:
+>
+> - **Дыра 1** «UI `/dev/models` не показывает service-chat:*» → **ложная.** `service-chat:*` taskIds присутствуют в `DEFAULT_TASK_MODELS` (task-assignments.ts:174-177), автоматически попадают в `ALL_TASK_IDS`, UI рендерит все из них через `data.tasks` без фильтрации. Автор хвоста grep'ал по директории `/dev/models/` и не нашёл упоминаний, но UI получает taskIds через import из `lib/ai/task-assignments.ts` — прямых упоминаний в `/dev/models/` и не должно быть
+> - **Дыра 2** «service-chat/route.ts не импортирует model-overrides-node» → **реальная, починена.** +1 side-effect import line. Теперь все 4 service chats (ben, project-creation, project-manager, briefing-onboarding) переключаемые через `/dev/models` override
+> - **Дыра 3** «docs/ai-chats-map.md не разделяет briefing-onboarding (service chat) и briefing pipeline (backend кухня)» → **починена.** Overview-таблица обновлена с явными маркерами «Service chat» vs «Backend pipeline (кухня)». Briefing Onboarding section в детальном блоке получила важное предисловие что она архитектурно независима от pipeline
+>
+> **Commit:** `<briefing-cleanup-commit>` 2026-04-16 (один коммит закрыл все три пункта)
+>
+> **Связанные изменения:**
+> - Side-effect import в [app/(chat)/api/service-chat/route.ts](../../../app/(chat)/api/service-chat/route.ts) с подробным комментарием
+> - Overview-таблица в [docs/ai-chats-map.md](../../../docs/ai-chats-map.md) с маркерами Service chat / Backend pipeline (кухня)
+> - Briefing Onboarding section header + новая строка «Dev override» в таблице параметров
+>
+> **Неподтверждённые Мета-правила из этого хвоста:**
+> 1. **Проверять claim «UI не показывает X»** — автор хвоста мог ошибиться с grep. Если UI динамически импортирует из SSOT-списка, отсутствие match в конкретной директории не значит отсутствия функциональности
+> 2. **Хвосты с «3 дыры» чаще бывают «1 дыра + 2 предположения»** — при closing'е готовиться к тому что scope может быть меньше чем в ТЗ
+>
+> Содержимое ниже сохранено как исторический артефакт.
+
+---
+
 # ТЗ-ServiceChatNotOverridable — service chats нельзя переопределить через dev panel (UI + backend gap)
 
-**Статус:** Хвост, Medium impact
+**Статус:** ✅ **CLOSED** 2026-04-16 — 1 реальная дыра (side-effect import) + 2 ложных (UI уже работал, docs cleanup). См. блок сверху.
 **Создано:** 2026-04-16 (сессия ТЗ-XAI-4 Этап 2, мануальное тестирование briefing onboarding)
 **Источник:** Владимир, замечено в режиме «Настройки брифинга» → /dev/models
-**Связано с:** [app/(chat)/api/service-chat/route.ts](../../app/(chat)/api/service-chat/route.ts), [app/(dashboard)/dev/models/](../../app/(dashboard)/dev/models/), [docs/decisions/048-dev-switchboard-ui.md](../../docs/decisions/048-dev-switchboard-ui.md) (ADR), TZ_DeadModelSelectors/FINDINGS (архив)
+**Связано с:** [app/(chat)/api/service-chat/route.ts](../../../app/(chat)/api/service-chat/route.ts), [app/(dashboard)/dev/models/](../../../app/(dashboard)/dev/models/), [docs/decisions/048-dev-switchboard-ui.md](../../../docs/decisions/048-dev-switchboard-ui.md) (ADR), TZ_DeadModelSelectors/FINDINGS (архив)
 
 ---
 

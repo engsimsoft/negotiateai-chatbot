@@ -67,24 +67,22 @@
 
 **ТЗ-XAI-4 закрыта** (включая scope expansion, покрывший XAI-5). **Блокер ТЗ-XAI-6 снят** после correction 2026-04-16 (commits `58d9d2e` + `eeba086`): «URL hallucination» оказалась metric bug (naive `Set.has()` без нормализации), а не architectural issue моделей. briefing:author на MiniMax работает корректно — миграция на Grok теперь вопрос cleanup, не качества.
 
-### Вариант A — ТЗ-XAI-6 cleanup MiniMax/OpenRouter (рекомендуется)
+### Вариант A — ТЗ-XAI-6 cleanup OpenRouter + dead code (MiniMax остаётся by design)
+
+**Важно:** целевая архитектура серии Simply_xAI — **3 провайдера, 4 роли**, не 2 провайдера. MiniMax M2.7 + M2.7-long остаются в production как **«кухня»** (briefing:author/section/podcast-script — фоновые pipelines). Полная философия — [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) запись 2026-04-16 «Философия серии "4 роли, 3 провайдера"».
 
 Что делается:
-- Миграция `briefing:author`, `briefing:section`, `briefing:podcast-script` на Grok (4.20 non-reasoning или 4.1 Fast-long — решается empirically через smoke test)
-- Удалить из `registry.ts` namespaces `minimax`, `minimaxLong`, `openrouter`
-- Удалить из `model-catalog.ts` все MiniMax и OpenRouter записи (кроме RESERVED `grok-4.20-multi-agent-0309` — она Grok)
-- Удалить из `task-assignments.ts` все ссылки
-- Удалить функции: `stripMiniMaxToolParts`, `stripLegacyOpenAICompatToolParts`, `isSimplyNonAnthropicModel`
-- Удалить `vercel-minimax-ai-provider` из `package.json`
-- Удалить env `MINIMAX_API_KEY` из Vercel (после подтверждения production stability)
+- **Оставить:** MiniMax namespaces (`minimax`, `minimaxLong`) + M2.7 / M2.7-long catalog entries + active taskIds (`briefing:author`, `briefing:section`, `briefing:podcast-script`) + `MINIMAX_API_KEY` env
+- **Удалить:** OpenRouter namespace (0 active taskIds после миграции), dead strip functions (`stripMiniMaxToolParts`, `stripLegacyOpenAICompatToolParts`, `isSimplyNonAnthropicModel`), `clerk:snapshot` dead code per ADR 052
+- **Удалить env:** `OPENROUTER_API_KEY` после подтверждения 0 usages
+- Обновить ADR если ссылаются только на OpenRouter
 
 **Почему первым:**
 1. Последний крупный шаг серии Simply_xAI — закрывает цикл миграции
-2. Scope хорошо понятный, риск низкий (модели уже готовы, DevPanel корректно покажет результат)
-3. Зачищает зоопарк провайдеров (3 namespace → 2), упрощает обслуживание
-4. Empirical validation простой — сгенерировать 2-3 briefing'а на Grok, сравнить DevPanel urlVerification (теперь работающей метрикой) с MiniMax baseline
+2. Scope хорошо понятный, риск низкий (OpenRouter не используется, убирается безболезненно)
+3. Зачищает зоопарк провайдеров (4 namespace → 3, по числу ролей)
 
-**Оценка:** 1-2 сессии.
+**Оценка:** 0.5-1 сессия.
 
 ### Вариант B — TZ_DevOverridesSideEffectImportAudit 🟥 (0.5-1 сессия)
 
@@ -209,6 +207,7 @@ fc8a995 fix(error-recovery): TZ_ErrorRecoveryUI Stage 1
 15. **Reserved vs deprecated семантика модели в каталоге.** Когда taskId снимается с активного использования, но запись каталога остаётся — различать «deprecated (удалить когда чисто)» и «reserved (placeholder под будущую фичу)». Reserved маркируется через placeholder taskId + подробный комментарий + cross-ref в ROADMAP. Пример: `expertise-multi-agent` taskId → `grok-4.20-multi-agent-0309` запись под ТЗ-XAI-MA-1
 16. **Audit metadata hardcoded modelId проверка при миграции taskId.** При переключении taskId X в task-assignments — обязательно grep на hardcoded имя старой модели в audit metadata блоках и заменять на `getModelIdForTask("X")`. Иначе в БД пишется лживое значение. Пример: `meeting/regenerate/route.ts:91` имел `"claude-sonnet-4-6"` hardcoded
 17. **🆕 Observability метрики канонизируются перед сравнением.** Сравнение URL / path / identifier в observability слое через `Set.has(rawValue)` — антипаттерн. Любая форматная разница (tracking params, anchor, trailing slash, case) даёт ложный positive. Канонизация обязательна: нормализовать оба сравниваемых значения функцией без побочек, потом Set.has. Живой пример — `normalizeUrlForComparison()` в [pipeline-trace.ts](../../lib/ai/pipeline-trace.ts) (2026-04-16, commit `58d9d2e`). Перед выводами о качестве модели на основе метрики — **читать код метрики**
+18. **🆕 Целевая архитектура серии: 4 роли, 3 провайдера (by design, НЕ 2).** Подсобка = Grok 4.1 Fast, Кухня = MiniMax M2.7/M2.7-long, Зал = Grok 4.20, Автор = Claude Opus. MiniMax остаётся в production **by design** для кухни (briefing author/section/podcast-script — фоновые pipelines ночью). ТЗ-XAI-6 cleanup убирает только OpenRouter + dead code, НЕ MiniMax. Полная формулировка владельца 2026-04-16 — [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) запись «Философия серии "4 роли, 3 провайдера"»
 
 ---
 

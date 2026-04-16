@@ -58,6 +58,15 @@ import {
 import { ChatSDKError } from "@/lib/errors";
 import { generateUUID } from "@/lib/utils";
 import type { Project } from "@/lib/db/schema";
+// Side-effect import: регистрирует reader `.simply-dev-overrides.json` через
+// registerOverridesReader(). Без него getActiveOverrides() возвращает {} →
+// dev-panel overrides для всех 4 service-chat taskIds (briefing-onboarding,
+// project-creation, project-manager, ben) молча игнорируются.
+// TZ_ServiceChatNotOverridable Дыра 2 (2026-04-16). Архитектурная константа
+// HANDOFF серии №10 — «любой backend route с getModel() обязан импортировать
+// reader». Глобальное решение — TZ_DevOverridesSideEffectImportAudit (через
+// instrumentation.ts). Пока — импорт в каждом route.
+import "@/lib/ai/model-overrides-node";
 
 // Load prompt templates from .md files
 const PROMPTS_DIR = path.join(process.cwd(), "lib", "prompts", "service-chats");

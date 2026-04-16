@@ -25,18 +25,18 @@
 | **Проект: Исполнитель** | Claude Haiku 4.5 (`project:expert:haiku`) | ✅ Работает | Быстрые простые задачи |
 | **Проект: Эксперт** (DEFAULT) | Claude Sonnet 4.6 (`project:expert:sonnet`) | ✅ Работает | Баланс качества и скорости |
 | **Проект: Профессор** | Claude Opus 4.6 (`project:expert:opus`) | ✅ Работает | Сложные задачи |
-| **Бен** (помощник по платформе) | Claude Haiku 4.5 (`service-chat:ben`) | ✅ Работает | Floating modal, онбординг |
-| **Секретарь** (создание проекта) | Claude Sonnet 4.6 (`service-chat:project-creation`) | ✅ Работает | AI-интервью для создания проекта |
-| **Менеджер проекта** | Claude Haiku 4.5 (`service-chat:project-manager`) | ✅ Работает | Живой AI-диалог, управление проектом |
+| **Бен** (помощник по платформе) | Claude Haiku 4.5 (`service-chat:ben`) | ✅ Работает | Service chat · Floating modal, онбординг |
+| **Секретарь** (создание проекта) | Claude Sonnet 4.6 (`service-chat:project-creation`) | ✅ Работает | Service chat · AI-интервью для создания проекта |
+| **Менеджер проекта** | Claude Haiku 4.5 (`service-chat:project-manager`) | ✅ Работает | Service chat · Живой AI-диалог, управление проектом |
+| **Briefing: Онбординг** | Claude Sonnet 4.6 (`service-chat:briefing-onboarding`) | ✅ Работает | **Service chat** · AI-интервью для настройки профиля брифинга. Архитектурно независим от briefing pipeline ниже — пользователь может его переключить через `/dev/models` override |
 | **Профессор планирования** | Claude Opus 4.6 (`professor:planning`) | ✅ Работает | Генерация плана задач проекта |
 | **Ревьюер задач** | Claude Opus 4.6 (`professor:review`) | ✅ Работает | Ревью завершённой задачи проекта |
 | **Суммаризатор задач** (Клерк) | Grok 4.1 Fast (`clerk:task-summary`) | ✅ Работает | Суммаризация результатов задачи |
 | **Клерк-анализатор** файлов | Grok 4.1 Fast (`clerk:file-analyzer`) | ✅ Работает | Автоматический анализ загруженных файлов |
-| **Briefing: Онбординг** | Claude Sonnet 4.6 (`service-chat:briefing-onboarding`) | ✅ Работает | AI-интервью для настройки брифинга |
-| **Briefing: Фильтр** | Grok 4.1 Fast (`briefing:filter`) | ✅ Работает | Фильтрация и дедупликация новостей |
-| **Briefing: Автор** | MiniMax M2.7 long (`briefing:author`) | ✅ Работает | Генерация статьи из отфильтрованных новостей |
-| **Briefing: Refresh секции** | MiniMax M2.7 long (`briefing:section`) | ✅ Работает | Per-section refresh |
-| **Podcast: Скрипт** | MiniMax M2.7 (`briefing:podcast-script`) | ✅ Работает | Генерация диалогового сценария |
+| **Briefing: Фильтр** | Grok 4.1 Fast (`briefing:filter`) | ✅ Работает | **Backend pipeline (кухня)** · Фильтрация и дедупликация новостей. Запускается cron'ом или refresh-кнопкой, пользователь не видит процесс |
+| **Briefing: Автор** | MiniMax M2.7 long (`briefing:author`) | ✅ Работает | **Backend pipeline (кухня)** · Генерация статьи из отфильтрованных новостей. MiniMax на этой роли by design (длинный output + экономика фоновых задач) |
+| **Briefing: Refresh секции** | MiniMax M2.7 long (`briefing:section`) | ✅ Работает | **Backend pipeline (кухня)** · Per-section refresh одной темы |
+| **Podcast: Скрипт** | MiniMax M2.7 (`briefing:podcast-script`) | ✅ Работает | **Backend pipeline (кухня)** · Генерация диалогового сценария для TTS |
 | **Podcast: TTS** | Gemini 2.5 Flash TTS (native `@google/genai`) | ✅ Работает | Озвучка (multi-speaker: Host=Kore + Expert=Iapetus) |
 | **Meeting: Транскрипция** | Deepgram Nova-3 (native SDK) | ✅ Работает | Batch transcription аудио (русский, diarize) |
 | **Meeting: Суммаризация** | Grok 4.20 reasoning (`meeting:summary`) | ✅ Работает | Структурированное резюме встречи |
@@ -270,16 +270,20 @@ lib/ai/task-completion-types.ts           # professorVerdictSchema
 lib/prompts/professors/task-review.md     # Промпт
 ```
 
-#### Briefing Onboarding
+#### Briefing Onboarding (service chat, независим от pipeline ниже)
+
+> **Важно:** Briefing Onboarding — это **сервисный чат** (UI-диалог, пользователь видит), **архитектурно независимый** от Briefing AI-пайплайна (backend-only, кухня) в следующем разделе. Они связаны только продуктово (обе фичи живут в `/briefing`), но переключаются через разные taskIds. Модель onboarding'а можно переключить через `/dev/models` override на `service-chat:briefing-onboarding` — это затронет только интерактивный диалог настройки профиля, pipeline останется на своих моделях.
+
 **Где:** `/briefing/setup` (split layout: preview + chat)
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | Claude Sonnet 4.6 (`claude-sonnet-4-6`) |
+| **Модель** | Claude Sonnet 4.6 (task `service-chat:briefing-onboarding` → registry `anthropic:claude-sonnet-4-6`) |
 | **Оболочка** | Full-page (split layout: aside 400px preview + main chat) |
 | **Промпт** | `lib/prompts/service-chats/briefing-onboarding.md` (v11) + mode injection |
 | **Инструменты** | `updateBriefingPreview`, `deepResearch`, `fetchUrl`, `readTelegramChannel` |
 | **Guardian** | Bypass mode — текст проходит без буферизации, Guardian только логирует ([ADR 025](decisions/025-guardian-bypass-pattern.md)) |
+| **Dev override** | ✅ Поддерживается (commit `<briefing-cleanup>`, 2026-04-16): `/dev/models` → selector `service-chat:briefing-onboarding` → переключение применяется через side-effect import `@/lib/ai/model-overrides-node` в `service-chat/route.ts` |
 
 **Как работает:**
 1. Server Component определяет mode (create/edit), загружает userProfile + topics/sources

@@ -9,6 +9,66 @@
 
 ---
 
+## 2026-04-16 — Философия серии «4 роли, 3 провайдера» + briefing cleanup + correction моих ошибочных утверждений о ТЗ-XAI-6
+
+**Контекст:** Follow-up сессия после correction URL hallucination (commit `58d9d2e` + `eeba086` + `2b0b131`). Владелец сделал важную тематическую правку моей картины мира + попросил закрыть briefing хвосты реальной работой, а не документацией.
+
+### Философия серии Simply_xAI — 4 роли, 3 провайдера (зафиксировано владельцем 2026-04-16)
+
+> Формулировка владельца, приводится дословно для будущих сессий:
+
+**Подсобка** — Grok 4.1 Fast. Фильтрация, заголовки, механика. Быстро, дёшево, надёжно.
+
+**Кухня** — MiniMax M2.7. Брифинги, подкасты, фоновые pipeline. Работяга который готовит ночью, а утром гость получает готовое блюдо.
+
+**Зал** — Grok 4.20. Всё что видит пользователь: чат, артефакты, экспертиза, документы. Качество, скорость, впечатление.
+
+**Автор** — Claude Opus. Профессор. Бренд. Лицо Simply для тех кто хочет максимум. Как шеф-повар который выходит к гостю лично.
+
+> Четыре роли, три провайдера, каждый на своём месте. Это философия Simply — мало элементов, каждый идеален.
+
+**Ключевой вывод:** **MiniMax M2.7 и M2.7-long остаются в production by design**, не подлежат удалению в ТЗ-XAI-6. Briefing author / section / podcast-script — это **«кухня»**, они работают ночью через Vercel Cron, пользователь видит результат утром готовым. Экономика и качество на этой роли превосходят Grok (длинный output + специализация MiniMax на structured JSON в briefing контексте).
+
+### Correction моих прежних ошибочных утверждений в документации
+
+В коммите `2b0b131` я написал:
+- «Блокер ТЗ-XAI-6 снят. Миграция briefing:author/section/podcast-script на Grok разблокирована»
+- Вариант A в HANDOFF: «ТЗ-XAI-6 cleanup MiniMax/OpenRouter»
+- CHANGELOG Post-Correction: «блокер ТЗ-XAI-6 снят после URL hallucination correction»
+
+**Это была неверная рамка.** Миграция briefing:author на Grok **никогда не планировалась** — только я в своей картине мира хотел убрать MiniMax. Реальная цель серии **с самого начала** была гибридная: Grok для подсобки и зала, MiniMax для кухни, Anthropic для автора. ТЗ-XAI-6 scope правильно звучит так:
+
+- **Оставить:** MiniMax namespaces `minimax` + `minimaxLong`, записи M2.7 и M2.7-long в каталоге, active taskIds (`briefing:author`, `briefing:section`, `briefing:podcast-script`)
+- **Удалить:** OpenRouter namespace целиком (0 active taskIds после миграции), dead strip functions (`stripMiniMaxToolParts`, `stripLegacyOpenAICompatToolParts`, `isSimplyNonAnthropicModel`), `clerk:snapshot` dead code per ADR 052
+- **Удалить env:** `OPENROUTER_API_KEY` (после подтверждения что нет usages), `MINIMAX_API_KEY` **НЕ удалять** — активно используется в кухне
+
+**Следующие корректировки HANDOFF/CHANGELOG сделаны в той же сессии:**
+- `HANDOFF.md` — вариант A переформулирован «ТЗ-XAI-6 cleanup OpenRouter + dead code» с явным «MiniMax остаётся by design — кухня»
+- `CHANGELOG.md` Post-Correction запись — убрана неверная рамка про «MiniMax discharge»
+- Архитектурная константа №18 в HANDOFF (см. ниже) — «4 роли, 3 провайдера by design»
+
+### Briefing хвосты closure (TZ_ServiceChatNotOverridable закрыт)
+
+Хвост утверждал 3 дыры, при реализации:
+
+**Дыра 1 — ложная.** «UI `/dev/models` не показывает service-chat:*» — автор grep'ал директорию `/dev/models/` и не нашёл match'ей. Но UI получает taskIds через `ALL_TASK_IDS` import из `lib/ai/task-assignments.ts`, прямых упоминаний в директории UI и не должно быть. Все 4 service-chat taskIds (`ben`, `project-creation`, `project-manager`, `briefing-onboarding`) уже присутствуют в `DEFAULT_TASK_MODELS` (task-assignments.ts:174-177) и автоматически рендерятся в UI. Ничего делать не требовалось.
+
+**Дыра 2 — реальная, починена.** `app/(chat)/api/service-chat/route.ts` не импортировал `@/lib/ai/model-overrides-node` → reader `.simply-dev-overrides.json` не регистрировался → dev-panel overrides для всех 4 service chats молча игнорировались. Фикс — +1 side-effect import line с подробным комментарием. Теперь briefing-onboarding (и остальные 3 service chats) переключаемые через `/dev/models` override.
+
+**Дыра 3 — реальная, починена (docs).** `docs/ai-chats-map.md` overview-таблица не разделяла briefing-onboarding (service chat, UI, пользователь видит) от briefing pipeline (backend, cron). Добавлены явные маркеры «Service chat» vs «Backend pipeline (кухня)» в overview-строках. Briefing Onboarding section в детальном блоке получила важное предисловие что она **архитектурно независима** от pipeline, и новую строку «Dev override» в таблице параметров.
+
+### Мета-урок для будущих сессий
+
+1. **Хвосты с «N дыр» чаще бывают «1 дыра + N-1 предположений»** — при closing'е готовиться к тому что scope может быть меньше чем заявлено в оригинальной формулировке. Сверять каждую заявленную дыру против реального кода, а не принимать на веру
+2. **Проверять claim «UI не показывает X»** — если UI динамически импортирует из SSOT-списка, отсутствие match в конкретной директории не значит отсутствия функциональности. Grep по папке — недостаточный индикатор
+3. **Философия продукта живёт в NOTES, не HANDOFF.** HANDOFF — оперативный документ «где мы сейчас», NOTES — append-only история «почему приняли такие решения». Философия серии — это ответ на «почему», место ей в NOTES
+
+### Вторая итерация мета-правила empirical_test_before_model_blame
+
+Предыдущая итерация (2026-04-16 утро): «валидируй метрику перед выводами о моделях». Эта итерация (2026-04-16 вечер): **«проверяй также свои собственные рамки интерпретации продукта перед техническими решениями»**. Моё «cleanup MiniMax» было не ошибкой кода, не ошибкой метрики — это была ошибка на уровне **«что вообще является проблемой»**. Я смешал «технический долг» (OpenRouter, dead code) с «продуктовыми решениями» (MiniMax в кухне). Владелец поправил на уровне философии серии — это тот слой который выше Rule №0 «изучи документацию».
+
+---
+
 ## 2026-04-16 — Correction: URL hallucination была не галлюцинацией, а metric bug (3 раунда диагноза)
 
 **Контекст:** Follow-up сессия после v3.92.0 release. Владимир вернулся с альтернативной гипотезой о корне «URL hallucination в briefing:author». В процессе верификации выяснилось что предыдущий диагноз (мой же, в v3.92.0 CHANGELOG) был неверным на архитектурном уровне — проблемы, которой мы искали, не существовало.
