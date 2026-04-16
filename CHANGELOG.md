@@ -51,14 +51,116 @@
 ---
 
 ### Planned (Next Steps)
-- **Simply_xAI миграция** (активная серия, XAI-1, XAI-2, XAI-3 ✅ завершены + ATTACH-1 ✅ завершён, следующий XAI-4 — Utility/Pipeline batch миграция briefing/podcast/meeting/professor/title): уход с MiniMax + OpenRouter на xAI Grok + Anthropic
-- **TZ_ErrorRecoveryUI Stage 2** ([specs/_backlog/](specs/_backlog/TZ_ErrorRecoveryUI.md)) — root cause fix через useChat state recovery. Stage 1 ✅ сделан в v3.90.0+
-- **TZ_SimplyChatRaceCondition** ([specs/_backlog/](specs/_backlog/TZ_SimplyChatRaceCondition.md)) — `getOrCreateSimplyChat` без partial unique index → race при первых параллельных запросах нового пользователя
-- RAG-4: Библиотека MVP (загрузка документов + search)
+- **Simply_xAI миграция** (активная серия, XAI-1/2/3/4 ✅ + ATTACH-1 ✅ + XAI-5 закрыт scope expansion XAI-4; следующий XAI-6 — очистка MiniMax/OpenRouter, ожидает закрытия [TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md) чтобы можно было убрать MiniMax из каталога)
+- **[TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md)** 🟥 — briefing author 82-91% fabricated URLs на 4 моделях. Architectural, не model issue. Решение: `generateObject` + `z.enum([...allowedUrls])`
+- **[TZ_DevOverridesSideEffectImportAudit](specs/_backlog/TZ_DevOverridesSideEffectImportAudit.md)** 🟥 — 6+ backend routes без reader import. Блокирует A/B тесты
+- **[TZ_ErrorRecoveryUI Stage 2](specs/_backlog/TZ_ErrorRecoveryUI.md)** 🟥 — root cause fix useChat state recovery. Stage 1 ✅ в v3.90.0+
+- Medium хвосты в [specs/_backlog/README.md](specs/_backlog/README.md): ServiceChatNotOverridable, DevPanelFooterHidesSubCalls, TaskExpertChatInputMissingOnFirstOpen, ProfessorPlanStreaming, MaxOutputTokensAudit, SimplyContextUsageWidget, PromptsDeadCodeCleanup, SimplyChatRaceCondition
+- RAG-4: Библиотека MVP (загрузка документов + search) — ТЗ-XAI-COL-1
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
-- Universal document router для chatMode `expertise`/`create` — fallback на модель с `documentSupport.supported=true` когда пользователь шлёт PDF в Grok/MiniMax
 - xAI Files API integration — поднять флаги `documentSupport` для Grok reasoning-моделей
 - Alias entries refactor — устранить дублирование `pricing`/`capabilities` в alias через резолв через `aliasOf`
+
+---
+
+## [3.92.0] — 2026-04-16 — ТЗ-XAI-4 — Utility/Pipeline миграция на Grok + scope expansion (+ XAI-5 закрыт через scope expansion)
+
+**11 taskId переключены на Grok в одной плотной сессии.** Исходный scope ТЗ-XAI-4 (7 точек подсобки + meeting:summary) расширен Владимирскими IDE edits по empirical данным на 4 дополнительных точки «зала» — `simply-chat-think` variant switch, `expertise` (R-5 резолв из scope XAI-5), `create` (перенесено из XAI-5), `memory:extract` variant switch. Scope ТЗ-XAI-5 фактически закрыт без отдельного релиза. Следующий в серии — **ТЗ-XAI-6** (очистка MiniMax/OpenRouter), ожидает закрытия [TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md).
+
+Дополнительно в рамках сессии починены **2 pre-existing архитектурных бага** (dev overrides side-effect import в 4 routes + Anthropic `max_tokens > 21333` streaming threshold), обнаружена **architectural URL hallucination** (82-91% fabricated URLs на 4 разных моделях), и закреплён контракт **Reserved vs deprecated** для записей каталога через placeholder taskId.
+
+### Changed
+
+**Переключения модели (11 taskId в [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)):**
+
+*«Подсобка» на `grok-4-1-fast-non-reasoning` (6 taskId, commit `ceadd17`):*
+- `briefing:filter` — был MiniMax M2.7-long
+- `clerk:task-summary` — был Claude Haiku 4.5
+- `clerk:file-analyzer` — был Claude Haiku 4.5
+- `util:title` — был Claude Haiku 4.5
+- `util:project-summary` — был Claude Haiku 4.5
+- `util:artifact-suggestions` — был Claude Haiku 4.5 (streamObject smoke test PASSED на Grok 4.1 Fast 2026-04-16, запись в [SIMPLY_XAI_NOTES.md](specs/Simply_xAI/SIMPLY_XAI_NOTES.md))
+
+*«Зал» на `grok-4.20-0309-reasoning` (5 taskId, commit `676d50d`):*
+- `meeting:summary` — был Claude Sonnet 4.6 (Этап 3 ТЗ-XAI-4 по плану)
+- `simply-chat-think` — был `grok-4.20-0309-non-reasoning` (variant switch — пересмотр Q1 ТЗ-XAI-3 по empirical данным о multi-step reasoning)
+- `expertise` — был `grok-4.20-multi-agent-0309` (**R-5 резолв** — scope ТЗ-XAI-5)
+- `create` — был MiniMax M2.7 (scope ТЗ-XAI-5)
+- `memory:extract` — был `grok-4.20-0309-non-reasoning` (variant switch — mission-critical quality)
+
+**Документация моделей:**
+- [docs/ai-chats-map.md](docs/ai-chats-map.md) — 8+ синхронизирующих правок под новые taskId назначения + header warning «SSOT — код, не документ» от Владимира
+
+### Added
+
+- **`expertise-multi-agent` taskId** (RESERVED placeholder) в [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) TaskId union + DEFAULT_TASK_MODELS → `grok-4.20-multi-agent-0309`. Namespace зарезервирован под будущий ТЗ-XAI-MA-1 (Premium «Команда агентов» через Responses API + MCP, см. [BRAINSTORM_GrokMultiAgent.md](specs/Simply_xAI/BRAINSTORM_GrokMultiAgent.md))
+- **DevPanel display labels** для 5 Grok вариантов + MiniMax-long в 3 компонентах ([components/dev-panel/sections/model-section.tsx](components/dev-panel/sections/model-section.tsx), [components/dev-panel/dev-panel-footer.tsx](components/dev-panel/dev-panel-footer.tsx), [components/dev-panel/sections/timeline-section.tsx](components/dev-panel/sections/timeline-section.tsx)) — красивые названия вместо raw modelId в UI DevPanel
+- **3 новых backlog хвоста** (созданы в финализации Этапа 4): [TZ_DevOverridesSideEffectImportAudit](specs/_backlog/TZ_DevOverridesSideEffectImportAudit.md) (High), [TZ_ProfessorPlanStreaming](specs/_backlog/TZ_ProfessorPlanStreaming.md) (Medium), [TZ_MaxOutputTokensAudit](specs/_backlog/TZ_MaxOutputTokensAudit.md) (Medium)
+- **4 backlog хвоста** зафиксированы в Этапах 2+3 (pre-existing bugs): [TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md) (High), [TZ_ServiceChatNotOverridable](specs/_backlog/TZ_ServiceChatNotOverridable.md) (Medium), [TZ_DevPanelFooterHidesSubCalls](specs/_backlog/TZ_DevPanelFooterHidesSubCalls.md) (Medium), [TZ_TaskExpertChatInputMissingOnFirstOpen](specs/_backlog/TZ_TaskExpertChatInputMissingOnFirstOpen.md) (Medium)
+
+### Fixed
+
+**Hot-fix 1: plan/route.ts (commit `d9d3488`) — 2 pre-existing бага в одном месте:**
+
+- **Bug A** — `app/(chat)/api/projects/[id]/plan/route.ts` не импортировал `@/lib/ai/model-overrides-node` → reader `.simply-dev-overrides.json` не регистрировался → dev override `professor:planning` молча игнорировался → все 3 попытки планирования шли на Opus вместо выбранной в UI модели. Deterministic `bytesWritten=20223` × 3 retry = не сеть/VPN. +1 import line
+- **Bug B** — `maxOutputTokens` не указан явно → `@ai-sdk/anthropic` подставлял model capability max = 128 000 (Opus 4.6, legit после Anthropic 2026-04-12 128K upgrade). Но Anthropic требует **streaming** для `max_tokens > 21333` ([docs.anthropic.com/en/api/errors#long-requests](https://docs.anthropic.com/en/api/errors#long-requests)). Non-streaming `generateText` → first chunk не успевает за 60s fetch timeout → socket close × 3 retry = 180s fail с `UND_ERR_SOCKET: other side closed`. Фикс: tactical `maxOutputTokens: 16000` (16K < 21333 → non-streaming safe zone). Long-term fix (`streamText`) — [TZ_ProfessorPlanStreaming](specs/_backlog/TZ_ProfessorPlanStreaming.md)
+
+**Hot-fix 2: 3 briefing routes (commit `676d50d`) — та же архитектурная дыра:**
+
+- [app/(chat)/api/briefing/generate/route.ts](app/(chat)/api/briefing/generate/route.ts)
+- [app/(chat)/api/briefing/refresh-section/route.ts](app/(chat)/api/briefing/refresh-section/route.ts)
+- [app/api/cron/briefing/route.ts](app/api/cron/briefing/route.ts)
+
+Все три не импортировали `model-overrides-node` → override для `briefing:author` молча игнорировался, блокируя empirical test альтернативной модели. Фикс: +1 import line в каждый.
+
+**Audit metadata bug (commit `2ca1ac5`):**
+- [app/(chat)/api/meeting/regenerate/route.ts:91](app/(chat)/api/meeting/regenerate/route.ts#L91) — hardcoded `modelId: "claude-sonnet-4-6"` заменён на `getModelIdForTask("meeting:summary")`. Иначе после миграции meeting:summary на Grok 4.20 в БД писалось бы лживое значение. Урок зафиксирован в архитектурной константе №16 HANDOFF серии.
+
+### Removed
+
+- **Dead briefing constants** (commit `2fbc50b`) — `FILTER_MODEL` и `AUTHOR_MODEL` из [lib/briefing/briefing-config.ts](lib/briefing/briefing-config.ts). Наследие ТЗ-Briefing-1, 0 импортов после миграции (grep confirmed), дезинформировали будущего читателя
+
+### Empirical findings (рекомендую прочитать перед работой с briefing или миграциями моделей)
+
+**URL hallucination — architectural, не model issue.** DevPanel Pipeline Trace показал 10/11 URL fabricated в briefing author stage (MiniMax). Ранняя моя диагностика «MiniMax weakness» была ошибочной. Empirical test 2 моделей через hot-fix override:
+
+| Модель | Duration | Cost | Fabricated |
+|---|---|---|---|
+| MiniMax-M2.7 | 137.3s | $0.010 | **10/11 (91%)** |
+| grok-4.20-0309-non-reasoning | 15.6s | $0.044 | **9/11 (82%)** |
+
+4 разные модели (Sonnet, Gemini, MiniMax, Grok 4.20 — Sonnet и Gemini исторически на этой роли) дают 82-91% fabricated. Marginal 9% улучшение при 4.4× цене. Смена модели не решает. Решение — structured output через `generateObject` + `z.enum([...allowedUrls])`. Детали и рекомендация — [TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md). Новое правило в memory `feedback_empirical_test_before_model_blame.md`.
+
+**xAI prompt caching автоматический.** Smoke test streamObject показал 160/405 tokens cached без `providerOptions.xai.cacheControl`. Сервер xAI кэширует system prompt сам — ручная настройка не нужна.
+
+**Grok 4.20 reasoning сильнее чем ожидалось на multi-step tool-calling.** Подтверждено empirically на professor:planning, project:expert, briefing:author, task expert chat. Это повлияло на Владимирские IDE edits — `simply-chat-think` и `memory:extract` переключены на reasoning variant.
+
+### Why this matters
+
+Миграция 11 taskId с зоопарка провайдеров (Sonnet + Haiku + MiniMax) на Grok 4.1 Fast / 4.20 reasoning даёт **экономию ~3-6× на utility задачах** при сохранении качества (empirical проверка через DevPanel + SQL audit). Plus архитектурная победа — «зоопарк Anthropic/Sonnet/MiniMax на одной странице» сведён к **двум серьёзным провайдерам**: xAI Grok (11 новых точек в v3.92.0 + 5 из предыдущих ТЗ серии = 16 всего) и Anthropic Claude (остался только на высокого уровня задачах: Opus для professor, Sonnet для артефактов, Haiku для vision OCR).
+
+**Scope expansion как паттерн.** Владимир как product-owner расширил scope ТЗ-XAI-4 напрямую в IDE после empirical данных Этапа 2 (professor:planning + project:expert успешно работали на Grok 4.20 через override), обошёл формальные Этапы 3/4 и сразу принял 5 архитектурных решений. Правило для серии: такие изменения фиксируются как append-only записи в [SIMPLY_XAI_NOTES.md](specs/Simply_xAI/SIMPLY_XAI_NOTES.md), ROADMAP обновляется ретроспективно.
+
+**Reserved vs deprecated семантика.** Запись `grok-4.20-multi-agent-0309` в каталоге осталась после снятия `expertise` с multi-agent variant (2026-04-16). Правильный фрейминг — **RESERVED под будущий ТЗ-XAI-MA-1**, не deprecated. Маркер: placeholder taskId `expertise-multi-agent` в TaskId union + notes в каталоге + 🔒 в docs + cross-ref в ROADMAP. Без этого будущая сессия могла бы удалить запись как dead code. Зафиксировано архитектурной константой №15 HANDOFF серии.
+
+### Validation
+
+- [x] `npx tsc --noEmit` → 0 ошибок после каждой правки task-assignments
+- [x] `npm run build` → успешен
+- [x] **SQL confirmation (`ai_usage_log`):**
+  - `clerk:file-analyzer` → grok-4-1-fast-non-reasoning ✅ (3 calls)
+  - `util:title` (logged as `util:auto-naming`, pre-existing inconsistency) → grok-4-1-fast-non-reasoning ✅
+  - `briefing:filter` → grok-4-1-fast-non-reasoning ✅
+  - `professor:planner` → grok-4.20-0309-non-reasoning ✅ (через dev override + hot-fix plan route)
+  - `project:expert` → grok-4.20-0309-non-reasoning ✅ (через dev override)
+  - `briefing:author` empirical test → grok-4.20-0309-non-reasoning ✅
+- [x] Не триггерились, но scope принят Владельцем (Gate C Вариант A): `clerk:task-summary`, `util:project-summary`, `util:artifact-suggestions`, `meeting:summary`, `simply-chat-think`, `memory:extract`
+
+### Notes
+
+- **Архитектурные константы, добавленные в HANDOFF серии (№10-16):** Dev overrides global gap, Non-streaming maxOutputTokens = timeout-bomb, Empirical test перед model-blame, SSOT в коде > документация, xAI prompt caching автоматический, Reserved vs deprecated семантика, Audit metadata hardcoded modelId проверка при миграции. См. [specs/Simply_xAI/HANDOFF.md](specs/Simply_xAI/HANDOFF.md)
+- **Scope ТЗ-XAI-5 закрыт без релиза** — `create` + `expertise` + R-5 покрыты scope expansion ТЗ-XAI-4. Отдельный release commit для XAI-5 не нужен
+- **Следующий в серии — ТЗ-XAI-6** (очистка MiniMax/OpenRouter). Ожидает закрытия [TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md) потому что briefing author/section/podcast-script остаются на MiniMax до перехода на `generateObject` + `z.enum`
 
 ---
 

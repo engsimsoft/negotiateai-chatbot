@@ -1,7 +1,7 @@
 # Simply — Дорожная карта миграции на xAI
 
 **Создано:** 2026-04-14  
-**Обновлено:** 2026-04-15  
+**Обновлено:** 2026-04-16 (после ТЗ-XAI-4 ✅ завершён, v3.92.0)  
 **Статус:** В работе  
 **Серия:** ТЗ-XAI-1 → ТЗ-XAI-6 (+ ТЗ-ATTACH-1 + будущие расширения)
 
@@ -137,39 +137,52 @@
 
 ---
 
-### ТЗ-XAI-4 — Utility/Pipeline → Grok
-**Статус:** 📋 Планируется  
-**Зависимости:** ТЗ-XAI-1  
-**Риск:** низкий  
+### ТЗ-XAI-4 — Utility/Pipeline → Grok (+ scope expansion)
+**Статус:** ✅ Завершён 2026-04-16 (v3.92.0)
+**Зависимости:** ТЗ-XAI-1
+**Риск:** низкий (подтверждён мануальным тестом)
 
-**Суть:** Массовое переключение ~12 "лёгких" вызовов: briefing (author, section, filter), meeting-summary, podcast-script, professor-pipeline (3 шага), clerk-task-summary, professor-review, project-summary, title-generation, artifact handlers.
+**Суть (исходная):** переключить utility/pipeline точки на Grok по двум тир-группам — «подсобка» (Grok 4.1 Fast) и «зал» (Grok 4.20).
 
-**Подшаги:**
-1. Сначала utility (title, suggestions, summaries) — простые, без providerOptions
-2. Потом briefing pipeline — проверить работу стриминга
-3. Потом professor/clerk — адаптировать `providerOptions.anthropic.thinking` → убрать или заменить на xAI reasoning
+**Что фактически сделано (11 taskId):**
 
-**Примечание:** professor-review использует `anthropic: { thinking: { adaptive, effort: "high" } }`. Для Grok reasoning активен автоматически — параметр просто убирается.
+*Этап 2 — «подсобка» на `grok-4-1-fast-non-reasoning` (6 taskId, commit `ceadd17`):*
+- `briefing:filter`, `clerk:task-summary`, `clerk:file-analyzer`, `util:title`, `util:project-summary`, `util:artifact-suggestions`
+
+*Этап 3 + scope expansion — «зал» на `grok-4.20-0309-reasoning` (5 taskId, commit `676d50d`):*
+- `meeting:summary` (Этап 3 по исходному плану)
+- `simply-chat-think` (variant switch non-reasoning → reasoning, пересмотр Q1 ТЗ-XAI-3 по empirical данным)
+- `expertise` (**R-5 резолв** — перенесено из scope ТЗ-XAI-5)
+- `create` (**перенесено из ТЗ-XAI-5**)
+- `memory:extract` (variant switch non-reasoning → reasoning, empirical confidence в Grok 4.20 reasoning на multi-step задачах)
+
+*Этап 4 — финализация (v3.92.0):* v3.92.0 release commit + 3 новых backlog хвоста (DevOverridesSideEffectImportAudit, ProfessorPlanStreaming, MaxOutputTokensAudit)
+
+**2 hot-fix pre-existing багов (side-effect):**
+- `plan/route.ts` — добавлен `import "@/lib/ai/model-overrides-node"` (dev override для professor:planning молча игнорировался) + tactical `maxOutputTokens: 16000` (Anthropic streaming threshold 21333). Commit `d9d3488`
+- 3 briefing routes (generate + refresh-section + cron) — тот же side-effect import. Commit `676d50d`
+
+**Empirical находка (не решено, отдельный хвост):** briefing:author выдумывает 82-91% URLs — 4 модели одинаково плохо (Sonnet, Gemini, MiniMax, Grok 4.20). Architectural issue, не model issue. → [TZ_BriefingAuthorUrlHallucination](../_backlog/TZ_BriefingAuthorUrlHallucination.md)
+
+**Expertise-multi-agent RESERVED:** запись каталога `grok-4.20-multi-agent-0309` **не удалена**, а зарезервирована через placeholder taskId `expertise-multi-agent` под будущий ТЗ-XAI-MA-1 (commit `2fbc50b`).
+
+**Follow-up (commit `2fbc50b`):** multi-agent RESERVED fix, dead briefing constants cleanup, DevPanel Grok display labels.
+
+**Подробности:** [TZ_xai_4_UtilityPipelines/](TZ_xai_4_UtilityPipelines/) · [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) записи 2026-04-16 · [SIMPLY_XAI_CHANGELOG.md](SIMPLY_XAI_CHANGELOG.md) v3.92.0
 
 ---
 
 ### ТЗ-XAI-5 — Create / Expertise → Grok 4.20 (+ R-5)
-**Статус:** 📋 Планируется (сужено после ТЗ-XAI-3)
-**Зависимости:** ТЗ-XAI-3 (KITT + Think должны работать)
-**Риск:** средний
+**Статус:** ✅ **фактически закрыт в ТЗ-XAI-4 scope expansion** (2026-04-16, v3.92.0)
+**Зависимости:** ТЗ-XAI-3
 
-**Суть:** Переключить Create и Expertise на Grok 4.20 через Chat Completions. Think **уже на Grok 4.20** после ТЗ-XAI-3 — не в scope.
+**Что произошло:** scope ТЗ-XAI-5 полностью покрыт scope expansion ТЗ-XAI-4:
+- ✅ **R-5** — `expertise` → `grok-4.20-0309-reasoning` (через Владимирский IDE edit в scope ТЗ-XAI-4 Этапа 3)
+- ✅ `create` → `grok-4.20-0309-reasoning` (через Владимирский IDE edit в scope ТЗ-XAI-4 Этапа 3)
 
-**Что меняется:**
-- **[R-5]** expertise → **`grok-4.20-0309-non-reasoning`** (явно, не multi-agent). Сейчас expertise указывает на `grok-4.20-multi-agent-0309`, но вызывается через Chat Completions — multi-agent работает только через Responses API → фактически сейчас это обычный Grok 4.20 просто с дороже выглядящим именем. В `ai_usage_log` за всю историю — 1 вызов. Переключение на single-agent variant — фиксация реального поведения
-- create → Grok 4.20 (с нашими tools через function calling)
+**Остаётся только в теории:** если после production наблюдений появится идея вернуть `expertise` на non-reasoning variant из экономии — это отдельный product decision, не отдельное ТЗ миграции.
 
-**Убрано из scope (перенесено в XAI-3):**
-- ~~simply-chat-think → Grok 4.20~~ — **уже сделано в ТЗ-XAI-3** (v3.90.0)
-
-**Ключевой момент:** Expertise сейчас использует deepResearch (Perplexity). Оставляем — это наш tool, работает через function calling. Встроенный web_search от xAI — дополнительная опция на будущее.
-
-**Multi-agent отложен** в отдельную будущую ветку ТЗ-XAI-MA-1 через Responses API + MCP сервер для custom tools. См. [BRAINSTORM_GrokMultiAgent.md](BRAINSTORM_GrokMultiAgent.md).
+**Multi-agent отложен** в ТЗ-XAI-MA-1 (Responses API + MCP), taskId `expertise-multi-agent` зарезервирован в [task-assignments.ts](../../lib/ai/task-assignments.ts). См. [BRAINSTORM_GrokMultiAgent.md](BRAINSTORM_GrokMultiAgent.md).
 
 ---
 
@@ -233,8 +246,8 @@
 | ТЗ-XAI-2 | ✅ Завершён | 2026-04-14 | 2026-04-15 | v3.89.0 — 5 memory tasks → Grok (extract на 4.20, остальные на 4.1 Fast), native generateObject, создан MIND_ARCHITECTURE.md |
 | ТЗ-XAI-3 | ✅ Завершён | 2026-04-15 | 2026-04-15 | v3.90.0 — KITT → Grok 4.1 Fast, Think → Grok 4.20 (расширен scope), R-6 cleanup (80 строк strip-функций удалено). **Note:** R-6 сделан неполно — восстановлен правильно в v3.90.2 через adaptHistoryToCapabilities |
 | ТЗ-SimplyChatModeInjection | ✅ Завершён | 2026-04-15 | 2026-04-15 | v3.90.1 — плейсхолдеры `<current_mode>`/`<current_model>` через SSOT model-catalog (hotfix из backlog вне серии xAI) |
-| ТЗ-SimplyReadDocumentTool + R-6 correction | 🔄 В работе | 2026-04-15 | — | v3.90.2 — удаление мёртвого readDocument tool + adaptHistoryToCapabilities через SSOT (правильная реализация R-6 из XAI-3 через capabilities каталога) |
-| ТЗ-ATTACH-1 | 📋 План (следующий) | — | — | PDF text extraction при upload — избавит от Haiku overhead для текстовых PDF. См. [SIMPLY_ATTACHMENT_ARCHITECTURE.md](SIMPLY_ATTACHMENT_ARCHITECTURE.md) |
-| ТЗ-XAI-4 | 📋 План | — | — | Utility/Pipeline batch миграция |
-| ТЗ-XAI-5 | 📋 План (сужено) | — | — | Create + Expertise + R-5 (Think уже на Grok 4.20 после XAI-3) |
-| ТЗ-XAI-6 | 📋 План | — | — | Очистка MiniMax/OpenRouter |
+| ТЗ-SimplyReadDocumentTool + R-6 correction | ✅ Завершён | 2026-04-15 | 2026-04-15 | v3.90.2 — удаление мёртвого readDocument tool + adaptHistoryToCapabilities через SSOT (правильная реализация R-6 из XAI-3 через capabilities каталога) |
+| ТЗ-ATTACH-1 | ✅ Завершён | 2026-04-16 | 2026-04-16 | v3.91.0 — PDF text extraction при upload, текстовые PDF → `text/plain` → Grok inline, сканы → Haiku |
+| ТЗ-XAI-4 | ✅ Завершён | 2026-04-16 | 2026-04-16 | v3.92.0 — 11 taskId на Grok (6 подсобка Fast + 5 зал 4.20 reasoning, включая Владимирский scope expansion) + 2 hot-fix pre-existing багов (side-effect import + maxOutputTokens) + 3 новых backlog хвоста |
+| ТЗ-XAI-5 | ✅ Закрыт через scope expansion ТЗ-XAI-4 | — | 2026-04-16 | create + expertise + R-5 выполнены Владимирскими IDE edits в scope ТЗ-XAI-4 |
+| ТЗ-XAI-6 | 📋 План (следующий в серии) | — | — | Очистка MiniMax/OpenRouter — registry namespaces, caталог, strip-функции, dependency |

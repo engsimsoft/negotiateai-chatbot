@@ -1,6 +1,6 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.91.0
+**Версия:** 3.92.0
 **Статус:** Active development (серия Simply_xAI)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -14,7 +14,7 @@
 
 **Философия:** Apple-подход (качество важнее количества) + Best-in-Class API (интегрируем лучшие решения, не изобретаем). Детали видения → [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md).
 
-**Мультипровайдерная маршрутизация:** xAI Grok (Simply Chat, MIND, Экспертиза), Anthropic Claude (vision, артефакты, клерки, профессор, project expert), MiniMax (создание, briefing pipeline). SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) + [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts).
+**Мультипровайдерная маршрутизация:** xAI Grok (Simply Chat, MIND, Экспертиза, Создание, утилиты, meeting summary), Anthropic Claude (vision, артефакты, клерки, профессор, project expert, service chats), MiniMax (**только** briefing pipeline — author/section/podcast-script, до закрытия [TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md)). SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) + [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts).
 
 ---
 
@@ -24,15 +24,15 @@
 
 | Компонент | Статус | Модели / стек |
 |---|---|---|
-| **Simply Chat** (persistent, один на пользователя) | ✅ | Grok 4.1 Fast (default) · Grok 4.20 (кнопка «Думать») · Claude Haiku 4.5 (vision) |
-| **Экспертиза** (одноразовые экспертные запросы) | ✅ | Grok 4.20 Multi-Agent |
-| **Создание** (одноразовые creation-чаты) | ✅ | MiniMax M2.7 |
+| **Simply Chat** (persistent, один на пользователя) | ✅ | Grok 4.1 Fast (default) · Grok 4.20 reasoning (кнопка «Думать») · Claude Haiku 4.5 (vision) |
+| **Экспертиза** (одноразовые экспертные запросы) | ✅ | Grok 4.20 reasoning (single-agent, R-5 резолв 2026-04-16). Multi-agent вариант 🔒 зарезервирован под ТЗ-XAI-MA-1 |
+| **Создание** (одноразовые creation-чаты) | ✅ | Grok 4.20 reasoning (мигрировано 2026-04-16) |
 | **Проекты** (изолированные рабочие пространства) | ✅ | Claude Haiku / Sonnet / Opus по tier, Профессор (Opus planning/review + Haiku execute) |
-| **База знаний — MIND** (Слой 3 RAG, auto из разговоров) | ✅ | Grok 4.20 (extract) + Grok 4.1 Fast (batch, consolidate, profile, dedup) + Voyage AI (embeddings) + pgvector |
+| **База знаний — MIND** (Слой 3 RAG, auto из разговоров) | ✅ | Grok 4.20 reasoning (extract) + Grok 4.1 Fast (batch, consolidate, profile, dedup) + Voyage AI (embeddings) + pgvector |
 | **База знаний — Collections** (Слой 3 RAG, явная загрузка документов) | 📋 план | xAI Grok Collections API из коробки (`knowledge_search` / `file_search`). Отдельного векторного стека не строим. ТЗ-XAI-COL-1 |
-| **Briefing** (hourly Vercel Cron) | ✅ | MiniMax M2.7-long (filter, author, section) · MiniMax M2.7 (podcast-script) |
+| **Briefing** (hourly Vercel Cron) | ✅ | Grok 4.1 Fast (filter) · MiniMax M2.7-long (author, section) · MiniMax M2.7 (podcast-script). Миграция author/section на Grok отложена до [TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md) |
 | **Podcast** (attached to briefing) | ✅ | Gemini TTS (длинный формат, blob storage) |
-| **Meeting Recorder** | ✅ | Deepgram Nova-3 (STT) + Claude Sonnet (summary) |
+| **Meeting Recorder** | ✅ | Deepgram Nova-3 (STT) + Grok 4.20 reasoning (summary, мигрировано 2026-04-16) |
 | **Telegram Bot + Groups** | ✅ | Custom bot + ingestion pipeline |
 | **Artifacts** (text, markdown, excel, reveal, pptx) | ✅ | Claude Sonnet для всех 5 типов |
 | **Service Chats** (project-creation, project-manager, briefing-onboarding) | ✅ | Claude Haiku / Sonnet |
@@ -117,13 +117,20 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). Сводка на с
 
 ### 🟥 High impact
 
-- **[TZ_ErrorRecoveryUI](specs/_backlog/TZ_ErrorRecoveryUI.md)** — Stage 2 root cause fix: useChat state recovery через правильную обработку `clearError` для не-ChatSDK ошибок. Stage 1 (hint в красном флаге) уже сделан.
+- **[TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md)** — briefing author выдумывает 82-91% URLs. Empirical test 4 моделей (Sonnet, Gemini, MiniMax, Grok 4.20) — architectural issue, не model issue. Блокирует миграцию briefing author/section с MiniMax. Решение: `generateObject` + `z.enum([...allowedUrls])`.
+- **[TZ_DevOverridesSideEffectImportAudit](specs/_backlog/TZ_DevOverridesSideEffectImportAudit.md)** — 6+ backend routes без side-effect import `model-overrides-node` → dev panel overrides молча игнорируются. Блокирует A/B тесты. Рекомендация: `instrumentation.ts` register-on-boot + ADR 048 update.
+- **[TZ_ErrorRecoveryUI](specs/_backlog/TZ_ErrorRecoveryUI.md)** — Stage 2 root cause fix: useChat state recovery через `clearError`. Stage 1 (hint в красном флаге) уже сделан.
 
 ### 🟧 Medium impact
 
-- **[TZ_SimplyContextUsageWidget](specs/_backlog/TZ_SimplyContextUsageWidget.md)** — виджет контекста в Simply показывает не ту шкалу (привязан к `contextWindow` модели, не к `SIMPLY_CONTEXT_LIMIT`). Даёт ложную тревогу. Плюс подозрительное 128K для Grok 4.1 Fast в каталоге.
+- **[TZ_ServiceChatNotOverridable](specs/_backlog/TZ_ServiceChatNotOverridable.md)** — 3 дыры: UI `/dev/models` не показывает service-chat selectors + `service-chat/route.ts` не импортирует reader + docs ai-chats-map не разделяет briefing-onboarding и pipeline.
+- **[TZ_DevPanelFooterHidesSubCalls](specs/_backlog/TZ_DevPanelFooterHidesSubCalls.md)** — DevPanel footer скрывает nested subcalls (artifacts, clerks, tools). Backend `ai_usage_log` корректен, только frontend aggregation.
+- **[TZ_TaskExpertChatInputMissingOnFirstOpen](specs/_backlog/TZ_TaskExpertChatInputMissingOnFirstOpen.md)** — `multimodal-input` не рендерится при входе в task expert chat из режима планирования. Hard reload лечит.
+- **[TZ_ProfessorPlanStreaming](specs/_backlog/TZ_ProfessorPlanStreaming.md)** — long-term fix plan/route.ts timeout: переход `generateText` → `streamText`. Hot-fix `maxOutputTokens: 16000` — tactical.
+- **[TZ_MaxOutputTokensAudit](specs/_backlog/TZ_MaxOutputTokensAudit.md)** — явный `maxOutputTokens` для всех ~20 call sites. Предотвращает повторение инцидента d9d3488.
+- **[TZ_SimplyContextUsageWidget](specs/_backlog/TZ_SimplyContextUsageWidget.md)** — виджет контекста показывает не ту шкалу (привязан к `contextWindow` модели, не к `SIMPLY_CONTEXT_LIMIT`).
 - **[TZ_PromptsDeadCodeCleanup](specs/_backlog/TZ_PromptsDeadCodeCleanup.md)** — удалить мёртвые экспорты из `lib/ai/prompts.ts`. 90% файла dead.
-- **[TZ_SimplyChatRaceCondition](specs/_backlog/TZ_SimplyChatRaceCondition.md)** — `getOrCreateSimplyChat` без partial unique index → race при первых параллельных запросах нового пользователя.
+- **[TZ_SimplyChatRaceCondition](specs/_backlog/TZ_SimplyChatRaceCondition.md)** — `getOrCreateSimplyChat` без partial unique index.
 
 **Правило backlog (из `specs/WORKFLOW.md`):** перед стартом нового крупного ТЗ — пройтись по списку и предложить владельцу закрыть или игнорировать. Решение за владельцем.
 
@@ -163,4 +170,4 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). Сводка на с
 
 ---
 
-**Обновлено:** 2026-04-15 (TZ_DocsCleanup Этап 3 — переписан как snapshot)
+**Обновлено:** 2026-04-16 (ТЗ-XAI-4 ✅ v3.92.0 — 11 taskId на Grok, expertise/create/meeting:summary/memory:extract/briefing:filter + утилиты)

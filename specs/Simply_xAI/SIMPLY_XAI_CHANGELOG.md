@@ -48,6 +48,100 @@
 
 ---
 
+## [ТЗ-XAI-4 + scope expansion] 2026-04-16 — Utility/Pipeline миграция + IDE scope expansion — v3.92.0
+
+**Коммиты:** `ceadd17` (Этап 2 «подсобка»), `d9d3488` (plan/route.ts hot-fix), `d1e2c12` (2 backlog хвоста), `676d50d` (Этапы 3 + scope expansion + briefing hot-fix + 2 backlog хвоста), `2ca1ac5` (HANDOFF v1), `2fbc50b` (multi-agent RESERVED correction + dead constants + DevPanel labels), `5b1a141` (HANDOFF v2), `<release v3.92.0>` (этот release)
+
+**Продолжительность:** одна плотная сессия (2026-04-16)
+
+**Что сделано:**
+
+1. **Этап 2 — «подсобка» на `grok-4-1-fast-non-reasoning` (6 taskId):**
+   - `briefing:filter`, `clerk:task-summary`, `clerk:file-analyzer`, `util:title`, `util:project-summary`, `util:artifact-suggestions`
+   - [lib/ai/task-assignments.ts](../../lib/ai/task-assignments.ts) + inline-комментарии ТЗ-XAI-4
+   - [docs/ai-chats-map.md](../../docs/ai-chats-map.md) — 8 синхронизирующих правок
+
+2. **Этап 3 + scope expansion — «зал» на `grok-4.20-0309-reasoning` (5 taskId, Владимирские IDE edits по empirical данным):**
+   - `meeting:summary` (Этап 3 по плану, ранее Sonnet)
+   - `simply-chat-think` (variant switch: non-reasoning → reasoning, пересмотр Q1 ТЗ-XAI-3 после empirical на multi-step задачах)
+   - `expertise` (**R-5 резолв** — перенесено из scope ТЗ-XAI-5)
+   - `create` (перенесено из ТЗ-XAI-5 в scope expansion)
+   - `memory:extract` (variant switch: non-reasoning → reasoning — mission-critical quality важнее экономии)
+
+3. **Hot-fix 1 (commit `d9d3488`) — plan/route.ts:**
+   - **Bug A:** отсутствующий `import "@/lib/ai/model-overrides-node"` → dev override для `professor:planning` молча игнорировался → все 3 попытки шли на Opus. Идентичный `bytesWritten=20223` × 3 retry = deterministic
+   - **Bug B:** Anthropic требует streaming для `max_tokens > 21333`. Без явного `maxOutputTokens` `@ai-sdk/anthropic` подставлял 128 000 (Opus 4.6 capability) → non-streaming `generateText` не укладывался в 60s fetch timeout → socket close × 3 retry = 180s fail
+   - **Фикс:** +1 import line + `maxOutputTokens: 16000` (tactical, под 21333 safe zone)
+
+4. **Hot-fix 2 (commit `676d50d`) — 3 briefing routes:**
+   - Та же архитектурная дыра в `briefing/generate/route.ts`, `briefing/refresh-section/route.ts`, `cron/briefing/route.ts` — ни один не импортировал `model-overrides-node`
+   - Фикс: +1 import line в каждый → override для `briefing:author` снова работает (было нужно для empirical test URL hallucination)
+
+5. **Multi-agent RESERVED correction (commit `2fbc50b`):**
+   - `expertise-multi-agent` taskId добавлен как RESERVED placeholder в [task-assignments.ts](../../lib/ai/task-assignments.ts) TaskId union + DEFAULT_TASK_MODELS → `grok-4.20-multi-agent-0309` с подробным комментарием (ТЗ-XAI-MA-1)
+   - [model-catalog.ts](../../lib/ai/model-catalog.ts) notes обновлены: «RESERVED под taskId expertise-multi-agent, реализация в ТЗ-XAI-MA-1» вместо «expertise переведён, запись остаётся для аудита»
+   - [docs/ai-chats-map.md](../../docs/ai-chats-map.md) — 🔒 Reserved маркер + row в overview + cross-reference в [SIMPLY_XAI_ROADMAP.md](SIMPLY_XAI_ROADMAP.md)
+
+6. **Dead code cleanup (commit `2fbc50b`):**
+   - [lib/briefing/briefing-config.ts](../../lib/briefing/briefing-config.ts) — удалены `FILTER_MODEL` + `AUTHOR_MODEL` (0 импортов после миграции, grep confirmed)
+   - DevPanel Grok display labels в 3 компонентах ([model-section.tsx](../../components/dev-panel/sections/model-section.tsx), [dev-panel-footer.tsx](../../components/dev-panel/dev-panel-footer.tsx), [timeline-section.tsx](../../components/dev-panel/sections/timeline-section.tsx)) — добавлены лейблы для 5 Grok вариантов + MiniMax-long
+
+7. **Audit metadata fix (commit `2ca1ac5` / `676d50d`):**
+   - `meeting/regenerate/route.ts:91` — hardcoded `modelId: "claude-sonnet-4-6"` заменён на `getModelIdForTask("meeting:summary")` (иначе после миграции meeting:summary на Grok 4.20 в БД писалось бы лживое значение)
+   - Зафиксировано правило в [HANDOFF.md](HANDOFF.md) архитектурная константа №16
+
+8. **Этап 4 — финализация (v3.92.0 release):**
+   - 3 новых backlog хвоста: [TZ_DevOverridesSideEffectImportAudit.md](../_backlog/TZ_DevOverridesSideEffectImportAudit.md) (High), [TZ_ProfessorPlanStreaming.md](../_backlog/TZ_ProfessorPlanStreaming.md) (Medium), [TZ_MaxOutputTokensAudit.md](../_backlog/TZ_MaxOutputTokensAudit.md) (Medium)
+   - 4 backlog хвоста зафиксированы в Этапах 2+3 (все pre-existing): [TZ_BriefingAuthorUrlHallucination.md](../_backlog/TZ_BriefingAuthorUrlHallucination.md) (High), [TZ_ServiceChatNotOverridable.md](../_backlog/TZ_ServiceChatNotOverridable.md) (Medium), [TZ_DevPanelFooterHidesSubCalls.md](../_backlog/TZ_DevPanelFooterHidesSubCalls.md) (Medium), [TZ_TaskExpertChatInputMissingOnFirstOpen.md](../_backlog/TZ_TaskExpertChatInputMissingOnFirstOpen.md) (Medium)
+   - Архив `specs/Simply_xAI/TZ_xai_4_UtilityPipelines/` → `_archive/` + `BACKLOG_CLOSED.md`
+
+**Итого изменённых taskId: 11** (6 подсобка + 5 зал). Исходный scope был 7, scope expansion добавил 4 через Владимирские IDE edits по empirical данным.
+
+**Важная empirical находка (не решено, отдельный хвост [TZ_BriefingAuthorUrlHallucination.md](../_backlog/TZ_BriefingAuthorUrlHallucination.md)):** `briefing:author` выдумывает 82-91% URLs на 4 разных моделях (Sonnet, Gemini, MiniMax M2.7, Grok 4.20 non-reasoning). Empirical test 2026-04-16: MiniMax 10/11 (91%) fabricated vs Grok 4.20 9/11 (82%) fabricated. Marginal 9% улучшение при 4.4× цене. **Architectural issue (prompt + presentation + отсутствие schema enforcement), не model issue.** Новое правило в memory `feedback_empirical_test_before_model_blame.md`. Рекомендованное решение — `generateObject` + `z.enum([...allowedUrlsFromFilter])`.
+
+**Что НЕ сделано (и почему):**
+
+- `briefing:author` / `briefing:section` / `briefing:podcast-script` НЕ переключены на Grok — оставлены на MiniMax M2.7 до закрытия [TZ_BriefingAuthorUrlHallucination.md](../_backlog/TZ_BriefingAuthorUrlHallucination.md). Смена модели не решит URL hallucination, это отдельный architectural fix
+- `professor:*` — не тронуты, premium tier на Opus 4.6 остаётся (Q1)
+- `project:expert:*` — не тронуты, tier system остаётся
+- `clerk:snapshot` — dead code per ADR 052, будет удалён в ТЗ-XAI-6
+- `service-chat:*` — Q4 решение, отдельное ТЗ (связано с [TZ_ServiceChatNotOverridable.md](../_backlog/TZ_ServiceChatNotOverridable.md))
+- `artifact:*` — Q2 витрина, остаются на Sonnet (качество важнее цены в этих точках)
+- `vision:ocr` — Haiku 4.5, capability-критично
+- Global audit dev overrides side-effect import — **отдельный хвост** [TZ_DevOverridesSideEffectImportAudit.md](../_backlog/TZ_DevOverridesSideEffectImportAudit.md). В этой сессии закрыли только 4 из ~10 routes через hot-fix
+- Long-term fix plan/route.ts timeout (streamText переход) — **отдельный хвост** [TZ_ProfessorPlanStreaming.md](../_backlog/TZ_ProfessorPlanStreaming.md)
+- Явный `maxOutputTokens` по всей кодовой базе — **отдельный хвост** [TZ_MaxOutputTokensAudit.md](../_backlog/TZ_MaxOutputTokensAudit.md)
+
+**Связанные документы:**
+- [TZ_xai_4_UtilityPipelines/ANALYSIS.md](TZ_xai_4_UtilityPipelines/ANALYSIS.md) — scope, audit findings, Q-A…Q-D решения
+- [TZ_xai_4_UtilityPipelines/ROADMAP.md](TZ_xai_4_UtilityPipelines/ROADMAP.md) — чеклист этапов
+- [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) записи 2026-04-16 «ТЗ-XAI-4 Этапы 2+3 + scope expansion + 4 hot-fixes» и «Multi-agent reservation correction + dead code cleanup»
+
+**Следующий шаг:**
+- **ТЗ-XAI-6** — очистка MiniMax/OpenRouter (зависит от закрытия [TZ_BriefingAuthorUrlHallucination.md](../_backlog/TZ_BriefingAuthorUrlHallucination.md) — пока он не закрыт, MiniMax M2.7 нужен для briefing pipeline)
+- **ТЗ-XAI-5** — фактически закрыт scope expansion ТЗ-XAI-4 (create + expertise + R-5 уже мигрированы)
+
+---
+
+## [ТЗ-ATTACH-1] 2026-04-16 — PDF text extraction при upload — v3.91.0
+
+**Коммиты:** `dbe6bdf` (release v3.91.0), `6e6867b` (archive TZ_ATTACH_1)
+
+**Продолжительность:** одна сессия (2026-04-16, утро)
+
+**Что сделано:** Реализация Слоя 0 из [SIMPLY_ATTACHMENT_ARCHITECTURE.md](SIMPLY_ATTACHMENT_ARCHITECTURE.md) — текстовые PDF извлекаются в `text/plain` при загрузке через pdf-parse v2 (`new PDFParse({ data }).getText()`), сохраняются в Vercel Blob с переименованием `.pdf → .txt`. Эвристика scan detection (`avgCharsPerPage < 30` для ≥2 страниц, `text.length < 100` для 1 страницы) — сканы остаются `application/pdf` и идут на Haiku нативно. Truncate при `text.length > 50000` с маркером. Один механизм, capability-agnostic, $0 AI cost.
+
+**Что НЕ сделано (намеренно):** сканированные PDF остаются на Haiku как сейчас, очень большие PDF (>N страниц) обсуждается в SIMPLY_ATTACHMENT_ARCHITECTURE.md для будущих итераций (возможно Collections).
+
+**Связанные документы:**
+- [TZ_ATTACH_1/](../../_archive/TZ_ATTACH_1/) (архив)
+- [lib/pdf/extract-pdf-text.ts](../../lib/pdf/extract-pdf-text.ts) — shared utility
+- [CHANGELOG.md](../../CHANGELOG.md) v3.91.0 запись
+
+**Следующий шаг:** ТЗ-XAI-4 (запустился в той же сессии следующим потоком)
+
+---
+
 ## [TZ_SimplyReadDocumentTool + R-6 correction] 2026-04-15 — v3.90.2
 
 **Коммиты:** TBD (single release commit)
