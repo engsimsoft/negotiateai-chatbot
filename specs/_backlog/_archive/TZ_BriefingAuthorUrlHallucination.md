@@ -1,10 +1,24 @@
+# ⚠️ SUPERSEDED 2026-04-16 — проблема была в метрике, не в моделях
+
+> **Этот хвост отменён.** Root cause «82-91% fabricated URLs» оказался не в моделях (MiniMax/Grok/Sonnet/Gemini) и не в промпте briefing-author, а в **наивной `Set.has(url)` метрике без нормализации** в `verifyArticleUrls()`. Любая форматная разница (UTM, anchor, trailing slash, www./без, http/https) классифицировала корректно скопированный URL как fabricated.
+>
+> **Реальный фикс:** `normalizeUrlForComparison()` в [lib/ai/pipeline-trace.ts](../../../lib/ai/pipeline-trace.ts) — commit `58d9d2e` (2026-04-16). Smoke test показал OLD метрика 88% fabricated → NEW 25% (оставшиеся — контрольные реально выдуманные URL).
+>
+> **Связанный активный хвост:** [TZ_UrlVerificationMetricNormalization](../TZ_UrlVerificationMetricNormalization.md) — дальнейшая очистка (unit test suite, extended tracking params audit, ADR update).
+>
+> **Диагноз в 3 раундах + мета-урок:** [specs/Simply_xAI/SIMPLY_XAI_NOTES.md](../../Simply_xAI/SIMPLY_XAI_NOTES.md) запись 2026-04-16 «Correction: URL hallucination была не галлюцинацией».
+>
+> Содержимое ниже сохранено как исторический артефакт — демонстрация того, как неправильно интерпретированная метрика может выглядеть как убедительная architectural issue на 4 разных моделях подряд.
+
+---
+
 # ТЗ-BriefingAuthorUrlHallucination — briefing author выдумывает 82-91% URL (все модели одинаково)
 
-**Статус:** Хвост, **High impact** (качество продуктивного output)
+**Статус:** ⚠️ **SUPERSEDED** 2026-04-16 — проблема была в метрике, не в моделях
 **Создано:** 2026-04-16 (сессия ТЗ-XAI-4 Этап 2, мануальное тестирование briefing)
-**Обновлено:** 2026-04-16 — после empirical test Grok 4.20 vs MiniMax подтверждено что проблема в промпте/архитектуре, не в модели. Владимир уточнил: ранее эту роль выполняли Sonnet и Gemini — **тоже галлюцинировали URL**, именно поэтому была добавлена метрика `fabricated` как детектор hallucination в принципе (не конкретной модели).
+**Обновлено:** 2026-04-16 — после empirical test Grok 4.20 vs MiniMax подтверждено что проблема в промпте/архитектуре, не в модели. Владимир уточнил: ранее эту роль выполняли Sonnet и Gemini — **тоже галлюцинировали URL**, именно поэтому была добавлена метрика `fabricated` как детектор hallucination в принципе (не конкретной модели). *[Этот апдейт впоследствии также опровергнут — root cause оказался в самой метрике.]*
 **Источник:** Владимир + DevPanel Pipeline Trace, обнаружено в живой сессии после миграции `briefing:filter` → Grok 4.1 Fast
-**Связано с:** [lib/briefing/briefing-author.ts](../../lib/briefing/briefing-author.ts), [lib/ai/pipeline-trace.ts:368-381](../../lib/ai/pipeline-trace.ts#L368-L381), [docs/decisions/030-pipeline-observability.md](../../docs/decisions/030-pipeline-observability.md)
+**Связано с:** [lib/briefing/briefing-author.ts](../../../lib/briefing/briefing-author.ts), [lib/ai/pipeline-trace.ts:368-381](../../../lib/ai/pipeline-trace.ts#L368-L381), [docs/decisions/030-pipeline-observability.md](../../../docs/decisions/030-pipeline-observability.md)
 
 ---
 

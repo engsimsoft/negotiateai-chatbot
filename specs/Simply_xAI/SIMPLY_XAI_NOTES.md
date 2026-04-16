@@ -9,6 +9,80 @@
 
 ---
 
+## 2026-04-16 — Correction: URL hallucination была не галлюцинацией, а metric bug (3 раунда диагноза)
+
+**Контекст:** Follow-up сессия после v3.92.0 release. Владимир вернулся с альтернативной гипотезой о корне «URL hallucination в briefing:author». В процессе верификации выяснилось что предыдущий диагноз (мой же, в v3.92.0 CHANGELOG) был неверным на архитектурном уровне — проблемы, которой мы искали, не существовало.
+
+### Три раунда диагноза
+
+**Раунд 1 (моя ошибка, сессия ТЗ-XAI-4 Этап 3, 2026-04-15 вечер):**
+DevPanel Pipeline Trace показал 10/11 (91%) fabricated URLs в briefing:author на MiniMax. Первичная диагностика — «MiniMax weakness на structured URL attribution». Владелец немедленно поправил: «Sonnet и Gemini исторически на этой роли тоже галлюцинировали, метрика `fabricated` добавлена специально как universal детектор».
+
+Проведён empirical test hot-fix'нутого briefing route:
+- MiniMax-M2.7: 10/11 (91%) fabricated
+- Grok 4.20 non-reasoning: 9/11 (82%) fabricated
+
+Marginal 9% разница при 4.4× цене. Вывод (ошибочный): «4 модели одинаково плохо = architectural prompt issue, не model weakness. Решение — `generateObject` + `z.enum([...allowedUrls])`». Зафиксировано в [TZ_BriefingAuthorUrlHallucination](../_backlog/TZ_BriefingAuthorUrlHallucination.md), HANDOFF, CHANGELOG v3.92.0 как High-impact блокер ТЗ-XAI-6.
+
+Memory-правило `feedback_empirical_test_before_model_blame.md` было добавлено — правильное, но остановилось на полпути.
+
+**Раунд 2 (гипотеза Владимира, follow-up сессия):**
+«Галлюцинация не в author, а раньше — в `service-chat:briefing-onboarding` (Sonnet). Sonnet выдумывает RSS-источники по памяти, фетчер качает 404, автор работает с кривыми данными». Гипотеза связывала три хвоста в один investigation: [TZ_ServiceChatNotOverridable](../_backlog/TZ_ServiceChatNotOverridable.md) (UI dev panel не покажет onboarding selector), [TZ_DevOverridesSideEffectImportAudit](../_backlog/TZ_DevOverridesSideEffectImportAudit.md) (service-chat/route.ts без reader import → empirical test заблокирован), [TZ_BriefingAuthorUrlHallucination](../_backlog/TZ_BriefingAuthorUrlHallucination.md).
+
+Верификация против кода:
+- Промпт `briefing-onboarding.md` v11 — корректен. `<source_discovery>` запрещает называть источники по памяти, `<self_check>` § 1-2 проверяет каждый ответ, L353 «deepResearch недоступен: скажи честно. Не выдумывай источники», L399 «Все источники проверены через инструменты. Битых источников быть не может».
+- `BriefingSources` в БД (5 источников Владимира): Simon Willison's Weblog, Хабр — ИИ, TechSparks, AI of the Day, Сиолошная (seeallochnaya) — все 7 URL (5 feed + 2 RSS) **живы HTTP 200 с контентом 88-508 KB**. Нет ни одного выдуманного.
+- Sonnet сработал правильно. Гипотеза Раунда 2 опровергнута.
+
+**Раунд 3 (реальный root cause):**
+Проверил 11 article-level URLs из реального briefing `09b01675` (тот самый empirical test Grok 4.20, 9/11 fabricated по метрике). Все 11 URL — **живы HTTP 200 с контентом 15-346 KB**. А метрика в БД говорит 82% fabricated. **Противоречие.**
+
+Root cause в [lib/ai/pipeline-trace.ts:368-381](../../lib/ai/pipeline-trace.ts#L368) — функция `classifyUrl()`:
+
+```ts
+function classifyUrl(url, fetchedUrls, filterOutputUrls) {
+  if (fetchedUrls.has(url)) return "fetcher";       // ✓ verified
+  if (filterOutputUrls?.has(url)) return "filter";  // 🟡 modified
+  return "fabricated";                               // 🟥 AI выдумал
+}
+```
+
+`fetchedUrls = new Set(allItems.map(it => it.url))` — naive Set без нормализации. Любая форматная разница между URL фетчера и URL в статье → `fabricated`:
+
+- RSS Habr отдаёт `https://habr.com/ru/articles/1023812/?utm_campaign=1023812&utm_source=habrahabr&utm_medium=rss`, author правильно убирает UTM → `https://habr.com/ru/articles/1023812/` → **string mismatch → fabricated**
+- Atom feed Simon Willison'а даёт `https://simonwillison.net/2026/Apr/15/gemini-31-flash-tts/#atom-everything`, author правильно убирает anchor → **string mismatch → fabricated**
+- Trailing slash, `www.`, `http` vs `https`, порядок query params — любое несовпадение → fabricated
+
+### Фикс
+
+`normalizeUrlForComparison()` pure-функция в том же файле: strip hash, drop tracking params (utm_*, fbclid, gclid, ref, mc_*, yclid, _ga, igshid, msclkid), lowercase hostname без www., protocol→https, sorted query params, no trailing slash. `verifyArticleUrls()` нормализует оба Set'а once, `classifyUrl()` нормализует incoming URL.
+
+Commit `58d9d2e`, 66 insertions / 6 deletions. Smoke test 8/8 PASS: OLD метрика 88% fabricated → NEW метрика 25% (2 control cases с реально выдуманными URL).
+
+### Что отменяется
+
+- **TZ_BriefingAuthorUrlHallucination** (архивируется как superseded): `generateObject` + `z.enum([...allowedUrls])` подход НЕ нужен. Он бы force-matched метрику через схему, но реальной проблемы галлюцинации URL нет. Избыточная сложность без пользы.
+- **Блокер ТЗ-XAI-6** «briefing:author остаётся на MiniMax до закрытия URL hallucination» снимается. Можно планировать полный cleanup MiniMax registry/catalog в следующем ТЗ.
+- **Перекос в архитектурных константах HANDOFF серии**: «briefing author/section/podcast-script архитектурно проблематичны» теперь ложная предпосылка. Обновляю в следующем коммите.
+
+### Что остаётся валидным
+
+- **TZ_ServiceChatNotOverridable** — по-прежнему валидная проблема (UI dev panel не показывает service-chat селекторы). Связь с URL hallucination больше нет, но сам по себе хвост нужен.
+- **TZ_DevOverridesSideEffectImportAudit** — по-прежнему High-impact (6+ routes без reader import). Grok 4.20 instruction-following лучше Sonnet — переключение всё равно пригодится в будущих миграциях onboarding.
+- **Memory-правило `feedback_empirical_test_before_model_blame.md`** — подтверждено второй итерацией. **Усиливается:** недостаточно протестировать 2 модели, нужно ещё валидировать **саму метрику** на которую опираешься. Новая формулировка в memory.
+
+### Усвоенный мета-урок
+
+Правило Rule №0 «семь раз отмерь» не охватило **проверку измерительного инструмента**. Два раза подряд (раунд 1 мой, раунд 2 Владимира) мы строили модели объяснения на основе цифры «82-91% fabricated», не спросив: **а что именно считает эта цифра?** Ответ оказался: «наивный `Set.has()` без нормализации». Это fundamentally разный мир объяснений.
+
+**Правило усиливается:** перед тем как делать выводы о модели / промпте / архитектуре на основе метрики в DevPanel / observability слое — прочитать код метрики, понять что именно она считает, и на каких edge cases даст ложный результат. Цена нарушения в этой сессии — один ненужный хвост в backlog + несколько часов диагностики.
+
+### Благодарность Владимиру
+
+Гипотеза Раунда 2 (onboarding галлюцинация) оказалась неверной, но именно она заставила меня дойти до кода метрики. Без альтернативной гипотезы я бы продолжил верить в свой же диагноз из Раунда 1. Rule №0 работает только когда кто-то в команде сомневается в предпосылках.
+
+---
+
 ## 2026-04-16 — Multi-agent reservation correction + dead code cleanup (post-2ca1ac5 follow-up)
 
 **Контекст:** Короткая follow-up сессия после `2ca1ac5` (HANDOFF после Этапов 2+3). Владелец ревью текущего state SSOT и нашёл одну ошибку фрейминга, плюс попросил почистить мёртвые константы.

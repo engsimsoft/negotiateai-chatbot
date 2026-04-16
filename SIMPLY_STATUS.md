@@ -14,7 +14,7 @@
 
 **Философия:** Apple-подход (качество важнее количества) + Best-in-Class API (интегрируем лучшие решения, не изобретаем). Детали видения → [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md).
 
-**Мультипровайдерная маршрутизация:** xAI Grok (Simply Chat, MIND, Экспертиза, Создание, утилиты, meeting summary), Anthropic Claude (vision, артефакты, клерки, профессор, project expert, service chats), MiniMax (**только** briefing pipeline — author/section/podcast-script, до закрытия [TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md)). SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) + [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts).
+**Мультипровайдерная маршрутизация:** xAI Grok (Simply Chat, MIND, Экспертиза, Создание, утилиты, meeting summary), Anthropic Claude (vision, артефакты, клерки, профессор, project expert, service chats), MiniMax (только briefing pipeline — author/section/podcast-script; миграция на Grok разблокирована после correction 2026-04-16 — см. [SIMPLY_XAI_NOTES.md](specs/Simply_xAI/SIMPLY_XAI_NOTES.md) «URL hallucination была не галлюцинацией», ждёт ТЗ-XAI-6). SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) + [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts).
 
 ---
 
@@ -30,7 +30,7 @@
 | **Проекты** (изолированные рабочие пространства) | ✅ | Claude Haiku / Sonnet / Opus по tier, Профессор (Opus planning/review + Haiku execute) |
 | **База знаний — MIND** (Слой 3 RAG, auto из разговоров) | ✅ | Grok 4.20 reasoning (extract) + Grok 4.1 Fast (batch, consolidate, profile, dedup) + Voyage AI (embeddings) + pgvector |
 | **База знаний — Collections** (Слой 3 RAG, явная загрузка документов) | 📋 план | xAI Grok Collections API из коробки (`knowledge_search` / `file_search`). Отдельного векторного стека не строим. ТЗ-XAI-COL-1 |
-| **Briefing** (hourly Vercel Cron) | ✅ | Grok 4.1 Fast (filter) · MiniMax M2.7-long (author, section) · MiniMax M2.7 (podcast-script). Миграция author/section на Grok отложена до [TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md) |
+| **Briefing** (hourly Vercel Cron) | ✅ | Grok 4.1 Fast (filter) · MiniMax M2.7-long (author, section) · MiniMax M2.7 (podcast-script). Миграция author/section на Grok разблокирована 2026-04-16 (URL hallucination оказалась metric bug в `verifyArticleUrls`, не проблемой моделей — commit `58d9d2e`); планируется в ТЗ-XAI-6 |
 | **Podcast** (attached to briefing) | ✅ | Gemini TTS (длинный формат, blob storage) |
 | **Meeting Recorder** | ✅ | Deepgram Nova-3 (STT) + Grok 4.20 reasoning (summary, мигрировано 2026-04-16) |
 | **Telegram Bot + Groups** | ✅ | Custom bot + ingestion pipeline |
@@ -117,7 +117,6 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). Сводка на с
 
 ### 🟥 High impact
 
-- **[TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md)** — briefing author выдумывает 82-91% URLs. Empirical test 4 моделей (Sonnet, Gemini, MiniMax, Grok 4.20) — architectural issue, не model issue. Блокирует миграцию briefing author/section с MiniMax. Решение: `generateObject` + `z.enum([...allowedUrls])`.
 - **[TZ_DevOverridesSideEffectImportAudit](specs/_backlog/TZ_DevOverridesSideEffectImportAudit.md)** — 6+ backend routes без side-effect import `model-overrides-node` → dev panel overrides молча игнорируются. Блокирует A/B тесты. Рекомендация: `instrumentation.ts` register-on-boot + ADR 048 update.
 - **[TZ_ErrorRecoveryUI](specs/_backlog/TZ_ErrorRecoveryUI.md)** — Stage 2 root cause fix: useChat state recovery через `clearError`. Stage 1 (hint в красном флаге) уже сделан.
 
@@ -128,6 +127,7 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). Сводка на с
 - **[TZ_TaskExpertChatInputMissingOnFirstOpen](specs/_backlog/TZ_TaskExpertChatInputMissingOnFirstOpen.md)** — `multimodal-input` не рендерится при входе в task expert chat из режима планирования. Hard reload лечит.
 - **[TZ_ProfessorPlanStreaming](specs/_backlog/TZ_ProfessorPlanStreaming.md)** — long-term fix plan/route.ts timeout: переход `generateText` → `streamText`. Hot-fix `maxOutputTokens: 16000` — tactical.
 - **[TZ_MaxOutputTokensAudit](specs/_backlog/TZ_MaxOutputTokensAudit.md)** — явный `maxOutputTokens` для всех ~20 call sites. Предотвращает повторение инцидента d9d3488.
+- **[TZ_UrlVerificationMetricNormalization](specs/_backlog/TZ_UrlVerificationMetricNormalization.md)** — follow-up hardening после correction 2026-04-16 (unit tests, tracking params audit, ADR). Основной фикс уже в `58d9d2e`.
 - **[TZ_SimplyContextUsageWidget](specs/_backlog/TZ_SimplyContextUsageWidget.md)** — виджет контекста показывает не ту шкалу (привязан к `contextWindow` модели, не к `SIMPLY_CONTEXT_LIMIT`).
 - **[TZ_PromptsDeadCodeCleanup](specs/_backlog/TZ_PromptsDeadCodeCleanup.md)** — удалить мёртвые экспорты из `lib/ai/prompts.ts`. 90% файла dead.
 - **[TZ_SimplyChatRaceCondition](specs/_backlog/TZ_SimplyChatRaceCondition.md)** — `getOrCreateSimplyChat` без partial unique index.
@@ -170,4 +170,4 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). Сводка на с
 
 ---
 
-**Обновлено:** 2026-04-16 (ТЗ-XAI-4 ✅ v3.92.0 — 11 taskId на Grok, expertise/create/meeting:summary/memory:extract/briefing:filter + утилиты)
+**Обновлено:** 2026-04-16 (ТЗ-XAI-4 ✅ v3.92.0 — 11 taskId на Grok + correction URL hallucination metric bug commit `58d9d2e`)
