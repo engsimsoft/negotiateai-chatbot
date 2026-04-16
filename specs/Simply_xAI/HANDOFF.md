@@ -1,10 +1,14 @@
 # HANDOFF — Серия Simply_xAI миграции
 
-**Последнее обновление:** 2026-04-16 (финализация ТЗ-XAI-4 + v3.92.0 release + archive)
-**Текущая версия проекта:** **3.92.0** (bumped с 3.91.0 коммитом `583ef03`)
-**Git state:** локальный `claude/angry-nobel` (worktree), **29 коммитов ahead of origin**, не отпушено
+**Последнее обновление:** 2026-04-16 (**correction URL hallucination** — была metric bug, не архитектура. Commits `58d9d2e` + `eeba086` + финал этого HANDOFF)
+**Текущая версия проекта:** **3.92.0**
+**Git state:** локальный `claude/angry-nobel` (worktree), **32 коммита ahead of origin**, не отпушено
 **Последние коммиты локального master (сверху вниз):**
-- `05c7cb5` docs(xai-migration): финальный HANDOFF после v3.92.0 + ТЗ-XAI-4 финализация (этот файл)
+- `<этот HANDOFF commit>` docs(xai-migration): HANDOFF update после metric bug correction + memory rule + root CHANGELOG
+- `eeba086` docs(xai-migration): correction URL hallucination diagnosis + archive superseded backlog
+- `58d9d2e` **fix(pipeline-trace)**: URL normalization в verifyArticleUrls — metric bug, не архитектурная галлюцинация
+- `2c9bcb3` docs(xai-migration): fix HANDOFF self-references
+- `05c7cb5` docs(xai-migration): финальный HANDOFF после v3.92.0 + ТЗ-XAI-4 финализация
 - `fdfd03f` chore(xai-migration): archive TZ_xai_4_UtilityPipelines after v3.92.0
 - `583ef03` **release(v3.92.0)**: ТЗ-XAI-4 — 11 taskId на Grok + 2 hot-fixes + 3 новых backlog хвоста
 - `00b7f33` Merge branch 'claude/stoic-wu' (README.md + SIMPLY_PRODUCT_VISION.md rewrite)
@@ -32,7 +36,14 @@
 3. **ANALYSIS против реального кода** — прочитать все файлы зоны работы, свериться с SSOT документами (SIMPLY_ATTACHMENT_ARCHITECTURE.md, MIND_ARCHITECTURE.md, model-catalog.ts, task-assignments.ts, CLAUDE.md)
 4. **Только потом** — план, код, тесты
 
-**Правило из сессии 2026-04-16:** **Empirical test перед model-blame.** Не диагностировать AI-output проблему как «model-specific weakness» без empirical теста на 2+ моделях. Memory: [`feedback_empirical_test_before_model_blame.md`](~/.claude/projects/-Users-mactm-Projects-NegotiateAI-Chatbot/memory/feedback_empirical_test_before_model_blame.md). Инцидент: приписал briefing author URL hallucination «слабости MiniMax», empirical тест показал 82% fabricated на Grok 4.20 (vs 91% MiniMax) — это architectural/prompt issue, не model issue.
+**Правило из сессии 2026-04-16:** **Empirical test перед model-blame + validate the metric itself.** Не диагностировать AI-output проблему как «model-specific weakness» без empirical теста на 2+ моделях, **и** без проверки кода самой метрики. Memory: [`feedback_empirical_test_before_model_blame.md`](~/.claude/projects/-Users-mactm-Projects-NegotiateAI-Chatbot/memory/feedback_empirical_test_before_model_blame.md).
+
+**Мета-инцидент 2026-04-16** (3 раунда неверной диагностики до дна):
+- Раунд 1 (моя ошибка): «MiniMax weakness на URL attribution» (82-91% fabricated)
+- Раунд 2 (Владимир): «Sonnet в onboarding выдумывает источники» — опровергнуто curl-проверкой всех 5 источников (HTTP 200)
+- Раунд 3 (реальный): метрика `fabricated` использует наивное `Set.has(url)` без нормализации — любая форматная разница (UTM, anchor, trailing slash) → ложный positive
+
+Правило усилено: перед выводами о модели/промпте/архитектуре на основе observability метрики — **прочитать код метрики**, понять что она считает, на каких edge cases даст ложный результат. Rule №0 «семь раз отмерь» не охватывал проверку измерительного инструмента — теперь охватывает. См. [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) 2026-04-16 «Correction: URL hallucination была не галлюцинацией».
 
 ---
 
@@ -46,7 +57,7 @@
 - [x] **ТЗ-ATTACH-1** — PDF text extraction при upload (v3.91.0)
 - [x] **ТЗ-XAI-4** — Utility/Pipeline batch миграция + scope expansion (**v3.92.0 завершён 2026-04-16**)
 - [x] **ТЗ-XAI-5** — ✅ закрыт через scope expansion ТЗ-XAI-4 (create + expertise + R-5)
-- [ ] **ТЗ-XAI-6** — Очистка MiniMax/OpenRouter (**следующий в серии**, ожидает закрытия [TZ_BriefingAuthorUrlHallucination](../_backlog/TZ_BriefingAuthorUrlHallucination.md))
+- [ ] **ТЗ-XAI-6** — Очистка MiniMax/OpenRouter (**следующий в серии, разблокирован** после correction URL hallucination metric bug 2026-04-16)
 - [ ] ТЗ-XAI-COL-1 — Collections API для Библиотеки
 - [ ] ТЗ-XAI-MA-1 — Premium «Команда агентов» (Responses API + MCP), `expertise-multi-agent` taskId уже зарезервирован
 
@@ -54,54 +65,60 @@
 
 ## ⏭ Что дальше — варианты для следующей сессии
 
-Серия ТЗ-XAI-4 полностью закрыта (включая scope expansion, покрывший XAI-5). Следующий шаг в серии — **ТЗ-XAI-6 cleanup**, но он **заблокирован** на [TZ_BriefingAuthorUrlHallucination](../_backlog/TZ_BriefingAuthorUrlHallucination.md): пока briefing author/section/podcast-script остаются на MiniMax, namespace `minimax` и каталог нужны.
+**ТЗ-XAI-4 закрыта** (включая scope expansion, покрывший XAI-5). **Блокер ТЗ-XAI-6 снят** после correction 2026-04-16 (commits `58d9d2e` + `eeba086`): «URL hallucination» оказалась metric bug (naive `Set.has()` без нормализации), а не architectural issue моделей. briefing:author на MiniMax работает корректно — миграция на Grok теперь вопрос cleanup, не качества.
 
-### Вариант A — закрыть High-impact блокер (рекомендуется)
+### Вариант A — ТЗ-XAI-6 cleanup MiniMax/OpenRouter (рекомендуется)
 
-**[TZ_BriefingAuthorUrlHallucination](../_backlog/TZ_BriefingAuthorUrlHallucination.md)** 🟥 (1-2 сессии)
-
-Empirical confirmed: 82-91% fabricated URLs на 4 разных моделях. Architectural issue, не model issue. Решение — structured output через `generateObject` + `z.enum([...allowedUrlsFromFilter])` — модель физически не сможет генерировать URL вне списка из filter stage.
+Что делается:
+- Миграция `briefing:author`, `briefing:section`, `briefing:podcast-script` на Grok (4.20 non-reasoning или 4.1 Fast-long — решается empirically через smoke test)
+- Удалить из `registry.ts` namespaces `minimax`, `minimaxLong`, `openrouter`
+- Удалить из `model-catalog.ts` все MiniMax и OpenRouter записи (кроме RESERVED `grok-4.20-multi-agent-0309` — она Grok)
+- Удалить из `task-assignments.ts` все ссылки
+- Удалить функции: `stripMiniMaxToolParts`, `stripLegacyOpenAICompatToolParts`, `isSimplyNonAnthropicModel`
+- Удалить `vercel-minimax-ai-provider` из `package.json`
+- Удалить env `MINIMAX_API_KEY` из Vercel (после подтверждения production stability)
 
 **Почему первым:**
-1. Критично перед production релизом briefing (качество продукта)
-2. Разблокирует ТЗ-XAI-6 (можно будет убрать MiniMax)
-3. Empirical данные уже собраны, scope ясен, риск низкий
-4. Паттерн `generateObject` + `z.enum` применим и к другим pipeline стадиям (bonus migration)
+1. Последний крупный шаг серии Simply_xAI — закрывает цикл миграции
+2. Scope хорошо понятный, риск низкий (модели уже готовы, DevPanel корректно покажет результат)
+3. Зачищает зоопарк провайдеров (3 namespace → 2), упрощает обслуживание
+4. Empirical validation простой — сгенерировать 2-3 briefing'а на Grok, сравнить DevPanel urlVerification (теперь работающей метрикой) с MiniMax baseline
 
-### Вариант B — закрыть второй High-impact блокер
+**Оценка:** 1-2 сессии.
 
-**[TZ_DevOverridesSideEffectImportAudit](../_backlog/TZ_DevOverridesSideEffectImportAudit.md)** 🟥 (0.5-1 сессия)
+### Вариант B — TZ_DevOverridesSideEffectImportAudit 🟥 (0.5-1 сессия)
 
-6+ backend routes без `import "@/lib/ai/model-overrides-node"` → dev panel overrides молча игнорируются. Блокирует все будущие A/B тесты. Рекомендованное решение — `instrumentation.ts` register-on-boot + ADR 048 update.
+6+ backend routes без `import "@/lib/ai/model-overrides-node"` → dev panel overrides молча игнорируются. Блокирует все будущие A/B тесты — а Вариант A требует empirical smoke test. **Стоит сделать Вариант B перед A** если планируется тест на нескольких моделях briefing:author.
 
-**Почему можно вторым:**
-1. Быстрое закрытие (одна сессия)
-2. Инфраструктурный фикс — разблокирует future debugging
-3. Не влияет напрямую на продукт, но экономит сессии в будущем
+Рекомендованное решение: `instrumentation.ts` register-on-boot + ADR 048 update. Одна архитектурная точка вместо 11 side-effect импортов.
 
-### Вариант C — ТЗ-XAI-6 cleanup **после** закрытия TZ_BriefingAuthorUrlHallucination
+### Вариант C — Medium-impact хвосты
 
-Очистка зоопарка:
-- Удалить из `registry.ts` namespace `minimax`, `minimaxLong`, `openrouter`
-- Удалить из `model-catalog.ts` все MiniMax и OpenRouter записи (кроме RESERVED `grok-4.20-multi-agent-0309` — она Grok, не MiniMax)
-- Удалить из `task-assignments.ts` все ссылки
-- Удалить файлы/функции: `stripMiniMaxToolParts`, `stripLegacyOpenAICompatToolParts`, `isSimplyNonAnthropicModel`
-- Удалить `vercel-minimax-ai-provider` из `package.json`
-- Удалить env `MINIMAX_API_KEY` из Vercel
+7 Medium хвостов в [specs/_backlog/README.md](../_backlog/README.md): ServiceChatNotOverridable, DevPanelFooterHidesSubCalls, TaskExpertChatInputMissingOnFirstOpen, ProfessorPlanStreaming, MaxOutputTokensAudit, UrlVerificationMetricNormalization, SimplyContextUsageWidget, PromptsDeadCodeCleanup, SimplyChatRaceCondition.
 
-### Вариант D — Medium-impact хвосты
+### Вариант D — Пауза на серии, переключение на другое направление
 
-7 Medium хвостов в [specs/_backlog/README.md](../_backlog/README.md). Решает Владимир по приоритету.
+Серия Simply_xAI закрывает ~95% миграционных целей. Если есть продуктовые приоритеты вне неё — можно отвлечься на них.
+
+### Рекомендация порядка
+
+**B → A → C** если хочется максимальную чистоту:
+1. B разблокирует A/B тесты (одна сессия)
+2. A финализирует серию и убирает MiniMax (1-2 сессии)
+3. Потом Medium хвосты по приоритету владельца
+
+**A → B** если хочется быстрее закрыть MiniMax cleanup:
+- А не требует A/B теста если смотреть DevPanel urlVerification напрямую (теперь метрика работает корректно)
+- B можно отложить — остальные dev-overrides касаются service-chat и некритичных утилит
 
 ---
 
 ## 📦 Открытые хвосты (backlog) после ТЗ-XAI-4
 
-### 🟥 High impact (3)
+### 🟥 High impact (2)
 
-1. **[TZ_BriefingAuthorUrlHallucination](../_backlog/TZ_BriefingAuthorUrlHallucination.md)** — **блокирует ТЗ-XAI-6**. Architectural, не model issue
-2. **[TZ_DevOverridesSideEffectImportAudit](../_backlog/TZ_DevOverridesSideEffectImportAudit.md)** — 6+ routes без reader import
-3. **[TZ_ErrorRecoveryUI Stage 2](../_backlog/TZ_ErrorRecoveryUI.md)** — useChat state recovery, Stage 1 ✅ в v3.90.0+
+1. **[TZ_DevOverridesSideEffectImportAudit](../_backlog/TZ_DevOverridesSideEffectImportAudit.md)** — 6+ routes без reader import
+2. **[TZ_ErrorRecoveryUI Stage 2](../_backlog/TZ_ErrorRecoveryUI.md)** — useChat state recovery, Stage 1 ✅ в v3.90.0+
 
 ### 🟧 Medium impact (8)
 
@@ -110,9 +127,14 @@ Empirical confirmed: 82-91% fabricated URLs на 4 разных моделях. 
 3. [TZ_TaskExpertChatInputMissingOnFirstOpen](../_backlog/TZ_TaskExpertChatInputMissingOnFirstOpen.md) — useChat state bug
 4. [TZ_ProfessorPlanStreaming](../_backlog/TZ_ProfessorPlanStreaming.md) — long-term fix max_tokens timeout
 5. [TZ_MaxOutputTokensAudit](../_backlog/TZ_MaxOutputTokensAudit.md) — явный maxOutputTokens везде
-6. [TZ_SimplyContextUsageWidget](../_backlog/TZ_SimplyContextUsageWidget.md) — виджет контекста не ту шкалу
-7. [TZ_PromptsDeadCodeCleanup](../_backlog/TZ_PromptsDeadCodeCleanup.md) — 90% prompts.ts dead
-8. [TZ_SimplyChatRaceCondition](../_backlog/TZ_SimplyChatRaceCondition.md) — partial unique index
+6. [TZ_UrlVerificationMetricNormalization](../_backlog/TZ_UrlVerificationMetricNormalization.md) — follow-up hardening после commit `58d9d2e` (основной фикс уже в production)
+7. [TZ_SimplyContextUsageWidget](../_backlog/TZ_SimplyContextUsageWidget.md) — виджет контекста не ту шкалу
+8. [TZ_PromptsDeadCodeCleanup](../_backlog/TZ_PromptsDeadCodeCleanup.md) — 90% prompts.ts dead
+9. [TZ_SimplyChatRaceCondition](../_backlog/TZ_SimplyChatRaceCondition.md) — partial unique index
+
+### Закрытые в этой сессии
+
+- ❌ **TZ_BriefingAuthorUrlHallucination** (архивирован как SUPERSEDED) — 82-91% fabricated URLs оказались metric bug, не issue моделей. Реальный фикс в commit `58d9d2e` (1 функция `normalizeUrlForComparison`). 3 раунда неверной диагностики — подробности в [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md)
 
 ---
 
@@ -186,6 +208,7 @@ fc8a995 fix(error-recovery): TZ_ErrorRecoveryUI Stage 1
 14. **xAI prompt caching автоматический.** Сервер кэширует system prompt без каких-либо `providerOptions.xai.cacheControl`. Ручная настройка не нужна
 15. **Reserved vs deprecated семантика модели в каталоге.** Когда taskId снимается с активного использования, но запись каталога остаётся — различать «deprecated (удалить когда чисто)» и «reserved (placeholder под будущую фичу)». Reserved маркируется через placeholder taskId + подробный комментарий + cross-ref в ROADMAP. Пример: `expertise-multi-agent` taskId → `grok-4.20-multi-agent-0309` запись под ТЗ-XAI-MA-1
 16. **Audit metadata hardcoded modelId проверка при миграции taskId.** При переключении taskId X в task-assignments — обязательно grep на hardcoded имя старой модели в audit metadata блоках и заменять на `getModelIdForTask("X")`. Иначе в БД пишется лживое значение. Пример: `meeting/regenerate/route.ts:91` имел `"claude-sonnet-4-6"` hardcoded
+17. **🆕 Observability метрики канонизируются перед сравнением.** Сравнение URL / path / identifier в observability слое через `Set.has(rawValue)` — антипаттерн. Любая форматная разница (tracking params, anchor, trailing slash, case) даёт ложный positive. Канонизация обязательна: нормализовать оба сравниваемых значения функцией без побочек, потом Set.has. Живой пример — `normalizeUrlForComparison()` в [pipeline-trace.ts](../../lib/ai/pipeline-trace.ts) (2026-04-16, commit `58d9d2e`). Перед выводами о качестве модели на основе метрики — **читать код метрики**
 
 ---
 
@@ -193,27 +216,30 @@ fc8a995 fix(error-recovery): TZ_ErrorRecoveryUI Stage 1
 
 ```
 1. Прочитать этот HANDOFF (5-10 мин)
-2. Прочитать SIMPLY_XAI_NOTES.md две записи 2026-04-16 (10 мин)
-3. Прочитать MEMORY.md целиком (2 мин) — особенно empirical-test-before-model-blame
-4. git log --oneline -10 — проверить что 29 коммитов ahead of origin, HEAD на 05c7cb5
-5. cat package.json | grep version — проверить что 3.92.0
-6. ls .simply-dev-overrides.json — должно быть «нет такого файла» (чистое состояние)
+2. Прочитать SIMPLY_XAI_NOTES.md 3 записи 2026-04-16 (15 мин) — особенно
+   «Correction: URL hallucination была не галлюцинацией» (верхняя)
+3. Прочитать MEMORY.md целиком (2 мин) — empirical-test-before-model-blame
+   усилено: валидируй саму метрику, не только 2 модели
+4. git log --oneline -12 — проверить что 32+ коммитов ahead of origin
+5. cat package.json | grep version — 3.92.0
+6. ls .simply-dev-overrides.json — «нет такого файла» (чистое состояние)
 7. npm run dev в background + curl http://localhost:3000 → HTTP 307
-8. Обсудить с Владимиром варианты (A/B/C/D из секции «Что дальше»):
-   - A 🟥 TZ_BriefingAuthorUrlHallucination (рекомендуется, 1-2 сессии, разблокирует ТЗ-XAI-6)
-   - B 🟥 TZ_DevOverridesSideEffectImportAudit (0.5-1 сессия, инфраструктурный)
-   - C 📋 ТЗ-XAI-6 cleanup (ждёт закрытия A)
-   - D 🟧 Medium-impact хвосты (7 штук)
+8. Обсудить с Владимиром порядок:
+   - Рекомендованный: B → A → C (чистый путь)
+   - Быстрее: A → B (если хочется закрыть серию Simply_xAI сразу)
+   - A 📋 ТЗ-XAI-6 cleanup MiniMax/OpenRouter (1-2 сессии) — блокер снят
+   - B 🟥 TZ_DevOverridesSideEffectImportAudit (0.5-1 сессия)
+   - C 🟧 Medium-impact хвосты (9 штук, решает Владимир по приоритету)
 9. Запустить выбранный вариант по стандартному WORKFLOW (ANALYSIS → ROADMAP → код → финализация → архив)
 ```
 
 ---
 
-**ТЗ-XAI-4 завершена. v3.92.0 зарелижен локально. 29 коммитов ahead of origin, push — решение Владимира.**
+**ТЗ-XAI-4 завершена. v3.92.0 зарелижен локально. Блокер ТЗ-XAI-6 снят (URL hallucination оказалась metric bug). 32 коммита ahead of origin, push — решение Владимира.**
 
-**Семь раз отмерь, один раз отрежь.** Rule №0.
+**Семь раз отмерь, один раз отрежь + проверь сам метр.** Rule №0 усилено 2026-04-16.
 
-**Empirical test перед model-blame.** Rule из этой серии.
+**Empirical test перед model-blame + читать код метрики перед выводами.** Rule из этой серии усилено.
 
 **После любой правки `next.config.ts` — `rm -rf .next && npm run dev`.**
 

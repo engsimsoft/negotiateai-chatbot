@@ -50,9 +50,12 @@
 
 ---
 
+### Post-v3.92.0 correction (2026-04-16)
+
+**URL hallucination оказалась metric bug, не архитектурной проблемой.** Commit `58d9d2e` фиксит `verifyArticleUrls()` через `normalizeUrlForComparison()`. Смотри **[3.92.0-post: URL verification metric fix](#3920-post--2026-04-16--url-verification-metric-normalization-correction)** ниже в этом файле для деталей.
+
 ### Planned (Next Steps)
-- **Simply_xAI миграция** (активная серия, XAI-1/2/3/4 ✅ + ATTACH-1 ✅ + XAI-5 закрыт scope expansion XAI-4; следующий XAI-6 — очистка MiniMax/OpenRouter, ожидает закрытия [TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md) чтобы можно было убрать MiniMax из каталога)
-- **[TZ_BriefingAuthorUrlHallucination](specs/_backlog/TZ_BriefingAuthorUrlHallucination.md)** 🟥 — briefing author 82-91% fabricated URLs на 4 моделях. Architectural, не model issue. Решение: `generateObject` + `z.enum([...allowedUrls])`
+- **Simply_xAI миграция** (активная серия, XAI-1/2/3/4 ✅ + ATTACH-1 ✅ + XAI-5 закрыт scope expansion XAI-4; следующий XAI-6 — очистка MiniMax/OpenRouter, **блокер снят** после URL hallucination correction 2026-04-16)
 - **[TZ_DevOverridesSideEffectImportAudit](specs/_backlog/TZ_DevOverridesSideEffectImportAudit.md)** 🟥 — 6+ backend routes без reader import. Блокирует A/B тесты
 - **[TZ_ErrorRecoveryUI Stage 2](specs/_backlog/TZ_ErrorRecoveryUI.md)** 🟥 — root cause fix useChat state recovery. Stage 1 ✅ в v3.90.0+
 - Medium хвосты в [specs/_backlog/README.md](specs/_backlog/README.md): ServiceChatNotOverridable, DevPanelFooterHidesSubCalls, TaskExpertChatInputMissingOnFirstOpen, ProfessorPlanStreaming, MaxOutputTokensAudit, SimplyContextUsageWidget, PromptsDeadCodeCleanup, SimplyChatRaceCondition
@@ -60,6 +63,65 @@
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
 - xAI Files API integration — поднять флаги `documentSupport` для Grok reasoning-моделей
 - Alias entries refactor — устранить дублирование `pricing`/`capabilities` в alias через резолв через `aliasOf`
+
+---
+
+## [3.92.0-post] — 2026-04-16 — URL verification metric normalization (correction)
+
+**Не отдельный release — follow-up к v3.92.0** в рамках серии Simply_xAI. Пост-релиз correction показал что одна из ключевых находок v3.92.0 («briefing author 82-91% fabricated URLs как architectural issue на 4 моделях») была **неверной интерпретацией сломанной метрики**.
+
+### Root cause
+
+[lib/ai/pipeline-trace.ts](lib/ai/pipeline-trace.ts) функция `classifyUrl()` использовала наивное `Set.has(url)` сравнение URL из article sources против URL из fetcher. Любая форматная разница → ложный `fabricated` positive:
+
+- Habr RSS отдаёт `?utm_campaign=…&utm_source=habrahabr&utm_medium=rss`, author правильно убирает UTM → **string mismatch → fabricated**
+- Atom feed Simon Willison'а даёт `#atom-everything` anchor, author правильно убирает → **string mismatch → fabricated**
+- Trailing `/`, `www.`, `http` vs `https`, порядок query-params — любое расхождение → fabricated
+
+**Эмпирическое доказательство:** реальный briefing `09b01675` в БД. Сохранённая метрика: `urlVerification.fabricated = 9/11 (82%)`. curl-проверка всех 11 URL — **все HTTP 200 с контентом 15-346 KB**. Метрика врёт.
+
+### Changed
+
+- **[lib/ai/pipeline-trace.ts](lib/ai/pipeline-trace.ts)** (commit `58d9d2e`, 66 insertions / 6 deletions):
+  - Новая pure-функция `normalizeUrlForComparison()`:
+    - strip hash/anchor
+    - strip tracking params (`utm_*`, `fbclid`, `gclid`, `ref`, `mc_*`, `yclid`, `_ga`, `igshid`, `msclkid`)
+    - lowercase hostname + strip `www.`
+    - protocol → https (canonical для сравнения)
+    - sort remaining query params
+    - strip trailing slash (кроме root)
+    - malformed URL → graceful fallback (as-is, classifier честно скажет `fabricated`)
+  - `verifyArticleUrls()` нормализует оба Set'а once перед `classifyUrl`
+  - `classifyUrl()` нормализует incoming URL перед lookup
+  - Полная JSDoc-документация на кейсах которые ломались в старой логике
+
+### Removed (superseded)
+
+- **`specs/_backlog/TZ_BriefingAuthorUrlHallucination.md`** → `_backlog/_archive/` с SUPERSEDED banner. Содержимое сохранено как артефакт — демонстрация как ложная архитектурная гипотеза может выглядеть убедительно на 4 моделях подряд. Предложение из того хвоста (`generateObject` + `z.enum([...allowedUrls])`) **отменено** — оно бы force-matched метрику через схему, но реальной проблемы галлюцинации нет
+- **Блокер ТЗ-XAI-6** («briefing:author остаётся на MiniMax до закрытия URL hallucination») снят
+
+### Added
+
+- **[specs/_backlog/TZ_UrlVerificationMetricNormalization.md](specs/_backlog/TZ_UrlVerificationMetricNormalization.md)** — follow-up хвост Low impact: unit test suite (регрессия-защита), audit tracking params regex на полноту (возможно упущены `from=`, `si=`, `amp=`), ADR/docs контракт. **Основной фикс уже в production** — этот хвост про hardening
+
+### Архитектурная константа серии (№17)
+
+«Observability метрики канонизируются перед сравнением». Сравнение URL / path / identifier в observability слое через `Set.has(rawValue)` — антипаттерн. Перед выводами о качестве модели на основе метрики — читать код метрики. См. [specs/Simply_xAI/HANDOFF.md](specs/Simply_xAI/HANDOFF.md) константы №10-17.
+
+### Мета-урок (3 раунда неверной диагностики)
+
+- Раунд 1 (моя ошибка): «MiniMax weakness на URL attribution» (82-91% fabricated)
+- Раунд 2 (Владимир): «Sonnet в onboarding выдумывает источники» — опровергнуто curl-проверкой всех 5 sources (HTTP 200)
+- Раунд 3 (реальный): метрика `fabricated` — наивный `Set.has(url)` без нормализации
+
+Rule №0 «семь раз отмерь» не охватывал проверку измерительного инструмента — теперь охватывает. Memory rule `feedback_empirical_test_before_model_blame.md` усилено: валидируй не только 2 модели, но и саму метрику. Полный разбор — [specs/Simply_xAI/SIMPLY_XAI_NOTES.md](specs/Simply_xAI/SIMPLY_XAI_NOTES.md) 2026-04-16 запись «Correction: URL hallucination была не галлюцинацией».
+
+### Validation
+
+- `npx tsc --noEmit` → 0 ошибок
+- Disposable smoke test `scripts/test-url-verification-normalization.ts` (удалён после прохождения, паттерн v3.91.0): 8/8 unit cases PASS
+  - OLD метрика: 7/8 fabricated (88%)
+  - NEW метрика: 2/8 fabricated (25%) — 2 control case с реально разными URL
 
 ---
 
