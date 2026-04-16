@@ -323,6 +323,59 @@ export function buildTtsTrace(input: {
 
 const MARKDOWN_LINK_REGEX = /\[.*?\]\((https?:\/\/[^)]+)\)/g;
 
+/**
+ * ТЗ-UrlVerificationMetricNormalization (2026-04-16): до этой правки
+ * classifyUrl делал наивное `Set.has(url)` сравнение, из-за чего любая
+ * форматная разница между URL фетчера и URL в статье (anchor-фрагмент,
+ * UTM-параметры, trailing slash, www./без, http/https) классифицировала
+ * живой реально скопированный URL как "fabricated". Реальный инцидент:
+ * briefing 09b01675 — метрика показала 9/11 (82%) fabricated, все 11
+ * URLs при этом отдавали HTTP 200 с контентом (curl-проверено).
+ *
+ * Нормализация приводит оба URL к canonical форме перед сравнением:
+ *   - hostname lowercase, без `www.`
+ *   - protocol → https (для сравнения — без apples vs oranges)
+ *   - hash/anchor убирается (`#atom-everything` и т.п.)
+ *   - tracking query-params убираются (utm_*, fbclid, gclid, ref, mc_*, yclid)
+ *   - остальные query-params сортируются для стабильного порядка
+ *   - trailing `/` убирается (кроме root `/`)
+ *
+ * Если URL malformed — возвращаем как есть (не ломаем pipeline на плохом
+ * входе, пусть классификатор честно скажет "fabricated").
+ */
+const TRACKING_PARAM_REGEX = /^(utm_|fbclid$|gclid$|yclid$|mc_|ref$|_ga$|igshid$|msclkid$)/;
+
+export function normalizeUrlForComparison(url: string): string {
+  try {
+    const u = new URL(url);
+    // Host: lowercase + strip www.
+    u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
+    // Protocol: canonical https
+    u.protocol = "https:";
+    // Hash: always drop
+    u.hash = "";
+    // Query params: filter tracking + sort remaining
+    const keepKeys = [...u.searchParams.keys()].filter(
+      (k) => !TRACKING_PARAM_REGEX.test(k),
+    );
+    const sortedParams = new URLSearchParams();
+    for (const key of keepKeys.sort()) {
+      for (const val of u.searchParams.getAll(key)) {
+        sortedParams.append(key, val);
+      }
+    }
+    u.search = sortedParams.toString();
+    // Trailing slash: strip if pathname > "/"
+    if (u.pathname.length > 1 && u.pathname.endsWith("/")) {
+      u.pathname = u.pathname.slice(0, -1);
+    }
+    return u.toString();
+  } catch {
+    // Malformed URL — return as-is. classifyUrl will treat it as fabricated.
+    return url;
+  }
+}
+
 export function verifyArticleUrls(
   articleSections: Array<{
     topicId: string;
@@ -332,12 +385,18 @@ export function verifyArticleUrls(
   fetchedUrls: Set<string>,
   filterOutputUrls?: Set<string>,
 ): UrlVerificationTrace {
+  // Pre-normalize comparison sets once (not per URL) for O(1) lookup.
+  const normalizedFetched = new Set([...fetchedUrls].map(normalizeUrlForComparison));
+  const normalizedFilter = filterOutputUrls
+    ? new Set([...filterOutputUrls].map(normalizeUrlForComparison))
+    : undefined;
+
   const checks: UrlCheck[] = [];
 
   for (const section of articleSections) {
     // Check structured sources
     for (const source of section.sources) {
-      checks.push(classifyUrl(source.url, section.topicId, fetchedUrls, filterOutputUrls));
+      checks.push(classifyUrl(source.url, section.topicId, normalizedFetched, normalizedFilter));
     }
 
     // Check inline markdown links
@@ -346,7 +405,7 @@ export function verifyArticleUrls(
       const url = match[1];
       // Skip if already checked via sources
       if (checks.some((c) => c.url === url && c.sectionTopicId === section.topicId)) continue;
-      checks.push(classifyUrl(url, section.topicId, fetchedUrls, filterOutputUrls));
+      checks.push(classifyUrl(url, section.topicId, normalizedFetched, normalizedFilter));
     }
   }
 
@@ -368,13 +427,14 @@ export function verifyArticleUrls(
 function classifyUrl(
   url: string,
   sectionTopicId: string,
-  fetchedUrls: Set<string>,
-  filterOutputUrls?: Set<string>,
+  normalizedFetchedUrls: Set<string>,
+  normalizedFilterUrls?: Set<string>,
 ): UrlCheck {
-  if (fetchedUrls.has(url)) {
+  const normalized = normalizeUrlForComparison(url);
+  if (normalizedFetchedUrls.has(normalized)) {
     return { url, foundInSources: true, sourceStage: "fetcher", sectionTopicId };
   }
-  if (filterOutputUrls?.has(url)) {
+  if (normalizedFilterUrls?.has(normalized)) {
     return { url, foundInSources: false, sourceStage: "filter", sectionTopicId };
   }
   return { url, foundInSources: false, sourceStage: "fabricated", sectionTopicId };
