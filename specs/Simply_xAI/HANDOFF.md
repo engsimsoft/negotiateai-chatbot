@@ -44,8 +44,7 @@ observability UI. Найди их сам при чтении файлов.
 
 | # | Файл | Суть |
 |---|---|---|
-| 1 | [TZ_DevOverridesSideEffectImportAudit](../_backlog/TZ_DevOverridesSideEffectImportAudit.md) | Override модели не применяется без рестарта сервера — блокирует A/B тесты |
-| 2 | [TZ_ErrorRecoveryUI](../_backlog/TZ_ErrorRecoveryUI.md) | Чат упал с ошибкой → нельзя продолжить диалог |
+| 1 | [TZ_ErrorRecoveryUI](../_backlog/TZ_ErrorRecoveryUI.md) | Чат упал с ошибкой → нельзя продолжить диалог |
 
 ### 🟧 Средний приоритет
 
@@ -69,6 +68,7 @@ observability UI. Найди их сам при чтении файлов.
 | Input не появлялся при первом открытии задачи | `a7d1a3f` |
 | Grok пропускал вопросы при создании проекта (RAG-агрессия) | `a7d1a3f` |
 | Worktrees `stoic-wu` + `angry-nobel` удалены | git worktree prune |
+| Dev overrides — reader теперь регистрируется в `instrumentation.ts` (boot), все routes покрыты | pending commit |
 
 ---
 

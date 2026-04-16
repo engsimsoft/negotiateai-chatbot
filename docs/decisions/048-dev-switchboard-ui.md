@@ -18,10 +18,14 @@ Core Model Registry (ТЗ-1, v3.83.0) ввёл единую точку `getModel
 - `model-overrides.ts` — client-safe: dev-gate, parse, reader callback
 - `model-overrides-node.ts` — server-only: `fs.readFileSync/writeFileSync`, регистрирует себя в shared модуле при import
 
-Side-effect import в `chat/route.ts`:
+Reader регистрируется в `instrumentation.ts` (Next.js server boot hook) — один раз, до любого route:
 ```ts
-import "@/lib/ai/model-overrides-node";
+// instrumentation.ts
+if (process.env.NEXT_RUNTIME === "nodejs") {
+  await import("@/lib/ai/model-overrides-node");
+}
 ```
+Отдельные side-effect импорты в route-файлах — **не нужны** и не обязательны. Новые routes автоматически получают reader без дополнительных действий.
 
 ### Почему не cookies
 
