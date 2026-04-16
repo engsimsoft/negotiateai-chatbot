@@ -43,7 +43,6 @@ export type TaskId =
   | "professor:pipeline-synthesize"
   // Клерки
   | "clerk:task-summary"
-  | "clerk:snapshot"
   | "clerk:file-analyzer"
   // Memory (MIND / RAG)
   | "memory:extract"          // per-message extraction (Claude Sonnet, generateObject)
@@ -133,10 +132,10 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   // задачи механические (суммаризация завершённой задачи + анализ загруженного
   // файла), используют generateText + JSON.parse + Zod workaround паттерн.
   // Ценовая экономия ~4× input / ~8× output по сравнению с Haiku.
-  // clerk:snapshot остаётся на Haiku как мёртвый код per ADR 052 — удалится
-  // в ТЗ-XAI-6 cleanup.
+  // clerk:snapshot placeholder удалён в ТЗ-XAI-6 финализации серии (2026-04-16,
+  // v3.92.1) — snapshot-creator.ts был удалён ещё в ADR 052, taskId остался
+  // висеть без call sites, мёртвая запись убрана окончательно.
   "clerk:task-summary":       "grok-4-1-fast-non-reasoning",
-  "clerk:snapshot":           "claude-haiku-4-5-20251001",
   "clerk:file-analyzer":      "grok-4-1-fast-non-reasoning",
 
   // Memory (ТЗ-XAI-4 2026-04-16)

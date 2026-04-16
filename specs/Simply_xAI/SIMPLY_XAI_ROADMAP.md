@@ -1,9 +1,9 @@
 # Simply — Дорожная карта миграции на xAI
 
 **Создано:** 2026-04-14  
-**Обновлено:** 2026-04-16 (после ТЗ-XAI-4 ✅ завершён, v3.92.0)  
-**Статус:** В работе  
-**Серия:** ТЗ-XAI-1 → ТЗ-XAI-6 (+ ТЗ-ATTACH-1 + будущие расширения)
+**Обновлено:** 2026-04-16 (**серия закрыта** в v3.92.1 через финализацию ТЗ-XAI-6)  
+**Статус:** ✅ **Завершена**  
+**Серия:** ТЗ-XAI-1 → ТЗ-XAI-6 (+ ТЗ-ATTACH-1). Будущие расширения (ТЗ-XAI-MA-1, ТЗ-XAI-COL-1, ТЗ-XAI-VOICE-1) — отдельные ветки
 
 > Живой документ. Обновляется после завершения каждого ТЗ.
 
@@ -186,27 +186,29 @@
 
 ---
 
-### ТЗ-XAI-6 — Очистка
-**Статус:** 📋 Планируется  
-**Зависимости:** все предыдущие ТЗ завершены и проверены  
-**Риск:** низкий (удаление мёртвого кода)  
+### ТЗ-XAI-6 — Финализация серии
+**Статус:** ✅ Завершён 2026-04-16 (v3.92.1)
+**Зависимости:** все предыдущие ТЗ завершены и проверены
+**Риск:** минимальный (удаление placeholder-записи без call sites)
 
-**Суть:** Удалить всё что осталось от старых провайдеров.
+**Суть (финальная, после двух correction'ов владельца):** Символическое закрытие серии Simply_xAI. Scope сжался от «cleanup провайдеров» до «удаление одного оставшегося placeholder-taskId».
 
-**Удалить из registry.ts:** namespace `minimax`, `minimaxLong`, `openrouter`  
-**Удалить из model-catalog.ts:** все MiniMax и OpenRouter записи  
-**Удалить из task-assignments.ts:** все ссылки на удалённые модели  
-**Удалить файлы/функции:**
-- `stripMiniMaxToolParts` (если не убрано в ТЗ-XAI-3)
-- `stripLegacyOpenAICompatToolParts`
-- `isSimplyNonAnthropicModel`
-- `stripMediaPartsForTextModel` (если vision идёт на Haiku — может ещё нужна, проверить)
-- `vercel-minimax-ai-provider` dependency из package.json
-- Старые ADR / docs если ссылаются только на удалённых провайдеров
+**Что удалено:**
+- `clerk:snapshot` placeholder в [lib/ai/task-assignments.ts](../../lib/ai/task-assignments.ts) — 3 строки (TaskId union + DEFAULT_TASK_MODELS + комментарий). `snapshot-creator.ts` был удалён ещё в ADR 052, taskId остался висеть без call sites
+- 2 упоминания `clerk:snapshot` в [docs/decisions/038-cost-tracking-architecture.md](../../docs/decisions/038-cost-tracking-architecture.md) + [SIMPLY_PROMPTS_AND_MODEL_CONFIG.md](SIMPLY_PROMPTS_AND_MODEL_CONFIG.md)
 
-**Удалить env vars:** `MINIMAX_API_KEY` из Vercel (после подтверждения что всё работает)
+**Что НЕ удалено (by design, зафиксировано в [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) 2026-04-16):**
+- **MiniMax** (`minimax`, `minimaxLong` namespaces + M2.7/M2.7-long catalog + `MINIMAX_API_KEY`) — Кухня, production by design. Активно используется в briefing pipeline (`briefing:author`, `briefing:section`, `briefing:podcast-script`)
+- **OpenRouter** (`openrouter` namespace + `OPENROUTER_API_KEY`) — dev-инструмент для быстрого тестирования новых моделей (GLM, Qwen, DeepSeek и т.д.) через `/dev/models` override. НЕ production-провайдер, но нужен в процессе разработки
 
-**НЕ удалять:** `@ai-sdk/anthropic` (нужен для Haiku + Opus), `ANTHROPIC_API_KEY`
+**Почему «финализация», а не «cleanup»:**
+Все реальные cleanup-цели из оригинального плана ТЗ-XAI-6 **были сделаны заранее** в предыдущих ТЗ:
+- `stripMiniMaxToolParts`, `stripLegacyOpenAICompatToolParts`, `isSimplyNonAnthropicModel` — удалены в ТЗ-XAI-3 (Этап 2, R-6 резолв)
+- `snapshot-creator.ts` — удалён в ADR 052 (ТЗ-CreateSnapshotAudit)
+- MiniMax миграция — **никогда не планировалась** (это моя ошибка интерпретации)
+- OpenRouter cleanup — **тоже не планировался** (это моя вторая ошибка)
+
+Финальный scope свёлся к символическому closure серии.
 
 ---
 
@@ -250,4 +252,4 @@
 | ТЗ-ATTACH-1 | ✅ Завершён | 2026-04-16 | 2026-04-16 | v3.91.0 — PDF text extraction при upload, текстовые PDF → `text/plain` → Grok inline, сканы → Haiku |
 | ТЗ-XAI-4 | ✅ Завершён | 2026-04-16 | 2026-04-16 | v3.92.0 — 11 taskId на Grok (6 подсобка Fast + 5 зал 4.20 reasoning, включая Владимирский scope expansion) + 2 hot-fix pre-existing багов (side-effect import + maxOutputTokens) + 3 новых backlog хвоста |
 | ТЗ-XAI-5 | ✅ Закрыт через scope expansion ТЗ-XAI-4 | — | 2026-04-16 | create + expertise + R-5 выполнены Владимирскими IDE edits в scope ТЗ-XAI-4 |
-| ТЗ-XAI-6 | 📋 План (следующий в серии) | — | — | Очистка MiniMax/OpenRouter — registry namespaces, caталог, strip-функции, dependency |
+| ТЗ-XAI-6 | ✅ Завершён | 2026-04-16 | 2026-04-16 | v3.92.1 — финализация серии, удалён `clerk:snapshot` placeholder (3 строки кода + 2 в docs). MiniMax (кухня) и OpenRouter (dev-инструмент) остаются by design |

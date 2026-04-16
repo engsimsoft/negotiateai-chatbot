@@ -57,7 +57,7 @@
 - [x] **ТЗ-ATTACH-1** — PDF text extraction при upload (v3.91.0)
 - [x] **ТЗ-XAI-4** — Utility/Pipeline batch миграция + scope expansion (**v3.92.0 завершён 2026-04-16**)
 - [x] **ТЗ-XAI-5** — ✅ закрыт через scope expansion ТЗ-XAI-4 (create + expertise + R-5)
-- [ ] **ТЗ-XAI-6** — Очистка MiniMax/OpenRouter (**следующий в серии, разблокирован** после correction URL hallucination metric bug 2026-04-16)
+- [x] **ТЗ-XAI-6** — Финализация серии (**v3.92.1**, commit `<release>`) — dead code cleanup. MiniMax и OpenRouter остаются by design. Серия Simply_xAI **закрыта**
 - [ ] ТЗ-XAI-COL-1 — Collections API для Библиотеки
 - [ ] ТЗ-XAI-MA-1 — Premium «Команда агентов» (Responses API + MCP), `expertise-multi-agent` taskId уже зарезервирован
 
@@ -67,24 +67,11 @@
 
 **ТЗ-XAI-4 закрыта** (включая scope expansion, покрывший XAI-5). **Блокер ТЗ-XAI-6 снят** после correction 2026-04-16 (commits `58d9d2e` + `eeba086`): «URL hallucination» оказалась metric bug (naive `Set.has()` без нормализации), а не architectural issue моделей. briefing:author на MiniMax работает корректно — миграция на Grok теперь вопрос cleanup, не качества.
 
-### Вариант A — ТЗ-XAI-6 cleanup OpenRouter + dead code (MiniMax остаётся by design)
+### Вариант A — ~~ТЗ-XAI-6~~ ✅ закрыт в v3.92.1
 
-**Важно:** целевая архитектура серии Simply_xAI — **3 провайдера, 4 роли**, не 2 провайдера. MiniMax M2.7 + M2.7-long остаются в production как **«кухня»** (briefing:author/section/podcast-script — фоновые pipelines). Полная философия — [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) запись 2026-04-16 «Философия серии "4 роли, 3 провайдера"».
+Серия Simply_xAI закрыта. Следующие варианты на выбор:
 
-Что делается:
-- **Оставить:** MiniMax namespaces (`minimax`, `minimaxLong`) + M2.7 / M2.7-long catalog entries + active taskIds (`briefing:author`, `briefing:section`, `briefing:podcast-script`) + `MINIMAX_API_KEY` env
-- **Удалить:** OpenRouter namespace (0 active taskIds после миграции), dead strip functions (`stripMiniMaxToolParts`, `stripLegacyOpenAICompatToolParts`, `isSimplyNonAnthropicModel`), `clerk:snapshot` dead code per ADR 052
-- **Удалить env:** `OPENROUTER_API_KEY` после подтверждения 0 usages
-- Обновить ADR если ссылаются только на OpenRouter
-
-**Почему первым:**
-1. Последний крупный шаг серии Simply_xAI — закрывает цикл миграции
-2. Scope хорошо понятный, риск низкий (OpenRouter не используется, убирается безболезненно)
-3. Зачищает зоопарк провайдеров (4 namespace → 3, по числу ролей)
-
-**Оценка:** 0.5-1 сессия.
-
-### Вариант B — TZ_DevOverridesSideEffectImportAudit 🟥 (0.5-1 сессия)
+### Вариант B (теперь основной) — TZ_DevOverridesSideEffectImportAudit 🟥 (0.5-1 сессия)
 
 6+ backend routes без `import "@/lib/ai/model-overrides-node"` → dev panel overrides молча игнорируются. Блокирует все будущие A/B тесты — а Вариант A требует empirical smoke test. **Стоит сделать Вариант B перед A** если планируется тест на нескольких моделях briefing:author.
 
@@ -207,7 +194,7 @@ fc8a995 fix(error-recovery): TZ_ErrorRecoveryUI Stage 1
 15. **Reserved vs deprecated семантика модели в каталоге.** Когда taskId снимается с активного использования, но запись каталога остаётся — различать «deprecated (удалить когда чисто)» и «reserved (placeholder под будущую фичу)». Reserved маркируется через placeholder taskId + подробный комментарий + cross-ref в ROADMAP. Пример: `expertise-multi-agent` taskId → `grok-4.20-multi-agent-0309` запись под ТЗ-XAI-MA-1
 16. **Audit metadata hardcoded modelId проверка при миграции taskId.** При переключении taskId X в task-assignments — обязательно grep на hardcoded имя старой модели в audit metadata блоках и заменять на `getModelIdForTask("X")`. Иначе в БД пишется лживое значение. Пример: `meeting/regenerate/route.ts:91` имел `"claude-sonnet-4-6"` hardcoded
 17. **🆕 Observability метрики канонизируются перед сравнением.** Сравнение URL / path / identifier в observability слое через `Set.has(rawValue)` — антипаттерн. Любая форматная разница (tracking params, anchor, trailing slash, case) даёт ложный positive. Канонизация обязательна: нормализовать оба сравниваемых значения функцией без побочек, потом Set.has. Живой пример — `normalizeUrlForComparison()` в [pipeline-trace.ts](../../lib/ai/pipeline-trace.ts) (2026-04-16, commit `58d9d2e`). Перед выводами о качестве модели на основе метрики — **читать код метрики**
-18. **🆕 Целевая архитектура серии: 4 роли, 3 провайдера (by design, НЕ 2).** Подсобка = Grok 4.1 Fast, Кухня = MiniMax M2.7/M2.7-long, Зал = Grok 4.20, Автор = Claude Opus. MiniMax остаётся в production **by design** для кухни (briefing author/section/podcast-script — фоновые pipelines ночью). ТЗ-XAI-6 cleanup убирает только OpenRouter + dead code, НЕ MiniMax. Полная формулировка владельца 2026-04-16 — [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) запись «Философия серии "4 роли, 3 провайдера"»
+18. **🆕 Целевая архитектура серии: 4 роли, 3 production провайдера + 1 dev-инструмент.** Подсобка = Grok 4.1 Fast, Кухня = MiniMax M2.7/M2.7-long, Зал = Grok 4.20, Автор = Claude Opus/Sonnet/Haiku. **OpenRouter** = dev-инструмент для тестирования новых моделей (GLM, Qwen, DeepSeek и т.д.) через `/dev/models` override — НЕ production-провайдер, но остаётся в каталоге, registry, env как есть. Полная формулировка владельца 2026-04-16 — [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) записи «Философия серии "4 роли, 3 провайдера"» и «ТЗ-XAI-6 финализация + OpenRouter как dev-инструмент»
 
 ---
 

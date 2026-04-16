@@ -48,6 +48,50 @@
 
 ---
 
+## [ТЗ-XAI-6] 2026-04-16 — Финализация серии — v3.92.1
+
+**Коммит:** `<release v3.92.1>`
+**Продолжительность:** <1 часа (в рамках briefing cleanup сессии)
+
+**Контекст:** Символическое закрытие серии Simply_xAI. Scope сжался от изначальных планов («cleanup MiniMax/OpenRouter») до «удаление одного placeholder-taskId» после двух correction'ов владельца:
+1. MiniMax остаётся by design — Кухня
+2. OpenRouter остаётся by design — dev-инструмент для тестирования новых моделей
+
+Все реальные cleanup-цели были уже сделаны заранее в предыдущих ТЗ.
+
+**Что сделано:**
+
+1. **Удалён `clerk:snapshot` placeholder:**
+   - [lib/ai/task-assignments.ts](../../lib/ai/task-assignments.ts) — 3 строки (TaskId union L46, DEFAULT_TASK_MODELS L139, комментарий L135-136)
+   - [docs/decisions/038-cost-tracking-architecture.md:77](../../docs/decisions/038-cost-tracking-architecture.md#L77) — строка «Snapshot creator | Haiku | clerk:snapshot-creator» в таблице
+   - [SIMPLY_PROMPTS_AND_MODEL_CONFIG.md:195](SIMPLY_PROMPTS_AND_MODEL_CONFIG.md#L195) — строка `clerk:snapshot | Claude Haiku 4.5` в таблице клерков
+
+2. **Обновлены документы серии:**
+   - [SIMPLY_XAI_ROADMAP.md](SIMPLY_XAI_ROADMAP.md) — статус «Завершена» в шапке, ТЗ-XAI-6 переформулирован как «Финализация серии», прогресс-таблица обновлена
+   - [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) — новая append-only запись «ТЗ-XAI-6 финализация + OpenRouter как dev-инструмент»
+   - [HANDOFF.md](HANDOFF.md) — прогресс серии ✅, Вариант A в «Что дальше» убран (серия закрыта), архитектурная константа №18 обновлена (4 провайдера — 3 prod + 1 dev)
+   - Корневой [CHANGELOG.md](../../CHANGELOG.md) — запись v3.92.1
+
+**Что НЕ сделано (by design, не ошибка scope):**
+
+- **MiniMax namespaces + catalog + `MINIMAX_API_KEY`** — production by design (Кухня: `briefing:author`, `briefing:section`, `briefing:podcast-script`)
+- **OpenRouter namespace + catalog + `OPENROUTER_API_KEY`** — dev-инструмент by design (тестирование новых моделей через `/dev/models` override)
+- Functions `stripMiniMaxToolParts`, `stripLegacyOpenAICompatToolParts`, `isSimplyNonAnthropicModel` — **уже удалены в ТЗ-XAI-3** (R-6 резолв, Этап 2)
+- `snapshot-creator.ts` — **уже удалён в ADR 052** (ТЗ-CreateSnapshotAudit)
+- `vercel-minimax-ai-provider` dependency — остаётся, используется
+
+**Связанные документы:**
+- [SIMPLY_XAI_NOTES.md](SIMPLY_XAI_NOTES.md) запись 2026-04-16 «ТЗ-XAI-6 финализация + OpenRouter как dev-инструмент»
+- [SIMPLY_XAI_ROADMAP.md](SIMPLY_XAI_ROADMAP.md) обновлён как «серия завершена»
+
+**Следующий шаг:** **Серия Simply_xAI закрыта.** Возможные направления:
+- ТЗ-XAI-MA-1 — Multi-agent через Responses API + MCP (`expertise-multi-agent` taskId зарезервирован)
+- ТЗ-XAI-COL-1 — Collections API для Библиотеки
+- ТЗ-XAI-VOICE-1 — Voice Agent API
+- Открытые хвосты: TZ_DevOverridesSideEffectImportAudit (🟥 High), TZ_ErrorRecoveryUI Stage 2 (🟥 High), 8 Medium хвостов
+
+---
+
 ## [ТЗ-XAI-4 + scope expansion] 2026-04-16 — Utility/Pipeline миграция + IDE scope expansion — v3.92.0
 
 **Коммиты:** `ceadd17` (Этап 2 «подсобка»), `d9d3488` (plan/route.ts hot-fix), `d1e2c12` (2 backlog хвоста), `676d50d` (Этапы 3 + scope expansion + briefing hot-fix + 2 backlog хвоста), `2ca1ac5` (HANDOFF v1), `2fbc50b` (multi-agent RESERVED correction + dead constants + DevPanel labels), `5b1a141` (HANDOFF v2), `<release v3.92.0>` (этот release)

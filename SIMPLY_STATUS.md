@@ -1,7 +1,7 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.92.0
-**Статус:** Active development (серия Simply_xAI)
+**Версия:** 3.92.1
+**Статус:** Active development (**серия Simply_xAI закрыта** 2026-04-16 в v3.92.1)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** snapshot «что работает прямо сейчас» на один взгляд. История изменений → [CHANGELOG.md](CHANGELOG.md). Архитектура → [docs/architecture.md](docs/architecture.md). Карта моделей → [docs/ai-chats-map.md](docs/ai-chats-map.md).
@@ -14,7 +14,14 @@
 
 **Философия:** Apple-подход (качество важнее количества) + Best-in-Class API (интегрируем лучшие решения, не изобретаем). Детали видения → [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md).
 
-**Мультипровайдерная маршрутизация:** xAI Grok (Simply Chat, MIND, Экспертиза, Создание, утилиты, meeting summary), Anthropic Claude (vision, артефакты, клерки, профессор, project expert, service chats), MiniMax (только briefing pipeline — author/section/podcast-script; миграция на Grok разблокирована после correction 2026-04-16 — см. [SIMPLY_XAI_NOTES.md](specs/Simply_xAI/SIMPLY_XAI_NOTES.md) «URL hallucination была не галлюцинацией», ждёт ТЗ-XAI-6). SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) + [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts).
+**Мультипровайдерная маршрутизация (финальная после закрытия серии Simply_xAI, 4 роли / 3 production провайдера / 1 dev-инструмент):**
+- **Подсобка** — xAI Grok 4.1 Fast (`util:*`, `clerk:*`, `briefing:filter`, `memory:extract-batch/consolidate/profile/dedup-verify`)
+- **Кухня** — MiniMax M2.7 / M2.7-long (`briefing:author`, `briefing:section`, `briefing:podcast-script` — by design, фоновые pipelines)
+- **Зал** — xAI Grok 4.20 reasoning (`simply-chat-think`, `expertise`, `create`, `meeting:summary`, `memory:extract`)
+- **Автор** — Anthropic Claude Opus/Sonnet/Haiku (`professor:*`, `artifact:*`, `vision:ocr`, `service-chat:*`, `simply-chat-vision`)
+- **Dev-инструмент** — OpenRouter (только через `/dev/models` override для тестирования новых моделей)
+
+SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) + [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts).
 
 ---
 
@@ -169,4 +176,4 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). Сводка на с
 
 ---
 
-**Обновлено:** 2026-04-16 (ТЗ-XAI-4 ✅ v3.92.0 — 11 taskId на Grok + correction URL hallucination metric bug commit `58d9d2e`)
+**Обновлено:** 2026-04-16 (**серия Simply_xAI закрыта** v3.92.1 — финализация ТЗ-XAI-6: удалён `clerk:snapshot` placeholder, MiniMax/OpenRouter остаются by design, финальная архитектура «4 роли / 3 prod + 1 dev»)

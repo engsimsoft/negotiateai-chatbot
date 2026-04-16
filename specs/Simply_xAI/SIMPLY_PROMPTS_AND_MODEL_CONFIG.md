@@ -192,7 +192,6 @@
 | Задача | Модель |
 |---|---|
 | `clerk:task-summary` | Claude Haiku 4.5 |
-| `clerk:snapshot` | Claude Haiku 4.5 |
 | `clerk:file-analyzer` | Claude Haiku 4.5 |
 
 ### Память MIND (после ТЗ-XAI-2, апрель 2026)

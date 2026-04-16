@@ -55,7 +55,7 @@
 **URL hallucination оказалась metric bug, не архитектурной проблемой.** Commit `58d9d2e` фиксит `verifyArticleUrls()` через `normalizeUrlForComparison()`. Смотри **[3.92.0-post: URL verification metric fix](#3920-post--2026-04-16--url-verification-metric-normalization-correction)** ниже в этом файле для деталей.
 
 ### Planned (Next Steps)
-- **Simply_xAI миграция** (активная серия, XAI-1/2/3/4 ✅ + ATTACH-1 ✅ + XAI-5 закрыт scope expansion XAI-4; следующий XAI-6 — очистка MiniMax/OpenRouter, **блокер снят** после URL hallucination correction 2026-04-16)
+- **Simply_xAI миграция** — ✅ **серия закрыта в v3.92.1** (все ТЗ-XAI-1/2/3/4/5/6 ✅ + ТЗ-ATTACH-1 ✅). Следующие возможные ветки xAI — **новые направления**, не продолжение серии: ТЗ-XAI-MA-1 (Multi-agent через Responses API + MCP), ТЗ-XAI-COL-1 (Collections API), ТЗ-XAI-VOICE-1 (Voice Agent)
 - **[TZ_DevOverridesSideEffectImportAudit](specs/_backlog/TZ_DevOverridesSideEffectImportAudit.md)** 🟥 — 6+ backend routes без reader import. Блокирует A/B тесты
 - **[TZ_ErrorRecoveryUI Stage 2](specs/_backlog/TZ_ErrorRecoveryUI.md)** 🟥 — root cause fix useChat state recovery. Stage 1 ✅ в v3.90.0+
 - Medium хвосты в [specs/_backlog/README.md](specs/_backlog/README.md): ServiceChatNotOverridable, DevPanelFooterHidesSubCalls, TaskExpertChatInputMissingOnFirstOpen, ProfessorPlanStreaming, MaxOutputTokensAudit, SimplyContextUsageWidget, PromptsDeadCodeCleanup, SimplyChatRaceCondition
@@ -63,6 +63,63 @@
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
 - xAI Files API integration — поднять флаги `documentSupport` для Grok reasoning-моделей
 - Alias entries refactor — устранить дублирование `pricing`/`capabilities` в alias через резолв через `aliasOf`
+
+---
+
+## [3.92.1] — 2026-04-16 — ТЗ-XAI-6 финализация — закрытие серии Simply_xAI
+
+**Символическое закрытие серии Simply_xAI.** После двух correction'ов владельца (MiniMax остаётся как Кухня by design, OpenRouter остаётся как dev-инструмент для тестирования новых моделей) scope ТЗ-XAI-6 сжался от изначальных планов «cleanup MiniMax/OpenRouter» до удаления одного placeholder-taskId. Все реальные cleanup-цели были уже сделаны заранее в предыдущих ТЗ серии.
+
+### Removed
+
+- **`clerk:snapshot` taskId** — placeholder без call sites, `snapshot-creator.ts` был удалён ещё в ADR 052 (ТЗ-CreateSnapshotAudit). Убраны:
+  - `| "clerk:snapshot"` из TaskId union в [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) (L46)
+  - `"clerk:snapshot": "claude-haiku-4-5-20251001"` из DEFAULT_TASK_MODELS (L139)
+  - Устаревший комментарий L135-136 «удалится в ТЗ-XAI-6 cleanup»
+- **Упоминания `clerk:snapshot` в документации:**
+  - Строка таблицы «Snapshot creator | Haiku | clerk:snapshot-creator» из [docs/decisions/038-cost-tracking-architecture.md:77](docs/decisions/038-cost-tracking-architecture.md#L77)
+  - Строка `clerk:snapshot | Claude Haiku 4.5` из [specs/Simply_xAI/SIMPLY_PROMPTS_AND_MODEL_CONFIG.md:195](specs/Simply_xAI/SIMPLY_PROMPTS_AND_MODEL_CONFIG.md#L195)
+
+### Changed (документы серии)
+
+- **[specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md](specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md):** шапка «Статус: ✅ Завершена», ТЗ-XAI-6 переформулирован как «Финализация серии», прогресс-таблица обновлена
+- **[specs/Simply_xAI/SIMPLY_XAI_CHANGELOG.md](specs/Simply_xAI/SIMPLY_XAI_CHANGELOG.md):** запись v3.92.1
+- **[specs/Simply_xAI/SIMPLY_XAI_NOTES.md](specs/Simply_xAI/SIMPLY_XAI_NOTES.md):** append-only запись «ТЗ-XAI-6 финализация + OpenRouter как dev-инструмент» с дословной формулировкой владельца и финальной целевой архитектурой
+- **[specs/Simply_xAI/HANDOFF.md](specs/Simply_xAI/HANDOFF.md):** прогресс серии, вариант A в «Что дальше» убран (серия закрыта), архитектурная константа №18 обновлена
+
+### Финальная целевая архитектура серии Simply_xAI
+
+**4 роли · 3 production провайдера · 1 dev-инструмент:**
+
+| Роль | Провайдер | Примеры |
+|---|---|---|
+| Подсобка | Grok 4.1 Fast (xAI) | `util:*`, `clerk:*`, `briefing:filter`, `memory:extract-batch/consolidate/profile/dedup-verify` |
+| Кухня | MiniMax M2.7 / M2.7-long | `briefing:author`, `briefing:section`, `briefing:podcast-script` |
+| Зал | Grok 4.20 reasoning (xAI) | `simply-chat-think`, `expertise`, `create`, `meeting:summary`, `memory:extract` |
+| Автор | Claude Opus/Sonnet/Haiku (Anthropic) | `professor:*`, `artifact:*`, `vision:ocr`, `service-chat:*`, `simply-chat-vision` |
+| Dev-инструмент | OpenRouter | — (только через `/dev/models` override для тестирования новых моделей) |
+
+### Мета-урок — вторая итерация правила cleanup
+
+Первая итерация правила (эта же сессия): «MiniMax кухня by design, не подлежит удалению». Вторая: «OpenRouter dev-инструмент, тоже не подлежит удалению». Общий паттерн — я дважды предлагал cleanup провайдера исходя только из production-usage. **Перед предложением удалить компонент (провайдер, функцию, dependency, env var) — спрашивать о всех use cases, не только production traffic.** Dev workflow, testing tooling, emergency fallback, A/B experimentation — это всё валидные причины оставить. Новое memory-правило `feedback_cleanup_requires_full_context.md`.
+
+### Validation
+
+- `npx tsc --noEmit` → 0 ошибок после удаления placeholder
+
+### Серия Simply_xAI закрыта
+
+| ТЗ | v | Описание |
+|---|---|---|
+| ТЗ-XAI-1 | 3.88.0 | Фундамент |
+| ТЗ-XAI-2 | 3.89.0 | MIND pipeline → Grok |
+| ТЗ-XAI-3 | 3.90.0 | KITT + Think → Grok + R-6 cleanup |
+| ТЗ-SimplyChatModeInjection | 3.90.1 | Плейсхолдеры через SSOT |
+| ТЗ-SimplyReadDocumentTool + R-6 correction | 3.90.2 | adaptHistoryToCapabilities |
+| ТЗ-ATTACH-1 | 3.91.0 | PDF text extraction при upload |
+| ТЗ-XAI-4 | 3.92.0 | Utility/Pipeline batch миграция + scope expansion |
+| ТЗ-XAI-5 | — | Закрыт через scope expansion ТЗ-XAI-4 |
+| ТЗ-XAI-6 | **3.92.1** | **Финализация серии** (этот release) |
 
 ---
 

@@ -74,7 +74,6 @@
 | Auto-naming | Haiku | `util:auto-naming` |
 | Task summarizer | Haiku | `clerk:task-summarizer` |
 | Task reviewer | Opus | `professor:task-reviewer` |
-| Snapshot creator | Haiku | `clerk:snapshot-creator` |
 | File analyzer | Haiku | `clerk:file-analyzer` |
 
 ### Где данные используются

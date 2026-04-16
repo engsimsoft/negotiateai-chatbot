@@ -9,6 +9,97 @@
 
 ---
 
+## 2026-04-16 — ТЗ-XAI-6 финализация + OpenRouter как dev-инструмент (серия Simply_xAI закрыта, v3.92.1)
+
+**Контекст:** Владелец поправил вторую рамку о cleanup моего же ТЗ-XAI-6. Предыдущая рамка (commit `5c0a22e`) говорила «убираем OpenRouter + dead code». После разговора этой сессии **OpenRouter тоже остаётся** — как **dev-инструмент** для быстрого тестирования новых моделей.
+
+### OpenRouter — dev-инструмент (зафиксировано владельцем 2026-04-16)
+
+> **Дословная формулировка владельца:** «Не надо убирать OpenRouter, он нам всегда понадобится для тестирования моделей, мы пока не в продакшене, мы пока в стадии разработки и он нам всегда понадобится для тестирования какой-нибудь новой или другой модели.»
+
+**Роль OpenRouter в архитектуре Simply:**
+
+- **НЕ production-провайдер.** Нет active `taskId`, который бы routeил туда продуктовый трафик
+- **dev-инструмент.** Один API-ключ → доступ к сотням моделей (GLM, Qwen, DeepSeek, Llama и т.д.) через один namespace. Нужен когда хочется быстро протестировать новую модель без регистрации отдельного аккаунта / ключа / биллинга
+- **Используется через `/dev/models` override.** Если владелец хочет протестировать, например, «а что если simply-chat на DeepSeek?» — прописывает override, routing включает OpenRouter, получает empirical данные без продуктового rollout'а
+- **Остаётся в каталоге, registry, env как есть.** `OPENROUTER_API_KEY` остаётся в Vercel
+
+**Архитектурная константа серии обновляется:**
+- Было: «3 провайдера» (Grok + MiniMax + Anthropic)
+- Стало: **«4 провайдера — 3 production + 1 dev»** (production: Grok, MiniMax, Anthropic; dev-инструмент: OpenRouter)
+
+### Финальный scope ТЗ-XAI-6 после двух correction'ов
+
+**Предыдущие мои формулировки (обе неверные):**
+1. (commit `2b0b131`) «cleanup MiniMax/OpenRouter» — MiniMax кухня by design, нельзя убирать
+2. (commit `5c0a22e`) «OpenRouter + dead code» — OpenRouter dev-инструмент, тоже нельзя убирать
+
+**Финальный scope:** **только dead code cleanup.** При реализации оказалось, что:
+
+- `stripMiniMaxToolParts` — **уже удалён** в ТЗ-XAI-3 (commit из той сессии)
+- `stripLegacyOpenAICompatToolParts` — **уже удалён** в ТЗ-XAI-3 (Q1 решение, Этап 2.3 ROADMAP)
+- `isSimplyNonAnthropicModel` — **уже удалён** в ТЗ-XAI-3 (Этап 2.4 ROADMAP, R-6 резолв)
+- `snapshot-creator.ts` — **уже удалён** в ADR 052 «ТЗ-CreateSnapshotAudit cleanup»
+
+**Осталось для ТЗ-XAI-6:**
+
+1. `clerk:snapshot` placeholder в [lib/ai/task-assignments.ts](../../lib/ai/task-assignments.ts) — TaskId union (L46) + DEFAULT_TASK_MODELS (L139) + комментарий (L135-136). **Это висящая запись без call sites** — `snapshot-creator.ts` удалён, `getModel("clerk:snapshot")` никто не вызывает, но тип остался
+2. `docs/decisions/038-cost-tracking-architecture.md:77` — строка `| Snapshot creator | Haiku | clerk:snapshot-creator |` в служебной таблице
+3. `specs/Simply_xAI/SIMPLY_PROMPTS_AND_MODEL_CONFIG.md:195` — строка `| clerk:snapshot | Claude Haiku 4.5 |` в таблице клерков
+
+**Итого:** 3 строки кода + 2 строки docs. Весь ТЗ-XAI-6 — 5 строк.
+
+### Версия bump: v3.92.1 (patch)
+
+Минорное изменение — patch по semver. Не feature, не breaking.
+
+### Мета-урок — вторая итерация правила cleanup
+
+Первая итерация (эта же сессия выше): «MiniMax кухня by design, не подлежит удалению». Вторая (эта запись): «OpenRouter dev-инструмент, тоже не подлежит удалению».
+
+**Общий паттерн:** я дважды предлагал cleanup провайдера исходя только из production-usage. Оба раза владелец поправил на уровне **use cases за пределами production** — у MiniMax это продуктовая роль (фоновые pipelines), у OpenRouter это dev workflow (тестирование новых моделей).
+
+**Новое правило в memory (`feedback_cleanup_requires_full_context.md`):**
+
+> **Перед предложением удалить компонент** (провайдер, функцию, dependency, env var) — спрашивать о **всех use cases, не только production trafficе**. Dev workflow, testing tooling, emergency fallback, A/B experimentation — это всё валидные причины оставить компонент. Grep по production коду показывает только часть картины. Формулировка вопроса к владельцу: «Используется ли это в dev/testing/fallback, или можно убирать?»
+
+### Серия Simply_xAI — закрыта
+
+После этого ТЗ серия **официально завершена**. Итоговая картина:
+
+| ТЗ | Результат |
+|---|---|
+| ТЗ-XAI-1 | ✅ v3.88.0 — Фундамент (каталог, архитектурные решения) |
+| ТЗ-XAI-2 | ✅ v3.89.0 — MIND pipeline → Grok |
+| ТЗ-XAI-3 | ✅ v3.90.0 — KITT + Think → Grok + R-6 cleanup |
+| ТЗ-SimplyChatModeInjection | ✅ v3.90.1 — плейсхолдеры через SSOT |
+| ТЗ-SimplyReadDocumentTool + R-6 correction | ✅ v3.90.2 — adaptHistoryToCapabilities |
+| ТЗ-ATTACH-1 | ✅ v3.91.0 — PDF text extraction при upload |
+| ТЗ-XAI-4 | ✅ v3.92.0 — Utility/Pipeline batch миграция + scope expansion |
+| ТЗ-XAI-5 | ✅ закрыт через scope expansion XAI-4 |
+| **ТЗ-XAI-6** | ✅ **v3.92.1 — финальный cleanup dead code** (этот ТЗ) |
+
+**Открыто для будущих веток серии xAI:**
+- ТЗ-XAI-MA-1 — Multi-agent через Responses API + MCP (`expertise-multi-agent` taskId зарезервирован)
+- ТЗ-XAI-COL-1 — Collections API для Библиотеки
+- ТЗ-XAI-VOICE-1 — Voice Agent API
+
+Это **новые направления**, не продолжение серии. Серия «миграция на xAI» закрыта.
+
+### Финальная целевая архитектура (зафиксирована)
+
+**4 роли · 3 production провайдера · 1 dev-инструмент:**
+
+| Роль | Провайдер | Примеры taskId |
+|---|---|---|
+| Подсобка | Grok 4.1 Fast (xAI) | `util:*`, `clerk:*`, `briefing:filter`, `memory:extract-batch/consolidate/profile/dedup-verify` |
+| Кухня | MiniMax M2.7 / M2.7-long | `briefing:author`, `briefing:section`, `briefing:podcast-script` |
+| Зал | Grok 4.20 reasoning (xAI) | `simply-chat-think`, `expertise`, `create`, `meeting:summary`, `memory:extract` |
+| Автор | Claude Opus / Sonnet / Haiku (Anthropic) | `professor:*`, `artifact:*`, `vision:ocr`, `service-chat:*` |
+| Dev-инструмент | OpenRouter | — (только через `/dev/models` override) |
+
+---
+
 ## 2026-04-16 — Философия серии «4 роли, 3 провайдера» + briefing cleanup + correction моих ошибочных утверждений о ТЗ-XAI-6
 
 **Контекст:** Follow-up сессия после correction URL hallucination (commit `58d9d2e` + `eeba086` + `2b0b131`). Владелец сделал важную тематическую правку моей картины мира + попросил закрыть briefing хвосты реальной работой, а не документацией.
