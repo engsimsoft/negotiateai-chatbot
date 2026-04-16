@@ -9,6 +9,40 @@
 
 ---
 
+## 2026-04-16 — v3.92.2 post-серия tweak: Professor pipeline на Grok (4 точки)
+
+**Контекст:** после закрытия серии Simply_xAI (v3.92.1) владелец посмотрел на текущие модели Professor pipeline и предложил gradient по критичности. Сессия dev-тестирования, Opus на слишком многих ролях тратит деньги без пропорциональной ценности.
+
+### Решение
+
+4 точки переведены с Anthropic на Grok по философии «4 роли»:
+
+| taskId | Было | Стало | Роль |
+|---|---|---|---|
+| `professor:review` | Opus | grok-4.20-0309-reasoning | Зал |
+| `professor:pipeline-analyze` | Opus | grok-4.20-0309-reasoning | Зал |
+| `professor:pipeline-execute` | Haiku 4.5 | grok-4-1-fast-non-reasoning | Подсобка |
+| `professor:pipeline-synthesize` | Opus | grok-4.20-0309-reasoning | Зал |
+
+**Остались на Opus (Автор):**
+- `professor:planning` — mission-critical план проекта, один вызов определяет всё остальное
+- `project:expert:opus` — tier choice пользователя (brand promise)
+
+### Обоснование
+
+- **Consistency:** `professor:pipeline-execute` был outlier-ом (Haiku 4.5) — механический subtask executor, по философии должен быть в Подсобке. Аналоги — `clerk:task-summary`, `clerk:file-analyzer` — уже на Grok 4.1 Fast после ТЗ-XAI-4.
+- **Empirical basis:** `professor:planning` (самая сложная точка pipeline) уже эмпирически отработал на Grok 4.20 non-reasoning через `/dev/models` override в ТЗ-XAI-4 ($0.028, 26.6s, 1 SQL-подтверждённый call). Если planning справляется — review/analyze/synthesize тоже.
+- **Экономика:** на проекте из 10 задач с pipeline — ~$7-12 → ~$2-3. 70% экономии без потери способностей на наиболее рисковой точке (planning).
+- **Philosophy integrity:** «Автор = Opus» сохранена для **самых ответственных** точек. Менее критичные операции идут в Зал/Подсобку где им место.
+
+### Инициатива владельца
+
+Предложение `professor:pipeline-execute` → Grok 4.1 Fast (а не оставлять на Haiku) было Владимира. Это правильное решение — я в ТЗ-XAI-4 ошибочно отнёс execute к «Professor — не трогать», хотя фактически это механика. Владимир восстановил consistency через формулировку «Подсобка».
+
+**Мета-урок:** при классификации taskId по ролям смотреть **не на название/группу** (professor:* ≠ Author автоматически), а на **характер работы** (механический executor vs мыслитель).
+
+---
+
 ## 2026-04-16 — ТЗ-XAI-6 финализация + OpenRouter как dev-инструмент (серия Simply_xAI закрыта, v3.92.1)
 
 **Контекст:** Владелец поправил вторую рамку о cleanup моего же ТЗ-XAI-6. Предыдущая рамка (commit `5c0a22e`) говорила «убираем OpenRouter + dead code». После разговора этой сессии **OpenRouter тоже остаётся** — как **dev-инструмент** для быстрого тестирования новых моделей.

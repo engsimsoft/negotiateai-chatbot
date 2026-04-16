@@ -66,6 +66,27 @@
 
 ---
 
+## [3.92.2] — 2026-04-16 — Post-серия tweak: Professor pipeline на Grok (4 точки)
+
+Экономия ~70% на Professor pipeline при сохранении Opus на mission-critical `professor:planning` и `project:expert:opus`.
+
+### Changed
+
+- `professor:review`, `professor:pipeline-analyze`, `professor:pipeline-synthesize` — **Opus → Grok 4.20 reasoning** (Зал)
+- `professor:pipeline-execute` — **Haiku 4.5 → Grok 4.1 Fast** (Подсобка). Восстанавливает consistency с `clerk:task-summary` / `clerk:file-analyzer` после ТЗ-XAI-4 — механический subtask executor, не мыслитель
+- `docs/ai-chats-map.md` — обновлены 5 строк overview + таблица моделей
+
+### Не тронуто
+
+- `professor:planning` → остаётся Opus (один вызов определяет весь проект)
+- `project:expert:opus` → остаётся Opus (tier choice пользователя)
+
+### Обоснование
+
+Philosophy «4 роли / 3 prod провайдера / 1 dev» — [SIMPLY_XAI_NOTES.md](specs/Simply_xAI/SIMPLY_XAI_NOTES.md) запись 2026-04-16 «v3.92.2 post-серия tweak».
+
+---
+
 ## [3.92.1] — 2026-04-16 — ТЗ-XAI-6 финализация — закрытие серии Simply_xAI
 
 **Символическое закрытие серии Simply_xAI.** После двух correction'ов владельца (MiniMax остаётся как Кухня by design, OpenRouter остаётся как dev-инструмент для тестирования новых моделей) scope ТЗ-XAI-6 сжался от изначальных планов «cleanup MiniMax/OpenRouter» до удаления одного placeholder-taskId. Все реальные cleanup-цели были уже сделаны заранее в предыдущих ТЗ серии.

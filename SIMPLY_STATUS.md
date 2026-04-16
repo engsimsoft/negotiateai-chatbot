@@ -1,6 +1,6 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.92.1
+**Версия:** 3.92.2
 **Статус:** Active development (**серия Simply_xAI закрыта** 2026-04-16 в v3.92.1)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 

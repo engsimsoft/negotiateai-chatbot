@@ -29,8 +29,11 @@
 | **Секретарь** (создание проекта) | Claude Sonnet 4.6 (`service-chat:project-creation`) | ✅ Работает | Service chat · AI-интервью для создания проекта |
 | **Менеджер проекта** | Claude Haiku 4.5 (`service-chat:project-manager`) | ✅ Работает | Service chat · Живой AI-диалог, управление проектом |
 | **Briefing: Онбординг** | Claude Sonnet 4.6 (`service-chat:briefing-onboarding`) | ✅ Работает | **Service chat** · AI-интервью для настройки профиля брифинга. Архитектурно независим от briefing pipeline ниже — пользователь может его переключить через `/dev/models` override |
-| **Профессор планирования** | Claude Opus 4.6 (`professor:planning`) | ✅ Работает | Генерация плана задач проекта |
-| **Ревьюер задач** | Claude Opus 4.6 (`professor:review`) | ✅ Работает | Ревью завершённой задачи проекта |
+| **Профессор планирования** | Claude Opus 4.6 (`professor:planning`) | ✅ Работает | Автор · Mission-critical план проекта — остаётся на Opus |
+| **Ревьюер задач** | Grok 4.20 reasoning (`professor:review`) | ✅ Работает | Зал · Ревью завершённой задачи (v3.92.2: Opus → Grok 4.20 reasoning) |
+| **Профессор pipeline: analyze** | Grok 4.20 reasoning (`professor:pipeline-analyze`) | ✅ Работает | Зал · Разбивка задачи на subtask'и (v3.92.2: Opus → Grok 4.20 reasoning) |
+| **Профессор pipeline: execute** | Grok 4.1 Fast (`professor:pipeline-execute`) | ✅ Работает | Подсобка · Исполнитель subtask'ов (v3.92.2: Haiku → Grok 4.1 Fast) |
+| **Профессор pipeline: synthesize** | Grok 4.20 reasoning (`professor:pipeline-synthesize`) | ✅ Работает | Зал · Финальная сборка результата (v3.92.2: Opus → Grok 4.20 reasoning) |
 | **Суммаризатор задач** (Клерк) | Grok 4.1 Fast (`clerk:task-summary`) | ✅ Работает | Суммаризация результатов задачи |
 | **Клерк-анализатор** файлов | Grok 4.1 Fast (`clerk:file-analyzer`) | ✅ Работает | Автоматический анализ загруженных файлов |
 | **Briefing: Фильтр** | Grok 4.1 Fast (`briefing:filter`) | ✅ Работает | **Backend pipeline (кухня)** · Фильтрация и дедупликация новостей. Запускается cron'ом или refresh-кнопкой, пользователь не видит процесс |
@@ -596,7 +599,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
 | **Grok 4.20** (reasoning) | `grok-4.20-0309-reasoning` | $2 / $6 | 256K | Simply Chat (кнопка «Думать»), Экспертиза (chatMode=expertise), Создание (chatMode=create), Meeting summary, MIND memory (extract — mission-critical) |
 | **Grok 4.20 Multi-Agent** | `grok-4.20-multi-agent-0309` | $2 / $6 | 256K | 🔒 Reserved для taskId `expertise-multi-agent` (placeholder, не вызывать). Реализация Premium «Команда агентов» через Responses API + MCP — отдельная ветка ТЗ-XAI-MA-1. Архитектура: [BRAINSTORM_GrokMultiAgent.md](../specs/Simply_xAI/BRAINSTORM_GrokMultiAgent.md) |
 | **Claude Sonnet 4.6** | `claude-sonnet-4-6` | $3 / $15 | 200K (1M beta) | project:expert:sonnet (DEFAULT), Секретарь, Briefing Onboarding, Artifact handlers (5 типов) |
-| **Claude Haiku 4.5** | `claude-haiku-4-5-20251001` | $1 / $5 | 200K | Simply Chat vision, project:expert:haiku, Бен, Менеджер, Клерки (snapshot — dead code per ADR 052), vision:ocr, professor:pipeline-execute |
+| **Claude Haiku 4.5** | `claude-haiku-4-5-20251001` | $1 / $5 | 200K | Simply Chat vision, project:expert:haiku, Бен, Менеджер, vision:ocr |
 | **Claude Opus 4.6** | `claude-opus-4-6` | $5 / $25 | 200K (1M beta) | project:expert:opus, Профессор (planning, review, pipeline-analyze, pipeline-synthesize) |
 | **MiniMax M2.7** | `MiniMax-M2.7` | $0.30 / $1.20 | 200K | Podcast: Script |
 | **MiniMax M2.7** (long timeout) | `MiniMax-M2.7-long` | $0.30 / $1.20 | 200K | Briefing pipeline (author, section refresh) — alias с 180s fetch timeout |

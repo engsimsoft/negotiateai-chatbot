@@ -120,12 +120,19 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "project:expert:sonnet":    "claude-sonnet-4-6",
   "project:expert:opus":      "claude-opus-4-6",
 
-  // Профессор
-  "professor:planning":              "claude-opus-4-6",
-  "professor:review":                "claude-opus-4-6",
-  "professor:pipeline-analyze":      "claude-opus-4-6",
-  "professor:pipeline-execute":      "claude-haiku-4-5-20251001",
-  "professor:pipeline-synthesize":   "claude-opus-4-6",
+  // Профессор (v3.92.2, 2026-04-16)
+  // Post-серия tweak: 4 точки переведены на Grok по философии «4 роли».
+  // Остались на Opus (Автор): planning (mission-critical план всего проекта)
+  // и project:expert:opus (tier choice пользователя). Review/analyze/synthesize
+  // переведены в Зал (Grok 4.20 reasoning) — empirical test planning на
+  // Grok 4.20 non-reasoning в ТЗ-XAI-4 подтвердил способность модели.
+  // Execute переведён в Подсобку (Grok 4.1 Fast) по прецеденту clerk:task-summary
+  // и clerk:file-analyzer — механическая работа subtask executor, не мыслителя.
+  "professor:planning":              "claude-opus-4-6",              // Автор
+  "professor:review":                "grok-4.20-0309-reasoning",     // Зал
+  "professor:pipeline-analyze":      "grok-4.20-0309-reasoning",     // Зал
+  "professor:pipeline-execute":      "grok-4-1-fast-non-reasoning",  // Подсобка
+  "professor:pipeline-synthesize":   "grok-4.20-0309-reasoning",     // Зал
 
   // Клерки (ТЗ-XAI-4 2026-04-16)
   // task-summary и file-analyzer переведены с Haiku 4.5 на Grok 4.1 Fast — обе
