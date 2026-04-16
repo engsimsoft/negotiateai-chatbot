@@ -41,7 +41,7 @@ export default async function TaskPage({ params }: TaskPageProps) {
   }
 
   // Load task + all tasks in parallel
-  const [task, allTasks] = await Promise.all([
+  let [task, allTasks] = await Promise.all([
     getProjectTaskById({ taskId, projectId }),
     getProjectTasksByProjectId({ projectId }),
   ]);
@@ -64,6 +64,9 @@ export default async function TaskPage({ params }: TaskPageProps) {
       projectId,
       taskTitle: task.title,
     });
+    // startTask changed status to 'in_progress' in DB but task was loaded before —
+    // update the object so TaskChat renders the input on first navigation (no F5 needed)
+    task = { ...task, status: "in_progress" };
   }
 
   // Load chat data
