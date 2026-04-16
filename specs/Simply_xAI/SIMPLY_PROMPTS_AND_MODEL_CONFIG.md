@@ -228,7 +228,6 @@
 | Задача | Модель | Применение |
 |---|---|---|
 | `util:title` | Claude Haiku 4.5 | Автонейминг нового чата |
-| `util:project-summary` | Claude Haiku 4.5 | Краткое описание проекта |
 | `util:artifact-suggestions` | Claude Sonnet 4.6 | Подсказки по артефактам |
 
 ### Генерация документов (артефакты)

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
-import { FolderOpen, Plus, FileText, MessageSquare } from "lucide-react";
+import { FolderOpen, Plus, FileText, ListTodo } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +22,7 @@ interface ProjectWithStats {
   name: string;
   description: string | null;
   fileCount: number;
-  chatCount: number;
+  taskCount: number;
   updatedAt: string;
 }
 
@@ -109,8 +109,8 @@ export function SidebarProjects() {
                           {project.fileCount}
                         </span>
                         <span className="flex items-center gap-0.5">
-                          <MessageSquare className="size-3" />
-                          {project.chatCount}
+                          <ListTodo className="size-3" />
+                          {project.taskCount}
                         </span>
                       </span>
                     </div>

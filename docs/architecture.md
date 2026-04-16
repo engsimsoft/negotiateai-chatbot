@@ -261,7 +261,7 @@
 - **Route:** `app/(dashboard)/projects/` (list, create, detail) + `app/(chat)/projects/` (project chat) + `app/(task)/projects/` (task-level chat)
 - **Pipeline:** `lib/ai/professor-pipeline.ts` (planning, review, synthesize), `lib/ai/professors/`, `lib/ai/clerks/`
 - **Tools:** `read-project-file.ts`, `create-document.ts`
-- **UI:** `components/projects/`, `components/tasks/`, `components/file-viewer/`
+- **UI:** `components/projects/`, `components/file-viewer/`
 - **БД:** `Project`, `ProjectFolder`, `ProjectFile`, `ProjectTask` (enum `project_task_status`)
 - **Models:** `project:expert:haiku|sonnet|opus` (tier), `professor:*`, `clerk:*`
 

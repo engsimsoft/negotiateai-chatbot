@@ -5,7 +5,7 @@ import { ru } from "date-fns/locale";
 import {
   ArrowRight,
   FolderOpen,
-  MessageSquare,
+  ListTodo,
   FileText,
   Pencil,
   Trash2,
@@ -66,11 +66,11 @@ export function ProjectDetailPanel({
         <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
           <span>{formattedDate}</span>
           <span className="flex items-center gap-1">
-            <MessageSquare className="size-4" />
-            {project.chatCount}{" "}
-            {project.chatCount === 1
+            <ListTodo className="size-4" />
+            {project.taskCount}{" "}
+            {project.taskCount === 1
               ? "задача"
-              : project.chatCount >= 2 && project.chatCount <= 4
+              : project.taskCount >= 2 && project.taskCount <= 4
                 ? "задачи"
                 : "задач"}
           </span>

@@ -64,7 +64,6 @@ export type TaskId =
   | "service-chat:briefing-onboarding"
   // Утилиты
   | "util:title"                 // автонейминг чата
-  | "util:project-summary"       // суммаризация проекта
   | "util:artifact-suggestions"  // request-suggestions tool
   // Artifact generation (document handlers)
   | "artifact:text"
@@ -189,7 +188,6 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   // Zod schema — проверено smoke test'ом на Grok 4.1 Fast через AI SDK v6
   // xAI provider. Подробности в SIMPLY_XAI_NOTES.md запись 2026-04-16.
   "util:title":                 "grok-4-1-fast-non-reasoning",
-  "util:project-summary":       "grok-4-1-fast-non-reasoning",
   "util:artifact-suggestions":  "grok-4-1-fast-non-reasoning",
 
   // Artifact generation — все 5 типов используют Sonnet

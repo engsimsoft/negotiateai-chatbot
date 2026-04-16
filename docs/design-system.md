@@ -428,7 +428,6 @@ Building blocks для AI-интерфейса (паттерн Vercel AI SDK UI)
 | `components/projects/` | Проекты | project list, card, detail |
 | `components/service-chat/` | Service chats | Ben, project-creation UI |
 | `components/settings/` | Settings page | settings sections |
-| `components/tasks/` | Project tasks | task list, expert chat UI |
 
 ### 13.5 Top-level компоненты (`components/*.tsx`)
 

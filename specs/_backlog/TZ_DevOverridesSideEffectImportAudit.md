@@ -34,7 +34,6 @@ ADR 048 утверждает (L94): «Один side-effect import в `chat/route
 | `app/api/cron/briefing/route.ts` | ✅ side-effect (676d50d) | **починено в ТЗ-XAI-4** |
 | `app/(chat)/api/service-chat/route.ts` | ❌ отсутствует | **сломан** (4 service chats) |
 | `app/(chat)/api/assistant/ben/route.ts` | ❌ отсутствует | **под подозрением** (ben deprecation plan, но пока живой) |
-| `app/(chat)/api/projects/[id]/generate-summary/route.ts` | ❌ отсутствует | **сломан** (`util:project-summary`) |
 | `app/(chat)/api/projects/[id]/analyze-file/route.ts` | ❌ отсутствует | **сломан** (`clerk:file-analyzer`) |
 | `app/(chat)/api/chat/[id]/generate-title/route.ts` | ❌ отсутствует | **сломан** (`util:title`) |
 | `app/(expertise)/expertise/[id]/page.tsx` | ❌ отсутствует | SSR page, нужна проверка call-site |

@@ -9,7 +9,7 @@ import {
   Pencil,
   Trash2,
   ExternalLink,
-  MessageSquare,
+  ListTodo,
   FileText,
 } from "lucide-react";
 import Link from "next/link";
@@ -82,8 +82,8 @@ export function ProjectListItem({
 
           <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
-              <MessageSquare className="size-3" />
-              {project.chatCount}
+              <ListTodo className="size-3" />
+              {project.taskCount}
             </span>
             <span className="flex items-center gap-1">
               <FileText className="size-3" />

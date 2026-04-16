@@ -33,7 +33,7 @@ export type ProjectWithStats = {
   description: string | null;
   phase: string;
   fileCount: number;
-  chatCount: number;
+  taskCount: number;
   updatedAt: Date;
 };
 

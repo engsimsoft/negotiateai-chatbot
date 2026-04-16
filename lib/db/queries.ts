@@ -1260,33 +1260,6 @@ export async function updateProjectPlan({
 }
 
 /**
- * ТЗ-07C2: Update project summary (AI-generated from task summaries)
- */
-export async function updateProjectSummary({
-  id,
-  summary,
-}: {
-  id: string;
-  summary: string;
-}) {
-  try {
-    const [updated] = await db
-      .update(project)
-      .set({
-        summary,
-        summaryUpdatedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(project.id, id))
-      .returning();
-
-    return updated;
-  } catch (error) {
-    throw new ChatSDKError("bad_request:database", error);
-  }
-}
-
-/**
  * Delete a project and all its files and chats (cascade)
  */
 export async function deleteProjectById({ id }: { id: string }) {
@@ -1795,11 +1768,11 @@ export async function getProjectsWithStats({ userId }: { userId: string }) {
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
         fileCount: sql<number>`COALESCE(COUNT(DISTINCT ${projectFile.id}), 0)::int`,
-        chatCount: sql<number>`COALESCE(COUNT(DISTINCT ${chat.id}), 0)::int`,
+        taskCount: sql<number>`COALESCE(COUNT(DISTINCT ${projectTask.id}), 0)::int`,
       })
       .from(project)
       .leftJoin(projectFile, eq(projectFile.projectId, project.id))
-      .leftJoin(chat, eq(chat.projectId, project.id))
+      .leftJoin(projectTask, eq(projectTask.projectId, project.id))
       .where(eq(project.userId, userId))
       .groupBy(project.id)
       .orderBy(desc(project.updatedAt));
@@ -2066,64 +2039,6 @@ export async function getChatsByModeWithStats({
   }
 }
 
-/**
- * ТЗ-07C1: Get project chats (tasks) with message count
- * Returns chats for a specific project with messageCount for each
- */
-export async function getProjectChatsWithStats({
-  projectId,
-  limit = 50,
-}: {
-  projectId: string;
-  limit?: number;
-}) {
-  try {
-    const result = await db
-      .select({
-        id: chat.id,
-        createdAt: chat.createdAt,
-        title: chat.title,
-        summary: chat.summary,
-        isStarred: chat.isStarred,
-        isRenamed: chat.isRenamed,
-        taskStatus: chat.taskStatus,
-        messageCount: sql<number>`COALESCE(COUNT(${message.id}), 0)::int`,
-      })
-      .from(chat)
-      .leftJoin(message, eq(message.chatId, chat.id))
-      .where(and(
-        eq(chat.projectId, projectId),
-        sql`${chat.title} NOT LIKE '__service:%'`
-      ))
-      .groupBy(chat.id)
-      .orderBy(desc(chat.createdAt))
-      .limit(limit);
-
-    return result;
-  } catch (error) {
-    throw new ChatSDKError("bad_request:database", error);
-  }
-}
-
-/**
- * ТЗ-07C1: Get count of chats (tasks) for a project
- * Used for the task history card counter on project page
- */
-export async function getProjectChatsCount({ projectId }: { projectId: string }) {
-  try {
-    const [result] = await db
-      .select({ count: count(chat.id) })
-      .from(chat)
-      .where(and(
-        eq(chat.projectId, projectId),
-        sql`${chat.title} NOT LIKE '__service:%'`
-      ));
-
-    return result?.count ?? 0;
-  } catch (error) {
-    throw new ChatSDKError("bad_request:database", error);
-  }
-}
 
 // ============================================
 // ТЗ-A3: Service Chat Persistence (Manager)
