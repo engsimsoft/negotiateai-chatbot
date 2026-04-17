@@ -63,11 +63,30 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
   const finishReason = data.finish?.finishReason ?? data.steps.at(-1)?.finishReason;
   const isError = !!finishReason && ERROR_REASONS.has(finishReason);
 
-  const modelName = data.finish?.modelId
-    ? (MODEL_DISPLAY[data.finish.modelId] ?? data.finish.modelId)
-    : data.steps[0]?.modelId
-      ? (MODEL_DISPLAY[data.steps[0].modelId] ?? data.steps[0].modelId)
-      : "...";
+  const displayName = (id: string) => MODEL_DISPLAY[id] ?? id;
+
+  // TZ_DevPanelFooterHidesSubCalls: aggregate cost per unique model and sort
+  // descending, so the footer reveals ALL models that worked on this message
+  // (parent chat + artifact handlers + clerks + any other nested AI sub-calls),
+  // with the dominant cost model listed first.
+  const costByModel = data.steps.reduce((acc, step) => {
+    acc.set(step.modelId, (acc.get(step.modelId) ?? 0) + getStepCostRub(step));
+    return acc;
+  }, new Map<string, number>());
+  const modelsByCost = Array.from(costByModel.entries()).sort((a, b) => b[1] - a[1]);
+
+  const fallbackModelId = data.finish?.modelId ?? data.steps[0]?.modelId;
+  const modelName = modelsByCost.length === 0
+    ? (fallbackModelId ? displayName(fallbackModelId) : "...")
+    : modelsByCost.length === 1
+      ? displayName(modelsByCost[0][0])
+      : modelsByCost.length === 2
+        ? `${displayName(modelsByCost[0][0])} + ${displayName(modelsByCost[1][0])}`
+        : `${displayName(modelsByCost[0][0])} +${modelsByCost.length - 1}`;
+
+  const modelBreakdown = modelsByCost.length > 1
+    ? modelsByCost.map(([id, c]) => `${displayName(id)}: ₽${c.toFixed(2)}`).join("\n")
+    : undefined;
 
   // ТЗ-DEV3: Sum per-step tokens (real total billed, not last step cumulative)
   const totalTokens = data.steps.reduce(
@@ -85,7 +104,7 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
   // Uses server-calculated stepCostRub (TokenLens SSOT) with local fallback.
   const isCostFallback = data.steps.length === 0 && data.finish?.estimatedCostRub != null;
   const cost = data.steps.length > 0
-    ? data.steps.reduce((sum, step) => sum + getStepCostRub(step), 0)
+    ? modelsByCost.reduce((sum, [, c]) => sum + c, 0)
     : data.finish?.estimatedCostRub;
   const duration = data.finish?.totalDurationMs;
 
@@ -108,7 +127,7 @@ export function DevPanelFooter({ messageId }: { messageId: string }) {
             : "bg-muted/30 text-muted-foreground/60 hover:bg-muted/50 hover:text-muted-foreground/80"
         }`}
       >
-        <span>{modelName}</span>
+        <span title={modelBreakdown}>{modelName}</span>
         <span className={isError ? "text-destructive/30" : "text-muted-foreground/30"}>&middot;</span>
         <span>{formatTokens(totalTokens)} tok</span>
         {cost != null && (

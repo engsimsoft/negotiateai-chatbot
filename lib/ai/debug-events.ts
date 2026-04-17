@@ -252,6 +252,56 @@ export function emitArtifactDebugStep(
   dataStream.write({ type: "data-debug-step", data });
 }
 
+/**
+ * Emit a debug step for any tool that runs its own AI sub-call via the AI SDK
+ * (streamText, streamObject, generateObject, etc.). Keeps the DevPanel footer
+ * honest: nested sub-calls contribute their modelId + cost to the per-message
+ * aggregation instead of being invisible behind the tool name.
+ *
+ * Use this for tools where a different model from the parent chat is invoked —
+ * e.g. request-suggestions (util:artifact-suggestions), professor pipeline
+ * sub-calls. For artifact handlers use the artifact-specific helper above.
+ */
+export function emitToolDebugStep(
+  dataStream: DataStreamWriter,
+  params: {
+    taskId: string;
+    modelId: string;
+    usage: import("ai").LanguageModelUsage | undefined;
+    toolName: string;
+    durationMs: number;
+    finishReason?: string;
+  },
+): void {
+  if (!isSimplyDevMode) return;
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { extractUsageForPricing, calculateCostRub } =
+    require("./providers") as typeof import("./providers");
+
+  const u = extractUsageForPricing(params.usage);
+  const stepCostRub = calculateCostRub(params.modelId, u);
+
+  const data: DebugStepData = {
+    schemaVersion: DEBUG_EVENT_SCHEMA_VERSION,
+    stepIndex: Date.now(),
+    stepType: `tool:${params.toolName}`,
+    modelId: params.modelId,
+    noCacheInputTokens: u.noCacheInputTokens,
+    cacheReadTokens: u.cacheReadTokens,
+    cacheWriteTokens: u.cacheWriteTokens,
+    outputTokens: u.outputTokens,
+    reasoningTokens: u.reasoningTokens ?? 0,
+    finishReason: params.finishReason ?? "stop",
+    stepCostRub,
+    toolCalls: [],
+    toolResults: [{ toolName: params.toolName, result: { taskId: params.taskId } }],
+    timestamp: Date.now(),
+  };
+
+  dataStream.write({ type: "data-debug-step", data });
+}
+
 export function emitDebugGuardian(
   dataStream: DataStreamWriter,
   data: DebugGuardianData,

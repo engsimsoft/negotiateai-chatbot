@@ -6,6 +6,7 @@ import { getDocumentById, saveSuggestions } from "@/lib/db/queries";
 import type { Suggestion } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
+import { emitToolDebugStep } from "../debug-events";
 import { getModel, getModelIdForTask, getProviderForTask } from "../getModel";
 import { logUsage } from "../usage-utils";
 import { wrapToolExecution } from "./tool-wrapper";
@@ -46,6 +47,7 @@ export const requestSuggestions = ({
         "userId" | "createdAt" | "documentCreatedAt"
       >[] = [];
 
+      const requestStart = Date.now();
       const { elementStream, usage } = streamObject({
         // ТЗ-1 CoreRegistry
         model: getModel("util:artifact-suggestions"),
@@ -63,19 +65,29 @@ export const requestSuggestions = ({
       // ТЗ-CachePipelineMetrics: закрытие GAP #1 — логируем usage
       // request-suggestions ранее не писал в ai_usage_log вообще.
       // fire-and-forget: не блокируем ответ пользователю.
+      // TZ_DevPanelFooterHidesSubCalls: попутно эмитим debug-step, чтобы эта
+      // nested AI-операция попадала в агрегацию DevPanel footer.
       if (session.user?.id) {
         const suggestionsUserId = session.user.id;
+        const taskModelId = getModelIdForTask("util:artifact-suggestions");
         waitUntil(
           usage
-            .then((resolvedUsage) =>
-              logUsage({
+            .then((resolvedUsage) => {
+              emitToolDebugStep(dataStream, {
+                taskId: "util:artifact-suggestions",
+                modelId: taskModelId,
+                usage: resolvedUsage,
+                toolName: "requestSuggestions",
+                durationMs: Date.now() - requestStart,
+              });
+              return logUsage({
                 userId: suggestionsUserId,
                 usage: resolvedUsage,
-                modelId: getModelIdForTask("util:artifact-suggestions"),
+                modelId: taskModelId,
                 provider: getProviderForTask("util:artifact-suggestions"),
                 chatMode: "util:artifact-suggestions",
-              }),
-            )
+              });
+            })
             .catch(() => {
               // stream errored or usage never resolved — no-op
             }),
