@@ -24,14 +24,18 @@ Smoke test v3.92.2 пройден 2026-04-17 — все модели на мес
 
 **Приоритет:** закрыть оставшиеся 7 хвостов перед продуктовыми фичами.
 
-### Следующий хвост: TZ_DevPanelFooterHidesSubCalls
+### Следующий хвост в работе
 
-Цена под-вызовов (artifact handlers, clerks) скрыта в footer DevPanel —
-показывается только parent chat model. Видна только реальная картина в SQL.
+Из 5 оставшихся хвостов 2 (`MaxOutputTokensAudit` + `ProfessorPlanStreaming`) —
+парные, отложены до финализации моделей по taskId.
+
+Из активных кандидатов: `TZ_DevPanelFooterHidesSubCalls` (рекомендуется до Simply
+Compaction чтобы видеть новые nested вызовы), либо `TZ_PromptsDeadCodeCleanup`
+(чистое поле перед добавлением Compaction промпта).
 
 ---
 
-## 📋 Хвосты (6 активных)
+## 📋 Хвосты (5 активных)
 
 ### 🟧 Средний приоритет
 
@@ -40,9 +44,8 @@ Smoke test v3.92.2 пройден 2026-04-17 — все модели на мес
 | 1 | [TZ_DevPanelFooterHidesSubCalls](../_backlog/TZ_DevPanelFooterHidesSubCalls.md) | Цена под-вызовов (artifacts, clerks) скрыта в footer |
 | 2 | [TZ_MaxOutputTokensAudit](../_backlog/TZ_MaxOutputTokensAudit.md) | Нет явных лимитов длины ответа → потенциальный timeout |
 | 3 | [TZ_PromptsDeadCodeCleanup](../_backlog/TZ_PromptsDeadCodeCleanup.md) | 90% prompts.ts мёртвый код — мешает читать |
-| 4 | [TZ_SimplyChatRaceCondition](../_backlog/TZ_SimplyChatRaceCondition.md) | Редкий дубль сообщений при параллельных запросах |
-| 5 | [TZ_UrlVerificationMetricNormalization](../_backlog/TZ_UrlVerificationMetricNormalization.md) | Unit тесты для URL-нормализации (основной фикс уже в проде) |
-| 6 | [TZ_ProfessorPlanStreaming](../_backlog/TZ_ProfessorPlanStreaming.md) | Plan показывается целиком в конце вместо стриминга |
+| 4 | [TZ_UrlVerificationMetricNormalization](../_backlog/TZ_UrlVerificationMetricNormalization.md) | Unit тесты для URL-нормализации (основной фикс уже в проде) |
+| 5 | [TZ_ProfessorPlanStreaming](../_backlog/TZ_ProfessorPlanStreaming.md) | Plan показывается целиком в конце вместо стриминга |
 
 ---
 
@@ -56,7 +59,8 @@ Smoke test v3.92.2 пройден 2026-04-17 — все модели на мес
 | Worktrees `stoic-wu` + `angry-nobel` удалены | git worktree prune |
 | Dev overrides — reader регистрируется в `instrumentation.ts` (boot), все routes покрыты | `c4b2b63` |
 | Error Recovery UI — Stage 2 закрыт: не воспроизводится, Stage 1 hint достаточно, Session Errors поймает если вернётся | — |
-| Context Widget — поглощён архитектурным документом `SIMPLY_COMPACTION_ARCHITECTURE.md` (виджет фиксится при реализации Simply Compaction) | pending commit |
+| Context Widget — поглощён архитектурным документом `SIMPLY_COMPACTION_ARCHITECTURE.md` (виджет фиксится при реализации Simply Compaction) | `01f154f` |
+| Simply Chat race condition — partial unique index в БД, defensive `onConflictDoNothing` в коде, 1 дубль вычищен | pending commit |
 
 ---
 

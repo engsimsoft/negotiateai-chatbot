@@ -227,7 +227,6 @@ export async function saveChat({
  */
 export async function getOrCreateSimplyChat(userId: string) {
   try {
-    // Try to find existing Simply chat
     const [existing] = await db
       .select()
       .from(chat)
@@ -238,24 +237,29 @@ export async function getOrCreateSimplyChat(userId: string) {
 
     if (existing) return existing;
 
-    // Create new Simply chat
-    const id = generateUUID();
-    await db.insert(chat).values({
-      id,
-      createdAt: new Date(),
-      userId,
-      title: "Simply",
-      visibility: "private",
-      chatMode: "simply",
-      isRenamed: true, // prevent auto-naming
-    });
+    // Race-safe insert: partial unique index "Chat_user_simply_uniq"
+    // (migration 0055) guarantees at most one row per (userId, chatMode='simply').
+    // onConflictDoNothing absorbs the loser of any concurrent insert race.
+    await db
+      .insert(chat)
+      .values({
+        id: generateUUID(),
+        createdAt: new Date(),
+        userId,
+        title: "Simply",
+        visibility: "private",
+        chatMode: "simply",
+        isRenamed: true,
+      })
+      .onConflictDoNothing();
 
-    const [created] = await db
+    const [row] = await db
       .select()
       .from(chat)
-      .where(eq(chat.id, id));
+      .where(and(eq(chat.userId, userId), eq(chat.chatMode, "simply")))
+      .limit(1);
 
-    return created;
+    return row;
   } catch (error) {
     console.error("[getOrCreateSimplyChat] Error:", error);
     throw new ChatSDKError(
