@@ -47,6 +47,23 @@ Server Component (briefing/page.tsx)
 5. **Reusable footer/drawer** — `PipelineTraceFooter` + `PipelineTraceDrawer` работают для briefing и podcast с одним props interface.
 6. **URL Verification** — `verifyArticleUrls()` сверяет каждый URL из итоговой статьи с источниками на каждом этапе (fetcher → filter → author). Классификация: verified / modified / fabricated.
 
+### URL Verification: canonical comparison (ТЗ-UrlVerificationMetricNormalization, 2026-04-16)
+
+**Проблема:** наивный `Set.has(url)` давал 82-91% false-positive fabricated на реальных briefings (anchor, UTM, trailing slash, www., http/https → "другой" URL при идентичном ресурсе).
+
+**Решение:** `normalizeUrlForComparison()` в [lib/ai/url-normalize.ts](../../lib/ai/url-normalize.ts) приводит оба URL к canonical форме перед сравнением:
+- hostname → lowercase, без `www.`
+- protocol → `https`
+- hash/anchor → убирается
+- tracking query-params → убираются (utm_*, fbclid, gclid, yclid, msclkid, mc_*, ref/ref_src/ref_url, _ga, igshid, share_source/from, si, feature, spm/spm_*)
+- остальные query-params → сортируются
+- trailing `/` → убирается (кроме root)
+- malformed URL → возвращается as-is (классификатор честно скажет "fabricated")
+
+**Контракт:** любое observability-сравнение URL обязано проходить через `normalizeUrlForComparison`. Не дублировать `Set.has(rawUrl)` в новых метриках.
+
+**Регрессия:** [scripts/test-url-verification-normalization.ts](../../scripts/test-url-verification-normalization.ts) — 25 кейсов, запуск `npx tsx scripts/test-url-verification-normalization.ts` перед правкой регекспа/логики.
+
 ## Причины
 
 1. **Observability перед fixes** — сначала видимость, потом исправления. С панелью можно чинить pipeline с полной видимостью каждого шага

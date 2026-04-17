@@ -19,7 +19,13 @@ import { isSimplyDevMode } from "@/lib/constants";
 
 import { calculateTtsCostRub } from "./providers";
 import { calcStepCostRub } from "./tokenlens-catalog";
+import { normalizeUrlForComparison } from "./url-normalize";
 import { extractUsageForPricing } from "./usage-utils";
+
+// Re-export: SSOT — lib/ai/url-normalize.ts. Исторически функция жила здесь,
+// некоторый внешний код мог импортировать из pipeline-trace. Оставляем для
+// обратной совместимости (extract, не `from`, чтобы не конфликтовать с импортом).
+export { normalizeUrlForComparison };
 
 // ---------------------------------------------------------------------------
 // Types: AI call trace
@@ -322,59 +328,6 @@ export function buildTtsTrace(input: {
 // ---------------------------------------------------------------------------
 
 const MARKDOWN_LINK_REGEX = /\[.*?\]\((https?:\/\/[^)]+)\)/g;
-
-/**
- * ТЗ-UrlVerificationMetricNormalization (2026-04-16): до этой правки
- * classifyUrl делал наивное `Set.has(url)` сравнение, из-за чего любая
- * форматная разница между URL фетчера и URL в статье (anchor-фрагмент,
- * UTM-параметры, trailing slash, www./без, http/https) классифицировала
- * живой реально скопированный URL как "fabricated". Реальный инцидент:
- * briefing 09b01675 — метрика показала 9/11 (82%) fabricated, все 11
- * URLs при этом отдавали HTTP 200 с контентом (curl-проверено).
- *
- * Нормализация приводит оба URL к canonical форме перед сравнением:
- *   - hostname lowercase, без `www.`
- *   - protocol → https (для сравнения — без apples vs oranges)
- *   - hash/anchor убирается (`#atom-everything` и т.п.)
- *   - tracking query-params убираются (utm_*, fbclid, gclid, ref, mc_*, yclid)
- *   - остальные query-params сортируются для стабильного порядка
- *   - trailing `/` убирается (кроме root `/`)
- *
- * Если URL malformed — возвращаем как есть (не ломаем pipeline на плохом
- * входе, пусть классификатор честно скажет "fabricated").
- */
-const TRACKING_PARAM_REGEX = /^(utm_|fbclid$|gclid$|yclid$|mc_|ref$|_ga$|igshid$|msclkid$)/;
-
-export function normalizeUrlForComparison(url: string): string {
-  try {
-    const u = new URL(url);
-    // Host: lowercase + strip www.
-    u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
-    // Protocol: canonical https
-    u.protocol = "https:";
-    // Hash: always drop
-    u.hash = "";
-    // Query params: filter tracking + sort remaining
-    const keepKeys = [...u.searchParams.keys()].filter(
-      (k) => !TRACKING_PARAM_REGEX.test(k),
-    );
-    const sortedParams = new URLSearchParams();
-    for (const key of keepKeys.sort()) {
-      for (const val of u.searchParams.getAll(key)) {
-        sortedParams.append(key, val);
-      }
-    }
-    u.search = sortedParams.toString();
-    // Trailing slash: strip if pathname > "/"
-    if (u.pathname.length > 1 && u.pathname.endsWith("/")) {
-      u.pathname = u.pathname.slice(0, -1);
-    }
-    return u.toString();
-  } catch {
-    // Malformed URL — return as-is. classifyUrl will treat it as fabricated.
-    return url;
-  }
-}
 
 export function verifyArticleUrls(
   articleSections: Array<{
