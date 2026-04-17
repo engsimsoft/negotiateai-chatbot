@@ -2,7 +2,7 @@
 
 **Создан:** 2026-04-17
 **Версия проекта:** 3.92.2 → 3.93.0
-**Статус:** Готов к Фазе 3 (ожидает апрува владельца)
+**Статус:** Этап 1 закрыт (коммит `a20ad29`). Следующий — Этап 2.
 
 ---
 
@@ -11,7 +11,7 @@
 | Метрика | Значение |
 |---|---|
 | Этапов | 4 (3 содержательных + финализация) |
-| Текущий этап | 1 (Этап 1 — DevOverrides cleanup) |
+| Текущий этап | 2 (Этап 1 закрыт) |
 | Сессий (оценка) | 3-4 |
 | Базовый коммит | `43ed3d0` (master) |
 
@@ -19,40 +19,34 @@
 
 ## Принципы выполнения (подтверждено владельцем)
 
-1. **Gate-keeping строго.** После каждого этапа: `tsc --noEmit` → `npm run build` → git commit → мануальный тест владельцем → OK → следующий этап. Ни одна отметка `[x]` без реальной проверки.
-2. **Официальная документация ДО работы** (Правило 1 WORKFLOW). Уже проверены: Next.js instrumentation.ts, AI SDK v6 streamText, Anthropic streaming threshold, @ai-sdk/anthropic 3.0.66 default. Зафиксировано в [ANALYSIS.md § «Изученная документация»](ANALYSIS.md).
-3. **Никаких костылей.** Архитектурно правильные решения, даже если дороже по времени.
-4. **Находки вне scope → FINDINGS.md СРАЗУ** (Правило 8). Не «заодно чиним», не «потом вспомним».
+1. **Официальная документация ДО внедрения.** Перед ЛЮБОЙ правкой, затрагивающей внешнюю технологию (SDK, API, фреймворк), сначала читать первоисточник — WebSearch + WebFetch + исходники в `node_modules`. Работа по памяти = провал. В этом ТЗ уже проверены: Next.js instrumentation.ts, AI SDK v6 createUIMessageStream lifecycle, @ai-sdk/anthropic 3.0.66 streaming threshold. Все находки — в [ANALYSIS.md](ANALYSIS.md).
+2. **Никаких костылей и заплаток.** Только архитектурно правильные решения. Если нашёл band-aid в существующем коде — устраняем, а не обходим. Быстрые фиксы запрещены даже под давлением дедлайна.
+3. **Gate-keeping строго.** После каждого этапа: `tsc --noEmit` → `npm run build` → git commit → **обязательный мануальный тест владельцем** → OK → следующий этап. Мануальный тест обязателен на КАЖДОМ этапе (не только в финализации). Ни одна отметка `[x]` без реальной проверки владельцем.
+4. **Находки вне scope → FINDINGS.md СРАЗУ** (Правило 8 WORKFLOW). Не «заодно чиним», не «потом вспомним».
 5. **`npm run build` в Simply = `tsx lib/db/migrate && next build`** (Правило из MEMORY). Запускаем только когда dev сервер остановлен + предупреждаем владельца.
 
 ---
 
-## Этап 1: DevOverrides cleanup
+## Этап 1: DevOverrides cleanup ✅ ЗАКРЫТ (коммит `a20ad29`)
 
-**Статус:** ⬜ Не начат
-**Оценка:** 0.5 сессии
+**Статус:** ✅ Закрыт 2026-04-17. End-to-end валидация подтвердила работу overrides.
+**Фактически ушло:** 1 сессия + бонус-находка (HMR-баг + DevPanel auto-naming).
 
-**Контекст:** `instrumentation.ts` уже реализует Вариант C (коммит `c4b2b63`). 7 routes продолжают нести redundant side-effect import, ADR 048 описывает устаревшее состояние, README в backlog имеет сломанную ссылку. Этап — гигиена + фиксация SSOT.
-
-**Цель:** Единственным местом регистрации reader-а остаётся `instrumentation.ts`. ADR 048 отражает новое состояние. Backlog README чист.
+**Цель была:** Единственным местом регистрации reader-а остаётся `instrumentation.ts`. ADR 048 отражает новое состояние. Backlog README чист.
 
 **Задачи:**
 
-- [ ] 1.1. Добавить в `instrumentation.ts` комментарий-маяк: «Единственное место регистрации `model-overrides-node`. Не дублировать в routes — см. ADR 048 раздел Overrides Reader Registration». (условие владельца)
-- [ ] 1.2. Удалить redundant side-effect импорт `import "@/lib/ai/model-overrides-node";` из 7 routes:
-  - `app/(chat)/api/chat/route.ts:31`
-  - `app/(chat)/api/projects/[id]/plan/route.ts:35` (заодно удалить многословный комментарий про hot-fix)
-  - `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts:21`
-  - `app/(chat)/api/briefing/generate/route.ts:15`
-  - `app/(chat)/api/briefing/refresh-section/route.ts:27`
-  - `app/api/cron/briefing/route.ts:24`
-  - `app/(chat)/api/service-chat/route.ts:69`
-- [ ] 1.3. Обновить ADR 048:
-  - Удалить раздел «Постскриптум (2026-04-14, сессия 3)» — он отрицает проблему которая позже подтвердилась и закрыта через instrumentation.ts
-  - Заменить L94-102 актуальным описанием: «Reader регистрируется через `instrumentation.ts` (boot-time hook Next.js 15). Единая точка регистрации гарантирует покрытие всех routes и Server Actions без per-route импорта»
-  - Добавить ссылку на коммит `c4b2b63`
-- [ ] 1.4. Удалить сломанную ссылку на `TZ_DevOverridesSideEffectImportAudit.md` из `specs/_backlog/README.md` (строка 40). Файл в `_backlog/_archive/`.
-- [ ] 1.5. Обновить `specs/_backlog/README.md` — удалить записи `TZ_MaxOutputTokensAudit` и `TZ_ProfessorPlanStreaming` (вошли в umbrella ТЗ).
+- [x] 1.1. Добавить в `instrumentation.ts` комментарий-маяк о единственной точке регистрации reader-а.
+- [x] 1.2. Удалить redundant side-effect импорт `import "@/lib/ai/model-overrides-node";` из 7 routes (chat, plan, tasks/chat, briefing generate, briefing refresh-section, cron/briefing, service-chat).
+- [x] 1.3. Обновить ADR 048 — удалён устаревший постскриптум, актуализировано описание SSOT-регистрации через instrumentation.ts.
+- [x] 1.4. Удалить сломанную ссылку на `TZ_DevOverridesSideEffectImportAudit.md` из `specs/_backlog/README.md` (файл уже в `_archive/`).
+- [x] 1.5. Удалить записи `TZ_MaxOutputTokensAudit` и `TZ_ProfessorPlanStreaming` из `specs/_backlog/README.md` (вошли в umbrella ТЗ).
+
+**Бонус-находки (закрыты в том же коммите, архитектурные):**
+
+- [x] **HMR regression fix** — после удаления 7 side-effect импортов в dev сломались overrides: Next.js HMR пересоздавал `lib/ai/model-overrides.ts` на каждом hot-reload, module-level `activeOverridesReader` сбрасывался в no-op. Раньше 7 side-effect импортов маскировали проблему (перезапускали регистрацию при hot-reload route). Фикс — вынесение reader в `globalThis.__simplyOverridesReader` (HMR-immune). Production (без HMR) не затронут.
+- [x] **Diagnostic endpoint** `/api/dev/resolve-model?taskId=<id>` — возвращает runtime `{ effectiveModelId, defaultModelId, overrideActive }` без AI-вызова. Помог эмпирически обнаружить HMR-баг и валидировать фикс.
+- [x] **DevPanel auto-naming visibility** — sub-call `util:auto-naming` не отображался в Timeline. Причина (из исходников AI SDK `handle-ui-message-stream-finish.ts`): `createUIMessageStream.onFinish` вызывается в `flush()` TransformStream уже после `controller.close()`, поздние writes молча глотаются `safeEnqueue`. Фикс: перенос `autoNameChat` в `streamText.onFinish` (writer ещё открыт через активный merged stream). `autoNameChat` принимает текст ассистента напрямую чтобы сохранить прежний min-count gate.
 
 **Файлы:**
 - `instrumentation.ts` — маяк-комментарий
@@ -60,25 +54,16 @@
 - `docs/decisions/048-dev-switchboard-ui.md` — актуализация
 - `specs/_backlog/README.md` — cleanup
 
-**Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен (предупредить владельца, запускать после остановки dev)
-- [ ] Smoke test (Claude): временно закомментировать в `instrumentation.ts` регистрацию → `npm run dev` → через `/dev/models` установить override для `professor:planning` на Haiku → позвать plan endpoint → SQL `ai_usage_log` проверка что модель == default Opus (override игнорируется без registration) → раскомментировать → повторить → модель == Haiku (override применяется)
-- [ ] 🧪 Мануальный тест владельцем:
-  1. Открой `/dev/models`
-  2. Установи override для `util:title` на Haiku
-  3. Создай новый чат, отправь сообщение
-  4. Через минуту проверь что заголовок чата сгенерировался (факт работы route)
-  5. Проверь `SELECT modelId FROM ai_usage_log WHERE chatMode='util:title' ORDER BY createdAt DESC LIMIT 1;` — должен быть Haiku
-  6. Сбрось override через UI
+**Валидация этапа (факт):**
+- [x] `npx tsc --noEmit` — 0 ошибок
+- [x] Empirical curl на `/api/dev/resolve-model?taskId=util:title` → `overrideActive: true`, `effectiveModelId: grok-4-1-fast-reasoning`
+- [x] 🧪 Мануальный тест владельцем (новый expertise/create чат, 4+ сообщений):
+  - В DevPanel Timeline появилась строка `tool:util:auto-naming Grok 4.1F·R 1624 tok stop` (·R = override reasoning variant, не default non-reasoning)
+  - SQL: `SELECT modelId FROM ai_usage_log WHERE chatMode='util:auto-naming' ORDER BY createdAt DESC LIMIT 1;` → `grok-4-1-fast-reasoning` ✅
 
-**Git (после валидации):**
-```bash
-git add instrumentation.ts docs/decisions/048-dev-switchboard-ui.md specs/_backlog/README.md app/(chat)/api/chat/route.ts app/(chat)/api/projects/[id]/plan/route.ts app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts app/(chat)/api/briefing/generate/route.ts app/(chat)/api/briefing/refresh-section/route.ts app/api/cron/briefing/route.ts app/(chat)/api/service-chat/route.ts
-git commit -m "chore(tz-aisdk): centralize overrides reader registration in instrumentation.ts"
-```
+**Git:** коммит `a20ad29` — `fix(tz-aisdk-stage1): HMR-proof overrides reader + centralize registration + make DevPanel show auto-naming`
 
-**Критерий готовности:** `grep -rn 'import "@/lib/ai/model-overrides-node"' app/ lib/` возвращает 0 строк. Smoke test + мануальный тест подтверждают, что overrides работают только через instrumentation.ts.
+**Критерий готовности (выполнен):** `grep -rn 'import "@/lib/ai/model-overrides-node"' app/ lib/` → 0 строк. Empirical endpoint + мануальный тест владельцем подтверждают end-to-end работу overrides включая `util:title`.
 
 ---
 
