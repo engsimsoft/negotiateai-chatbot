@@ -22,41 +22,28 @@
 **Серия Simply_xAI закрыта (v3.92.1).** Финальная архитектура работает.
 Smoke test v3.92.2 пройден 2026-04-17 — все модели на месте.
 
-**Приоритет:** закрыть все 9 хвостов перед продуктовыми фичами.
+**Приоритет:** закрыть оставшиеся 7 хвостов перед продуктовыми фичами.
 
-### Старт следующей сессии — 3 шага:
+### Следующий хвост в работе: TZ_SimplyContextUsageWidget
 
-```
-1. Прочитать все 9 файлов хвостов в specs/_backlog/ (не архив, только активные)
-2. Найти пересечения — некоторые можно закрыть одним проходом
-3. Предложить владельцу сгруппированный план → работать группами, маленькими шагами
-```
-
-Хвосты могут пересекаться — например cleanup prompts.ts (№6) пересекается с
-любой правкой промптов. DevPanel footer (№3) и context widget (№5) — оба про
-observability UI. Найди их сам при чтении файлов.
+Виджет контекста воспроизводится стабильно и показывает неправильные цифры
+(знаменатель = `contextWindow`, не `SIMPLY_CONTEXT_LIMIT`). Это следующий шаг.
 
 ---
 
-## 📋 Хвосты (9 активных)
-
-### 🟥 Высокий приоритет
-
-| # | Файл | Суть |
-|---|---|---|
-| 1 | [TZ_ErrorRecoveryUI](../_backlog/TZ_ErrorRecoveryUI.md) | Чат упал с ошибкой → нельзя продолжить диалог |
+## 📋 Хвосты (7 активных)
 
 ### 🟧 Средний приоритет
 
 | # | Файл | Суть |
 |---|---|---|
-| 3 | [TZ_DevPanelFooterHidesSubCalls](../_backlog/TZ_DevPanelFooterHidesSubCalls.md) | Цена под-вызовов (artifacts, clerks) скрыта в footer |
-| 4 | [TZ_MaxOutputTokensAudit](../_backlog/TZ_MaxOutputTokensAudit.md) | Нет явных лимитов длины ответа → потенциальный timeout |
-| 5 | [TZ_SimplyContextUsageWidget](../_backlog/TZ_SimplyContextUsageWidget.md) | Виджет контекста показывает неправильную шкалу |
-| 6 | [TZ_PromptsDeadCodeCleanup](../_backlog/TZ_PromptsDeadCodeCleanup.md) | 90% prompts.ts мёртвый код — мешает читать |
-| 7 | [TZ_SimplyChatRaceCondition](../_backlog/TZ_SimplyChatRaceCondition.md) | Редкий дубль сообщений при параллельных запросах |
-| 8 | [TZ_UrlVerificationMetricNormalization](../_backlog/TZ_UrlVerificationMetricNormalization.md) | Unit тесты для URL-нормализации (основной фикс уже в проде) |
-| 9 | [TZ_ProfessorPlanStreaming](../_backlog/TZ_ProfessorPlanStreaming.md) | Plan показывается целиком в конце вместо стриминга |
+| 1 | [TZ_SimplyContextUsageWidget](../_backlog/TZ_SimplyContextUsageWidget.md) | Виджет контекста показывает неправильную шкалу |
+| 2 | [TZ_DevPanelFooterHidesSubCalls](../_backlog/TZ_DevPanelFooterHidesSubCalls.md) | Цена под-вызовов (artifacts, clerks) скрыта в footer |
+| 3 | [TZ_MaxOutputTokensAudit](../_backlog/TZ_MaxOutputTokensAudit.md) | Нет явных лимитов длины ответа → потенциальный timeout |
+| 4 | [TZ_PromptsDeadCodeCleanup](../_backlog/TZ_PromptsDeadCodeCleanup.md) | 90% prompts.ts мёртвый код — мешает читать |
+| 5 | [TZ_SimplyChatRaceCondition](../_backlog/TZ_SimplyChatRaceCondition.md) | Редкий дубль сообщений при параллельных запросах |
+| 6 | [TZ_UrlVerificationMetricNormalization](../_backlog/TZ_UrlVerificationMetricNormalization.md) | Unit тесты для URL-нормализации (основной фикс уже в проде) |
+| 7 | [TZ_ProfessorPlanStreaming](../_backlog/TZ_ProfessorPlanStreaming.md) | Plan показывается целиком в конце вместо стриминга |
 
 ---
 
@@ -68,7 +55,8 @@ observability UI. Найди их сам при чтении файлов.
 | Input не появлялся при первом открытии задачи | `a7d1a3f` |
 | Grok пропускал вопросы при создании проекта (RAG-агрессия) | `a7d1a3f` |
 | Worktrees `stoic-wu` + `angry-nobel` удалены | git worktree prune |
-| Dev overrides — reader теперь регистрируется в `instrumentation.ts` (boot), все routes покрыты | pending commit |
+| Dev overrides — reader регистрируется в `instrumentation.ts` (boot), все routes покрыты | `c4b2b63` |
+| Error Recovery UI — Stage 2 закрыт: не воспроизводится, Stage 1 hint достаточно, Session Errors поймает если вернётся | — |
 
 ---
 
