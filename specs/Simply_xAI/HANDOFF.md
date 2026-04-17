@@ -1,10 +1,10 @@
 # HANDOFF — Хвосты (Backlog)
 
-**Последнее обновление:** 2026-04-17 (сессия smoke test + 2 фикса)
+**Последнее обновление:** 2026-04-17 (длинная cleanup-сессия)
 **Версия:** 3.92.2
-**HEAD:** `a7d1a3f` fix(projects): input missing + project-creation prompt guard
-**Git state:** ~40 коммитов ahead of origin — push решение владельца
-**Dev overrides:** файла нет (чистое состояние)
+**HEAD:** `pending` — серия коммитов за сессию (см. ниже)
+**Git state:** много коммитов ahead of origin — push решение владельца
+**Dev overrides:** есть файл (несколько задач под override)
 
 ---
 
@@ -17,34 +17,40 @@
 
 ---
 
-## 🎯 Задача следующей сессии: закрыть долги
+## 🎯 Состояние после сессии 2026-04-17
 
 **Серия Simply_xAI закрыта (v3.92.1).** Финальная архитектура работает.
-Smoke test v3.92.2 пройден 2026-04-17 — все модели на месте.
 
-**Приоритет:** закрыть оставшиеся 7 хвостов перед продуктовыми фичами.
+**Из активных хвостов закрыто 6 за сессию** (см. таблицу внизу). Осталось 3 активных — все низкоприоритетные или отложенные.
 
-### Следующий хвост в работе
-
-Из 5 оставшихся хвостов 2 (`MaxOutputTokensAudit` + `ProfessorPlanStreaming`) —
-парные, отложены до финализации моделей по taskId.
-
-Из активных кандидатов: `TZ_DevPanelFooterHidesSubCalls` (рекомендуется до Simply
-Compaction чтобы видеть новые nested вызовы), либо `TZ_PromptsDeadCodeCleanup`
-(чистое поле перед добавлением Compaction промпта).
+### Архитектурный документ создан
+`specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md` — концепция Simply Compaction
+(сжатие истории через Summary Buffer для Grok-чатов, где нет Anthropic Compaction API).
+Фикс виджета контекста интегрирован в реализацию этой фичи.
 
 ---
 
-## 📋 Хвосты (4 активных)
+## 📋 Хвосты (3 активных)
 
-### 🟧 Средний приоритет
+### 🟧 Низкий / отложенный приоритет
 
 | # | Файл | Суть |
 |---|---|---|
-| 1 | [TZ_MaxOutputTokensAudit](../_backlog/TZ_MaxOutputTokensAudit.md) | Нет явных лимитов длины ответа → потенциальный timeout |
-| 2 | [TZ_PromptsDeadCodeCleanup](../_backlog/TZ_PromptsDeadCodeCleanup.md) | 90% prompts.ts мёртвый код — мешает читать |
-| 3 | [TZ_UrlVerificationMetricNormalization](../_backlog/TZ_UrlVerificationMetricNormalization.md) | Unit тесты для URL-нормализации (основной фикс уже в проде) |
-| 4 | [TZ_ProfessorPlanStreaming](../_backlog/TZ_ProfessorPlanStreaming.md) | Plan показывается целиком в конце вместо стриминга |
+| 1 | [TZ_MaxOutputTokensAudit](../_backlog/TZ_MaxOutputTokensAudit.md) | Нет явных лимитов длины ответа. **Отложено** до финализации моделей по taskId — лимит зависит от модели |
+| 2 | [TZ_ProfessorPlanStreaming](../_backlog/TZ_ProfessorPlanStreaming.md) | Plan целиком в конце вместо стриминга. **Отложено** — парный с #1 (один проход) |
+| 3 | [TZ_UrlVerificationMetricNormalization](../_backlog/TZ_UrlVerificationMetricNormalization.md) | Unit тесты для URL-нормализации (основной фикс `58d9d2e` уже в проде) |
+
+### Следующая сессия — что делать
+
+**Приоритет — Simply Compaction** (реализация `SIMPLY_COMPACTION_ARCHITECTURE.md`):
+- Новый механизм сжатия для всех Grok-чатов (expertise/create/projects на Grok)
+- Попутно чинится виджет контекста (три типа событий: extract/compaction/truncation_warning)
+- Открытые вопросы: пороги триггера, порядок MIND vs Compaction в Simply Chat, детекция Anthropic compaction event
+
+**Перед стартом Compaction:**
+- Прочитать `SIMPLY_COMPACTION_ARCHITECTURE.md` целиком
+- Обсудить с владельцем открытые вопросы из раздела «Открытые вопросы» документа
+- Определить триггеры для каждого режима/модели отдельно
 
 ---
 
@@ -57,10 +63,12 @@ Compaction чтобы видеть новые nested вызовы), либо `TZ
 | Grok пропускал вопросы при создании проекта (RAG-агрессия) | `a7d1a3f` |
 | Worktrees `stoic-wu` + `angry-nobel` удалены | git worktree prune |
 | Dev overrides — reader регистрируется в `instrumentation.ts` (boot), все routes покрыты | `c4b2b63` |
-| Error Recovery UI — Stage 2 закрыт: не воспроизводится, Stage 1 hint достаточно, Session Errors поймает если вернётся | — |
-| Context Widget — поглощён архитектурным документом `SIMPLY_COMPACTION_ARCHITECTURE.md` (виджет фиксится при реализации Simply Compaction) | `01f154f` |
+| Error Recovery UI — Stage 2 закрыт: не воспроизводится, Stage 1 hint достаточно | `e703e6c` |
+| Context Widget — поглощён архитектурным документом `SIMPLY_COMPACTION_ARCHITECTURE.md` | `01f154f` |
 | Simply Chat race condition — partial unique index в БД, defensive `onConflictDoNothing` в коде, 1 дубль вычищен | `84c5fb5` |
-| DevPanel footer — агрегирует все nested AI-вызовы (артефакты + request-suggestions), показывает домин. модель, tooltip с разбивкой по цене | pending commit |
+| DevPanel footer — агрегирует все nested AI-вызовы (артефакты + request-suggestions), показывает домин. модель, tooltip с разбивкой по цене | `6b3b61d` |
+| requestSuggestions tool удалён — 0 вызовов за всю историю, legacy из Vercel template | `d27a116` |
+| `lib/ai/prompts.ts` dead code cleanup — 90% файла удалено, остался только `updateDocumentPrompt`, файл переименован в `artifact-prompts.ts` | pending commit |
 
 ---
 
@@ -80,11 +88,11 @@ Compaction чтобы видеть новые nested вызовы), либо `TZ
 - **Voyage + финский VPN** → 403. Переключить на US Buffalo. Не код.
 - **`npm run build`** автоматически накатывает pending migrations. Предупреждать владельца ДО запуска.
 - **`next build` ломает активный `next dev`** → для валидации только `tsc --noEmit`.
-- **Dev overrides** — файл `.simply-dev-overrides.json` отсутствует (чистое состояние).
+- **Партициальный unique index** `Chat_user_simply_uniq` — физически запрещает второй Simply чат у одного userId.
 
 ---
 
-## 🚀 Продуктовые направления (после хвостов)
+## 🚀 Продуктовые направления (после Simply Compaction и хвостов)
 
 - Оплата в рублях (ЮKassa, Тинькофф, СБП)
 - ТЗ-XAI-MA-1 — Multi-agent через Responses API + MCP

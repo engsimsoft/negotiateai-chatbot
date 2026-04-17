@@ -1,5 +1,5 @@
 import { smoothStream, streamText } from "ai";
-import { updateDocumentPrompt } from "@/lib/ai/prompts";
+import { updateDocumentPrompt } from "@/lib/ai/artifact-prompts";
 import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
 import { emitArtifactDebugStep } from "@/lib/ai/debug-events";
 
