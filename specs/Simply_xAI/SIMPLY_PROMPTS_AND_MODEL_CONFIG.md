@@ -228,7 +228,6 @@
 | Задача | Модель | Применение |
 |---|---|---|
 | `util:title` | Claude Haiku 4.5 | Автонейминг нового чата |
-| `util:artifact-suggestions` | Claude Sonnet 4.6 | Подсказки по артефактам |
 
 ### Генерация документов (артефакты)
 Все 5 типов (`artifact:text`, `markdown`, `excel`, `pptx`, `reveal`) — **Claude Sonnet 4.6**.

@@ -193,7 +193,7 @@
 - `Vote_v2` — голосование за сообщения
 - `Vote` — deprecated
 - `Document` — артефакты (text, markdown, excel, reveal, pptx)
-- `Suggestion` — AI-suggestions к артефактам (`request-suggestions` tool)
+- `Suggestion` — AI-suggestions к артефактам (dormant: инструмент `requestSuggestions` удалён 2026-04-17 после SQL audit 0 вызовов за всю историю, таблица и `lib/editor/suggestions.tsx` плагин остались на случай возврата фичи)
 - `Stream` — streaming state (resumable streams)
 
 #### Projects
@@ -324,7 +324,7 @@
 
 ### Artifacts
 - **Pipeline:** `artifacts/` (корневая папка + handlers: text, markdown, excel, presentation-reveal, presentation-pptx)
-- **Tools:** `create-document.ts`, `update-document.ts`, `request-suggestions.ts`
+- **Tools:** `create-document.ts`, `update-document.ts`
 - **UI:** top-level `components/artifact.tsx`, `components/artifact-*.tsx`, `components/create-artifact.tsx`
 - **БД:** `Document`, `Suggestion`, `Stream`
 - **Модели:** `artifact:text|markdown|excel|pptx|reveal` → Claude Sonnet

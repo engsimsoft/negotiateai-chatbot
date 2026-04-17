@@ -48,7 +48,6 @@
 | **MIND Memory: batch/consolidate/profile/dedup** | Grok 4.1 Fast (`memory:*`) | ✅ Работает | Механические задачи MIND pipeline |
 | **Vision OCR** | Claude Haiku 4.5 (`vision:ocr`) | ✅ Работает | OCR-экстракция текста из изображений |
 | **Title** | Grok 4.1 Fast (`util:title`) | ✅ Работает | Автонейминг чатов |
-| **Artifact suggestions** | Grok 4.1 Fast (`util:artifact-suggestions`) | ✅ Работает | `request-suggestions` tool — streamObject array mode |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники (не подключены) |
 
 ---
@@ -595,7 +594,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
 
 | Модель | catalogId | Input / Output (USD/1M) | Контекст | Где используется |
 |---|---|---|---|---|
-| **Grok 4.1 Fast** (non-reasoning) | `grok-4-1-fast-non-reasoning` | $0.20 / $0.50 | 128K | Simply Chat (default text), MIND memory (extract-batch, consolidate, profile, dedup-verify), Briefing filter, Clerks (task-summary, file-analyzer), util (title, artifact-suggestions) |
+| **Grok 4.1 Fast** (non-reasoning) | `grok-4-1-fast-non-reasoning` | $0.20 / $0.50 | 128K | Simply Chat (default text), MIND memory (extract-batch, consolidate, profile, dedup-verify), Briefing filter, Clerks (task-summary, file-analyzer), util (title) |
 | **Grok 4.20** (reasoning) | `grok-4.20-0309-reasoning` | $2 / $6 | 256K | Simply Chat (кнопка «Думать»), Экспертиза (chatMode=expertise), Создание (chatMode=create), Meeting summary, MIND memory (extract — mission-critical) |
 | **Grok 4.20 Multi-Agent** | `grok-4.20-multi-agent-0309` | $2 / $6 | 256K | 🔒 Reserved для taskId `expertise-multi-agent` (placeholder, не вызывать). Реализация Premium «Команда агентов» через Responses API + MCP — отдельная ветка ТЗ-XAI-MA-1. Архитектура: [BRAINSTORM_GrokMultiAgent.md](../specs/Simply_xAI/BRAINSTORM_GrokMultiAgent.md) |
 | **Claude Sonnet 4.6** | `claude-sonnet-4-6` | $3 / $15 | 200K (1M beta) | project:expert:sonnet (DEFAULT), Секретарь, Briefing Onboarding, Artifact handlers (5 типов) |

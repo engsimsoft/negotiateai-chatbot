@@ -543,7 +543,6 @@ components/modal-assistants/
 - `readDocument` — чтение из базы знаний
 - `createDocument` — создание артефактов
 - `updateDocument` — редактирование артефактов
-- `requestSuggestions` — предложения по улучшению
 - `parseExcel` — анализ Excel файлов
 - `loadSkill` — загрузка инструкций из SKILL.md
 

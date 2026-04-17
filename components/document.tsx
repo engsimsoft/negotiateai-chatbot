@@ -2,10 +2,10 @@ import { memo } from "react";
 import { toast } from "sonner";
 import { useArtifact } from "@/hooks/use-artifact";
 import type { ArtifactKind } from "./artifact";
-import { FileIcon, LoaderIcon, MessageIcon, PencilEditIcon } from "./icons";
+import { FileIcon, LoaderIcon, PencilEditIcon } from "./icons";
 
 const getActionText = (
-  type: "create" | "update" | "request-suggestions",
+  type: "create" | "update",
   tense: "present" | "past"
 ) => {
   switch (type) {
@@ -13,17 +13,13 @@ const getActionText = (
       return tense === "present" ? "Creating" : "Created";
     case "update":
       return tense === "present" ? "Updating" : "Updated";
-    case "request-suggestions":
-      return tense === "present"
-        ? "Adding suggestions"
-        : "Added suggestions to";
     default:
       return null;
   }
 };
 
 type DocumentToolResultProps = {
-  type: "create" | "update" | "request-suggestions";
+  type: "create" | "update";
   result: { id: string; title: string; kind: ArtifactKind };
   isReadonly: boolean;
 };
@@ -68,13 +64,7 @@ function PureDocumentToolResult({
       type="button"
     >
       <div className="mt-1 text-muted-foreground">
-        {type === "create" ? (
-          <FileIcon />
-        ) : type === "update" ? (
-          <PencilEditIcon />
-        ) : type === "request-suggestions" ? (
-          <MessageIcon />
-        ) : null}
+        {type === "create" ? <FileIcon /> : <PencilEditIcon />}
       </div>
       <div className="text-left">
         {`${getActionText(type, "past")} "${result.title}"`}
@@ -86,11 +76,10 @@ function PureDocumentToolResult({
 export const DocumentToolResult = memo(PureDocumentToolResult, () => true);
 
 type DocumentToolCallProps = {
-  type: "create" | "update" | "request-suggestions";
+  type: "create" | "update";
   args:
     | { title: string; kind: ArtifactKind } // for create
-    | { id: string; description: string } // for update
-    | { documentId: string }; // for request-suggestions
+    | { id: string; description: string }; // for update
   isReadonly: boolean;
 };
 
@@ -131,13 +120,7 @@ function PureDocumentToolCall({
     >
       <div className="flex flex-row items-start gap-3">
         <div className="mt-1 text-muted-foreground">
-          {type === "create" ? (
-            <FileIcon />
-          ) : type === "update" ? (
-            <PencilEditIcon />
-          ) : type === "request-suggestions" ? (
-            <MessageIcon />
-          ) : null}
+          {type === "create" ? <FileIcon /> : <PencilEditIcon />}
         </div>
 
         <div className="text-left">
@@ -146,9 +129,7 @@ function PureDocumentToolCall({
               ? `"${args.title}"`
               : type === "update" && "description" in args
                 ? `"${args.description}"`
-                : type === "request-suggestions"
-                  ? "for document"
-                  : ""
+                : ""
           }`}
         </div>
       </div>

@@ -259,8 +259,8 @@ export function emitArtifactDebugStep(
  * aggregation instead of being invisible behind the tool name.
  *
  * Use this for tools where a different model from the parent chat is invoked —
- * e.g. request-suggestions (util:artifact-suggestions), professor pipeline
- * sub-calls. For artifact handlers use the artifact-specific helper above.
+ * e.g. professor pipeline sub-calls. For artifact handlers use the
+ * artifact-specific helper above.
  */
 export function emitToolDebugStep(
   dataStream: DataStreamWriter,

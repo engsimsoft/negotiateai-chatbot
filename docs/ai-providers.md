@@ -78,7 +78,7 @@ logUsage({
 | `briefing:*` | Генерация брифинга (filter / author / section / podcast-script) |
 | `meeting:*` | Транскрипция и суммаризация встреч |
 | `service-chat:*` | Сервисные чаты (ben / project-creation / project-manager / briefing-onboarding) |
-| `util:*` | Утилиты (title / project-summary / artifact-suggestions) |
+| `util:*` | Утилиты (title / project-summary) |
 | `artifact:*` | Artifact handlers (text / markdown / excel / pptx / reveal) |
 | `vision:ocr` | OCR через vision-модель |
 

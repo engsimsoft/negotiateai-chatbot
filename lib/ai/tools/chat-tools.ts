@@ -12,7 +12,6 @@ import { parseExcel } from "./excel";
 import { getCurrentDate } from "./get-current-date";
 import { getWeather } from "./get-weather";
 import { readProjectFile } from "./read-project-file";
-import { requestSuggestions } from "./request-suggestions";
 import { updateDocument } from "./update-document";
 import { webSearch } from "./web-search";
 import { fetchUrl } from "./fetch-url";
@@ -36,7 +35,7 @@ interface GetStandardToolsParams {
  * Build the standard tools object for streamText().
  *
  * - readProjectFile is included only for project chats (needs projectId)
- * - createDocument/updateDocument/requestSuggestions need session + dataStream
+ * - createDocument/updateDocument need session + dataStream
  *
  * Attached file handling (non-project chats):
  *  - DOCX/TXT/MD/CSV are converted to text/plain on upload ([app/(chat)/api/files/upload/route.ts])
@@ -68,7 +67,6 @@ export function getStandardTools({
       : {}),
     createDocument: createDocument({ session, dataStream }),
     updateDocument: updateDocument({ session, dataStream }),
-    requestSuggestions: requestSuggestions({ session, dataStream }),
     webSearch,
     fetchUrl,
     deepResearch: deepResearch({ defaultDepth: researchDepth, userId: session.user?.id }),
@@ -128,7 +126,6 @@ const ALL_TOOL_NAMES = [
   "deepResearch",
   "createDocument",
   "updateDocument",
-  "requestSuggestions",
   "parseExcel",
   "loadSkill",
   "readProjectFile",
@@ -158,7 +155,6 @@ export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode, 
       "deepResearch",
       "createDocument",
       "updateDocument",
-      "requestSuggestions",
       "parseExcel",
       "loadSkill",
       "readProjectFile",
@@ -174,7 +170,6 @@ export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode, 
     "deepResearch",
     "createDocument",
     "updateDocument",
-    "requestSuggestions",
     "parseExcel",
     "loadSkill",
     "readTelegramChannel",

@@ -33,7 +33,6 @@
 | `readTelegramChannel` | Чтение публичных Telegram-каналов (посты, даты, медиа) | Все агенты |
 | `createDocument` | Создание артефактов (text, markdown, excel, presentations) | Все агенты |
 | `updateDocument` | Обновление артефактов | Все агенты |
-| `requestSuggestions` | Предложения по улучшению текста | Все агенты |
 | `parseExcel` | Анализ загруженных Excel-файлов | Все агенты |
 | `loadSkill` | Загрузка инструкций из SKILL.md (6 скиллов) | Все агенты |
 | `readProjectFile` | Чтение файлов проекта по имени из manifest | Только проектные чаты (Эксперт) |
@@ -58,6 +57,7 @@
 | `saveFact` | v3.75.0 | v3.76.0 | Заменён Extract-on-compression (v3.78.0) |
 | `startResearch` | v3.52.0 | — | Не отдельный tool, а внутренняя функция briefing research engine |
 | `createSnapshot` | v3.18.0 | v3.87.3 | SQL audit: 2 all-time calls (оба через Sonnet-«Думать»), 0 через MiniMax. Model-invoked trigger ненадёжен, schema хрупкая (1/2 calls failed JSON parse). Заменён Extract-on-compression (L1) + Anthropic Compaction (L2). См. [ADR 052](decisions/052-context-management-strategy-per-provider.md) |
+| `requestSuggestions` | v1.0 (template) | 2026-04-17 | SQL audit: 0 all-time calls за всю историю продукта. AI не вызывал tool ни разу — пользователи просят правки через `updateDocument` или обычным текстом. Удалён как неиспользуемый legacy из Vercel AI Chatbot template. |
 
 ---
 
@@ -74,7 +74,6 @@
 | `readTelegramChannel` | + | + | + | + | + | + |
 | `createDocument` | + | + | + | + | + | + |
 | `updateDocument` | + | + | + | + | + | + |
-| `requestSuggestions` | + | + | + | + | + | + |
 | `parseExcel` | + | + | + | + | + | + |
 | `loadSkill` | + | + | + | + | + | + |
 | `readProjectFile` | -- | -- | -- | -- | -- | + |
@@ -500,38 +499,6 @@ updateDocument({
 
 ---
 
-## Request Suggestions
-
-Генерация предложений по улучшению текстовых артефактов.
-
-### Возможности
-- Анализ текста
-- До 5 умных предложений
-- Описание каждого изменения
-- Сохранение в БД (таблица `Suggestion`)
-
-### Параметры
-
-```typescript
-requestSuggestions({
-  documentId: string,   // UUID документа
-})
-```
-
-### Модель
-Резолвится через `getModel("util:artifact-suggestions")` → Claude Sonnet 4.6 (`claude-sonnet-4-6`) по умолчанию (см. [task-assignments.ts](../lib/ai/task-assignments.ts)).
-
-### Файл
-[lib/ai/tools/request-suggestions.ts](../lib/ai/tools/request-suggestions.ts)
-
-### Пример использования
-```
-[После создания текстового артефакта]
-Предложи улучшения для этого текста
-```
-
----
-
 ## Excel (через артефакты)
 
 Excel-документы создаются и редактируются через систему артефактов.
@@ -815,7 +782,6 @@ export function getStandardTools({ session, dataStream, isProjectChat, projectId
       : {}),
     createDocument: createDocument({ session, dataStream }),
     updateDocument: updateDocument({ session, dataStream }),
-    requestSuggestions: requestSuggestions({ session, dataStream }),
     webSearch,
     fetchUrl,
     deepResearch: deepResearch({ defaultDepth: researchDepth }),

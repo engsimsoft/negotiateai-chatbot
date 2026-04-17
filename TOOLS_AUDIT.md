@@ -35,7 +35,6 @@
 | 7 | `readTelegramChannel` | `lib/ai/tools/read-telegram-channel.ts` | **+** | **+** | **+** | **+** | **+** | **+** |
 | 8 | `createDocument` | `lib/ai/tools/create-document.ts` | **+** | **+** | **+** | **+** | **+** | **+** |
 | 9 | `updateDocument` | `lib/ai/tools/update-document.ts` | **+** | **+** | **+** | **+** | **+** | **+** |
-| 10 | `requestSuggestions` | `lib/ai/tools/request-suggestions.ts` | **+** | **+** | **+** | **+** | **+** | **+** |
 | 11 | `parseExcel` | `lib/ai/tools/excel/parse-excel.ts` | **+** | **+** | **+** | **+** | **+** | **+** |
 | 12 | `loadSkill` | `lib/ai/tools/load-skill.ts` | **+** | **+** | **+** | **+** | **+** | **+** |
 | 13 | `readProjectFile` | `lib/ai/tools/read-project-file.ts` | -- | -- | -- | -- | -- | **+** |
@@ -109,13 +108,7 @@
 - **Параметры:** `id` (UUID), `description` (описание изменений)
 - **Timeout:** 120с (для сложных таблиц)
 
-### 2.10 requestSuggestions
-- **Что делает:** Генерация предложений по улучшению текста
-- **Параметры:** `documentId` (UUID)
-- **Модель:** Claude Sonnet 4.6 через `artifact-model`
-- **Ограничение:** Макс 5 предложений, сохраняются в БД
-
-### 2.11 parseExcel
+### 2.10 parseExcel
 - **Что делает:** Анализ загруженных пользователем Excel-файлов
 - **Параметры:** `fileUrl` (URL из Vercel Blob)
 - **Возвращает:** Структура листов, типы колонок, preview 10 строк, формулы

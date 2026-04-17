@@ -64,7 +64,6 @@ export type TaskId =
   | "service-chat:briefing-onboarding"
   // Утилиты
   | "util:title"                 // автонейминг чата
-  | "util:artifact-suggestions"  // request-suggestions tool
   // Artifact generation (document handlers)
   | "artifact:text"
   | "artifact:markdown"
@@ -182,13 +181,9 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "service-chat:briefing-onboarding": "claude-sonnet-4-6",
 
   // Утилиты (ТЗ-XAI-4 2026-04-16)
-  // Все три — короткие механические задачи (автонейминг чата, summary проекта,
-  // предложения правок к документу). Переведены с Haiku/Sonnet на Grok 4.1 Fast.
-  // util:artifact-suggestions использует streamObject с output:"array" +
-  // Zod schema — проверено smoke test'ом на Grok 4.1 Fast через AI SDK v6
-  // xAI provider. Подробности в SIMPLY_XAI_NOTES.md запись 2026-04-16.
+  // Короткая механическая задача (автонейминг чата). Переведена с Haiku на
+  // Grok 4.1 Fast. Подробности в SIMPLY_XAI_NOTES.md запись 2026-04-16.
   "util:title":                 "grok-4-1-fast-non-reasoning",
-  "util:artifact-suggestions":  "grok-4-1-fast-non-reasoning",
 
   // Artifact generation — все 5 типов используют Sonnet
   "artifact:text":              "claude-sonnet-4-6",
