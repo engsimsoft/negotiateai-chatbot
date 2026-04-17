@@ -25,10 +25,6 @@ import {
   isTaskOverridden,
 } from "@/lib/ai/getModel";
 import { getModelEntry, type ModelCapabilities } from "@/lib/ai/model-catalog";
-// ТЗ-2: side-effect import installs the file-based overrides reader at
-// module-eval time. Without this import the client-safe stub (returns {})
-// stays active and getModel() never sees dev overrides.
-import "@/lib/ai/model-overrides-node";
 import type { TaskId } from "@/lib/ai/task-assignments";
 import { DEFAULT_TASK_MODELS } from "@/lib/ai/task-assignments";
 import {
@@ -58,6 +54,7 @@ import {
   emitDebugCompaction,
   emitDebugError,
   emitDebugWarning,
+  emitToolDebugStep,
   truncateForDebug,
   DEBUG_EVENT_SCHEMA_VERSION,
   type DebugStepData,
@@ -95,7 +92,12 @@ export const maxDuration = 180; // 3 minutes - increased for complex document ge
  * Eliminates race condition where client calls generate-title
  * before assistant messages are persisted to DB.
  */
-async function autoNameChat(chatId: string, userId: string): Promise<void> {
+async function autoNameChat(
+  chatId: string,
+  userId: string,
+  dataStream?: UIMessageStreamWriter,
+  generatedAssistantText?: string,
+): Promise<void> {
   const chat = await getChatById({ id: chatId });
   if (!chat || chat.isRenamed) return;
 
@@ -108,10 +110,22 @@ async function autoNameChat(chatId: string, userId: string): Promise<void> {
   const DEFAULT_TITLES = new Set(["Новый чат", "Новый запрос", "Новое задание", "Чат проекта"]);
   if (!DEFAULT_TITLES.has(chat.title)) return;
 
-  const messages = await getMessagesByChatId({ id: chatId });
-  if (messages.length < 4) return;
+  const dbMessages = await getMessagesByChatId({ id: chatId });
+  // Called from streamText.onFinish — the assistant message being generated
+  // is not yet saved to DB. Count it via generatedAssistantText so the
+  // min-message-count gate fires on the same turn as before (4th message).
+  const totalCount = dbMessages.length + (generatedAssistantText ? 1 : 0);
+  if (totalCount < 4) return;
 
-  const contextMessages = messages.slice(0, 4);
+  const contextMessages = generatedAssistantText
+    ? [
+        ...dbMessages,
+        {
+          role: "assistant" as const,
+          parts: [{ type: "text" as const, text: generatedAssistantText }],
+        },
+      ].slice(0, 4)
+    : dbMessages.slice(0, 4);
   const contextSummary = contextMessages
     .map((m) => {
       const role = m.role === "user" ? "Пользователь" : "Ассистент";
@@ -128,6 +142,7 @@ async function autoNameChat(chatId: string, userId: string): Promise<void> {
 
   // ТЗ-1 CoreRegistry: auto-naming via task-assignments
   const resolvedModelId = getModelIdForTask("util:title");
+  const autoNameStartedAt = Date.now();
 
   const { object, usage } = await generateObject({
     model: getModel("util:title"),
@@ -175,6 +190,17 @@ async function autoNameChat(chatId: string, userId: string): Promise<void> {
     chatMode: "util:auto-naming",
     chatId,
   });
+
+  // Emit sub-call step to DevPanel so footer aggregates auto-naming model/cost
+  if (dataStream) {
+    emitToolDebugStep(dataStream, {
+      taskId: "util:title",
+      modelId: resolvedModelId,
+      usage,
+      toolName: "util:auto-naming",
+      durationMs: Date.now() - autoNameStartedAt,
+    });
+  }
 
   console.log(`[generate-title] Server-side success for ${chatId}: "${cleanTitle}"`);
 }
@@ -1111,7 +1137,7 @@ export async function POST(request: Request) {
             }
           },
           // ТЗ-PIPELINE1: Use totalUsage (sum of all steps), not per-step usage
-          onFinish: async ({ totalUsage, providerMetadata }) => {
+          onFinish: async ({ text: responseText, totalUsage, providerMetadata }) => {
             const totalTime = Date.now() - startTime;
             if (firstTokenTime === null) {
               firstTokenTime = totalTime;
@@ -1171,6 +1197,28 @@ export async function POST(request: Request) {
               chatMode: logChatMode,
               durationMs: totalTime,
             };
+
+            // Server-side auto-naming — runs here (inside streamText.onFinish)
+            // because at this moment the UI message stream is still open (merged
+            // stream from result.toUIMessageStream is active), so the sub-call
+            // debug step emitted by autoNameChat reaches the client and lands
+            // in the same DevPanel batch as the main response. By the time
+            // createUIMessageStream.onFinish fires, the controller is already
+            // closed (see handle-ui-message-stream-finish.ts flush) and writes
+            // are silently dropped by safeEnqueue. Cost: +1-2s on the message
+            // that triggers auto-naming (4th chat message); zero otherwise.
+            if (!projectId) {
+              try {
+                await autoNameChat(
+                  id,
+                  session.user.id!,
+                  dataStream,
+                  responseText,
+                );
+              } catch (err) {
+                console.error("[generate-title] Background error:", err);
+              }
+            }
 
             // ТЗ-DEV1: Emit debug finish summary
             const finishUsage = extractUsageForPricing(totalUsage);
@@ -1492,12 +1540,9 @@ export async function POST(request: Request) {
           await saveMessages({ messages: messagesToSave });
         }
 
-        // ТЗ-07A: Server-side auto-naming (fire-and-forget, after messages saved)
-        if (!projectId) {
-          void autoNameChat(id, session.user.id!).catch((err) =>
-            console.error("[generate-title] Background error:", err)
-          );
-        }
+        // ТЗ-07A: Auto-naming moved to streamText.onFinish (above) — stream
+        // must still be open for DevPanel sub-call event to reach client.
+        // See streamText.onFinish for the call site and detailed rationale.
 
         // ТЗ-RAG1: Extract facts from conversation (fire-and-forget)
         // ТЗ-RAG2: Respects memoryEnabled setting (checked earlier in execute)

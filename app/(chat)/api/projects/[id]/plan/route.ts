@@ -26,13 +26,6 @@ import {
   professorPlanJsonSchema,
   MVP_TOOLS_MANIFEST,
 } from "@/lib/ai/professor-types";
-// Side-effect import: регистрирует reader `.simply-dev-overrides.json` через
-// `registerOverridesReader`. Без этого импорта `getActiveOverrides()` вернёт
-// пусто и dev-panel overrides для `professor:planning` будут проигнорированы.
-// Найдено в сессии ТЗ-XAI-4 (2026-04-16): 3 попытки планирования игнорировали
-// override на Haiku, шли на Opus из task-assignments. Аналогичная проверка
-// нужна всем backend routes — отдельный хвост в _backlog.
-import "@/lib/ai/model-overrides-node";
 
 // Load professor prompt from .md file
 const PROFESSOR_PROMPT_PATH = path.join(

@@ -37,7 +37,6 @@
 
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
-| [TZ_DevOverridesSideEffectImportAudit](TZ_DevOverridesSideEffectImportAudit.md) | **Dev overrides reader не регистрируется для 6+ backend routes.** Reader `.simply-dev-overrides.json` активируется только через side-effect `import "@/lib/ai/model-overrides-node"`. В ТЗ-XAI-4 закрыли 4 routes hot-fix'ами (plan + 3 briefing), но `service-chat`, `generate-summary`, `analyze-file`, `generate-title`, `assistant/ben` без импорта → dev panel overrides для их taskIds молча игнорируются. Варианты решения: (A) добавить импорт везде, (B) импорт в getModel.ts (центральный), (C) `instrumentation.ts` register-on-boot, (D) убрать side-effect паттерн. Рекомендуется C + ADR 048 update. Блокирует A/B тесты. | 0.5-1 сессия | ТЗ-XAI-4, hot-fixes d9d3488 + 676d50d, 2026-04-16 |
 | [TZ_ErrorRecoveryUI](TZ_ErrorRecoveryUI.md) | Stage 2 — root cause fix: useChat state recovery через правильную обработку `clearError` для не-ChatSDK ошибок. Stage 1 (hint в красном флаге) ✅ сделан в v3.90.0+. | 0.5 сессии | 9 эпизодов в разных ТЗ |
 
 ### 🟧 Medium impact
@@ -49,8 +48,8 @@
 | [TZ_SimplyContextUsageWidget](TZ_SimplyContextUsageWidget.md) | **UI виджет контекста в Simply показывает не ту шкалу** — знаменатель прогресс-бара привязан к `contextWindow` модели (128K), а не к `SIMPLY_CONTEXT_LIMIT` (200K). Даёт ложную тревогу («55% предела» когда реально 23% от наших порогов Extract-on-compression). Плюс — число 128K для Grok 4.1 Fast подозрительное, возможно ошибка в model-catalog. Плюс — «Расход за сессию» без определения термина «сессия». | 1 сессия | Владимир, 2026-04-16 после ТЗ-ATTACH-1 |
 | [TZ_PromptsDeadCodeCleanup](TZ_PromptsDeadCodeCleanup.md) | Удалить мёртвые экспорты из `lib/ai/prompts.ts` (`artifactsPrompt`, `regularPrompt`, `systemPrompt` deprecated, `buildUserContext` deprecated). 90% файла dead, только `updateDocumentPrompt` живой. Рассмотреть переименование в `lib/ai/artifact-prompts.ts`. | 0.5 сессии | TZ_DeadModelSelectors |
 | [TZ_SimplyChatRaceCondition](TZ_SimplyChatRaceCondition.md) | `getOrCreateSimplyChat` без partial unique index → race при первых параллельных запросах нового пользователя (SELECT + INSERT без транзакционной защиты). Partial unique index + `onConflictDoNothing`. | 0.5 сессии | ТЗ-XAI-2 smoke test |
-| [TZ_ProfessorPlanStreaming](TZ_ProfessorPlanStreaming.md) | **Long-term fix для plan/route.ts timeout.** Hot-fix d9d3488 добавил tactical `maxOutputTokens: 16000` чтобы избежать Anthropic streaming threshold (21333). Правильное решение — перевод route на `streamText` вместо `generateText`: adaptive thinking требует streaming by design, cap снимается, готовит почву для progressive UX. 1-2 сессии. | 1-2 сессии | hot-fix d9d3488, ТЗ-XAI-4, 2026-04-16 |
-| [TZ_MaxOutputTokensAudit](TZ_MaxOutputTokensAudit.md) | **Явный `maxOutputTokens` для всех ~20 generateText/streamText/generateObject/streamObject call sites.** Неявный параметр → подставляется model capability max (128K Opus, 64K Sonnet) → timeout-bomb для non-streaming (Anthropic требует streaming при > 21333). Решение: `DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number>` + `getMaxOutputTokensForTask()` в task-assignments.ts, call sites через getter. Предотвращает повторение инцидента d9d3488. | 1 сессия | hot-fix d9d3488 + architectural pattern, 2026-04-16 |
+
+> **В работе (umbrella ТЗ-AISDKLayerHardening):** `TZ_DevOverridesSideEffectImportAudit`, `TZ_MaxOutputTokensAudit`, `TZ_ProfessorPlanStreaming` объединены в одно ТЗ `specs/TZ_AISDKLayerHardening/` (3 этапа, v3.93.0).
 
 ---
 

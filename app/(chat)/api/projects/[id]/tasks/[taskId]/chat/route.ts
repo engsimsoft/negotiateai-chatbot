@@ -15,10 +15,6 @@ import { getProjectTierModelId, getTaskIdForTier } from "@/lib/ai/model-tiers";
 import { getProviderForTask, isTaskOverridden } from "@/lib/ai/getModel";
 import { DEFAULT_TASK_MODELS } from "@/lib/ai/task-assignments";
 import { getModelEntry } from "@/lib/ai/model-catalog";
-// Side-effect import: installs the file-based dev overrides reader.
-// Same pattern as app/(chat)/api/chat/route.ts — required so getModel()
-// sees overrides from /dev/models and DevPanel Switchboard.
-import "@/lib/ai/model-overrides-node";
 import { getStandardTools, getActiveToolNames, withCacheControlOnLastTool } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment, isSimplyDevMode } from "@/lib/constants";
 import { calculateCostRub } from "@/lib/ai/providers";

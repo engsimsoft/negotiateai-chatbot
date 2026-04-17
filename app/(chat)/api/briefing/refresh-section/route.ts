@@ -21,10 +21,6 @@ import {
 } from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
 import { getTokenlensCatalog } from "@/lib/ai/tokenlens-catalog";
-// Side-effect import: регистрирует reader `.simply-dev-overrides.json`. Без
-// этого импорта dev-panel overrides для briefing:* taskIds игнорируются
-// в этом route. См. hot-fix plan/route.ts (d9d3488) для контекста.
-import "@/lib/ai/model-overrides-node";
 
 export const maxDuration = 180; // ТЗ-Briefing-1: MiniMax M2.7 thinking model needs more time
 

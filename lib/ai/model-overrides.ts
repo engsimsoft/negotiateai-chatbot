@@ -93,17 +93,31 @@ export function serializeOverrides(overrides: OverridesMap): string {
  */
 const NO_OVERRIDES_READER: () => OverridesMap = () => ({});
 
-let activeOverridesReader: () => OverridesMap = NO_OVERRIDES_READER;
+/**
+ * Reader is stored on `globalThis` so that Next.js HMR (which re-instantiates
+ * this module when any dependent file is edited) does not reset the reader
+ * to the no-op fallback. Reader is registered once at boot via
+ * `instrumentation.ts` → `model-overrides-node.ts`. Without globalThis the
+ * reader reference would be cleared on every hot-reload and overrides would
+ * silently stop applying in dev (observed empirically via /api/dev/resolve-model
+ * after ТЗ-AISDKLayerHardening Этап 1 removed side-effect imports that used
+ * to re-register the reader as a side effect of each route hot-reload).
+ * Production is unaffected (no HMR) — same code path, same behaviour.
+ */
+interface GlobalWithOverridesReader {
+  __simplyOverridesReader?: () => OverridesMap;
+}
+const globalSlot = globalThis as unknown as GlobalWithOverridesReader;
 
 /**
- * Install a real overrides reader. Called exactly once, at module-eval time,
- * from `model-overrides-node.ts` — the Node-only companion that reads the
+ * Install a real overrides reader. Called at module-eval time from
+ * `model-overrides-node.ts` — the Node-only companion that reads the
  * overrides file. Because that file is imported only from server entry points
- * (route handlers), it never reaches the client bundle and webpack therefore
- * never tries to resolve `node:fs`.
+ * (instrumentation.ts), it never reaches the client bundle and webpack
+ * therefore never tries to resolve `node:fs`.
  */
 export function registerOverridesReader(reader: () => OverridesMap): void {
-  activeOverridesReader = reader;
+  globalSlot.__simplyOverridesReader = reader;
 }
 
 /**
@@ -114,5 +128,5 @@ export function registerOverridesReader(reader: () => OverridesMap): void {
  */
 export function getActiveOverrides(): OverridesMap {
   if (!isOverridesAllowed()) return {};
-  return activeOverridesReader();
+  return (globalSlot.__simplyOverridesReader ?? NO_OVERRIDES_READER)();
 }

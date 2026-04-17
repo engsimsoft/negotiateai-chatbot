@@ -7,13 +7,6 @@ import { runBriefingPipeline } from "@/lib/briefing/briefing-pipeline";
 import type { BriefingProgressEvent } from "@/lib/briefing/briefing-types";
 import { isSimplyDevMode } from "@/lib/constants";
 import { ChatSDKError } from "@/lib/errors";
-// Side-effect import: регистрирует reader `.simply-dev-overrides.json` через
-// `registerOverridesReader`. Без этого импорта `getActiveOverrides()` вернёт
-// пусто и dev-panel overrides для briefing:* taskIds игнорируются. Та же
-// архитектурная дыра как в plan/route.ts до hot-fix d9d3488. Глобальный
-// audit — хвост TZ_DevOverridesSideEffectImportAudit.
-import "@/lib/ai/model-overrides-node";
-
 export const maxDuration = 240; // ТЗ-Briefing-1: MiniMax M2.7 thinking model needs more time
 
 export async function POST() {

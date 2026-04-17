@@ -91,18 +91,23 @@ File-based решение: zero-dependency, stable through hot-reloads, рабо
 
 В production (`SIMPLY_DEV_MODE` не установлен) **файл `.simply-dev-overrides.json` физически не читается** — панель считается архитектурно отсутствующей.
 
-### ⛔ НЕ заводить в backlog «production coverage» для этой панели
+### Overrides reader registration — SSOT `instrumentation.ts`
 
-Любая находка типа «side-effect import в X файлах из Y, в production это пробел» — **неверна по смыслу**. В production этой фичи нет. Никакой «20 call-sites молча игнорируют override в production» не существует — в production `isOverridesAllowed()` возвращает false **раньше** чем reader вообще вызывается.
+Reader регистрируется один раз через Next.js boot-time hook — файл `instrumentation.ts` в корне проекта импортирует `@/lib/ai/model-overrides-node` под `NEXT_RUNTIME === "nodejs"`. Один центральный import покрывает **все** backend routes и Server Actions без дополнительных действий. Новые routes автоматически получают reader.
 
-Один side-effect import `import "@/lib/ai/model-overrides-node"` в `chat/route.ts` достаточен: в dev Next.js работает одним Node-процессом, модуль `model-overrides.ts` загружается один раз, `activeOverridesReader` — module-local переменная в shared instance, видна всем 26 call-sites `getModel()` через транзитивный импорт того же модуля.
+```ts
+// instrumentation.ts (SSOT)
+if (process.env.NEXT_RUNTIME === "nodejs") {
+  await import("@/lib/ai/model-overrides-node");
+}
+```
+
+**Не дублировать side-effect import в отдельных routes.** До этапа централизации (ТЗ-AISDKLayerHardening, v3.93.0) в кодовой базе был разбросанный паттерн `import "@/lib/ai/model-overrides-node"` в 7 routes — убран как избыточный. App Router компилирует routes лениво; если первый запрос идёт на route без импорта, reader никогда не регистрировался → `getActiveOverrides()` возвращал `{}` и override молча игнорировался. Эта дыра была эмпирически подтверждена в ТЗ-XAI-4 (2026-04-16, hot-fixes `d9d3488` + `676d50d`) и закрыта переносом регистрации в `instrumentation.ts` (коммит `c4b2b63`).
 
 ### Если нужен override для какого-то taskId
 
 Открыть `/dev/models` → найти строку ровно с именем taskId из `lib/ai/task-assignments.ts` (например `simply-chat`, `briefing:author`, `clerk:task-summary`) → выбрать модель из каталога → Save. UI пишет в `.simply-dev-overrides.json`. Reader читает файл на каждый `getModel()` вызов — изменения подхватываются мгновенно без перезапуска.
 
-### Постскриптум (2026-04-14, сессия 3)
+### Не заводить в backlog «production coverage»
 
-В `_archive/TZ_DeadModelSelectors/FINDINGS.md` есть Finding #2, утверждающий что «scattered side-effect imports — high-impact architectural concern». Этот finding **неверен**: он сформулирован как production-проблема для dev-only фичи. В сессии 2026-04-14 session 3 попытка его исправить (перенос side-effect import в `instrumentation.ts`) была проведена и полностью откачена без последствий для кода. См. `_archive/TZ_OverridesReaderCentralization/HANDOFF.md` для полного разбора.
-
-**Правило для будущего:** перед заведением любой находки в FINDINGS.md — сверять с действующими ADR. Если ADR явно декларирует ограничение (как здесь «только local dev»), то «отсутствие покрытия за пределами ограничения» — это реализация дизайна, а не долг.
+В production (`SIMPLY_DEV_MODE` не установлен) `isOverridesAllowed()` возвращает false → reader даже не вызывается → `.simply-dev-overrides.json` физически не читается. Любая находка типа «overrides не работают в production» — это реализация дизайна, а не долг.
