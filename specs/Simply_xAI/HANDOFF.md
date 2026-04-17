@@ -24,26 +24,25 @@ Smoke test v3.92.2 пройден 2026-04-17 — все модели на мес
 
 **Приоритет:** закрыть оставшиеся 7 хвостов перед продуктовыми фичами.
 
-### Следующий хвост в работе: TZ_SimplyContextUsageWidget
+### Следующий хвост: TZ_DevPanelFooterHidesSubCalls
 
-Виджет контекста воспроизводится стабильно и показывает неправильные цифры
-(знаменатель = `contextWindow`, не `SIMPLY_CONTEXT_LIMIT`). Это следующий шаг.
+Цена под-вызовов (artifact handlers, clerks) скрыта в footer DevPanel —
+показывается только parent chat model. Видна только реальная картина в SQL.
 
 ---
 
-## 📋 Хвосты (7 активных)
+## 📋 Хвосты (6 активных)
 
 ### 🟧 Средний приоритет
 
 | # | Файл | Суть |
 |---|---|---|
-| 1 | [TZ_SimplyContextUsageWidget](../_backlog/TZ_SimplyContextUsageWidget.md) | Виджет контекста показывает неправильную шкалу |
-| 2 | [TZ_DevPanelFooterHidesSubCalls](../_backlog/TZ_DevPanelFooterHidesSubCalls.md) | Цена под-вызовов (artifacts, clerks) скрыта в footer |
-| 3 | [TZ_MaxOutputTokensAudit](../_backlog/TZ_MaxOutputTokensAudit.md) | Нет явных лимитов длины ответа → потенциальный timeout |
-| 4 | [TZ_PromptsDeadCodeCleanup](../_backlog/TZ_PromptsDeadCodeCleanup.md) | 90% prompts.ts мёртвый код — мешает читать |
-| 5 | [TZ_SimplyChatRaceCondition](../_backlog/TZ_SimplyChatRaceCondition.md) | Редкий дубль сообщений при параллельных запросах |
-| 6 | [TZ_UrlVerificationMetricNormalization](../_backlog/TZ_UrlVerificationMetricNormalization.md) | Unit тесты для URL-нормализации (основной фикс уже в проде) |
-| 7 | [TZ_ProfessorPlanStreaming](../_backlog/TZ_ProfessorPlanStreaming.md) | Plan показывается целиком в конце вместо стриминга |
+| 1 | [TZ_DevPanelFooterHidesSubCalls](../_backlog/TZ_DevPanelFooterHidesSubCalls.md) | Цена под-вызовов (artifacts, clerks) скрыта в footer |
+| 2 | [TZ_MaxOutputTokensAudit](../_backlog/TZ_MaxOutputTokensAudit.md) | Нет явных лимитов длины ответа → потенциальный timeout |
+| 3 | [TZ_PromptsDeadCodeCleanup](../_backlog/TZ_PromptsDeadCodeCleanup.md) | 90% prompts.ts мёртвый код — мешает читать |
+| 4 | [TZ_SimplyChatRaceCondition](../_backlog/TZ_SimplyChatRaceCondition.md) | Редкий дубль сообщений при параллельных запросах |
+| 5 | [TZ_UrlVerificationMetricNormalization](../_backlog/TZ_UrlVerificationMetricNormalization.md) | Unit тесты для URL-нормализации (основной фикс уже в проде) |
+| 6 | [TZ_ProfessorPlanStreaming](../_backlog/TZ_ProfessorPlanStreaming.md) | Plan показывается целиком в конце вместо стриминга |
 
 ---
 
@@ -57,6 +56,7 @@ Smoke test v3.92.2 пройден 2026-04-17 — все модели на мес
 | Worktrees `stoic-wu` + `angry-nobel` удалены | git worktree prune |
 | Dev overrides — reader регистрируется в `instrumentation.ts` (boot), все routes покрыты | `c4b2b63` |
 | Error Recovery UI — Stage 2 закрыт: не воспроизводится, Stage 1 hint достаточно, Session Errors поймает если вернётся | — |
+| Context Widget — поглощён архитектурным документом `SIMPLY_COMPACTION_ARCHITECTURE.md` (виджет фиксится при реализации Simply Compaction) | pending commit |
 
 ---
 
