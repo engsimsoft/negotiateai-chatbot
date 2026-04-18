@@ -139,17 +139,17 @@ export async function reviewTask(
       maxOutputTokens: getMaxOutputTokensForTask("professor:review"),
       system: REVIEWER_SYSTEM_PROMPT,
       prompt: userMessage,
-      temperature: 0.2,
       ...(supportsThinking
         ? {
             providerOptions: {
               anthropic: {
-                thinking: { type: "adaptive" as const },
-                effort: "high" as const,
+                thinking: { type: "enabled" as const, budgetTokens: 4096 },
               },
             },
           }
-        : {}),
+        : {
+            temperature: 0.2,
+          }),
     });
 
     // ТЗ-CACHE2: Usage logging

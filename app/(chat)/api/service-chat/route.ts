@@ -779,6 +779,7 @@ export async function POST(request: Request) {
           });
         }
 
+        const thinkingEnabled = context === "briefing-onboarding" && taskSupportsThinking(taskId);
         const result = streamText({
           model: getModel(taskId),
           maxOutputTokens: getMaxOutputTokensForTask(taskId),
@@ -789,18 +790,20 @@ export async function POST(request: Request) {
           ],
           tools: Object.keys(tools).length > 0 ? tools : undefined,
           stopWhen: stepCountIs(maxSteps),
-          // ТЗ-FIX3: 0.5 for structured flows (manager, briefing). Note: ignored when adaptive thinking is enabled
-          temperature: (context === "project-manager" || context === "briefing-onboarding") ? 0.5 : 1.0,
-          // Adaptive thinking for briefing-onboarding (Sonnet 4.6) —
-          // ТЗ-1: only if resolved model supports thinking (catalog.capabilities)
-          ...(context === "briefing-onboarding" && taskSupportsThinking(taskId) ? {
-            providerOptions: {
-              anthropic: {
-                thinking: { type: "adaptive" as const },
-                effort: "high" as const,
-              },
-            },
-          } : {}),
+          // temperature несовместим с Anthropic thinking (SDK warning + отключает
+          // thinking). Передаём только когда thinking не активен.
+          ...(thinkingEnabled
+            ? {
+                providerOptions: {
+                  anthropic: {
+                    thinking: { type: "enabled" as const, budgetTokens: 4096 },
+                  },
+                },
+              }
+            : {
+                // ТЗ-FIX3: 0.5 для structured flows (manager, briefing), 1.0 default
+                temperature: (context === "project-manager" || context === "briefing-onboarding") ? 0.5 : 1.0,
+              }),
           onStepFinish: ({ usage, toolCalls, toolResults, response, finishReason }) => {
             if (isSimplyDevMode) {
               const inferredType = finishReason === "tool-calls"
