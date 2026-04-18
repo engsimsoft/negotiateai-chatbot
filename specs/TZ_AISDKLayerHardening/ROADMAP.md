@@ -67,10 +67,10 @@
 
 ---
 
-## Этап 2: MaxOutputTokens SSOT + getter + 36 call sites
+## Этап 2: MaxOutputTokens SSOT + getter + 36 call sites ✅ ЗАКРЫТ (коммит `3bb23b3`)
 
-**Статус:** ⬜ Не начат
-**Оценка:** 1.5-2 сессии
+**Статус:** ✅ Закрыт 2026-04-18. Мануальный тест владельцем подтвердил корректную работу safety-net на 4 разных моделях (Sonnet, Grok 4.1 Fast non-reasoning/reasoning, Grok 4.20 non-reasoning).
+**Фактически ушло:** 1 сессия.
 
 ⛔ **НЕ НАЧИНАТЬ без подтверждения Этапа 1**
 
@@ -186,7 +186,7 @@
   5. SQL: все outputTokens в разумных пределах (max 2420 для expertise с tools), никаких 100K+ runaway записей ✅
   6. Dev-логи: 0 warning'ов safety-net, 0 UND_ERR, 0 TypeError из 546 строк вывода ✅
 
-**Git:** коммит Этапа 2 (SHA добавляется после).
+**Git:** коммит `3bb23b3` — `feat(tz-aisdk-stage2): explicit maxOutputTokens SSOT + 36 call sites + capability safety-net`
 
 **Git (после валидации):**
 ```bash
