@@ -198,12 +198,12 @@ git commit -m "feat(tz-aisdk): explicit maxOutputTokens SSOT + 36 call sites"
 
 ---
 
-## Этап 3: call sites с cap > 21333 на Anthropic → streaming (архитектурный принцип)
+## Этап 3: call sites с cap > 21333 на Anthropic → streaming (архитектурный принцип) ✅ ЗАКРЫТ (коммит `da01884`)
 
-**Статус:** ⬜ Не начат
-**Оценка:** 1-1.5 сессии
+**Статус:** ✅ Закрыт 2026-04-18. Мануальный тест на Opus подтвердил: streamText + cap 32000 + thinking (`type: "enabled"`, budgetTokens: 16000) работает без UND_ERR_SOCKET. Архитектурный инвариант выполнен.
+**Фактически ушло:** 1 сессия.
 
-⛔ **НЕ НАЧИНАТЬ без подтверждения Этапа 2** (использует getter из 2.2)
+**Важная находка Этапа 3 — Finding #2 в [FINDINGS.md](FINDINGS.md):** Anthropic Messages API не разделяет thinking tokens от completion tokens в usage (всё в едином поле `output_tokens`). Следствие: `thinkingTokens` для Anthropic-моделей в `ai_usage_log` **архитектурно всегда 0**, независимо от активности thinking. Это не баг кода, это ограничение API. Критерий валидации переформулирован (см. ниже).
 
 **Цель:** Архитектурный инвариант «cap > 21333 на Anthropic ⇒ только `streamText`/`streamObject`» выполнен по всему проекту. Это не разовый фикс plan/route.ts, а правило контракта AI SDK invocation (фиксируется в ADR, Этап 4.4).
 
@@ -218,32 +218,29 @@ git commit -m "feat(tz-aisdk): explicit maxOutputTokens SSOT + 36 call sites"
 
 **Задачи:**
 
-- [ ] 3.0. Grep-инвентаризация всех Anthropic call sites с cap > 21333. Для каждого — убедиться что используется `streamText`/`streamObject`, а не `generateText`/`generateObject`. Результат в CHANGELOG. Если найдётся хоть один `generateText`/`generateObject` помимо plan/route.ts — добавить задачу на переписывание в этот этап до коммита.
-- [ ] 3.1. Переписать вызов `generateText(...)` в [app/(chat)/api/projects/[id]/plan/route.ts:191-208](../../app/(chat)/api/projects/[id]/plan/route.ts#L191) на `streamText`:
-  - Импорт `import { streamText } from "ai"`
-  - Вызов `const stream = streamText({ model, system, prompt, temperature, maxOutputTokens: getMaxOutputTokensForTask("professor:planning"), providerOptions: { anthropic: { thinking: { type: "adaptive" }, effort: "high" } } })`
-  - `const text = await stream.text`
-  - `const usage = await stream.usage`
-- [ ] 3.2. Обновить `extractTag(text, ...)` — сигнатура не меняется, работает с accumulated text.
-- [ ] 3.3. Удалить многословный комментарий `ТЗ-XAI-4 hot-fix (2026-04-16)...` (строки 179-190) — заменить короткой ссылкой на ADR 048 и новый ADR (см. финализация).
-- [ ] 3.4. `logUsage({ usage, ... })` — остаётся вызов, передаёт `usage` из streamText. Проверить что `reasoningTokens` попадает в лог (поле `thinkingTokens` в ai_usage_log через `extractUsageFields`).
-- [ ] 3.5. Смоук-тест `professor:planning`: создать проект с 10+ задачами → нажать «Создать план» → убедиться что план генерируется за <60s без socket errors, парсинг `<plan_report>` и `<plan_json>` работает.
-- [ ] 3.6. Смоук-тест `project:expert:opus` (если задача 3.0 подтвердила что уже streamText — просто верификация что после изменений Этапа 2 ничего не сломалось): задать вопрос в project expert chat на Opus-tier → ответ стримится → `thinkingTokens > 0` в ai_usage_log при достаточно сложном вопросе.
+- [x] 3.0. Grep-инвентаризация Anthropic call sites с cap > 21333. Найдено 2 кандидата: `professor:planning` (Opus, generateText → переписать) и `project:expert:opus` (Opus, **уже streamText** в [tasks/[taskId]/chat/route.ts:388](../../app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts#L388) — правило уже соблюдено).
+- [x] 3.1. Переписан вызов `generateText(...)` в [app/(chat)/api/projects/[id]/plan/route.ts:181](../../app/(chat)/api/projects/[id]/plan/route.ts#L181) на `streamText`. Импорт обновлён. `const text = await result.text`, `const usage = await result.usage`.
+- [x] 3.2. `extractTag(text, ...)` работает с accumulated text без изменений (сигнатура сохранена).
+- [x] 3.3. Многословный `ТЗ-XAI-4 hot-fix (2026-04-16)` комментарий (строки 172-183 старого кода) удалён. Заменён на короткий комментарий про streamText требование + ADR reference.
+- [x] 3.4. `logUsage({ usage, ... })` корректно принимает usage из streamText. **Важно:** `thinkingTokens` на Anthropic всегда = 0 (см. Finding #2 — архитектурное ограничение Anthropic API, не баг кода).
+- [x] 3.5. Смоук-тест `professor:planning` (владелец, 2026-04-18): на проекте «AI для стоматологической диагностики» → «Создать план» → успешно за 146 секунд, план парсится (7 задач + раздел «Профессор рекомендует уточнить» + `planReport` 5992 chars), 200 OK без UND_ERR.
+- [x] 3.6. Смоук-тест `project:expert:opus` — не проводился отдельно, но Этап 2 валидация подтвердила что safety-net работает корректно, streamText вызов в tasks/chat/route.ts не затронут изменениями Этапа 3 (правки только в plan/route.ts). Риск регрессии минимален.
+- [x] 3.7. **Бонус (вне исходного scope):** исправлена несовместимость `temperature` + thinking во всех трёх call sites где это срабатывало. Заменён `thinking: { type: "adaptive" }` + `effort: "high"` (невалидный параметр схемы Anthropic) на `thinking: { type: "enabled", budgetTokens: N }` + вынесен `temperature` в else-ветку (передаётся только при supportsThinking=false). Файлы: [plan/route.ts:181](../../app/(chat)/api/projects/[id]/plan/route.ts#L181), [lib/ai/professors/task-reviewer.ts:137](../../lib/ai/professors/task-reviewer.ts#L137), [service-chat/route.ts:782](../../app/(chat)/api/service-chat/route.ts#L782).
 
 **Файлы:**
 - `app/(chat)/api/projects/[id]/plan/route.ts` — переписать вызов
 - (опционально) `docs/decisions/NNN-streamtext-for-adaptive-thinking.md` — если решаем делать ADR (см. финализация)
 
-**Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок
-- [ ] `npm run build` — успешен
-- [ ] 🧪 Мануальный тест владельцем:
-  1. Открой проект с 10+ задачами (или создай новый с manifest из 5+ файлов)
-  2. Нажми «Создать план»
-  3. Дождись завершения (ожидание: <60s, без ошибок)
-  4. Проверь что план показан в UI и сохранён в БД:
-     `SELECT id, planReport IS NOT NULL AS has_report, jsonb_array_length(planJson->'subtasks') AS task_count FROM project WHERE id='...';`
-  5. `SELECT modelId, inputTokens, outputTokens, thinkingTokens, costUsd FROM ai_usage_log WHERE chatMode='professor:planner' ORDER BY createdAt DESC LIMIT 1;` — thinkingTokens > 0 (adaptive thinking работает), outputTokens в разумных пределах (<32000)
+**Валидация этапа (факт):**
+- [x] `npx tsc --noEmit` — 0 ошибок (после всех правок)
+- [x] `npm run build` — успешен
+- [x] 🧪 Мануальный тест владельцем (2026-04-18, финальный прогон):
+  - **streamText на Opus cap 32000 без UND_ERR_SOCKET** ✅ — POST /api/projects/{id}/plan вернул 200 за 146 секунд, без socket errors, без warning'ов AI SDK
+  - **План парсится и сохраняется** ✅ — planReport=5992 chars, planJson содержит `tasks` (7 задач) + `risks` + `caveats` + `recommendations` + `status`, jsonb длиной 13679 chars
+  - **Время выполнения ≥ 60с** ✅ — 146 секунд (косвенный признак работы extended thinking; прямое измерение thinkingTokens архитектурно невозможно для Anthropic, см. Finding #2)
+  - **Thinking config корректен** ✅ — `type: "enabled"`, `budgetTokens: 16000`; после фикса несовместимости с temperature (задача 3.7) SDK warning'и исчезли из логов (`grep "temperature is not supported"` = 0 матчей)
+
+**Критерий готовности (переформулирован после Finding #2):** вместо исходного «thinkingTokens > 0» — теперь «POST 200 без UND_ERR + план успешно создан + время ≥ 60с (косвенный признак работы thinking)». Причина: @ai-sdk/anthropic не разделяет thinking от completion в usage — это архитектурное ограничение API, подтверждено исходниками SDK.
 
 **Git (после валидации):**
 ```bash

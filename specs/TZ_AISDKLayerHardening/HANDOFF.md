@@ -11,8 +11,8 @@
 - [x] Фаза 2 — Планирование (ROADMAP с cap table на 37 taskIds)
 - [x] **Этап 1: DevOverrides cleanup — закрыт коммитом `a20ad29`**
 - [x] **Этап 2: MaxOutputTokens SSOT + safety-net + 36 call sites — закрыт коммитом `3bb23b3`**
-- [ ] Этап 3: cap > 21333 на Anthropic → streamText/streamObject (архитектурный принцип) ← **СЛЕДУЮЩИЙ**
-- [ ] Этап 4: Финализация + ADR «AI SDK invocation contract»
+- [x] **Этап 3: cap > 21333 на Anthropic → streamText + thinking config fix — закрыт коммитом `da01884`**
+- [ ] Этап 4: Финализация + ADR «AI SDK invocation contract» ← **СЛЕДУЮЩИЙ**
 
 ---
 
