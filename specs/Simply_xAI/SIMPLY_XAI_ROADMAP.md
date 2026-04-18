@@ -214,11 +214,38 @@
 
 ## Будущие расширения (не в текущей серии)
 
-| ID | Название | Зависимости | Описание |
-|---|---|---|---|
-| ТЗ-XAI-MA-1 | Multi-Agent Экспертиза | ТЗ-XAI-5 + A/B тест | Responses API + MCP сервер для custom tools в режиме multi-agent. **TaskId `expertise-multi-agent` зарезервирован в [task-assignments.ts](../../lib/ai/task-assignments.ts) с 2026-04-16** (placeholder, call sites нет). Полное обоснование архитектуры — [BRAINSTORM_GrokMultiAgent.md](BRAINSTORM_GrokMultiAgent.md) |
-| ТЗ-XAI-COL-1 | Collections (Библиотека) | ТЗ-XAI-1 | Grok Collections API для RAG документов пользователя |
-| ТЗ-XAI-VOICE-1 | Voice Agent | — | Grok Voice Agent API для голосового режима |
+**Порядок выполнения** (утверждён владельцем 2026-04-18, после закрытия ТЗ-AISDKLayerHardening v3.93.0):
+
+```
+[серия xAI закрыта v3.92.1]
+  ↓
+ТЗ-AISDKLayerHardening ✅ v3.93.0 (umbrella, 3 долга + ADR 053)
+  ↓
+1. ТЗ-COMPACTION-1 ← СЛЕДУЮЩИЙ (фундамент, блокирует COL-1)
+  ↓
+2. ТЗ-XAI-COL-1 (продуктовая ценность: загрузка документов в RAG)
+  ↓
+3. ТЗ-XAI-MA-1 (Multi-Agent premium-режим)
+  ↓
+4. ТЗ-XAI-VOICE-1 (голосовой канал)
+```
+
+**Обоснование порядка (владелец 2026-04-18):**
+- COMPACTION-1 первым — фундамент: чинит молчаливую потерю контекста в expertise/create/projects-on-Grok (реальная UX-деградация в 3 chat-режимах) + блокирует COL-1 (большие документы переполнят контекст мгновенно) + расширяет ADR 053 до 5-го аспекта (compaction strategy) пока контракт свежий.
+- COL-1 вторым, а не MA-1 — ближе к продуктовому видению (пользователь загружает документы), понятнее в реализации (Grok Collections из коробки). MA-1 требует MCP-сервер + auth layer — больше работы, меньше сразу осязаемой ценности.
+- MA-1 третьим — бонусно закрывает Finding #2 (thinking tokens на Anthropic естественно переходом Professor Planning на Grok Multi-Agent).
+- VOICE-1 последним — отдельный канал, не зависит от остального, продуктовая приоритизация.
+
+| № | ID | Название | Зависимости | Описание |
+|---|---|---|---|---|
+| 1 | **ТЗ-COMPACTION-1** | Simply Compaction MVP | ADR 053 (v3.93.0 ✅) | Summary Buffer для Grok-чатов (expertise/create как pilot). Capability-driven middleware `applyContextStrategy`, новый taskId `compaction:summarize`, 5-й аспект ADR 053. Архитектура — [SIMPLY_COMPACTION_ARCHITECTURE.md](SIMPLY_COMPACTION_ARCHITECTURE.md) v1.0 → v1.1 в Фазе 1. Поглощает backlog-хвост `TZ_SimplyContextUsageWidget`. |
+| 2 | ТЗ-XAI-COL-1 | Collections (Библиотека) | ТЗ-XAI-1 + COMPACTION-1 | Grok Collections API для RAG документов пользователя. Unified `knowledge_search` с MIND. |
+| 3 | ТЗ-XAI-MA-1 | Multi-Agent Экспертиза | ТЗ-XAI-5 + A/B тест | Responses API + MCP сервер для custom tools в режиме multi-agent. **TaskId `expertise-multi-agent` зарезервирован в [task-assignments.ts](../../lib/ai/task-assignments.ts) с 2026-04-16** (placeholder, call sites нет). Полное обоснование архитектуры — [BRAINSTORM_GrokMultiAgent.md](BRAINSTORM_GrokMultiAgent.md). Попутно закрывает Finding #2 (Anthropic thinking tokens) естественным переходом Professor Planning на Grok Multi-Agent. |
+| 4 | ТЗ-XAI-VOICE-1 | Voice Agent | — | Grok Voice Agent API для голосового режима. |
+
+**Отложены (не независимые серии, вплетаются по мере необходимости):**
+- ТЗ-COMPACTION-2 — расширение Simply Compaction на Simply Chat как страховочная сетка поверх MIND (для сверхдлинных сессий). После COMPACTION-1 MVP.
+- ТЗ-COMPACTION-3 — «Новый чат с итогом» (UX Фазы 3 из архитектуры). После COMPACTION-1/COMPACTION-2.
 
 ---
 
