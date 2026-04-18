@@ -1,7 +1,7 @@
 # Передача сессии ТЗ-AISDKLayerHardening
 
-**Дата:** 2026-04-17 (конец сессии 2)
-**Сессия:** 2 (Фазы 1-2 + Этап 1 закрыты)
+**Дата:** 2026-04-18 (конец сессии 3)
+**Сессия:** 3 (Этап 2 закрыт)
 
 ---
 
@@ -10,9 +10,9 @@
 - [x] Фаза 1 — Анализ + Код-ревью (SPEC + ANALYSIS, 4 вопроса отвечены владельцем)
 - [x] Фаза 2 — Планирование (ROADMAP с cap table на 37 taskIds)
 - [x] **Этап 1: DevOverrides cleanup — закрыт коммитом `a20ad29`**
-- [ ] Этап 2: MaxOutputTokens SSOT + getter + 36 call sites ← **СЛЕДУЮЩИЙ**
-- [ ] Этап 3: plan/route.ts → streamText
-- [ ] Этап 4: Финализация
+- [x] **Этап 2: MaxOutputTokens SSOT + safety-net + 36 call sites — закрыт коммитом этой сессии**
+- [ ] Этап 3: cap > 21333 на Anthropic → streamText/streamObject (архитектурный принцип) ← **СЛЕДУЮЩИЙ**
+- [ ] Этап 4: Финализация + ADR «AI SDK invocation contract»
 
 ---
 

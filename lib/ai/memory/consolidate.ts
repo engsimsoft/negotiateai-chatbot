@@ -16,6 +16,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -149,6 +150,7 @@ async function runConsolidation(
   // 2026-04-14 that xAI generateObject works natively.)
   const { object, usage } = await generateObject({
     model: getModel(MEMORY_CONSOLIDATE_TASK),
+    maxOutputTokens: getMaxOutputTokensForTask(MEMORY_CONSOLIDATE_TASK),
     maxRetries: 0,
     schema: consolidationResultSchema,
     system: CONSOLIDATE_SYSTEM_PROMPT,

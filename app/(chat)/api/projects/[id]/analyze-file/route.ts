@@ -15,6 +15,7 @@ import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -129,6 +130,7 @@ ${folderNames.length > 0 ? JSON.stringify(folderNames) : "[]"}
 
     const result = await generateText({
       model: getModel("clerk:file-analyzer"),
+      maxOutputTokens: getMaxOutputTokensForTask("clerk:file-analyzer"),
       system: CLERK_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.1,

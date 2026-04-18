@@ -198,3 +198,87 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
 
 /** Все известные taskId. */
 export const ALL_TASK_IDS = Object.keys(DEFAULT_TASK_MODELS) as TaskId[];
+
+/**
+ * Default maxOutputTokens per task — SSOT для `maxOutputTokens` параметра
+ * AI SDK вызовов (generateText / streamText / generateObject / streamObject).
+ *
+ * ТЗ-AISDKLayerHardening (2026-04-18): раньше cap задавался явно в каждом
+ * call site (неконсистентно) или не задавался вовсе (неявный default SDK =
+ * `Infinity` → runaway risk + timeout-bomb на Anthropic > 21333). Теперь
+ * каждый call site обязан получать cap через `getMaxOutputTokensForTask()`.
+ *
+ * Инвариант: каждое значение ≤ `maxOutput` default-модели этого taskId
+ * (см. lib/ai/model-catalog.ts). Runtime safety-net в `getMaxOutputTokensForTask`
+ * дополнительно делает `Math.min(requested, capability)` — защита при смене
+ * default-модели через /dev/models override или правку DEFAULT_TASK_MODELS.
+ *
+ * При cap > 21333 на Anthropic call site ОБЯЗАН использовать `streamText` /
+ * `streamObject` (threshold SDK, иначе `UND_ERR_SOCKET`). Getter логирует
+ * warning для dev'а.
+ *
+ * Изменение cap для задачи = одна правка здесь. TypeScript `Record<TaskId, number>`
+ * гарантирует что при добавлении нового TaskId компиляция падает без записи.
+ */
+export const DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number> = {
+  // Simply Chat
+  "simply-chat":              8192,   // Grok 4.1 Fast, типичные ответы 1-4K.
+  "simply-chat-think":        16000,  // Grok 4.20 reasoning — потолок capability Grok.
+  "simply-chat-vision":       4096,   // Haiku vision, OCR + summary.
+
+  // Экспертиза / Создание / Multi-agent
+  "expertise":                16000,  // Grok 4.20 reasoning — потолок capability Grok.
+  "expertise-multi-agent":    16000,  // RESERVED placeholder, потолок capability Grok multi-agent.
+  "create":                   16000,  // Grok 4.20 reasoning — потолок capability Grok.
+
+  // Project expert chat (tier)
+  "project:expert:haiku":     8192,   // Haiku tier — лёгкие вопросы.
+  "project:expert:sonnet":    16384,  // Sonnet tier — средняя глубина.
+  "project:expert:opus":      32000,  // Opus tier, streamText обязателен (>21333).
+
+  // Professor pipeline
+  "professor:planning":              32000,  // Opus 4.6 adaptive thinking, streamText (Этап 3).
+  "professor:review":                8192,   // Analysis text.
+  "professor:pipeline-analyze":      4096,   // Короткий JSON subtasks.
+  "professor:pipeline-execute":      8192,   // Работа над одной subtask.
+  "professor:pipeline-synthesize":   16000,  // Grok 4.20 reasoning — потолок capability Grok.
+
+  // Clerks
+  "clerk:task-summary":       2048,   // Короткий multiline summary.
+  "clerk:file-analyzer":      4096,   // JSON-анализ файла.
+
+  // Memory (MIND / RAG)
+  "memory:extract":           4096,   // per-message facts, MAX_FACTS_PER_EXTRACTION=10.
+  "memory:extract-batch":     16000,  // batch extraction, MAX_BATCH_FACTS=30 × ~500 = ~15K, потолок Grok 4.1 Fast.
+  "memory:consolidate":       4096,   // JSON консолидация.
+  "memory:profile":           4096,   // Narrative profile JSON.
+  "memory:dedup-verify":      512,    // Haiku дедуп-верификация, крошечный ответ.
+
+  // Briefing / Podcast
+  "briefing:filter":          1024,   // JSON список IDs.
+  "briefing:author":          8192,   // Особый случай: call site сохраняет dynamic MAX_TOKENS_BY_VOLUME, это значение = fallback + документация.
+  "briefing:section":         8192,
+  "briefing:podcast-script":  4096,
+
+  // Meeting
+  "meeting:summary":          8192,
+
+  // Service chats
+  "service-chat:ben":                 4096,
+  "service-chat:project-creation":    8192,
+  "service-chat:project-manager":     4096,
+  "service-chat:briefing-onboarding": 8192,
+
+  // Утилиты
+  "util:title":               64,     // Tight cap против runaway (1-3 слова).
+
+  // Artifacts (document handlers, все на Sonnet capability 64K)
+  "artifact:text":            16384,
+  "artifact:markdown":        16384,
+  "artifact:excel":           8192,
+  "artifact:pptx":            16384,
+  "artifact:reveal":          16384,
+
+  // Vision
+  "vision:ocr":               4096,   // Haiku non-streaming, cap критичен (capability 64K = timeout-bomb иначе).
+};

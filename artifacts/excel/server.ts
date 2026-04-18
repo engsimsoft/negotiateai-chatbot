@@ -4,7 +4,7 @@
 
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { streamText } from "ai";
-import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
+import { getMaxOutputTokensForTask, getModel, getModelIdForTask } from "@/lib/ai/getModel";
 import { emitArtifactDebugStep } from "@/lib/ai/debug-events";
 
 const ARTIFACT_TASK = "artifact:excel" as const;
@@ -178,6 +178,7 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
       const startTime = Date.now();
       const result = streamText({
         model: getModel(ARTIFACT_TASK),
+        maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
         system: EXCEL_SYSTEM_PROMPT,
         prompt: title,
       });
@@ -273,6 +274,7 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
     const startTime = Date.now();
     const result = streamText({
       model: getModel(ARTIFACT_TASK),
+      maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
       system: `${EXCEL_SYSTEM_PROMPT}
 
 ТЕКУЩАЯ ТАБЛИЦА:

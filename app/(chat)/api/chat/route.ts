@@ -19,6 +19,7 @@ import { buildChatPrompt, buildExpertisePrompt, buildCreatePrompt } from "@/lib/
 import type { BuildContext } from "@/lib/prompts";
 import { buildProjectContext } from "@/lib/prompts/contexts";
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -146,6 +147,7 @@ async function autoNameChat(
 
   const { object, usage } = await generateObject({
     model: getModel("util:title"),
+    maxOutputTokens: getMaxOutputTokensForTask("util:title"),
     schema: z.object({
       title: z.string().describe("Короткое название чата (2-4 слова)"),
       summary: z.string().describe("Краткое описание темы разговора (1-2 предложения)"),
@@ -1086,6 +1088,7 @@ export async function POST(request: Request) {
         // Standard streaming mode (non-professor)
         const result = streamText({
           model: modelToUse,
+          maxOutputTokens: getMaxOutputTokensForTask(activeTaskId),
           messages: messagesForRequest,
           providerOptions: compactionOptions,
           // ТЗ-XAI-3: Simply Chat — 0.7 для всех провайдеров (стабильность

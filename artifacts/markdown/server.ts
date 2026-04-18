@@ -1,6 +1,6 @@
 import { smoothStream, streamText } from "ai";
 import { updateDocumentPrompt } from "@/lib/ai/artifact-prompts";
-import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
+import { getMaxOutputTokensForTask, getModel, getModelIdForTask } from "@/lib/ai/getModel";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { logUsage } from "@/lib/ai/usage-utils";
 import { emitArtifactDebugStep } from "@/lib/ai/debug-events";
@@ -16,6 +16,7 @@ export const markdownDocumentHandler = createDocumentHandler<"markdown">({
 
     const result = streamText({
       model: getModel(ARTIFACT_TASK),
+      maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
       system: `Напиши документ на тему, используя Markdown форматирование.
 
 ПРАВИЛА ОФОРМЛЕНИЯ:
@@ -75,6 +76,7 @@ export const markdownDocumentHandler = createDocumentHandler<"markdown">({
 
     const result = streamText({
       model: getModel(ARTIFACT_TASK),
+      maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
       system: updateDocumentPrompt(document.content, "markdown"),
       experimental_transform: smoothStream({ chunking: "word" }),
       prompt: description,

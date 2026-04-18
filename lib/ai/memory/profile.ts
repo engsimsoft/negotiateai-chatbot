@@ -14,6 +14,7 @@ import path from "path";
 import { generateText } from "ai";
 
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -115,6 +116,7 @@ export async function generateUserProfile(
   // Generate profile via resolved memory:profile model
   const { text, usage } = await generateText({
     model: getModel(MEMORY_PROFILE_TASK),
+    maxOutputTokens: getMaxOutputTokensForTask(MEMORY_PROFILE_TASK),
     maxRetries: 0,
     system: PROFILE_SYSTEM_PROMPT,
     prompt: userPrompt,

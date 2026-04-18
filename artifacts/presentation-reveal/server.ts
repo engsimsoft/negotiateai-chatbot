@@ -1,6 +1,6 @@
 import { smoothStream, streamText } from "ai";
 import { updateDocumentPrompt } from "@/lib/ai/artifact-prompts";
-import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
+import { getMaxOutputTokensForTask, getModel, getModelIdForTask } from "@/lib/ai/getModel";
 import { emitArtifactDebugStep } from "@/lib/ai/debug-events";
 
 const ARTIFACT_TASK = "artifact:reveal" as const;
@@ -115,6 +115,7 @@ export const presentationRevealDocumentHandler =
       const startTime = Date.now();
       const result = streamText({
         model: getModel(ARTIFACT_TASK),
+        maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
         system: PRESENTATION_SYSTEM_PROMPT,
         experimental_transform: smoothStream({ chunking: "word" }),
         prompt: `Create a presentation about: ${title}`,
@@ -189,6 +190,7 @@ export const presentationRevealDocumentHandler =
       const startTime = Date.now();
       const result = streamText({
         model: getModel(ARTIFACT_TASK),
+        maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
         system: `${PRESENTATION_SYSTEM_PROMPT}
 
 Current slides:

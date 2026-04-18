@@ -12,7 +12,7 @@ import { auth } from "@/app/(auth)/auth";
 import { buildTaskExpertPrompt } from "@/lib/prompts/build-task-expert-prompt";
 import { getProjectModel, isValidModelTier, DEFAULT_PROJECT_MODEL } from "@/lib/ai/model-tiers";
 import { getProjectTierModelId, getTaskIdForTier } from "@/lib/ai/model-tiers";
-import { getProviderForTask, isTaskOverridden } from "@/lib/ai/getModel";
+import { getMaxOutputTokensForTask, getProviderForTask, isTaskOverridden } from "@/lib/ai/getModel";
 import { DEFAULT_TASK_MODELS } from "@/lib/ai/task-assignments";
 import { getModelEntry } from "@/lib/ai/model-catalog";
 import { getStandardTools, getActiveToolNames, withCacheControlOnLastTool } from "@/lib/ai/tools/chat-tools";
@@ -387,6 +387,7 @@ export async function POST(
 
         const result = streamText({
           model: modelToUse,
+          maxOutputTokens: getMaxOutputTokensForTask(getTaskIdForTier(tier)),
           messages: messagesForRequest,
           ...(compactionProviderOptions ? { providerOptions: compactionProviderOptions } : {}),
           temperature: 1.0,

@@ -82,12 +82,12 @@
 |---|---|---|
 | **Simply Chat** |  |  |
 | `simply-chat` | `8192` | Основной продуктовый чат, Grok 4.1 Fast. Типичные ответы 1-4K, 8K даёт запас без runaway. |
-| `simply-chat-think` | `16384` | Кнопка «Думать» — Grok 4.20 reasoning. Глубокий анализ часто длиннее чем быстрый ответ. |
+| `simply-chat-think` | `16000` | Кнопка «Думать» — Grok 4.20 reasoning. Потолок capability Grok. |
 | `simply-chat-vision` | `4096` | Haiku vision. Ответы по изображениям обычно короткие (OCR + summary). |
 | **Expertise / Create / Multi-agent** |  |  |
-| `expertise` | `16384` | Grok 4.20 reasoning, экспертные ответы развёрнутые. |
-| `expertise-multi-agent` | `16384` | RESERVED placeholder. Реальное значение будет установлено в ТЗ-XAI-MA-1 когда появится call site. |
-| `create` | `16384` | Grok 4.20 reasoning, генерация длинных материалов. |
+| `expertise` | `16000` | Grok 4.20 reasoning, экспертные ответы развёрнутые. Потолок capability Grok. |
+| `expertise-multi-agent` | `16000` | RESERVED placeholder. Потолок capability Grok multi-agent (капа уточняется в ТЗ-XAI-MA-1 когда появится call site). |
+| `create` | `16000` | Grok 4.20 reasoning, генерация длинных материалов. Потолок capability Grok. |
 | **Project expert chat (tier)** |  |  |
 | `project:expert:haiku` | `8192` | Haiku tier — лёгкие вопросы по задаче. |
 | `project:expert:sonnet` | `16384` | Sonnet tier — средняя глубина. |
@@ -97,13 +97,13 @@
 | `professor:review` | `8192` | Analysis text по задаче. |
 | `professor:pipeline-analyze` | `4096` | Список subtasks, короткий JSON. |
 | `professor:pipeline-execute` | `8192` | Работа над одной subtask. |
-| `professor:pipeline-synthesize` | `16000` | Финальный synthesis из результатов subtasks. |
+| `professor:pipeline-synthesize` | `16000` | Финальный synthesis из результатов subtasks. Потолок capability Grok. |
 | **Clerks** |  |  |
 | `clerk:task-summary` | `2048` | Короткий multiline summary завершённой задачи. |
 | `clerk:file-analyzer` | `4096` | JSON-анализ загруженного файла. |
 | **Memory (MIND / RAG)** |  |  |
 | `memory:extract` | `4096` | `generateObject` JSON facts list per-message. |
-| `memory:extract-batch` | `8192` | Batch extraction при compression — больше объём входа, больше facts. |
+| `memory:extract-batch` | `16000` | Batch extraction при compression: `MAX_BATCH_FACTS=30` × ~500 токенов/факт = ~15K. Cap 8192 = timeout-bomb (JSON обрезается в середине), 4096 хватает только на 10 фактов. 16000 = потолок capability Grok 4.1 Fast, дают 30 фактам развернуться. |
 | `memory:consolidate` | `4096` | JSON консолидация. |
 | `memory:profile` | `4096` | Narrative profile JSON. |
 | `memory:dedup-verify` | `512` | Haiku верификация дедупликации — ответ крошечный (решение + причина). |
@@ -132,21 +132,41 @@
 
 **Итого 37 taskId.** Для передвижки любого cap в будущем — одна правка в `DEFAULT_MAX_OUTPUT_TOKENS`.
 
+**Согласование с capability моделей (проверено против [lib/ai/model-catalog.ts](../../lib/ai/model-catalog.ts) 2026-04-18):** каждое значение в таблице ≤ `maxOutput` своей default-модели. 6 taskId на Grok упёрты в потолок 16000 (Grok 4.20 reasoning / Grok 4.1 Fast / Grok 4.20 multi-agent все имеют `maxOutput: 16_000`). Safety-net в getter (см. задачу 2.2) защитит runtime при переключении default-модели через `/dev/models` или смене `DEFAULT_TASK_MODELS` — но cap table в SSOT должна отражать реалистичный потолок, а не «хотелку».
+
 ### 2.2 Задачи этапа
 
-- [ ] 2.1. Создать `DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number>` в [lib/ai/task-assignments.ts](../../lib/ai/task-assignments.ts) со значениями из cap table выше. TypeScript `Record<TaskId, number>` гарантирует compile-time check — при добавлении нового TaskId build упадёт без записи. (условие владельца)
-- [ ] 2.2. Экспортировать getter `getMaxOutputTokensForTask(taskId: TaskId): number` из [lib/ai/getModel.ts](../../lib/ai/getModel.ts). Простая реализация: return `DEFAULT_MAX_OUTPUT_TOKENS[taskId]`.
-- [ ] 2.3. Обновить все 36 call sites чтобы использовали getter (кроме `briefing:author` который остаётся с dynamic вычислением):
-  - [ ] 2.3.1. **Artifacts (5 файлов, 10 call sites):** text/markdown/excel/presentation-reveal/presentation-pptx
-  - [ ] 2.3.2. **Professor pipeline (3 вызова):** analyze/execute/synthesize
-  - [ ] 2.3.3. **Professors/Clerks (2 вызова):** task-reviewer, task-summarizer
-  - [ ] 2.3.4. **Memory (5 вызовов):** extract.ts × 3, consolidate.ts, profile.ts
-  - [ ] 2.3.5. **Vision (2 вызова):** vision-ocr.ts
-  - [ ] 2.3.6. **Briefing filter (1 вызов):** briefing-filter.ts (briefing-author НЕ трогаем — оставляем dynamic)
-  - [ ] 2.3.7. **Backend routes (8 вызовов):** chat/route.ts × 2, service-chat/route.ts, assistant/ben, tasks/chat/route.ts, analyze-file/route.ts, generate-title/route.ts, actions.ts
-- [ ] 2.4. Сохранить tactical `maxOutputTokens: 16000` в plan/route.ts как есть — он убирается в Этапе 3 при переходе на streamText. Альтернативно можно в этапе 2 перевести на `getMaxOutputTokensForTask("professor:planning")` = 32000 (Этап 3 всё равно пересмотрит эту строку). Выбираю **оставить как 16000** чтобы не сломать текущий работающий hot-fix до Этапа 3.
-- [ ] 2.5. Верификация покрытия: `grep -rn '(generateText|streamText|generateObject|streamObject)\s*\(' lib/ app/ artifacts/ --include="*.ts"` → для каждой строки проверить что maxOutputTokens проставлен. Результат в CHANGELOG.
-- [ ] 2.6. Обновить [specs/Simply_xAI/SIMPLY_PROMPTS_AND_MODEL_CONFIG.md § 4.2](../Simply_xAI/SIMPLY_PROMPTS_AND_MODEL_CONFIG.md) с финальной cap table.
+- [x] 2.1. Создать `DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number>` в [lib/ai/task-assignments.ts](../../lib/ai/task-assignments.ts) со значениями из cap table выше. TypeScript `Record<TaskId, number>` гарантирует compile-time check — при добавлении нового TaskId build упадёт без записи. (условие владельца)
+- [x] 2.2. Экспортировать getter `getMaxOutputTokensForTask(taskId: TaskId): number` из [lib/ai/getModel.ts](../../lib/ai/getModel.ts) с **двухслойной safety-net**:
+  ```ts
+  export function getMaxOutputTokensForTask(taskId: TaskId): number {
+    const requested = DEFAULT_MAX_OUTPUT_TOKENS[taskId];
+    const modelId = getModelIdForTask(taskId); // учитывает override
+    const entry = resolveModelEntry(modelId);
+    const capability = entry?.maxOutput ?? requested;
+    const effective = Math.min(requested, capability);
+
+    // Anthropic non-streaming threshold — при cap > 21333 call site ОБЯЗАН
+    // использовать streamText/streamObject (см. ADR AI SDK invocation contract).
+    if (entry?.provider === "anthropic" && effective > 21333) {
+      warnOnce(taskId, `[${taskId}] cap ${effective} > 21333 with Anthropic — call site MUST use streamText/streamObject`);
+    }
+    return effective;
+  }
+  ```
+  - **Math.min к capability** — защищает от смены default-модели через `/dev/models` или правки `DEFAULT_TASK_MODELS`, при которой cap окажется выше capability новой модели (runtime, без краха).
+  - **warnOnce через `Set<TaskId>` сеен** — логируется один раз на процесс. Предупреждение для dev (обязывает перейти на streaming); production не крашится.
+- [x] 2.3. Обновить все 36 call sites чтобы использовали getter (кроме `briefing:author` который остаётся с dynamic вычислением):
+  - [x] 2.3.1. **Artifacts (5 файлов, 10 call sites):** text/markdown/excel/presentation-reveal/presentation-pptx
+  - [x] 2.3.2. **Professor pipeline (3 вызова):** analyze/execute/synthesize
+  - [x] 2.3.3. **Professors/Clerks (2 вызова):** task-reviewer, task-summarizer
+  - [x] 2.3.4. **Memory (5 вызовов):** extract.ts × 3, consolidate.ts, profile.ts
+  - [x] 2.3.5. **Vision (2 вызова):** vision-ocr.ts
+  - [x] 2.3.6. **Briefing filter (1 вызов):** briefing-filter.ts (briefing-author НЕ трогаем — оставляем dynamic). Заодно переведены уже-явные `briefing:section`, `briefing:podcast-script`, `meeting:summary` с литералов на getter — для консистентности SSOT.
+  - [x] 2.3.7. **Backend routes (8 вызовов):** chat/route.ts × 2, service-chat/route.ts, assistant/ben, tasks/chat/route.ts, analyze-file/route.ts, generate-title/route.ts, actions.ts
+- [x] 2.4. Сохранить tactical `maxOutputTokens: 16000` в plan/route.ts как есть — он убирается в Этапе 3 при переходе на streamText.
+- [x] 2.5. Верификация покрытия: каждый production AI SDK call site имеет `maxOutputTokens` (grep count AI calls == count maxOutputTokens в 25 production файлах, scripts/ исключены). Единственное исключение — `briefing:author` сохраняет dynamic `MAX_TOKENS_BY_VOLUME[volume]` по задизайну.
+- [x] 2.6. Обновил [specs/Simply_xAI/SIMPLY_PROMPTS_AND_MODEL_CONFIG.md § 4.2](../Simply_xAI/SIMPLY_PROMPTS_AND_MODEL_CONFIG.md) — раздел переписан под SSOT-архитектуру (`DEFAULT_MAX_OUTPUT_TOKENS` + getter + двухслойная safety-net + полная таблица 37 taskId).
 
 **Файлы:**
 - `lib/ai/task-assignments.ts` — SSOT
@@ -154,16 +174,19 @@
 - 24 файла с call sites (см. ANALYSIS.md инвентаризацию)
 - `specs/Simply_xAI/SIMPLY_PROMPTS_AND_MODEL_CONFIG.md` — документация
 
-**Валидация этапа:**
-- [ ] `npx tsc --noEmit` — 0 ошибок (включая compile-time check `Record<TaskId, number>`)
-- [ ] `npm run build` — успешен (после остановки dev)
-- [ ] Grep-test: `grep -rn '(generateText|streamText|generateObject|streamObject)' lib/ app/ artifacts/ | grep -v '\.d\.ts'` → каждый результат имеет `maxOutputTokens:` в пределах 10 строк
-- [ ] 🧪 Мануальный тест владельцем:
-  1. Отправь сообщение в Simply (обычный чат) → ответ приходит, заголовок чата генерируется → ok
-  2. Открой экспертизу → задай вопрос → ответ приходит → ok
-  3. Создай документ (artifact: markdown) → генерируется → ok
-  4. Попробуй briefing (если есть активная тема) → генерируется → ok
-  5. `SELECT modelId, outputTokens FROM ai_usage_log ORDER BY createdAt DESC LIMIT 10;` — проверить что outputTokens не зашкаливает (нет 100K+ ответов)
+**Валидация этапа (факт):**
+- [x] `npx tsc --noEmit` — 0 ошибок (включая compile-time check `Record<TaskId, number>`)
+- [x] `npm run build` — успешен (migrations 3360ms + compile 10.1s + 62/62 static pages)
+- [x] Grep-test: 25 production файлов имеют совпадающий count AI calls ↔ `maxOutputTokens`. Scripts/ исключены как тестовые.
+- [x] 🧪 Мануальный тест владельцем (2026-04-18):
+  1. **Simply chat** — `simply` on Grok 4.1 Fast Non-Reasoning: outputTokens 111 (cap 8192, не обрезан) ✅
+  2. **Expertise** (новый чат) — `expertise` on Grok 4.1 Fast Reasoning (override): outputTokens 202/789 (cap 16000) + `util:auto-naming` на reasoning variant (override) outputTokens 570 (64 final + 506 thinking — safety-net сработал ровно по cap) ✅
+  3. **Artifact markdown** — `artifact:markdown` on Sonnet (default): outputTokens 1979/2056; на Grok 4.20 non-reasoning (override): outputTokens 698/1683/2319 (capability Grok 16000 < наш 16384 → safety-net автоматически понизил до 16000) ✅
+  4. **Повторный `util:auto-naming`** на default non-reasoning: outputTokens 61 (cap 64, idle margin 3 токена) ✅
+  5. SQL: все outputTokens в разумных пределах (max 2420 для expertise с tools), никаких 100K+ runaway записей ✅
+  6. Dev-логи: 0 warning'ов safety-net, 0 UND_ERR, 0 TypeError из 546 строк вывода ✅
+
+**Git:** коммит Этапа 2 (SHA добавляется после).
 
 **Git (после валидации):**
 ```bash
@@ -175,17 +198,27 @@ git commit -m "feat(tz-aisdk): explicit maxOutputTokens SSOT + 36 call sites"
 
 ---
 
-## Этап 3: plan/route.ts → streamText
+## Этап 3: call sites с cap > 21333 на Anthropic → streaming (архитектурный принцип)
 
 **Статус:** ⬜ Не начат
 **Оценка:** 1-1.5 сессии
 
 ⛔ **НЕ НАЧИНАТЬ без подтверждения Этапа 2** (использует getter из 2.2)
 
-**Цель:** `plan/route.ts` работает через `streamText` с adaptive thinking. Tactical cap 16000 заменён на `getMaxOutputTokensForTask("professor:planning") = 32000`.
+**Цель:** Архитектурный инвариант «cap > 21333 на Anthropic ⇒ только `streamText`/`streamObject`» выполнен по всему проекту. Это не разовый фикс plan/route.ts, а правило контракта AI SDK invocation (фиксируется в ADR, Этап 4.4).
+
+**Обоснование расширения scope:** Anthropic threshold 21333 — hard constraint SDK (при `maxOutputTokens > 21333` non-streaming вызов превышает default fetch timeout → `UND_ERR_SOCKET`). Правило касается обоих non-streaming API: `generateText` **и** `generateObject` (та же timeout-bomb при больших JSON-ответах).
+
+**Кандидаты для проверки (из cap table, Anthropic с cap > 21333):**
+
+| TaskId | Cap | Модель | Текущий режим | Действие |
+|---|---|---|---|---|
+| `professor:planning` | 32000 | claude-opus-4-6 | `generateText` | **переписать на `streamText`** (задача 3.1) |
+| `project:expert:opus` | 32000 | claude-opus-4-6 | уже `streamText`? | **проверить и подтвердить** (задача 3.0) |
 
 **Задачи:**
 
+- [ ] 3.0. Grep-инвентаризация всех Anthropic call sites с cap > 21333. Для каждого — убедиться что используется `streamText`/`streamObject`, а не `generateText`/`generateObject`. Результат в CHANGELOG. Если найдётся хоть один `generateText`/`generateObject` помимо plan/route.ts — добавить задачу на переписывание в этот этап до коммита.
 - [ ] 3.1. Переписать вызов `generateText(...)` в [app/(chat)/api/projects/[id]/plan/route.ts:191-208](../../app/(chat)/api/projects/[id]/plan/route.ts#L191) на `streamText`:
   - Импорт `import { streamText } from "ai"`
   - Вызов `const stream = streamText({ model, system, prompt, temperature, maxOutputTokens: getMaxOutputTokensForTask("professor:planning"), providerOptions: { anthropic: { thinking: { type: "adaptive" }, effort: "high" } } })`
@@ -194,7 +227,8 @@ git commit -m "feat(tz-aisdk): explicit maxOutputTokens SSOT + 36 call sites"
 - [ ] 3.2. Обновить `extractTag(text, ...)` — сигнатура не меняется, работает с accumulated text.
 - [ ] 3.3. Удалить многословный комментарий `ТЗ-XAI-4 hot-fix (2026-04-16)...` (строки 179-190) — заменить короткой ссылкой на ADR 048 и новый ADR (см. финализация).
 - [ ] 3.4. `logUsage({ usage, ... })` — остаётся вызов, передаёт `usage` из streamText. Проверить что `reasoningTokens` попадает в лог (поле `thinkingTokens` в ai_usage_log через `extractUsageFields`).
-- [ ] 3.5. Смоук-тест: создать проект с 10+ задачами → нажать «Создать план» → убедиться что план генерируется за <60s без socket errors, парсинг `<plan_report>` и `<plan_json>` работает.
+- [ ] 3.5. Смоук-тест `professor:planning`: создать проект с 10+ задачами → нажать «Создать план» → убедиться что план генерируется за <60s без socket errors, парсинг `<plan_report>` и `<plan_json>` работает.
+- [ ] 3.6. Смоук-тест `project:expert:opus` (если задача 3.0 подтвердила что уже streamText — просто верификация что после изменений Этапа 2 ничего не сломалось): задать вопрос в project expert chat на Opus-tier → ответ стримится → `thinkingTokens > 0` в ai_usage_log при достаточно сложном вопросе.
 
 **Файлы:**
 - `app/(chat)/api/projects/[id]/plan/route.ts` — переписать вызов
@@ -271,8 +305,9 @@ ORDER BY outputTokens DESC;
   ```
   ### [3.93.0] - 2026-04-XX — ТЗ-AISDKLayerHardening
   - chore(aisdk): centralized overrides reader registration in instrumentation.ts (removed 7 redundant side-effect imports)
-  - feat(aisdk): explicit maxOutputTokens SSOT (`DEFAULT_MAX_OUTPUT_TOKENS`) + getter `getMaxOutputTokensForTask()` + 36 call sites migrated
-  - feat(aisdk): plan/route.ts migrated from generateText to streamText with adaptive thinking (replaces tactical cap 16000 with SSOT 32000)
+  - feat(aisdk): explicit maxOutputTokens SSOT (`DEFAULT_MAX_OUTPUT_TOKENS`) + getter `getMaxOutputTokensForTask()` with capability safety-net (Math.min + warnOnce for Anthropic >21333) + 36 call sites migrated
+  - feat(aisdk): architectural invariant "cap > 21333 on Anthropic ⇒ streamText/streamObject" — plan/route.ts migrated from generateText to streamText with adaptive thinking (replaces tactical cap 16000 with SSOT 32000)
+  - docs(aisdk): ADR "AI SDK invocation contract" codifies 4-aspect contract (taskId / model / cap / call mode) + checklist for future changes
   ```
 - [ ] Обновить `SIMPLY_STATUS.md` (snapshot — таблица компонентов, не история)
 - [ ] ⛔ **CLAUDE.md — НЕ редактировать** (`wc -l CLAUDE.md` ≤ 220, иначе STOP)
@@ -289,13 +324,23 @@ ORDER BY outputTokens DESC;
 - [ ] `docs/architecture.md` — добавить упоминание `DEFAULT_MAX_OUTPUT_TOKENS` + `getMaxOutputTokensForTask()` в разделе AI / Chat core.
 - [ ] `docs/decisions/048-dev-switchboard-ui.md` — уже обновлён в Этапе 1.
 
-**ADR (новый, если владелец согласен):**
-- [ ] `docs/decisions/NNN-aisdk-layer-hardening.md` — зафиксировать три архитектурных решения этого ТЗ:
-  1. Регистрация overrides reader через `instrumentation.ts` (not per-route)
-  2. Обязательный explicit `maxOutputTokens` через SSOT
-  3. streamText для adaptive thinking (not generateText)
+**ADR (обязательный — условие владельца):**
+- [ ] `docs/decisions/NNN-aisdk-invocation-contract.md` — ADR «AI SDK invocation contract». Фиксирует 4 аспекта контракта и их взаимосвязи:
+  1. **taskId** — стабильная точка конфигурации в `DEFAULT_TASK_MODELS` (не меняется).
+  2. **model** — SSOT `task-assignments.ts`, меняется (А/Б тесты, смена провайдера).
+  3. **cap** — SSOT `DEFAULT_MAX_OUTPUT_TOKENS` в `task-assignments.ts`, привязан к taskId, capped к capability модели в runtime через `getMaxOutputTokensForTask()`.
+  4. **call mode** — `streamText`/`streamObject` **обязательно** при cap > 21333 на Anthropic (threshold SDK, иначе socket timeout). Независимо от текущей default-модели.
 
-  Обоснование ADR: три решения касаются общего паттерна (AI SDK invocations contract), будут референсом для будущих routes.
+  Также фиксирует результаты этого ТЗ:
+  - Регистрация overrides reader через `instrumentation.ts` (not per-route) — см. ADR 048.
+  - `globalThis.__simplyOverridesReader` — HMR-immunity reader (Этап 1 бонус).
+
+  **Checklist для будущих изменений (обязательный раздел в ADR):**
+  - [ ] Добавляешь новый taskId: (a) запись в `DEFAULT_TASK_MODELS`, (b) запись в `DEFAULT_MAX_OUTPUT_TOKENS` (иначе TS падает), (c) cap ≤ capability назначенной модели, (d) если cap > 21333 и модель Anthropic — call site использует `streamText`/`streamObject`.
+  - [ ] Меняешь default-модель taskId в `DEFAULT_TASK_MODELS`: (a) проверить что cap в `DEFAULT_MAX_OUTPUT_TOKENS` не превышает `maxOutput` новой модели — иначе SSOT рассинхронизируется с каталогом (runtime safety-net молча срежет до capability, но в таблице останется неправильное число); (b) если новая модель Anthropic и cap > 21333 — убедиться что все call sites этого taskId используют `streamText`/`streamObject`.
+  - [ ] Увеличиваешь cap в `DEFAULT_MAX_OUTPUT_TOKENS`: (a) новое значение ≤ `maxOutput` default-модели, (b) если > 21333 и модель Anthropic — проверить call mode.
+
+  Обоснование ADR: четыре аспекта — общий паттерн AI SDK invocations, будут референсом для будущих routes. Без ADR следующее изменение легко нарушит инвариант (этот же ТЗ родился из того что 3 предыдущих долга накопились).
 
 ### 4.5 Архивирование
 

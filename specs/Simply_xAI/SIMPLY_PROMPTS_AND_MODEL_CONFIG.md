@@ -325,17 +325,39 @@
 
 **Главного чата Simply Chat в списке нет** — там температура по умолчанию провайдера (обычно 1.0).
 
-## 4.2 Лимиты длины ответа (maxOutputTokens / maxTokens)
+## 4.2 Лимиты длины ответа (maxOutputTokens) — SSOT
 
-Сколько модель может выдать за один ответ.
+📁 **Файл:** [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) — `DEFAULT_MAX_OUTPUT_TOKENS`
+📁 **Getter:** [lib/ai/getModel.ts](lib/ai/getModel.ts) — `getMaxOutputTokensForTask(taskId)`
 
-| Лимит | Файл | Применение |
+Сколько модель может выдать за один ответ. Единственное место настройки — `DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number>` в `task-assignments.ts`. Каждый AI call site берёт cap через getter `getMaxOutputTokensForTask(taskId)`.
+
+**Двухслойная safety-net в getter'e:**
+1. `Math.min(requested, capability)` — защищает от смены default-модели при которой cap окажется выше capability (через `/dev/models` override или правку `DEFAULT_TASK_MODELS`). Runtime молча режет до capability, без крахов.
+2. `warnOnce` при cap > 21333 на Anthropic — предупреждает dev'а что call site обязан использовать `streamText`/`streamObject` (иначе timeout-bomb, `UND_ERR_SOCKET`).
+
+**Текущие значения (37 taskId):**
+
+| Группа | TaskId | Cap |
 |---|---|---|
-| **8192** | [lib/meeting/meeting-pipeline.ts:97](lib/meeting/meeting-pipeline.ts#L97) | Резюме встречи |
-| **8192** | [lib/briefing/briefing-section-author.ts:192](lib/briefing/briefing-section-author.ts#L192) | Per-section брифинг |
-| **4096** | [lib/podcast/script-generator.ts:139](lib/podcast/script-generator.ts#L139) | Сценарий подкаста |
-| **динамический** | [lib/briefing/briefing-author.ts](lib/briefing/briefing-author.ts) | Автор брифинга — зависит от `volume` (standard / detailed / compact) |
-| **50 000** | [app/(chat)/api/service-chat/route.ts:558](app/(chat)/api/service-chat/route.ts#L558) | Сервисные чаты |
+| Simply Chat | `simply-chat` / `-think` / `-vision` | 8192 / 16000 / 4096 |
+| Экспертиза и Создание | `expertise` / `create` / `expertise-multi-agent` | 16000 / 16000 / 16000 |
+| Project expert (tier) | `project:expert:haiku` / `:sonnet` / `:opus` | 8192 / 16384 / 32000 |
+| Professor pipeline | `planning` / `review` / `pipeline-analyze` / `-execute` / `-synthesize` | 32000 / 8192 / 4096 / 8192 / 16000 |
+| Clerks | `clerk:task-summary` / `clerk:file-analyzer` | 2048 / 4096 |
+| Memory | `memory:extract` / `-batch` / `consolidate` / `profile` / `dedup-verify` | 4096 / 16000 / 4096 / 4096 / 512 |
+| Briefing / Podcast | `filter` / `author` (dynamic) / `section` / `podcast-script` | 1024 / 8192 fallback / 8192 / 4096 |
+| Meeting | `meeting:summary` | 8192 |
+| Service chats | `ben` / `project-creation` / `project-manager` / `briefing-onboarding` | 4096 / 8192 / 4096 / 8192 |
+| Утилиты | `util:title` | 64 |
+| Artifacts | `artifact:text` / `markdown` / `excel` / `pptx` / `reveal` | 16384 / 16384 / 8192 / 16384 / 16384 |
+| Vision | `vision:ocr` | 4096 |
+
+**Инвариант:** каждое значение ≤ `maxOutput` default-модели этого taskId (см. [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts)). 6 taskId на Grok (`simply-chat-think`, `expertise`, `expertise-multi-agent`, `create`, `professor:pipeline-synthesize`, `memory:extract-batch`) упёрты в потолок capability Grok = 16000.
+
+**Особый случай `briefing:author`:** call site сохраняет dynamic `MAX_TOKENS_BY_VOLUME[volume]` (бизнес-логика объёма). Значение 8192 в SSOT = fallback + документация намерения.
+
+**Архитектурное правило (ADR «AI SDK invocation contract»):** при cap > 21333 на Anthropic call site ОБЯЗАН использовать `streamText`/`streamObject` (threshold Anthropic SDK — иначе socket timeout). В проекте два таких taskId: `professor:planning` и `project:expert:opus` (оба 32000 на Opus). В финализации ТЗ-AISDKLayerHardening оба переведены/проверены на streaming.
 
 ## 4.3 Контекстный бюджет (сколько истории грузим в модель)
 

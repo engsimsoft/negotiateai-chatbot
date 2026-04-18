@@ -4,6 +4,7 @@ import { generateText, type UIMessage } from "ai";
 import { cookies } from "next/headers";
 import type { VisibilityType } from "@/components/visibility-selector";
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -32,6 +33,7 @@ export async function generateTitleFromUserMessage({
 
   const { text: title, usage } = await generateText({
     model: getModel("util:title"),
+    maxOutputTokens: getMaxOutputTokensForTask("util:title"),
     system: `\n
     - you will generate a short title based on the first message a user begins a conversation with
     - ensure it is not more than 80 characters long

@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { ModelCatalog } from "tokenlens/core";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -117,6 +118,7 @@ Output JSON with "candidates" array.` + FILTER_JSON_INSTRUCTION;
     async () => {
       const res = streamText({
         model: getModel(BRIEFING_FILTER_TASK),
+        maxOutputTokens: getMaxOutputTokensForTask(BRIEFING_FILTER_TASK),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: 0.1,

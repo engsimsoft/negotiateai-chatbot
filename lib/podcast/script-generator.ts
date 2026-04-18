@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import { generateText, type LanguageModelUsage } from "ai";
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -136,7 +137,7 @@ export async function generateScript(
           providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
         },
       ],
-      maxOutputTokens: 4096,
+      maxOutputTokens: getMaxOutputTokensForTask(PODCAST_SCRIPT_TASK),
       maxRetries: 0,
       temperature: 0.7,
     });

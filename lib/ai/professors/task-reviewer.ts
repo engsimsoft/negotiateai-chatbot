@@ -14,6 +14,7 @@ import path from "path";
 import { generateText } from "ai";
 
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -135,6 +136,7 @@ export async function reviewTask(
 
     const result = await generateText({
       model: getModel("professor:review"),
+      maxOutputTokens: getMaxOutputTokensForTask("professor:review"),
       system: REVIEWER_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.2,

@@ -8,6 +8,7 @@ import path from "path";
 import { generateText } from "ai";
 import { del } from "@vercel/blob";
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -91,10 +92,10 @@ export async function summarizeTranscript(
 
   const { text: rawSummary, usage } = await generateText({
     model: getModel(MEETING_SUMMARY_TASK),
+    maxOutputTokens: getMaxOutputTokensForTask(MEETING_SUMMARY_TASK),
     system: systemPrompt,
     prompt: userMessage,
     temperature: 0.3,
-    maxOutputTokens: 8192,
   });
 
   const { title, summary } = parseTitleAndSummary(rawSummary);

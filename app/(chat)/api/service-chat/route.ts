@@ -16,6 +16,7 @@ import { streamText, tool, stepCountIs, createUIMessageStream, JsonToSseTransfor
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -780,6 +781,7 @@ export async function POST(request: Request) {
 
         const result = streamText({
           model: getModel(taskId),
+          maxOutputTokens: getMaxOutputTokensForTask(taskId),
           // ТЗ-CACHE1: system as message with per-message cacheControl (top-level providerOptions doesn't mark messages)
           messages: [
             { role: 'system' as const, content: systemPrompt, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },

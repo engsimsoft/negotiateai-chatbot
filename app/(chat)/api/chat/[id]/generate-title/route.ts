@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -86,6 +87,7 @@ export async function POST(
     // Generate title and summary using Claude Haiku (fast and cheap)
     const { object, usage } = await generateObject({
       model: getModel("util:title"),
+      maxOutputTokens: getMaxOutputTokensForTask("util:title"),
       schema: z.object({
         title: z.string().describe("Короткое название чата (2-4 слова)"),
         summary: z.string().describe("Краткое описание темы разговора (1-2 предложения)"),

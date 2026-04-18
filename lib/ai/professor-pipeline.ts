@@ -16,7 +16,7 @@
  */
 
 import { generateText, streamText, type ModelMessage } from "ai";
-import { getModel, getModelIdForTask, getProviderForTask } from "./getModel";
+import { getMaxOutputTokensForTask, getModel, getModelIdForTask, getProviderForTask } from "./getModel";
 import { saveAiUsageLog } from "@/lib/db/queries";
 import { calcCostUsd } from "./tokenlens-catalog";
 import { extractUsageFields } from "./usage-utils";
@@ -216,6 +216,7 @@ export async function executeProfessorPipeline(
   try {
     const analyzeResult = await generateText({
       model: analyzeModel,
+      maxOutputTokens: getMaxOutputTokensForTask("professor:pipeline-analyze"),
       system: systemPrompt + "\n\n" + ANALYZE_PROMPT,
       messages: [
         ...messages,
@@ -306,6 +307,7 @@ export async function executeProfessorPipeline(
 
         const executeResult = await generateText({
           model: executeModel,
+          maxOutputTokens: getMaxOutputTokensForTask("professor:pipeline-execute"),
           system: systemPrompt + "\n\n" + executePrompt,
           messages: [
             ...messages,
@@ -368,6 +370,7 @@ export async function executeProfessorPipeline(
     // Use streaming for final response
     const synthesizeStream = streamText({
       model: synthesizeModel,
+      maxOutputTokens: getMaxOutputTokensForTask("professor:pipeline-synthesize"),
       system: systemPrompt + "\n\n" + synthesizePrompt,
       messages: [
         ...messages,

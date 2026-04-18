@@ -10,6 +10,7 @@
 import { convertToModelMessages, streamText } from "ai";
 import { auth } from "@/app/(auth)/auth";
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
 
     const result = streamText({
       model: getModel("service-chat:ben"),
+      maxOutputTokens: getMaxOutputTokensForTask("service-chat:ben"),
       system: prompt.systemPrompt,
       // ТЗ-1 hotfix: strip failed/in-flight tool parts before conversion
       messages: await convertToModelMessages(stripIncompleteToolParts(messages)),

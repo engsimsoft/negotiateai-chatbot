@@ -9,6 +9,7 @@
 
 import { generateText } from "ai";
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -58,6 +59,7 @@ export async function extractTextFromImage(
 
     const { text, usage } = await generateText({
       model: getModel(VISION_OCR_TASK),
+      maxOutputTokens: getMaxOutputTokensForTask(VISION_OCR_TASK),
       messages: [
         {
           role: "user",
@@ -111,6 +113,7 @@ export async function extractTextFromPDF(
   try {
     const { text, usage } = await generateText({
       model: getModel(VISION_OCR_TASK),
+      maxOutputTokens: getMaxOutputTokensForTask(VISION_OCR_TASK),
       messages: [
         {
           role: "user",

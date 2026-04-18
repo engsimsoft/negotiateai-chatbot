@@ -17,6 +17,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -132,6 +133,7 @@ export async function extractFactsFromMessages(
 
   const { object, usage } = await generateObject({
     model: getModel(MEMORY_EXTRACT_TASK),
+    maxOutputTokens: getMaxOutputTokensForTask(MEMORY_EXTRACT_TASK),
     maxRetries: 0,
     schema: extractionResultSchema,
     system: EXTRACT_SYSTEM_PROMPT,
@@ -313,6 +315,7 @@ export async function batchExtractFacts(
     // generateObject works natively via @ai-sdk/xai).
     const { object: parsedResult, usage } = await generateObject({
       model: getModel(MEMORY_EXTRACT_BATCH_TASK),
+      maxOutputTokens: getMaxOutputTokensForTask(MEMORY_EXTRACT_BATCH_TASK),
       maxRetries: 0,
       schema: extractionResultSchema,
       system: EXTRACT_BATCH_SYSTEM_PROMPT,
@@ -447,6 +450,7 @@ async function verifyDuplicatesWithLLM(
   try {
     const { object } = await generateObject({
       model: getModel(MEMORY_DEDUP_VERIFY_TASK),
+      maxOutputTokens: getMaxOutputTokensForTask(MEMORY_DEDUP_VERIFY_TASK),
       maxRetries: 0,
       schema: deduplicationSchema,
       system: `Ты проверяешь дубликаты фактов в памяти пользователя.

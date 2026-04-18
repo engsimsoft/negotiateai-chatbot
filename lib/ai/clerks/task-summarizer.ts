@@ -13,6 +13,7 @@ import path from "path";
 import { generateText } from "ai";
 
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -153,6 +154,7 @@ export async function summarizeTask(
 
     const result = await generateText({
       model: getModel("clerk:task-summary"),
+      maxOutputTokens: getMaxOutputTokensForTask("clerk:task-summary"),
       system: SUMMARIZER_SYSTEM_PROMPT,
       prompt: userMessage,
       temperature: 0.1,

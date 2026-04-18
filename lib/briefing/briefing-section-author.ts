@@ -10,6 +10,7 @@ import type { ModelCatalog } from "tokenlens/core";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { retryWithLogging } from "@/lib/ai/retry-with-logging";
 import {
+  getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -187,9 +188,9 @@ export async function generateSection(
       // реальных данных о частоте burst-refresh.
       const res = streamText({
         model: getModel(BRIEFING_SECTION_TASK),
+        maxOutputTokens: getMaxOutputTokensForTask(BRIEFING_SECTION_TASK),
         system: systemPrompt + SECTION_JSON_INSTRUCTION,
         prompt: userMessage,
-        maxOutputTokens: 8192,
         temperature: 0.7,
         maxRetries: 0,
       });

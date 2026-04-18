@@ -20,9 +20,18 @@ import { getModelEntry, resolveModelEntry } from "./model-catalog";
 import { getActiveOverrides } from "./model-overrides";
 import { registry, type RegistryProviderId } from "./registry";
 import {
+  DEFAULT_MAX_OUTPUT_TOKENS,
   DEFAULT_TASK_MODELS,
   type TaskId,
 } from "./task-assignments";
+
+/**
+ * Anthropic non-streaming threshold — при `maxOutputTokens > 21333` вызов
+ * `generateText` / `generateObject` превышает default fetch timeout и падает
+ * с `UND_ERR_SOCKET`. Для таких cap'ов call site ОБЯЗАН использовать
+ * `streamText` / `streamObject`. См. ADR AI SDK invocation contract.
+ */
+const ANTHROPIC_NON_STREAMING_THRESHOLD = 21333;
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -234,4 +243,46 @@ export function isTaskOverridden(taskId: TaskId): boolean {
  */
 export function getCurrentOverrides(): Record<string, string> {
   return getActiveOverrides();
+}
+
+// ---------------------------------------------------------------------------
+// maxOutputTokens getter (ТЗ-AISDKLayerHardening Этап 2)
+// ---------------------------------------------------------------------------
+
+const anthropicThresholdWarned = new Set<TaskId>();
+
+function warnAnthropicThresholdOnce(taskId: TaskId, effective: number): void {
+  if (anthropicThresholdWarned.has(taskId)) return;
+  anthropicThresholdWarned.add(taskId);
+  console.warn(
+    `[getMaxOutputTokensForTask] ${taskId}: cap ${effective} > ${ANTHROPIC_NON_STREAMING_THRESHOLD} with Anthropic — ` +
+      `call site MUST use streamText/streamObject (non-streaming will UND_ERR_SOCKET). ` +
+      `See ADR "AI SDK invocation contract".`,
+  );
+}
+
+/**
+ * Получить `maxOutputTokens` для AI SDK вызова по задаче.
+ *
+ * Двухслойная safety-net:
+ *  1. `Math.min(requested, capability)` — защищает от рассинхрона SSOT с
+ *     каталогом при переключении модели через /dev/models или правку
+ *     `DEFAULT_TASK_MODELS`. Runtime режет молча, без крахов.
+ *  2. warnOnce при `cap > 21333` на Anthropic — предупреждает dev что
+ *     call site ДОЛЖЕН быть на streamText/streamObject. Один раз per process.
+ *
+ * Источник SSOT — `DEFAULT_MAX_OUTPUT_TOKENS` в `task-assignments.ts`.
+ */
+export function getMaxOutputTokensForTask(taskId: TaskId): number {
+  const requested = DEFAULT_MAX_OUTPUT_TOKENS[taskId];
+  const modelId = getModelIdForTask(taskId);
+  const entry = resolveModelEntry(modelId);
+  const capability = entry?.maxOutput ?? requested;
+  const effective = Math.min(requested, capability);
+
+  if (entry?.provider === "anthropic" && effective > ANTHROPIC_NON_STREAMING_THRESHOLD) {
+    warnAnthropicThresholdOnce(taskId, effective);
+  }
+
+  return effective;
 }

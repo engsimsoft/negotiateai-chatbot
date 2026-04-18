@@ -1,5 +1,5 @@
 import { smoothStream, streamText } from "ai";
-import { getModel, getModelIdForTask } from "@/lib/ai/getModel";
+import { getMaxOutputTokensForTask, getModel, getModelIdForTask } from "@/lib/ai/getModel";
 import { emitArtifactDebugStep } from "@/lib/ai/debug-events";
 
 const ARTIFACT_TASK = "artifact:pptx" as const;
@@ -133,6 +133,7 @@ export const presentationPptxDocumentHandler =
       const startTime = Date.now();
       const result = streamText({
         model: getModel(ARTIFACT_TASK),
+        maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
         system: PPTX_SYSTEM_PROMPT,
         experimental_transform: smoothStream({ chunking: "word" }),
         prompt: `Create a presentation about: ${title}`,
@@ -261,6 +262,7 @@ export const presentationPptxDocumentHandler =
       const startTime = Date.now();
       const result = streamText({
         model: getModel(ARTIFACT_TASK),
+        maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
         system: `${PPTX_SYSTEM_PROMPT}
 
 Current slides:
