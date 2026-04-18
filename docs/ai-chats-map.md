@@ -2,13 +2,13 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-04-16
+**Обновлено:** 2026-04-18
 
 ---
 
 ## Быстрый обзор
 
-Все AI-точки приложения резолвят модель через единый `getModel(taskId)`. SSOT — [task-assignments.ts](../lib/ai/task-assignments.ts) (taskId → catalogId), [model-catalog.ts](../lib/ai/model-catalog.ts) (pricing + capabilities), [getModel.ts](../lib/ai/getModel.ts) (resolver). Смена модели для любой задачи = одна строка в task-assignments.ts. Детали — [ai-providers.md](ai-providers.md#core-registry) и [ADR 047](decisions/047-core-model-registry.md).
+Все AI-точки приложения резолвят модель через единый `getModel(taskId)` и лимит output через `getMaxOutputTokensForTask(taskId)`. SSOT — [task-assignments.ts](../lib/ai/task-assignments.ts) (`DEFAULT_TASK_MODELS` — taskId → catalogId, `DEFAULT_MAX_OUTPUT_TOKENS` — taskId → maxOutputTokens), [model-catalog.ts](../lib/ai/model-catalog.ts) (pricing + capabilities), [getModel.ts](../lib/ai/getModel.ts) (resolver + safety-net: `Math.min(requested, capability)` + warnOnce при Anthropic cap > 21333). Смена модели или output cap для любой задачи = одна строка в task-assignments.ts. Детали — [ai-providers.md](ai-providers.md#core-registry), [ADR 047](decisions/047-core-model-registry.md), [ADR 053](decisions/053-aisdk-invocation-contract.md).
 
 **Активные AI-провайдеры:** Anthropic Claude (Haiku 4.5 / Sonnet 4.6 / Opus 4.6), xAI Grok (4.1 Fast / 4.20 / 4.20 Multi-Agent), MiniMax M2.7, Google Gemini (vision-ocr, Podcast TTS), Deepgram Nova-3 (voice input + meeting transcription), Perplexity Sonar (deepResearch tool).
 

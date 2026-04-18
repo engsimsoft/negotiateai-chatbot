@@ -1,6 +1,6 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.92.2
+**Версия:** 3.93.0
 **Статус:** Active development (**серия Simply_xAI закрыта** 2026-04-16 в v3.92.1)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
@@ -124,19 +124,20 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). Сводка на с
 
 ### 🟥 High impact
 
-- **[TZ_DevOverridesSideEffectImportAudit](specs/_backlog/TZ_DevOverridesSideEffectImportAudit.md)** — 6+ backend routes без side-effect import `model-overrides-node` → dev panel overrides молча игнорируются. Блокирует A/B тесты. Рекомендация: `instrumentation.ts` register-on-boot + ADR 048 update.
 - **[TZ_ErrorRecoveryUI](specs/_backlog/TZ_ErrorRecoveryUI.md)** — Stage 2 root cause fix: useChat state recovery через `clearError`. Stage 1 (hint в красном флаге) уже сделан.
 
 ### 🟧 Medium impact
 
 - **[TZ_DevPanelFooterHidesSubCalls](specs/_backlog/TZ_DevPanelFooterHidesSubCalls.md)** — DevPanel footer скрывает nested subcalls (artifacts, clerks, tools). Backend `ai_usage_log` корректен, только frontend aggregation.
 - **[TZ_TaskExpertChatInputMissingOnFirstOpen](specs/_backlog/TZ_TaskExpertChatInputMissingOnFirstOpen.md)** — `multimodal-input` не рендерится при входе в task expert chat из режима планирования. Hard reload лечит.
-- **[TZ_ProfessorPlanStreaming](specs/_backlog/TZ_ProfessorPlanStreaming.md)** — long-term fix plan/route.ts timeout: переход `generateText` → `streamText`. Hot-fix `maxOutputTokens: 16000` — tactical.
-- **[TZ_MaxOutputTokensAudit](specs/_backlog/TZ_MaxOutputTokensAudit.md)** — явный `maxOutputTokens` для всех ~20 call sites. Предотвращает повторение инцидента d9d3488.
 - **[TZ_UrlVerificationMetricNormalization](specs/_backlog/TZ_UrlVerificationMetricNormalization.md)** — follow-up hardening после correction 2026-04-16 (unit tests, tracking params audit, ADR). Основной фикс уже в `58d9d2e`.
 - **[TZ_SimplyContextUsageWidget](specs/_backlog/TZ_SimplyContextUsageWidget.md)** — виджет контекста показывает не ту шкалу (привязан к `contextWindow` модели, не к `SIMPLY_CONTEXT_LIMIT`).
 - **[TZ_PromptsDeadCodeCleanup](specs/_backlog/TZ_PromptsDeadCodeCleanup.md)** — удалить мёртвые экспорты из `lib/ai/prompts.ts`. 90% файла dead.
 - **[TZ_SimplyChatRaceCondition](specs/_backlog/TZ_SimplyChatRaceCondition.md)** — `getOrCreateSimplyChat` без partial unique index.
+
+### 🟩 Low impact (косметика)
+
+- **[TZ_UtilTitleCapReasoningMargin](specs/_backlog/TZ_UtilTitleCapReasoningMargin.md)** — cap `util:title`=64 тесен при dev override на reasoning variant. Production не затронут (default = non-reasoning). Решение — поднять cap до 256.
 
 **Правило backlog (из `specs/WORKFLOW.md`):** перед стартом нового крупного ТЗ — пройтись по списку и предложить владельцу закрыть или игнорировать. Решение за владельцем.
 
@@ -176,4 +177,4 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). Сводка на с
 
 ---
 
-**Обновлено:** 2026-04-16 (**серия Simply_xAI закрыта** v3.92.1 — финализация ТЗ-XAI-6: удалён `clerk:snapshot` placeholder, MiniMax/OpenRouter остаются by design, финальная архитектура «4 роли / 3 prod + 1 dev»)
+**Обновлено:** 2026-04-18 (**ТЗ-AISDKLayerHardening v3.93.0** — umbrella закрыл 3 backlog долга: централизованный overrides reader через `instrumentation.ts`, SSOT `DEFAULT_MAX_OUTPUT_TOKENS` + safety-net getter на 37 taskId, архитектурный инвариант «cap > 21333 на Anthropic ⇒ streamText»; + ADR 053 «AI SDK invocation contract» фиксирует 4-аспектный контракт для будущих изменений)

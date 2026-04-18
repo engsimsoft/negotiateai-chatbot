@@ -49,7 +49,11 @@
 | [TZ_PromptsDeadCodeCleanup](TZ_PromptsDeadCodeCleanup.md) | Удалить мёртвые экспорты из `lib/ai/prompts.ts` (`artifactsPrompt`, `regularPrompt`, `systemPrompt` deprecated, `buildUserContext` deprecated). 90% файла dead, только `updateDocumentPrompt` живой. Рассмотреть переименование в `lib/ai/artifact-prompts.ts`. | 0.5 сессии | TZ_DeadModelSelectors |
 | [TZ_SimplyChatRaceCondition](TZ_SimplyChatRaceCondition.md) | `getOrCreateSimplyChat` без partial unique index → race при первых параллельных запросах нового пользователя (SELECT + INSERT без транзакционной защиты). Partial unique index + `onConflictDoNothing`. | 0.5 сессии | ТЗ-XAI-2 smoke test |
 
-> **В работе (umbrella ТЗ-AISDKLayerHardening):** `TZ_DevOverridesSideEffectImportAudit`, `TZ_MaxOutputTokensAudit`, `TZ_ProfessorPlanStreaming` объединены в одно ТЗ `specs/TZ_AISDKLayerHardening/` (3 этапа, v3.93.0).
+### 🟩 Low impact (косметика)
+
+| ТЗ | Описание | Оценка | Источник |
+|---|---|---|---|
+| [TZ_UtilTitleCapReasoningMargin](TZ_UtilTitleCapReasoningMargin.md) | Cap `util:title` = 64 рассчитан на non-reasoning default. При dev override на `grok-4-1-fast-reasoning` (через `/dev/models`) safety-net обрезает финальный ответ ровно по cap (506 thinking + 64 output = 570 total, final JSON на границе). Production не затронут. Решение — поднять cap до 256 для запаса при reasoning variant. | < 0.25 сессии | ТЗ-AISDKLayerHardening Finding #1 |
 
 ---
 

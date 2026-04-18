@@ -56,13 +56,75 @@
 
 ### Planned (Next Steps)
 - **Simply_xAI миграция** — ✅ **серия закрыта в v3.92.1** (все ТЗ-XAI-1/2/3/4/5/6 ✅ + ТЗ-ATTACH-1 ✅). Следующие возможные ветки xAI — **новые направления**, не продолжение серии: ТЗ-XAI-MA-1 (Multi-agent через Responses API + MCP), ТЗ-XAI-COL-1 (Collections API), ТЗ-XAI-VOICE-1 (Voice Agent)
-- **[TZ_DevOverridesSideEffectImportAudit](specs/_backlog/TZ_DevOverridesSideEffectImportAudit.md)** 🟥 — 6+ backend routes без reader import. Блокирует A/B тесты
 - **[TZ_ErrorRecoveryUI Stage 2](specs/_backlog/TZ_ErrorRecoveryUI.md)** 🟥 — root cause fix useChat state recovery. Stage 1 ✅ в v3.90.0+
-- Medium хвосты в [specs/_backlog/README.md](specs/_backlog/README.md): ServiceChatNotOverridable, DevPanelFooterHidesSubCalls, TaskExpertChatInputMissingOnFirstOpen, ProfessorPlanStreaming, MaxOutputTokensAudit, SimplyContextUsageWidget, PromptsDeadCodeCleanup, SimplyChatRaceCondition
+- Medium хвосты в [specs/_backlog/README.md](specs/_backlog/README.md): ServiceChatNotOverridable, DevPanelFooterHidesSubCalls, TaskExpertChatInputMissingOnFirstOpen, SimplyContextUsageWidget, PromptsDeadCodeCleanup, SimplyChatRaceCondition
 - RAG-4: Библиотека MVP (загрузка документов + search) — ТЗ-XAI-COL-1
 - Raw-fetch switchboard: подключение Perplexity, Deepgram, Voyage, Gemini TTS к override системе
 - xAI Files API integration — поднять флаги `documentSupport` для Grok reasoning-моделей
 - Alias entries refactor — устранить дублирование `pricing`/`capabilities` в alias через резолв через `aliasOf`
+
+---
+
+## [3.93.0] — 2026-04-18 — ТЗ-AISDKLayerHardening — укрепление слоя AI SDK invocations
+
+**Umbrella ТЗ: 3 backlog-долга закрыты одним релизом** — `TZ_DevOverridesSideEffectImportAudit` (🟥 High), `TZ_MaxOutputTokensAudit` (🟧), `TZ_ProfessorPlanStreaming` (🟧). Цель — устранить накопленный технический долг в слое AI SDK invocations и закодифицировать 4-аспектный контракт (taskId / model / cap / call mode) через ADR.
+
+### Этап 1 — Centralized overrides reader (commit `a20ad29`)
+
+- **Removed:** side-effect импорт `import "@/lib/ai/model-overrides-node";` из 7 backend routes (chat, plan, tasks/chat, briefing generate/refresh-section, cron/briefing, service-chat). Единственная точка регистрации reader'а теперь — [instrumentation.ts](instrumentation.ts) (Next.js SSOT).
+- **Changed:** reader вынесен в `globalThis.__simplyOverridesReader` — **HMR-immune** ([lib/ai/model-overrides.ts](lib/ai/model-overrides.ts)). Раньше 7 side-effect импортов маскировали баг: HMR пересоздавал модуль, module-level `activeOverridesReader` сбрасывался в no-op.
+- **Bonus fix — DevPanel auto-naming visibility:** `util:auto-naming` sub-call теперь отображается в Timeline. Root cause (из исходников AI SDK `handle-ui-message-stream-finish.ts`): `createUIMessageStream.onFinish` вызывается в `flush()` TransformStream уже после `controller.close()`, поздние writes молча глотаются `safeEnqueue`. Фикс — перенос `autoNameChat` в `streamText.onFinish` (writer ещё открыт через merged stream).
+- **Added:** diagnostic endpoint `GET /api/dev/resolve-model?taskId=<id>` → `{ effectiveModelId, defaultModelId, overrideActive }` без AI-вызова. Использовался эмпирически для обнаружения HMR-бага и валидации фикса.
+- **Updated:** ADR 048 — удалён устаревший постскриптум, актуализировано описание SSOT-регистрации через `instrumentation.ts`.
+
+### Этап 2 — MaxOutputTokens SSOT + capability safety-net + 36 call sites (commit `3bb23b3`)
+
+- **Added:** `DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number>` в [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) — **SSOT для всех 37 taskId**. TypeScript `Record<TaskId, number>` гарантирует compile-time check: добавление нового TaskId без записи → TS падает.
+- **Added:** getter `getMaxOutputTokensForTask(taskId): number` в [lib/ai/getModel.ts](lib/ai/getModel.ts) с **двухслойной safety-net**:
+  1. `Math.min(requested, capability)` — защита от смены default-модели через `/dev/models` или правки `DEFAULT_TASK_MODELS` при которой cap окажется выше capability новой модели (runtime, без краха).
+  2. `warnOnce` при `entry.provider === "anthropic" && effective > 21333` — логируется раз на процесс, обязывает dev перейти на streaming.
+- **Changed:** 36 call sites мигрированы на getter в 5 группах (artifacts × 10, professor pipeline × 3, professors/clerks × 2, memory × 5, vision × 2, briefing/meeting × 4, backend routes × 8). Единственное исключение по дизайну: `briefing:author` сохраняет dynamic `MAX_TOKENS_BY_VOLUME[volume]` (бизнес-логика объёма).
+- **Updated:** [specs/Simply_xAI/SIMPLY_PROMPTS_AND_MODEL_CONFIG.md § 4.2](specs/Simply_xAI/SIMPLY_PROMPTS_AND_MODEL_CONFIG.md) — раздел переписан под SSOT-архитектуру (DEFAULT_MAX_OUTPUT_TOKENS + getter + safety-net + полная таблица 37 taskId).
+
+### Этап 3 — Архитектурный инвариант "cap > 21333 на Anthropic ⇒ streamText/streamObject" (commit `da01884`)
+
+- **Changed:** [app/(chat)/api/projects/[id]/plan/route.ts](app/(chat)/api/projects/[id]/plan/route.ts) переписан с `generateText` на `streamText` для `professor:planning` (Opus 4.6, cap 32000). `extractTag()` парсит accumulated text без изменений. Устранена хрупкая зависимость от 60s fetch timeout при non-streaming вызовах Opus с большим cap.
+- **Fixed:** несовместимость `temperature` + `thinking` в 3 call sites — [plan/route.ts](app/(chat)/api/projects/[id]/plan/route.ts), [lib/ai/professors/task-reviewer.ts](lib/ai/professors/task-reviewer.ts), [app/(chat)/api/service-chat/route.ts](app/(chat)/api/service-chat/route.ts). Заменён `thinking: { type: "adaptive" }` + невалидный `effort: "high"` на `thinking: { type: "enabled", budgetTokens: N }`; `temperature` вынесен в else-ветку (передаётся только при `supportsThinking=false`). Anthropic API возвращал warning `"temperature is not supported when thinking is enabled"` — thinking молча отключался.
+
+### ADR 053 — AI SDK invocation contract
+
+- **Added:** [docs/decisions/053-aisdk-invocation-contract.md](docs/decisions/053-aisdk-invocation-contract.md) кодифицирует 4-аспектный контракт AI SDK invocations (taskId / model / cap / call mode) + обязательный checklist для будущих изменений (новый taskId, смена default-модели, увеличение cap). Закрывает процессный корень того, что этот ТЗ родился из накопленных 3-х долгов, и предотвращает повторение.
+
+### Known limitation (Finding #2 — не баг, architectural)
+
+**Для Anthropic моделей (Opus / Sonnet / Haiku) `thinkingTokens` в `ai_usage_log` архитектурно всегда = 0**, независимо от активности extended thinking. Подтверждено исходниками `@ai-sdk/anthropic@3.0.66` ([dist/index.js:1646-1659](node_modules/@ai-sdk/anthropic/dist/index.js)) — функция `convertAnthropicMessagesUsage` всегда возвращает `outputTokens.reasoning: void 0`. Anthropic Messages API response содержит единое поле `usage.output_tokens` без разделения thinking vs completion (в отличие от OpenAI/xAI, где есть `completion_tokens_details.reasoning_tokens`). **Pricing корректен** — thinking tokens попадают в `outputTokens` и учитываются через `outputTokens × output_price`. Теряется только аналитика «сколько модель думала». В backlog не выносится — неразрешимое SDK+API limitation; стратегически обсуждается переход Professor Planning на Grok Multi-Agent (ТЗ-XAI-MA-1), где разделение работает штатно.
+
+### Findings → backlog
+
+- **Finding #1** → [specs/_backlog/TZ_UtilTitleCapReasoningMargin.md](specs/_backlog/TZ_UtilTitleCapReasoningMargin.md) (🟩 Low impact, < 0.25 сессии). `util:title` cap=64 тесен при ручном dev override на reasoning variant (reasoning съедает budget — financial answer обрезается ровно по cap). Production не затронут. Решение — поднять cap до 256.
+
+### Validation
+
+- `npx tsc --noEmit` → 0 ошибок на всех этапах (включая compile-time check `Record<TaskId, number>`)
+- `npm run build` → успешен (migrations + compile + 62/62 static pages)
+- **Мануальный тест владельцем на каждом этапе:** Этап 1 — override reasoning для `util:auto-naming` виден в DevPanel Timeline; Этап 2 — 4 разных модели (Sonnet, Grok 4.1 Fast Non-R/R, Grok 4.20 Non-R) без обрезания и runaway; Этап 3 — план на Opus 4.6 cap 32000 streamText за 146s без UND_ERR_SOCKET, 0 SDK warnings.
+- **SQL-проверка БД (runaway detection, 24h):** 0 записей `outputTokens > 32000` ✅
+- `grep "import \"@/lib/ai/model-overrides-node\"" app/ lib/` → 0 результатов
+- `grep "thinking.*type:\s*\"adaptive\"" app/ lib/` → 0 результатов
+- `grep "effort:\s*\"high\"" app/ lib/` → 0 результатов (невалидный Anthropic параметр)
+
+### Backlog impact
+
+- ✅ `TZ_DevOverridesSideEffectImportAudit` (🟥 High) — закрыт Этапом 1
+- ✅ `TZ_MaxOutputTokensAudit` (🟧 Medium) — закрыт Этапом 2
+- ✅ `TZ_ProfessorPlanStreaming` (🟧 Medium) — закрыт Этапом 3
+- ➕ `TZ_UtilTitleCapReasoningMargin` (🟩 Low) — новый, Finding #1
+
+### Урок сессии (для будущего)
+
+**HMR в dev может НЕ перезапустить route handler** даже после Edit файла. В Этапе 3 temperature warning всё ещё появлялся во 2-м прогоне после фикса — Next.js держал скомпилированный старый код. Решение: `rm -rf .next/cache && npm run dev` — гарантированно свежий код при правке глубоких server-side файлов. Зафиксировано в memory (`feedback_dev_cache_clean_restart.md`).
+
+**Архивирование:** папка ТЗ перемещена в `_archive/TZ_AISDKLayerHardening/` для future reference (HANDOFF, FINDINGS, ROADMAP сохранены).
 
 ---
 

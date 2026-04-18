@@ -151,8 +151,8 @@
 
 Все 39 AI-точек приложения получают модель через единую функцию `getModel(taskId)`.
 
-- **`getModel.ts`** — публичный API (`getModel`, `getModelIdForTask`, `getProviderForTask`, `taskSupportsThinking`). Порядок резолва: test mocks → dev overrides (`model-overrides-node.ts`) → task-assignments → catalog → registry.
-- **`task-assignments.ts`** — SSOT маппинга `TaskId → catalogId`. 39 taskId. Изменение default-модели для задачи = одна строка.
+- **`getModel.ts`** — публичный API (`getModel`, `getModelIdForTask`, `getProviderForTask`, `taskSupportsThinking`, `getMaxOutputTokensForTask`). Порядок резолва модели: test mocks → dev overrides → task-assignments → catalog → registry. `getMaxOutputTokensForTask(taskId)` применяет двухслойную safety-net: `Math.min(requested, modelCapability)` + `warnOnce` при `provider === "anthropic" && effective > 21333` (см. ADR 053).
+- **`task-assignments.ts`** — SSOT маппинга `TaskId → catalogId` (`DEFAULT_TASK_MODELS`) + **SSOT лимитов output** (`DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number>` — compile-time check через TS). Изменение default-модели или output cap для задачи = одна строка.
 - **`model-catalog.ts`** — SSOT физических моделей: pricing (USD/1M), capabilities (vision/tools/thinking), contextWindow, алиасы.
 - **`registry.ts`** — `createProviderRegistry` (AI SDK v6) с 5 namespace: `anthropic`, `minimax`, `minimaxLong` (180s timeout), `xai`, `openrouter`.
 - **`providers.ts`** — остался как **чистый pricing/cost utility module**: `calculateCostRub`, `calculateCostBreakdownRub`, `extractUsageForPricing`, `getContextWindow`, non-LLM cost helpers (Deepgram, Gemini TTS). Больше не содержит model resolution logic.
@@ -400,11 +400,12 @@ createUIMessageStream → JsonToSseTransformStream → Response (SSE)
 **Dev Switchboard:**
 - `/dev/models` — полная карта 39 задач + каталог моделей + ENV-статусы 8 провайдеров
 - File-based overrides: `.simply-dev-overrides.json` → `model-overrides-node.ts` (server-only fs) → `lookupOverride()` в `getModel.ts`
+- **Reader регистрация:** единственная точка в [`instrumentation.ts`](../instrumentation.ts) (Next.js SSOT, boot-time). Reader вынесен в `globalThis.__simplyOverridesReader` — HMR-immune (иначе dev HMR пересоздаёт модуль и сбрасывает module-level state в no-op).
 - Per-message switcher в DevPanel drawer (`switchboard-section.tsx`)
 - Triple dev-gate: `lookupOverride` (silent null), page (`notFound`), Server Actions (`throw`)
 - Catalog SSOT: `chat/route.ts` резолвит capabilities через catalog entry, не угадывает из chatMode
 - Workflow: [docs/model-catalog-ops.md](model-catalog-ops.md) — аудит цен, capabilities, добавление моделей
-- **ADR:** [048-dev-switchboard-ui](decisions/048-dev-switchboard-ui.md)
+- **ADR:** [048-dev-switchboard-ui](decisions/048-dev-switchboard-ui.md), [053-aisdk-invocation-contract](decisions/053-aisdk-invocation-contract.md)
 
 **Tool Call Guardian:**
 - `lib/ai/tool-call-guardian.ts` — детектор галлюцинаций tool calls
