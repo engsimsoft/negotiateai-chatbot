@@ -226,6 +226,13 @@ export const chat = pgTable("Chat", {
     .notNull()
     .default("private"),
   lastContext: jsonb("lastContext").$type<AppUsage | null>(),
+  // ТЗ-COMPACTION-1: Simply Compaction MVP — состояние сжатия истории чата.
+  // compactionSummary — текст 5-секционного summary (null = ещё не сжимался).
+  // compactionIndex — индекс message, начиная с которого идёт verbatim window.
+  // compactionCount — счётчик циклов compaction (для Фазы 2 повторного сжатия).
+  compactionSummary: text("compactionSummary"),
+  compactionIndex: integer("compactionIndex"),
+  compactionCount: integer("compactionCount").notNull().default(0),
 });
 
 export type Chat = InferSelectModel<typeof chat>;

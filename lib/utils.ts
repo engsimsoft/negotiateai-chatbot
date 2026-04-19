@@ -339,8 +339,21 @@ export function estimateTokenCount(text: string): number {
 }
 
 /**
- * Оценка количества токенов для сообщения
- * Считает токены из text parts + добавляет overhead для метаданных
+ * Оценка количества токенов для сообщения.
+ *
+ * Учитывает все parts которые реально попадают в payload провайдера:
+ *  - text parts (основное)
+ *  - tool-call parts (input — аргументы tool от модели)
+ *  - tool-result parts (output — результат tool, часто 10K+ для deepResearch/webSearch)
+ *
+ * ТЗ-COMPACTION-1 fix #2 (2026-04-19): добавлены tool-call/tool-result.
+ * Раньше функция считала только text — это занижало `totalHistoryTokens`
+ * на десятки тысяч в expertise/Simply Chat с активными tools, что приводило
+ * к позднему срабатыванию compaction (см. SIMPLY_COMPACTION_ARCHITECTURE.md).
+ *
+ * file parts не считаем — для текстовых файлов конверсия в text part происходит
+ * через `convertTextFilePartsInMessage` (см. chat/route.ts), для PDF/изображений
+ * существует отдельный capability-routing на vision-модели.
  */
 export function estimateMessageTokens(parts: any[]): number {
   let total = 0;
@@ -348,9 +361,12 @@ export function estimateMessageTokens(parts: any[]): number {
   for (const part of parts) {
     if (part.type === 'text' && part.text) {
       total += estimateTokenCount(part.text);
+    } else if (part.type === 'tool-call' && part.input !== undefined) {
+      total += estimateTokenCount(JSON.stringify(part.input));
+    } else if (part.type === 'tool-result' && part.output !== undefined) {
+      total += estimateTokenCount(JSON.stringify(part.output));
     }
-    // tool-call, step-start, step-finish и другие parts игнорируем
-    // (они уже отфильтрованы при сохранении)
+    // step-start, step-finish, file (file конвертится в text заранее) — игнорируем
   }
 
   // Добавляем overhead для метаданных сообщения (role, id, timestamps, etc.)

@@ -50,6 +50,8 @@ export type TaskId =
   | "memory:consolidate"      // event-triggered consolidation
   | "memory:profile"          // nightly narrative profile
   | "memory:dedup-verify"     // Haiku LLM verify для двухуровневой дедупликации
+  // Compaction (Simply Compaction MVP — ТЗ-COMPACTION-1)
+  | "compaction:summarize"    // сжатие истории чата в 5-секционное summary (Grok 4.1 Fast non-reasoning)
   // Briefing + Podcast
   | "briefing:filter"
   | "briefing:author"
@@ -156,6 +158,13 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "memory:profile":           "grok-4-1-fast-non-reasoning",
   "memory:dedup-verify":      "grok-4-1-fast-non-reasoning",
 
+  // Compaction (ТЗ-COMPACTION-1, 2026-04-18) — Simply Compaction MVP.
+  // «Подсобка»: роль summarizer истории чата (expertise/create при usage ≥50%
+  // от SIMPLY_CONTEXT_LIMIT). Grok 4.1 Fast non-reasoning — дешёвый, быстрый,
+  // структурированный вывод проверен в MIND extract (ТЗ-XAI-2). Архитектура:
+  // specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md §Модель для сжатия.
+  "compaction:summarize":     "grok-4-1-fast-non-reasoning",
+
   // Briefing (ТЗ-XAI-4 2026-04-16)
   // briefing:filter — механическая фильтрация/дедупликация новостей из потока —
   // переведён с MiniMax M2.7-long на Grok 4.1 Fast (подсобка). Остальные три
@@ -254,6 +263,12 @@ export const DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number> = {
   "memory:profile":           4096,   // Narrative profile JSON.
   "memory:dedup-verify":      512,    // Haiku дедуп-верификация, крошечный ответ.
 
+  // Compaction (ТЗ-COMPACTION-1)
+  // Hard cap 4096 для 5-секционного summary (target 3000 в промпте, буфер на
+  // структурный overhead Zod schema). См. SIMPLY_COMPACTION_ARCHITECTURE.md
+  // §Обоснование размера summary.
+  "compaction:summarize":     4096,
+
   // Briefing / Podcast
   "briefing:filter":          1024,   // JSON список IDs.
   "briefing:author":          8192,   // Особый случай: call site сохраняет dynamic MAX_TOKENS_BY_VOLUME, это значение = fallback + документация.
@@ -270,7 +285,9 @@ export const DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number> = {
   "service-chat:briefing-onboarding": 8192,
 
   // Утилиты
-  "util:title":               64,     // Tight cap против runaway (1-3 слова).
+  "util:title":               512,    // ТЗ-COMPACTION-1 fix #3: было 64, обрывало JSON {title,summary}
+                                      // на середине строки в русском (NoObjectGeneratedError). 512 даёт
+                                      // 4x запас под русский структурированный output, billing cap не cost.
 
   // Artifacts (document handlers, все на Sonnet capability 64K)
   "artifact:text":            16384,

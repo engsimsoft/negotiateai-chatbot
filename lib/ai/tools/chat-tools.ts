@@ -6,7 +6,9 @@
  */
 
 import type { Session } from "next-auth";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import type { ChatMode } from "@/lib/ai/chat-mode-config";
+import { estimateTokenCount } from "@/lib/utils";
 import { createDocument } from "./create-document";
 import { parseExcel } from "./excel";
 import { getCurrentDate } from "./get-current-date";
@@ -115,6 +117,50 @@ export function withCacheControlOnLastTool<T extends Record<string, any>>(
       },
     },
   } as T;
+}
+
+/**
+ * Оценить токены, которые tools schemas займут в payload провайдера.
+ *
+ * Provider (Anthropic / xAI) сериализует каждый tool как `{ name, description, input_schema }`
+ * — это входит в input_tokens billing. AI SDK v6 использует `zod-to-json-schema`
+ * внутри для конверсии Zod → JSON Schema; используем тот же путь напрямую (одна
+ * транзитивная версия в lockfile → нулевой drift).
+ *
+ * ТЗ-COMPACTION-1 fix #2 (архитекторское решение 2026-04-19):
+ * Compaction middleware принимает `toolsTokens` отдельным полем в `CompactionContext`.
+ * Считаем здесь — место где tools registry формируется (call site SSOT).
+ *
+ * Tool в AI SDK v6: `{ description?, inputSchema: ZodType | JSONSchema7, execute?, ... }`.
+ * Если `inputSchema` — Zod, конвертим. Если уже JSON-объект, сериализуем as-is.
+ * Любая ошибка конкретного tool — silent skip (никогда не блокирует основной flow).
+ */
+export function computeToolsTokens(tools: Record<string, unknown>): number {
+  let total = 0;
+  for (const [name, tool] of Object.entries(tools)) {
+    total += estimateTokenCount(name);
+    const t = tool as { description?: string; inputSchema?: unknown };
+    if (t.description) {
+      total += estimateTokenCount(t.description);
+    }
+    if (t.inputSchema) {
+      try {
+        // Zod schemas имеют `_def` поле (внутренняя структура). Если его нет —
+        // считаем что это уже сериализованный JSONSchema объект.
+        const isZodSchema =
+          typeof t.inputSchema === "object" &&
+          t.inputSchema !== null &&
+          "_def" in t.inputSchema;
+        const json = isZodSchema
+          ? JSON.stringify(zodToJsonSchema(t.inputSchema as Parameters<typeof zodToJsonSchema>[0]))
+          : JSON.stringify(t.inputSchema);
+        total += estimateTokenCount(json);
+      } catch {
+        // Невалидная схема — пропускаем этот tool, не блокируем расчёт.
+      }
+    }
+  }
+  return total;
 }
 
 /** All tool names that can be active */

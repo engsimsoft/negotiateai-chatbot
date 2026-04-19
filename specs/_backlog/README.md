@@ -9,6 +9,7 @@
 > Этот файл и папку создаёт правило 8 WORKFLOW.md (FINDINGS → backlog).
 >
 > Создан: 2026-04-13
+> Обновлён: 2026-04-18 — синхронизация с актуальным состоянием (убраны 6 закрытых/superseded записей) + добавлен Medium-долг TZ_UnifyContextThresholdBase (из Фазы 1 ТЗ-COMPACTION-1)
 
 ---
 
@@ -33,27 +34,18 @@
 
 ## Открытые долги
 
-### 🟥 High impact
-
-| ТЗ | Описание | Оценка | Источник |
-|---|---|---|---|
-| [TZ_ErrorRecoveryUI](TZ_ErrorRecoveryUI.md) | Stage 2 — root cause fix: useChat state recovery через правильную обработку `clearError` для не-ChatSDK ошибок. Stage 1 (hint в красном флаге) ✅ сделан в v3.90.0+. | 0.5 сессии | 9 эпизодов в разных ТЗ |
-
 ### 🟧 Medium impact
 
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
-| [TZ_DevPanelFooterHidesSubCalls](TZ_DevPanelFooterHidesSubCalls.md) | **DevPanel footer скрывает nested AI-вызовы (артефакты, clerks, tools).** Footer показывает модель + стоимость только parent chat, sub-calls (artifact:markdown → Sonnet, clerks → Haiku и т.д.) не агрегируются. Пример: в /expertise с Grok 4.1 Fast создан markdown-артефакт → footer «Grok 4.1 Fast — 3.43 руб», но SQL: 92% стоимости ушло на Sonnet sub-call внутри artifact handler. Backend observability (ai_usage_log) корректен, проблема только frontend. | 0.5–1 сессия | Владимир, 2026-04-16 во время тестирования ТЗ-XAI-4 |
-| [TZ_TaskExpertChatInputMissingOnFirstOpen](TZ_TaskExpertChatInputMissingOnFirstOpen.md) | **Task expert chat без поля ввода при входе из режима планирования.** Первый заход в задачу после утверждения плана показывает ответ эксперта, но не рендерит `multimodal-input` внизу. Hard reload лечит — воспроизводится 100%. Гипотеза — useChat state / hydration order при client navigation. Раздражает UX каждый раз при переключении задач. | 0.5–1 сессия | Владимир, 2026-04-16 во время тестирования ТЗ-XAI-4 |
-| [TZ_SimplyContextUsageWidget](TZ_SimplyContextUsageWidget.md) | **UI виджет контекста в Simply показывает не ту шкалу** — знаменатель прогресс-бара привязан к `contextWindow` модели (128K), а не к `SIMPLY_CONTEXT_LIMIT` (200K). Даёт ложную тревогу («55% предела» когда реально 23% от наших порогов Extract-on-compression). Плюс — число 128K для Grok 4.1 Fast подозрительное, возможно ошибка в model-catalog. Плюс — «Расход за сессию» без определения термина «сессия». | 1 сессия | Владимир, 2026-04-16 после ТЗ-ATTACH-1 |
-| [TZ_PromptsDeadCodeCleanup](TZ_PromptsDeadCodeCleanup.md) | Удалить мёртвые экспорты из `lib/ai/prompts.ts` (`artifactsPrompt`, `regularPrompt`, `systemPrompt` deprecated, `buildUserContext` deprecated). 90% файла dead, только `updateDocumentPrompt` живой. Рассмотреть переименование в `lib/ai/artifact-prompts.ts`. | 0.5 сессии | TZ_DeadModelSelectors |
-| [TZ_SimplyChatRaceCondition](TZ_SimplyChatRaceCondition.md) | `getOrCreateSimplyChat` без partial unique index → race при первых параллельных запросах нового пользователя (SELECT + INSERT без транзакционной защиты). Partial unique index + `onConflictDoNothing`. | 0.5 сессии | ТЗ-XAI-2 smoke test |
+| [TZ_UnifyContextThresholdBase](TZ_UnifyContextThresholdBase.md) | MIND пороги (`EXTRACT_THRESHOLD_*`) считаются от `CONTEXT_BUDGET=140K`, пороги Compaction от `SIMPLY_CONTEXT_LIMIT=200K` — две разные базы в одном приложении. Production behavior не затронут, долг семантический. Решение — унифицировать на `SIMPLY_CONTEXT_LIMIT`. | 0.5 сессии | Архитектор, в процессе Compaction-1 Фаза 1 |
 
 ### 🟩 Low impact (косметика)
 
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
-| [TZ_UtilTitleCapReasoningMargin](TZ_UtilTitleCapReasoningMargin.md) | Cap `util:title` = 64 рассчитан на non-reasoning default. При dev override на `grok-4-1-fast-reasoning` (через `/dev/models`) safety-net обрезает финальный ответ ровно по cap (506 thinking + 64 output = 570 total, final JSON на границе). Production не затронут. Решение — поднять cap до 256 для запаса при reasoning variant. | < 0.25 сессии | ТЗ-AISDKLayerHardening Finding #1 |
+| [TZ_UtilTitleCapReasoningMargin](TZ_UtilTitleCapReasoningMargin.md) | Cap `util:title` = 64 рассчитан на non-reasoning default. При dev override на `grok-4-1-fast-reasoning` (через `/dev/models`) safety-net обрезает финальный ответ ровно по cap (506 thinking + 64 output = 570 total, final JSON на границе). Production не затронут. Решение — поднять cap до 256 для запаса при reasoning variant. **NB:** при ТЗ-COMPACTION-1 (2026-04-19) cap уже поднят до 512 для решения проблемы #3 (autoNameChat обрывал JSON на русском) — этот долг по сути закрыт **с превышением рекомендованного значения**. Финальная проверка/закрытие при следующем backlog-review. | < 0.25 сессии | ТЗ-AISDKLayerHardening Finding #1 |
+| [TZ_CompactionActualCalibration](TZ_CompactionActualCalibration.md) | Compaction формула `totalContext = system + history + new + mind + tools` доведена до ±10-15% точности (ТЗ-COMPACTION-1). После недели MVP в production — sanity-check delta нашего `estimate` vs `actual.promptTokens` из `ai_usage_log`. Если ratio за пределами 0.85-1.15 — калибровать коэффициенты `estimateTokenCount` или перейти на tiktoken-based tokenizer. Иначе закрыть как невостребованный. | 0.3 сессии (или 0 если ratio ок) | Архитектор по решению Проблемы #2 ТЗ-COMPACTION-1 |
 
 ---
 

@@ -25,7 +25,10 @@ import {
   getProviderForTask,
   isTaskOverridden,
 } from "@/lib/ai/getModel";
-import { getModelEntry, type ModelCapabilities } from "@/lib/ai/model-catalog";
+import { getCompactionStrategy, getModelEntry, type ModelCapabilities } from "@/lib/ai/model-catalog";
+import { prepareMessagesWithCompaction } from "@/lib/ai/compaction/prepare-messages";
+import { emitCompactionEvent } from "@/lib/ai/compaction/events";
+import type { CompactionEvent } from "@/lib/ai/compaction/types";
 import type { TaskId } from "@/lib/ai/task-assignments";
 import { DEFAULT_TASK_MODELS } from "@/lib/ai/task-assignments";
 import {
@@ -42,7 +45,7 @@ import {
   calcUsagePercent,
 } from "@/lib/ai/context-limits";
 import { executeProfessorPipeline } from "@/lib/ai/professor-pipeline";
-import { getStandardTools, getActiveToolNames, withCacheControlOnLastTool } from "@/lib/ai/tools/chat-tools";
+import { computeToolsTokens, getStandardTools, getActiveToolNames, withCacheControlOnLastTool } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment, isSimplyDevMode } from "@/lib/constants";
 import { createStepTracker, type GuardianFlags } from "@/lib/ai/tool-call-guardian";
 import { calculateCostRub, RUB_PER_USD } from "@/lib/ai/providers";
@@ -145,14 +148,18 @@ async function autoNameChat(
   const resolvedModelId = getModelIdForTask("util:title");
   const autoNameStartedAt = Date.now();
 
-  const { object, usage } = await generateObject({
-    model: getModel("util:title"),
-    maxOutputTokens: getMaxOutputTokensForTask("util:title"),
-    schema: z.object({
-      title: z.string().describe("Короткое название чата (2-4 слова)"),
-      summary: z.string().describe("Краткое описание темы разговора (1-2 предложения)"),
-    }),
-    system: `Ты анализируешь чаты и генерируешь для них название и краткое описание на русском языке.
+  // ТЗ-COMPACTION-1 fix #3: try/catch — graceful fallback при NoObjectGeneratedError
+  // (модель обрывает JSON, сетевые сбои, и т.д.). Default title уже mode-aware
+  // («Новый запрос», «Новое задание»), пользователь видит штатное поведение.
+  try {
+    const { object, usage } = await generateObject({
+      model: getModel("util:title"),
+      maxOutputTokens: getMaxOutputTokensForTask("util:title"),
+      schema: z.object({
+        title: z.string().describe("Короткое название чата (2-4 слова)"),
+        summary: z.string().describe("Краткое описание темы разговора (1-2 предложения)"),
+      }),
+      system: `Ты анализируешь чаты и генерируешь для них название и краткое описание на русском языке.
 
 Правила для title (названия):
 - 2-4 слова максимум
@@ -170,41 +177,47 @@ async function autoNameChat(
 - 1-2 коротких предложения
 - Опиши о чём конкретно шёл разговор
 - Используй нейтральный тон`,
-    prompt: `Проанализируй этот чат и сгенерируй название и краткое описание:\n\n${contextSummary}`,
-  });
-
-  const cleanTitle = object.title
-    .replace(/["«»:]/g, "")
-    .replace(/^\s+|\s+$/g, "")
-    .slice(0, 80);
-  const cleanSummary = object.summary
-    .replace(/^\s+|\s+$/g, "")
-    .slice(0, 300);
-
-  await updateChatTitleAndSummary({ chatId, title: cleanTitle, summary: cleanSummary });
-
-  // ТЗ-CACHE2: Usage logging
-  logUsage({
-    userId,
-    usage,
-    modelId: resolvedModelId,
-    provider: getProviderForTask("util:title"),
-    chatMode: "util:auto-naming",
-    chatId,
-  });
-
-  // Emit sub-call step to DevPanel so footer aggregates auto-naming model/cost
-  if (dataStream) {
-    emitToolDebugStep(dataStream, {
-      taskId: "util:title",
-      modelId: resolvedModelId,
-      usage,
-      toolName: "util:auto-naming",
-      durationMs: Date.now() - autoNameStartedAt,
+      prompt: `Проанализируй этот чат и сгенерируй название и краткое описание:\n\n${contextSummary}`,
     });
-  }
 
-  console.log(`[generate-title] Server-side success for ${chatId}: "${cleanTitle}"`);
+    const cleanTitle = object.title
+      .replace(/["«»:]/g, "")
+      .replace(/^\s+|\s+$/g, "")
+      .slice(0, 80);
+    const cleanSummary = object.summary
+      .replace(/^\s+|\s+$/g, "")
+      .slice(0, 300);
+
+    await updateChatTitleAndSummary({ chatId, title: cleanTitle, summary: cleanSummary });
+
+    // ТЗ-CACHE2: Usage logging
+    logUsage({
+      userId,
+      usage,
+      modelId: resolvedModelId,
+      provider: getProviderForTask("util:title"),
+      chatMode: "util:auto-naming",
+      chatId,
+    });
+
+    // Emit sub-call step to DevPanel so footer aggregates auto-naming model/cost
+    if (dataStream) {
+      emitToolDebugStep(dataStream, {
+        taskId: "util:title",
+        modelId: resolvedModelId,
+        usage,
+        toolName: "util:auto-naming",
+        durationMs: Date.now() - autoNameStartedAt,
+      });
+    }
+
+    console.log(`[generate-title] Server-side success for ${chatId}: "${cleanTitle}"`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[generate-title] Failed for chat ${chatId} — keeping default title: ${message}`,
+    );
+  }
 }
 
 /**
@@ -481,10 +494,17 @@ export async function POST(request: Request) {
       // ТЗ-4: Greeting НЕ добавляется как сообщение — используем UI с заголовком + suggested actions
     }
 
-    // Вычисляем токены нового user message
-    const newMessageTokens = estimateMessageTokens(message.parts);
+    // ТЗ-COMPACTION-1 fix #1 (2026-04-19): Конверсия file→text ДО подсчёта newMessageTokens.
+    // Иначе estimateMessageTokens видит только { type: "file" } parts и игнорирует их размер
+    // (см. lib/utils.ts:345-358 — функция обрабатывает только text parts).
+    // Для текстовых файлов это означало занижение newMessageTokens на десятки тысяч токенов.
+    // Claude API также не поддерживает text/plain как file attachment — конвертируем в text.
+    const processedMessage = await convertTextFilePartsInMessage(message as ChatMessage);
+
+    // Вычисляем токены нового user message ПОСЛЕ конверсии — теперь учитываются файлы.
+    const newMessageTokens = estimateMessageTokens(processedMessage.parts);
     console.log(
-      `[Token Aware] Chat ${id}: New user message has ~${newMessageTokens} tokens`
+      `[Token Aware] Chat ${id}: New user message has ~${newMessageTokens} tokens (post file conversion)`
     );
 
     // Загружаем сообщения с учётом токенов нового сообщения
@@ -499,8 +519,6 @@ export async function POST(request: Request) {
       excludeExtracted: isSimplyChat,
     });
 
-    // Claude API не поддерживает text/plain как file attachment — конвертируем в text
-    const processedMessage = await convertTextFilePartsInMessage(message as ChatMessage);
     const uiMessages = [...convertToUIMessages(messagesFromDb), processedMessage];
 
     // Подсчитываем общее количество токенов в контексте
@@ -546,7 +564,7 @@ export async function POST(request: Request) {
           parts: processedMessage.parts,
           attachments: [],
           createdAt: new Date(),
-          tokenCount: estimateMessageTokens(processedMessage.parts),
+          tokenCount: newMessageTokens,
           extractedAt: null,
         },
       ],
@@ -668,13 +686,15 @@ export async function POST(request: Request) {
         // from chatMode/think/hasAttachments. That's the SSOT fix that lets
         // dev overrides (/dev/models) correctly enable Anthropic prompt caching
         // and Compaction API on any task the developer reroutes to Claude.
-        const effectiveCatalogEntry = activeTaskId
-          ? getModelEntry(getModelIdForTask(activeTaskId))
+        // ТЗ-COMPACTION-1: effectiveModelId — реальный physical modelId целевой
+        // модели чата. Используется и для capability lookup (effectiveCatalogEntry),
+        // и для compaction strategy resolution ниже (Finding #3 — убирает заплатку
+        // `|| isProjectChat` через прямую передачу resolved modelId в getCompactionStrategy).
+        const effectiveModelId = activeTaskId ? getModelIdForTask(activeTaskId) : undefined;
+        const effectiveCatalogEntry = effectiveModelId
+          ? getModelEntry(effectiveModelId)
           : undefined;
         const effectiveProvider = effectiveCatalogEntry?.provider ?? "anthropic";
-        const isAnthropicModel = effectiveProvider === "anthropic";
-        const modelSupportsCompaction =
-          effectiveCatalogEntry?.capabilities.supportsCompaction ?? false;
 
         // ТЗ-RAG1/RAG2: MIND memory — profile + retrieval
         // Scope: chat, expertise, create (not service chats, not professor pipeline)
@@ -945,13 +965,18 @@ export async function POST(request: Request) {
           return; // Exit execute for professor mode
         }
 
-        // ТЗ-2: `effectiveCatalogEntry` / `isAnthropicModel` /
-        // `modelSupportsCompaction` are computed once near the routing
-        // decision above — reuse them here. `|| isProjectChat` preserves the
-        // legacy project-tier exception unchanged.
-        const supportsCompaction =
-          isAnthropicModel && (modelSupportsCompaction || isProjectChat);
-        const compactionOptions = supportsCompaction ? {
+        // ТЗ-COMPACTION-1: capability-driven compaction strategy resolution.
+        // Старая заплатка `|| isProjectChat` (Finding #3) удалена: для project chat
+        // effectiveModelId совпадает с projectModelConfig.model.modelId через
+        // project:expert:* taskId mapping в DEFAULT_TASK_MODELS, поэтому
+        // forced-enable больше не нужен. Побочный эффект корректен:
+        // project:expert:haiku больше НЕ получает Anthropic Compaction API
+        // (Haiku.supportsCompaction = false — модель его не умеет), ранее был
+        // форсированно включён заплаткой. Это возврат к корректному поведению.
+        const compactionStrategy = effectiveModelId
+          ? getCompactionStrategy(effectiveModelId)
+          : { kind: "none" as const };
+        const compactionOptions = compactionStrategy.kind === "provider" ? {
           anthropic: {
             contextManagement: {
               edits: [{
@@ -970,7 +995,8 @@ export async function POST(request: Request) {
         // поэтому MiniMax принимает тот же синтаксис `providerOptions.anthropic.*`
         // что и чистый Claude: `cacheControl`, reasoning parts и т.д.
         // `contextManagement` (Claude Compaction) MiniMax игнорирует — для него
-        // используется отдельная проверка `isAnthropicModel`.
+        // capability-driven: `getCompactionStrategy(modelId)` вернёт "simply",
+        // и Anthropic compactionOptions не будут переданы в streamText (ТЗ-COMPACTION-1).
         const isAnthropicProtocolModel =
           effectiveProvider === "anthropic" || effectiveProvider === "minimax";
 
@@ -1024,8 +1050,52 @@ export async function POST(request: Request) {
                 effectiveCatalogEntry?.capabilities,
               )
             : textInlinedHistory;
+
+        // ТЗ-COMPACTION-1: Simply Compaction middleware gate.
+        // MVP Этап A — только expertise. Этап B расширит на "create".
+        // Middleware работает на ChatMessage[] ДО convertToModelMessages, пока
+        // история ещё не смешана с system/MIND/cache-control метками.
+        let historyForStream = preparedHistory;
+        let simplyCompactionEvent: CompactionEvent | undefined;
+        if (chatMode === "expertise" && effectiveModelId && activeTaskId) {
+          const systemPromptTokensForCompaction = estimateMessageTokens([
+            { type: "text", text: systemPromptText },
+          ]);
+          const mindTokensForCompaction = mindDynamicBlock
+            ? estimateMessageTokens([{ type: "text", text: mindDynamicBlock }])
+            : 0;
+          // ТЗ-COMPACTION-1 fix #2 (архитекторское решение 2026-04-19):
+          // Tools schemas (Zod inputSchema + description) входят в payload провайдера,
+          // но не в systemPromptText. Считаем явно — это свойство call site.
+          // Сериализация через zod-to-json-schema (транзитивная dep AI SDK,
+          // одна версия → нулевой drift).
+          const toolsTokens = computeToolsTokens(toolsForRequest);
+          const compactionResult = await prepareMessagesWithCompaction(
+            activeTaskId,
+            preparedHistory,
+            {
+              chatId: id,
+              modelId: effectiveModelId,
+              systemPromptTokens: systemPromptTokensForCompaction,
+              totalHistoryTokens,
+              newMessageTokens,
+              mindTokens: mindTokensForCompaction,
+              toolsTokens,
+            },
+            dataStream,
+          );
+          historyForStream = compactionResult.messages;
+          simplyCompactionEvent = compactionResult.compactionEvent;
+        }
+
+        // User-visible compaction event эмитится сразу после middleware, до
+        // streamText — виджет контекста получает индикатор до начала ответа.
+        if (simplyCompactionEvent) {
+          emitCompactionEvent(dataStream, simplyCompactionEvent);
+        }
+
         const coreHistory = sanitizeCoreMessages(
-          await convertToModelMessages(preparedHistory),
+          await convertToModelMessages(historyForStream),
         );
 
         // Сборка messages с 3 cache breakpoints (только для Anthropic-protocol):

@@ -8,6 +8,7 @@ import type {
   DebugGuardianData,
   DebugPromptData,
 } from "./ai/debug-events";
+import type { CompactionEvent } from "./ai/compaction/types";
 import type { getWeather } from "./ai/tools/get-weather";
 import type { updateDocument } from "./ai/tools/update-document";
 import type { AppUsage } from "./usage";
@@ -85,6 +86,10 @@ export type CustomUIDataTypes = {
   "debug-step": DebugStepData;
   "debug-guardian": DebugGuardianData;
   "debug-finish": DebugFinishData;
+  // ТЗ-COMPACTION-1: user-visible Simply Compaction event (always on).
+  // Эмитится из `emitCompactionEvent` в lib/ai/compaction/events.ts, слушается
+  // в components/elements/context.tsx для индикатора в виджете контекста.
+  compaction: CompactionEvent;
 };
 
 export type ChatMessage = UIMessage<

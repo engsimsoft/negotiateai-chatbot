@@ -26,6 +26,32 @@ export const EXTRACT_THRESHOLD_HARD = 0.8;
 /** ТЗ-ExtractCompression: Minimum pause before soft-threshold extract (10 minutes) */
 export const EXTRACT_PAUSE_MS = 10 * 60 * 1000;
 
+/**
+ * Simply Compaction MVP (ТЗ-COMPACTION-1, 2026-04-18).
+ *
+ * Константы для middleware `lib/ai/compaction/` — пороги срабатывания и
+ * размеры окон. База расчёта — `SIMPLY_CONTEXT_LIMIT` (200K). Подсчёт
+ * токенов через `estimateMessageTokens` из `lib/utils.ts` (SSOT формулы
+ * идентичен MIND extract).
+ *
+ * Унификация с `EXTRACT_THRESHOLD_*` запланирована в backlog-долге
+ * TZ_UnifyContextThresholdBase (не блокирует MVP).
+ *
+ * Архитектурный источник: specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md
+ */
+
+/** Soft threshold: 50% от SIMPLY_CONTEXT_LIMIT = 100_000 токенов — запускает сжатие. */
+export const COMPACTION_THRESHOLD_SOFT = 0.5;
+
+/** Hard threshold: 85% от SIMPLY_CONTEXT_LIMIT = 170_000 токенов — Фаза 3, предупреждение о новом чате. */
+export const COMPACTION_THRESHOLD_HARD = 0.85;
+
+/** Дословное окно: последние N токенов истории сохраняются verbatim после сжатия. */
+export const COMPACTION_VERBATIM_WINDOW_TOKENS = 40_000;
+
+/** Target объём summary в промпте (hard cap 4096 задан в task-assignments.ts для compaction:summarize). */
+export const COMPACTION_SUMMARY_TARGET_TOKENS = 3_000;
+
 /** Calculate usage percentage (0-100) */
 export function calcUsagePercent(
   tokens: number,

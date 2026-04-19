@@ -393,6 +393,13 @@
       "when": 1776732000000,
       "tag": "0055_simply-chat-unique",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1777000000000,
+      "tag": "0056_add-compaction-columns",
+      "breakpoints": true
     }
   ]
 }

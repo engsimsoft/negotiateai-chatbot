@@ -655,3 +655,52 @@ export function getContextWindow(id: string): number {
   const entry = resolveModelEntry(id);
   return entry?.contextWindow ?? 200_000;
 }
+
+// ---------------------------------------------------------------------------
+// Compaction strategy resolver (ТЗ-COMPACTION-1, 2026-04-18)
+// ---------------------------------------------------------------------------
+
+/**
+ * Стратегия сжатия контекста для конкретной модели.
+ *
+ *  - `provider` — модель поддерживает нативный провайдерский compaction
+ *    (Anthropic Sonnet/Opus 4+ через `contextManagement`). Наш middleware
+ *    делает no-op, SDK сам обрежет историю.
+ *  - `simply` — провайдерского compaction нет, активируем Simply Compaction
+ *    middleware (ручная подготовка summary + verbatim window).
+ *  - `none` — compaction архитектурно неприменим (embedding/audio/TTS модели
+ *    и прочие non-chat провайдеры). Middleware не трогает messages.
+ */
+export type CompactionStrategy =
+  | { kind: "provider" }
+  | { kind: "simply" }
+  | { kind: "none" };
+
+/**
+ * Резолв стратегии compaction по modelId. **Capability-driven**, не
+ * provider-driven: решение принимается по `capabilities.supportsCompaction`
+ * и признакам non-chat моделей, а не по списку провайдеров. Будущие
+ * Anthropic-совместимые модели автоматически попадают в `provider` через
+ * flag в каталоге.
+ *
+ * Unknown modelId → `none` (no-op): middleware ничего не делает, чтобы
+ * не трогать сообщения для модели, про которую каталог ничего не знает.
+ *
+ * Non-chat модели (embeddings, audio, TTS) → `none` — для них compaction
+ * не имеет смысла, даже если их случайно передадут в middleware.
+ *
+ * См. [SIMPLY_COMPACTION_ARCHITECTURE.md §Провайдер-агностичность](../../specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md).
+ */
+export function getCompactionStrategy(modelId: string): CompactionStrategy {
+  const entry = getModelEntry(modelId);
+  if (!entry) return { kind: "none" };
+  if (
+    entry.capabilities.embeddings ||
+    entry.provider === "voyage" ||
+    entry.provider === "deepgram"
+  ) {
+    return { kind: "none" };
+  }
+  if (entry.capabilities.supportsCompaction) return { kind: "provider" };
+  return { kind: "simply" };
+}

@@ -417,6 +417,9 @@ export async function getChatsByUserId({
           taskStatus: chat.taskStatus,
           visibility: chat.visibility,
           lastContext: sql<null>`NULL`.as("lastContext"),
+          compactionSummary: chat.compactionSummary,
+          compactionIndex: chat.compactionIndex,
+          compactionCount: chat.compactionCount,
         })
         .from(chat)
         .where(

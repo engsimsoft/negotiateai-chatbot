@@ -1,6 +1,10 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import { AlertTriangle, Package } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { type ComponentProps, useMemo } from "react";
+import { useDataStream } from "@/components/data-stream-provider";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,12 +12,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import type { CompactionEvent } from "@/lib/ai/compaction/types";
 import type { AppUsage } from "@/lib/usage";
-import { cn } from "@/lib/utils";
+import { cn, generateUUID, getChatUrl } from "@/lib/utils";
 
 export type ContextProps = ComponentProps<"button"> & {
   /** Cumulative session usage — summed across all messages in this chat. */
   usage?: AppUsage;
+  /**
+   * Текущий chatMode — нужен для корректной терминологии и URL-механики
+   * «новый запрос / новое задание» в compaction-индикаторе. Если не передан —
+   * кнопка-действие скрывается (только текст-предупреждение).
+   */
+  chatMode?: string;
 };
 
 const PERCENT_MAX = 100;
@@ -74,6 +85,96 @@ function formatRub(rub: number): string {
   return `₽${rub.toFixed(2)}`;
 }
 
+// ТЗ-COMPACTION-1: индикатор compaction в popover виджета контекста.
+// Архитектура v1.9 §Виджет контекста — 2 типа event'ов:
+//  - kind:"compaction" — Package иконка, «Разговор сжат», действий не нужно.
+//  - kind:"truncation_warning" — AlertTriangle янтарный, кнопка начать
+//    новую сессию текущего режима (терминология mode-aware — в expertise
+//    «запрос», в create «задание»; слово «чат» в этих режимах не используется).
+//
+// Кнопка-действие в MVP — **basic action**: создаёт UUID нового диалога и
+// навигирует на `getChatUrl(newId, chatMode)` по канонической механике
+// app-sidebar.tsx:79-86. Полная реализация с pre-fill summary — COMPACTION-3.
+//
+// Если `chatMode` не передан — кнопка скрывается (safety), показывается
+// только предупреждающий текст.
+function CompactionIndicator({
+  event,
+  chatMode,
+}: {
+  event: CompactionEvent;
+  chatMode?: string;
+}) {
+  const router = useRouter();
+  const isWarning = event.kind === "truncation_warning";
+
+  // Mode-aware label: в expertise/create термин «чат» НЕ используется (устойчивое
+  // продуктовое решение — «запросы» и «задания»).
+  const actionLabel =
+    chatMode === "expertise"
+      ? "Новый запрос с итогом"
+      : chatMode === "create"
+        ? "Новое задание с итогом"
+        : null;
+  const warningTitle =
+    chatMode === "expertise"
+      ? "Рекомендуем начать новый запрос"
+      : chatMode === "create"
+        ? "Рекомендуем начать новое задание"
+        : "Рекомендуем начать заново";
+
+  const handleStartNew = () => {
+    if (!chatMode) return;
+    const newId = generateUUID();
+    router.push(getChatUrl(newId, chatMode));
+    router.refresh();
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-start gap-2">
+        {isWarning ? (
+          <AlertTriangle
+            aria-hidden
+            className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+          />
+        ) : (
+          <Package
+            aria-hidden
+            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+          />
+        )}
+        <div className="space-y-0.5 text-xs">
+          <div
+            className={cn(
+              "font-medium",
+              isWarning && "text-amber-700 dark:text-amber-300",
+            )}
+          >
+            {isWarning ? warningTitle : "Разговор сжат"}
+          </div>
+          <div className="text-muted-foreground">
+            {event.squeezedTokens.toLocaleString()} → ~
+            {event.summaryTokens.toLocaleString()} токенов
+            {event.compactionCount > 1 && ` · сжатий: ${event.compactionCount}`}
+          </div>
+        </div>
+      </div>
+      {isWarning && actionLabel && (
+        <Button
+          className="w-full"
+          onClick={handleStartNew}
+          size="sm"
+          type="button"
+          variant="secondary"
+        >
+          {actionLabel}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function InfoRow({
   label,
   tokens,
@@ -107,7 +208,12 @@ function InfoRow({
   );
 }
 
-export const Context = ({ className, usage, ...props }: ContextProps) => {
+export const Context = ({
+  className,
+  usage,
+  chatMode,
+  ...props
+}: ContextProps) => {
   const contextUsed = usage?.contextWindow.used ?? 0;
   const contextMax = usage?.contextWindow.max ?? 0;
   const hasMax = contextMax > 0;
@@ -117,6 +223,15 @@ export const Context = ({ className, usage, ...props }: ContextProps) => {
 
   const cost = usage?.costRub;
   const totalRub = cost?.totalRub ?? 0;
+
+  // ТЗ-COMPACTION-1: подписка на data-compaction события. Извлекаем последнее
+  // событие (если пришло несколько за сессию — показываем свежее состояние).
+  const { dataStream } = useDataStream();
+  const compactionEvent = useMemo<CompactionEvent | null>(() => {
+    const parts = dataStream.filter((p) => p.type === "data-compaction");
+    const latest = parts[parts.length - 1];
+    return (latest?.data as CompactionEvent | undefined) ?? null;
+  }, [dataStream]);
 
   return (
     <DropdownMenu>
@@ -135,6 +250,14 @@ export const Context = ({ className, usage, ...props }: ContextProps) => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-fit p-3" side="top">
         <div className="min-w-[260px] space-y-2">
+          {/* ТЗ-COMPACTION-1: compaction indicator (при наличии события) */}
+          {compactionEvent && (
+            <>
+              <CompactionIndicator event={compactionEvent} chatMode={chatMode} />
+              <Separator />
+            </>
+          )}
+
           {/* Context window (last message fill) */}
           <div className="space-y-1">
             <div className="flex items-start justify-between text-sm">
