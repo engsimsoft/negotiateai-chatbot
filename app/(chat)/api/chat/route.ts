@@ -1052,12 +1052,16 @@ export async function POST(request: Request) {
             : textInlinedHistory;
 
         // ТЗ-COMPACTION-1: Simply Compaction middleware gate.
-        // MVP Этап A — только expertise. Этап B расширит на "create".
+        // Этап A — expertise. Этап B расширил на create (2026-04-19).
         // Middleware работает на ChatMessage[] ДО convertToModelMessages, пока
         // история ещё не смешана с system/MIND/cache-control метками.
         let historyForStream = preparedHistory;
         let simplyCompactionEvent: CompactionEvent | undefined;
-        if (chatMode === "expertise" && effectiveModelId && activeTaskId) {
+        if (
+          (chatMode === "expertise" || chatMode === "create") &&
+          effectiveModelId &&
+          activeTaskId
+        ) {
           const systemPromptTokensForCompaction = estimateMessageTokens([
             { type: "text", text: systemPromptText },
           ]);

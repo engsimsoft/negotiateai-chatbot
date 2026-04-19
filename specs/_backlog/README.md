@@ -34,6 +34,12 @@
 
 ## Открытые долги
 
+### 🟥 High impact
+
+| ТЗ | Описание | Оценка | Источник |
+|---|---|---|---|
+| [TZ_ExpertiseCreateVisionRouting](TZ_ExpertiseCreateVisionRouting.md) | В expertise/create нет vision-routing'а на Haiku 4.5 (как в Simply через `simply-chat-vision`). Сканированные PDF (CAD/чертежи) и картинки без vision-capable модели падают с `AI_UnsupportedFunctionalityError`. Архитектурный пробел — был и до COMPACTION-1, обнаружен в smoke test Этапа B1. Решение: распространить vision-routing pattern + adaptHistoryToCapabilities на expertise/create. Vision OCR module (`lib/ai/vision-ocr.ts`) уже есть, переиспользуем. | 0.5 сессии | Smoke test ТЗ-COMPACTION-1 Этап B1 (2026-04-19) |
+
 ### 🟧 Medium impact
 
 | ТЗ | Описание | Оценка | Источник |

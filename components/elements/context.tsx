@@ -37,19 +37,41 @@ const ICON_STROKE_WIDTH = 2;
 
 type ContextIconProps = {
   percent: number; // 0 - 100
+  /**
+   * Compaction state индикатор — меняет цвет иконки чтобы пользователь
+   * заметил без открытия popover'а:
+   *  - "truncation_warning" → янтарная обводка (Фаза 3 — рекомендация нового чата)
+   *  - "compaction" → muted-foreground (просто сжатие произошло, без warning)
+   *  - undefined → стандартный currentcolor (нет compaction в этой сессии)
+   */
+  compactionKind?: "compaction" | "truncation_warning";
 };
 
-export const ContextIcon = ({ percent }: ContextIconProps) => {
+export const ContextIcon = ({ percent, compactionKind }: ContextIconProps) => {
   const radius = ICON_RADIUS;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - percent / PERCENT_MAX);
 
+  const colorClass =
+    compactionKind === "truncation_warning"
+      ? "text-amber-600 dark:text-amber-400"
+      : compactionKind === "compaction"
+        ? "text-muted-foreground"
+        : undefined;
+
   return (
     <svg
-      aria-label={`${percent.toFixed(2)}% of model context used`}
+      aria-label={
+        compactionKind === "truncation_warning"
+          ? `${percent.toFixed(2)}% — рекомендуем начать новый разговор`
+          : compactionKind === "compaction"
+            ? `${percent.toFixed(2)}% — разговор сжат`
+            : `${percent.toFixed(2)}% of model context used`
+      }
+      className={colorClass}
       height="28"
       role="img"
-      style={{ color: "currentcolor" }}
+      style={colorClass ? undefined : { color: "currentcolor" }}
       viewBox={`0 0 ${ICON_VIEWBOX} ${ICON_VIEWBOX}`}
       width="28"
     >
@@ -57,7 +79,7 @@ export const ContextIcon = ({ percent }: ContextIconProps) => {
         cx={ICON_CENTER}
         cy={ICON_CENTER}
         fill="none"
-        opacity="0.25"
+        opacity={compactionKind === "truncation_warning" ? "0.5" : "0.25"}
         r={radius}
         stroke="currentColor"
         strokeWidth={ICON_STROKE_WIDTH}
@@ -66,7 +88,7 @@ export const ContextIcon = ({ percent }: ContextIconProps) => {
         cx={ICON_CENTER}
         cy={ICON_CENTER}
         fill="none"
-        opacity="0.7"
+        opacity={compactionKind === "truncation_warning" ? "1" : "0.7"}
         r={radius}
         stroke="currentColor"
         strokeDasharray={`${circumference} ${circumference}`}
@@ -245,7 +267,10 @@ export const Context = ({
           type="button"
           {...props}
         >
-          <ContextIcon percent={usedPercent} />
+          <ContextIcon
+            compactionKind={compactionEvent?.kind}
+            percent={usedPercent}
+          />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-fit p-3" side="top">
