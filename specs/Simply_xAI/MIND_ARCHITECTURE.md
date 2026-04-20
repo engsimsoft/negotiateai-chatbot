@@ -7,6 +7,9 @@
 - Testing harness — какие параметры временно крутить для быстрых тестов
 - Journal — отслеживать изменения маппингов модель↔задача по мере миграции
 
+**Последняя major ревизия: ТЗ-COMPACTION-UNIFY (v3.95.0, 2026-04-20).**
+Per-turn extract (taskId `memory:extract`, промпт `extract.md`, функции `extractFactsFromMessages` / `extractAndStoreFacts`) удалён. Extract запускается только внутри compaction cycle через `prepareMessagesWithCompaction` — на подмножестве сообщений, уходящих в summary (Mem0 best practice 2026 «memory formation before summarization»). Все пороги считаются от `SIMPLY_CONTEXT_LIMIT = 200_000` — константы `CONTEXT_BUDGET`, `EXTRACT_THRESHOLD_SOFT/HARD`, `EXTRACT_PAUSE_MS` удалены из кода. Полное обоснование: [ADR 054](../../docs/decisions/054-single-strategy-compaction.md).
+
 ---
 
 ## 1. Картина за 2 минуты
@@ -19,24 +22,27 @@
           │  Сохранение в Message_v2 │
           └────────────┬─────────────┘
                        │
-         ┌─────────────┴──────────────┐
-         │ chatMode === 'simply'?    │
-         └──────┬──────────┬──────────┘
-                │ да       │ нет (expertise/create/project)
-                ▼          ▼
-     ┌─────────────┐  ┌──────────────────────────┐
-     │ Ничего НЕ   │  │ extractAndStoreFacts()   │
-     │ делать сразу│  │ per-message, fire-&-forget│
-     └──────┬──────┘  └────────────┬─────────────┘
-            │                      │
-            │ При 60%/80%          │ Сразу после finish
-            │ заполнения контекста │
-            ▼                      ▼
+                       │ Все chatMode (simply/expertise/create/project)
+                       ▼
+     ┌──────────────────────────────────────┐
+     │ На каждом turn handler вызывает:    │
+     │   prepareMessagesWithCompaction(...) │
+     │                                      │
+     │ Если usage < 50% SIMPLY_CONTEXT_LIMIT │
+     │ → action=noop, MIND не трогается     │
+     │                                      │
+     │ Если usage ≥ 50% → middleware:       │
+     │  1. split = buildVerbatimWindow()    │
+     │  2. batchExtractFacts(split.toCompact)│
+     │  3. generateCompactionSummary(...)   │
+     └──────────────┬───────────────────────┘
+                    │
+                    ▼
      ┌───────────────────────────────────┐
      │   ЭТАП 1: EXTRACT                 │
-     │   batchExtractFacts (batch)       │
-     │   extractFactsFromMessages (single)│
-     │   → Grok (см. §4)                 │
+     │   batchExtractFacts (one call)    │
+     │   → Grok 4.1 Fast non-reasoning   │
+     │   → taskId: memory:extract-batch  │
      └──────────────┬────────────────────┘
                     ▼
      ┌───────────────────────────────────┐
@@ -118,20 +124,19 @@
 
 ---
 
-## 3. Маппинг задач на модели (актуальное состояние серии Simply_xAI)
+## 3. Маппинг задач на модели (актуальное состояние)
 
-После ТЗ-XAI-2 (v3.89.0) — 5 memory-задач резолвятся в xAI через `task-assignments.ts`:
+После ТЗ-COMPACTION-UNIFY (v3.95.0) — 4 memory-задачи резолвятся через `task-assignments.ts`:
 
 | Task ID | Default model | Провайдер | Что делает | Override через |
 |---|---|---|---|---|
-| `memory:extract` | `grok-4.20-0309-non-reasoning` | xAI | Первичное извлечение фактов из одной пары user↔assistant. **Mission-critical звено** — на сильной модели (Grok 4.20) | `/dev/models` |
-| `memory:extract-batch` | `grok-4-1-fast-non-reasoning` | xAI | Batch-извлечение из пачки ~50 сообщений (Extract-on-compression) | `/dev/models` |
+| `memory:extract-batch` | `grok-4-1-fast-non-reasoning` | xAI | **Единственный extract-таск.** Batch-извлечение из пачки ~20-50 сообщений, вызывается из `prepareMessagesWithCompaction` на `split.toCompact` | `/dev/models` |
 | `memory:dedup-verify` | `grok-4-1-fast-non-reasoning` | xAI | LLM-проверка дубликатов (бинарное решение over top-5 cosine-кандидатов) | `/dev/models` |
 | `memory:consolidate` | `grok-4-1-fast-non-reasoning` | xAI | Ревизия фактов (merge/supersede/remove) | `/dev/models` |
 | `memory:profile` | `grok-4-1-fast-non-reasoning` | xAI | Narrative profile generation | `/dev/models` |
 | **Embeddings** | `voyage-4` | Voyage AI (не в registry, raw fetch) | 1024-dim векторы для pgvector | — |
 
-**Принцип split'а (ТЗ-XAI-2, 2026-04-14):** mission-critical задача (первичное извлечение) на сильной модели, механические задачи (batch/dedup/consolidate/profile) на рабочей лошадке. Экономия ~15× по сравнению с Sonnet ($3/$15) при сохранении качества основного звена.
+**Принцип (ТЗ-COMPACTION-UNIFY):** все 4 memory-задачи — механические (batch extract, dedup, consolidate, profile) на рабочей лошадке Grok 4.1 Fast non-reasoning. Mission-critical per-turn extract на Grok 4.20 reasoning удалён — индустриальный консенсус 2026 (Mem0 default `gpt-5-mini`, Google ADK `gemini-2.5-flash`) подтверждает: extraction — структурная задача, не нужен reasoning.
 
 **Важно:** все defaults — **стартовые точки**, не финальный выбор. Любой из этих 5 taskId можно переключить через [/dev/models](../../app/(dashboard)/dev/models/page.tsx) без правки кода и коммитов. Использовать для A/B тестирования разных моделей на конкретных задачах памяти.
 
@@ -143,11 +148,12 @@
 
 | Task ID | Промпт-файл | Комментарий |
 |---|---|---|
-| `memory:extract` | [lib/prompts/memory/extract.md](../../lib/prompts/memory/extract.md) | Читается при старте модуля в [extract.ts:53](../../lib/ai/memory/extract.ts#L53) |
-| `memory:extract-batch` | [lib/prompts/memory/extract-batch.md](../../lib/prompts/memory/extract-batch.md) | Читается в [extract.ts:62](../../lib/ai/memory/extract.ts#L62) |
-| `memory:consolidate` | [lib/prompts/memory/consolidate.md](../../lib/prompts/memory/consolidate.md) | Читается в [consolidate.ts:41](../../lib/ai/memory/consolidate.ts#L41) |
-| `memory:profile` | [lib/prompts/memory/profile.md](../../lib/prompts/memory/profile.md) | Читается в [profile.ts:36](../../lib/ai/memory/profile.ts#L36) |
-| `memory:dedup-verify` | ⚠️ **Inline в коде** (нет отдельного файла) | Определён прямо в [extract.ts:464](../../lib/ai/memory/extract.ts#L464) — если понадобится менять, редактируем там. Backlog: вынести в `lib/prompts/memory/dedup-verify.md` |
+| `memory:extract-batch` | [lib/prompts/memory/extract-batch.md](../../lib/prompts/memory/extract-batch.md) | Единственный extract-промпт после ТЗ-COMPACTION-UNIFY. Читается при старте модуля в [extract.ts](../../lib/ai/memory/extract.ts) |
+| `memory:consolidate` | [lib/prompts/memory/consolidate.md](../../lib/prompts/memory/consolidate.md) | Читается в [consolidate.ts](../../lib/ai/memory/consolidate.ts) |
+| `memory:profile` | [lib/prompts/memory/profile.md](../../lib/prompts/memory/profile.md) | Читается в [profile.ts](../../lib/ai/memory/profile.ts) |
+| `memory:dedup-verify` | ⚠️ **Inline в коде** (нет отдельного файла) | Определён прямо в [extract.ts → verifyDuplicatesWithLLM](../../lib/ai/memory/extract.ts). Backlog: вынести в `lib/prompts/memory/dedup-verify.md` |
+
+> Промпт `memory:extract` (per-message extraction) и файл `lib/prompts/memory/extract.md` **удалены** в ТЗ-COMPACTION-UNIFY (v3.95.0) — см. шапку документа.
 
 ### Промпты chat-режимов (system prompt для самой беседы — влияет на что попадёт в память как источник)
 
@@ -176,21 +182,22 @@
 
 | Параметр | Production default | Файл | Что контролирует | Когда крутить для теста |
 |---|---|---|---|---|
-| `CONTEXT_BUDGET` | `140_000` | [context-limits.ts:9](../../lib/ai/context-limits.ts#L9) | Sliding window: сколько токенов истории грузим в модель | Только для тестирования рабочего бюджета качества |
-| `SIMPLY_CONTEXT_LIMIT` | `200_000` | [context-limits.ts:12](../../lib/ai/context-limits.ts#L12) | Знаменатель при расчёте `%` заполнения (используется в Extract trigger) | Почти никогда |
-| `EXTRACT_THRESHOLD_SOFT` | `0.6` (60%) | [context-limits.ts:21](../../lib/ai/context-limits.ts#L21) | % заполнения для мягкого триггера batch extract (+ требует паузу) | ⚡ **Для теста: `0.001`** → любое сообщение триггерит |
-| `EXTRACT_THRESHOLD_HARD` | `0.8` (80%) | [context-limits.ts:24](../../lib/ai/context-limits.ts#L24) | % заполнения для жёсткого триггера batch extract | ⚡ Для теста: `0.002` |
-| `EXTRACT_PAUSE_MS` | `600_000` (10 мин) | [context-limits.ts:27](../../lib/ai/context-limits.ts#L27) | Пауза между сообщениями для мягкого триггера | ⚡ **Для теста: `0`** → пауза не требуется |
-| `SNAPSHOT_THRESHOLD` | `0.7` (70%) | [context-limits.ts:15](../../lib/ai/context-limits.ts#L15) | Legacy от Snapshot fallback — к MIND отношения не имеет | — |
-| `MAX_BATCH_MESSAGES` | `50` | [extract.ts:246](../../lib/ai/memory/extract.ts#L246) | Лимит сообщений per batch extract call | Не трогать |
-| `MAX_BATCH_FACTS` | `30` | [extract.ts:249](../../lib/ai/memory/extract.ts#L249) | Кап на факты per batch extract | Не трогать |
-| `MAX_FACTS_PER_EXTRACTION` | `10` | [extract.ts:101](../../lib/ai/memory/extract.ts#L101) | Кап на факты per single extract call | Не трогать |
-| `DEDUP_CANDIDATE_THRESHOLD` | `0.55` | [extract.ts:98](../../lib/ai/memory/extract.ts#L98) | Cosine similarity threshold для dedup кандидатов (уровень 1) | Если шум в памяти: поднять до 0.65; если пропуски дубликатов: снизить до 0.5 |
-| `MINI_CONSOLIDATION_THRESHOLD` | `20` | [extract.ts:47](../../lib/ai/memory/extract.ts#L47) | Каждые N фактов → mini-consolidation | ⚡ Для теста consolidation: `2` |
-| `MINI_RECENT_FACTS_LIMIT` | `30` | [consolidate.ts:58](../../lib/ai/memory/consolidate.ts#L58) | Скольки фактов смотрит mini-consolidate | Не трогать |
-| `FULL_CONSOLIDATION_MAX_FACTS` | `200` | [consolidate.ts:64](../../lib/ai/memory/consolidate.ts#L64) | Кап на full consolidation (ночная ревизия) | Не трогать |
-| `MAX_ACTIONS_PER_CALL` | `20` | [consolidate.ts:61](../../lib/ai/memory/consolidate.ts#L61) | Кап на действия per LLM call | Не трогать |
-| `MAX_FACTS_FOR_PROFILE` | `300` | [profile.ts:50](../../lib/ai/memory/profile.ts#L50) | Кап фактов для генерации профиля | Не трогать |
+| `SIMPLY_CONTEXT_LIMIT` | `200_000` | [context-limits.ts](../../lib/ai/context-limits.ts) | **Единая база всех % порогов** — Compaction, виджет, extract trigger. | Для E2E тестов compaction можно временно понизить до 10_000 (см. §6). |
+| `COMPACTION_THRESHOLD_SOFT` | `0.5` (50%) | [context-limits.ts](../../lib/ai/context-limits.ts) | Порог срабатывания middleware (extract → compact) | Не меняется |
+| `COMPACTION_THRESHOLD_HARD` | `0.85` (85%) | [context-limits.ts](../../lib/ai/context-limits.ts) | Observability-only: различение `action=compact` vs `action=truncate` в логах | Не меняется |
+| `COMPACTION_VERBATIM_WINDOW_TOKENS` | `40_000` | [context-limits.ts](../../lib/ai/context-limits.ts) | Сколько токенов истории сохраняется дословно после сжатия | Для теста: 200-500 (см. §6) |
+| `COMPACTION_SUMMARY_TARGET_TOKENS` | `3_000` | [context-limits.ts](../../lib/ai/context-limits.ts) | Target размер summary (hard cap 4096 в task-assignments) | Для теста: 300-500 |
+| `SNAPSHOT_THRESHOLD` | `0.7` (70%) | [context-limits.ts](../../lib/ai/context-limits.ts) | Legacy от Snapshot fallback — к MIND отношения не имеет | — |
+| `MAX_BATCH_MESSAGES` | `50` | [extract.ts](../../lib/ai/memory/extract.ts) | Лимит сообщений per batch extract call | Не трогать |
+| `MAX_BATCH_FACTS` | `30` | [extract.ts](../../lib/ai/memory/extract.ts) | Кап на факты per batch extract | Не трогать |
+| `DEDUP_CANDIDATE_THRESHOLD` | `0.55` | [extract.ts](../../lib/ai/memory/extract.ts) | Cosine similarity threshold для dedup кандидатов (уровень 1) | Если шум в памяти: поднять до 0.65; если пропуски дубликатов: снизить до 0.5 |
+| `MINI_CONSOLIDATION_THRESHOLD` | `20` | [extract.ts](../../lib/ai/memory/extract.ts) | Каждые N фактов → mini-consolidation | ⚡ Для теста consolidation: `2` |
+| `MINI_RECENT_FACTS_LIMIT` | `30` | [consolidate.ts](../../lib/ai/memory/consolidate.ts) | Скольки фактов смотрит mini-consolidate | Не трогать |
+| `FULL_CONSOLIDATION_MAX_FACTS` | `200` | [consolidate.ts](../../lib/ai/memory/consolidate.ts) | Кап на full consolidation (ночная ревизия) | Не трогать |
+| `MAX_ACTIONS_PER_CALL` | `20` | [consolidate.ts](../../lib/ai/memory/consolidate.ts) | Кап на действия per LLM call | Не трогать |
+| `MAX_FACTS_FOR_PROFILE` | `300` | [profile.ts](../../lib/ai/memory/profile.ts) | Кап фактов для генерации профиля | Не трогать |
+
+> Константы `CONTEXT_BUDGET`, `EXTRACT_THRESHOLD_SOFT/HARD`, `EXTRACT_PAUSE_MS`, `MAX_FACTS_PER_EXTRACTION` **удалены** в ТЗ-COMPACTION-UNIFY (v3.95.0) — см. шапку документа.
 
 **Когда меняем значение — записываем в § «Журнал изменений» ниже.**
 
@@ -198,45 +205,36 @@
 
 ## 6. Тест-сценарии
 
-### Сценарий A — Быстрый E2E тест MIND через Simply Chat
+### Сценарий A — Быстрый E2E тест MIND через compaction в Simply Chat
 
-**Что проверяется:** весь MIND pipeline на Grok-моделях end-to-end через привычный Simply Chat flow, без переключения chatMode.
+**Что проверяется:** весь MIND pipeline end-to-end через привычный chat flow. После ТЗ-COMPACTION-UNIFY extract срабатывает только внутри compaction cycle — значит нужно спровоцировать compaction.
 
-**Временные изменения в [lib/ai/context-limits.ts](../../lib/ai/context-limits.ts):**
+**Временные изменения в [lib/ai/context-limits.ts](../../lib/ai/context-limits.ts) (⚠️ НЕ коммитить):**
 ```ts
-export const EXTRACT_THRESHOLD_SOFT = 0.001;  // было 0.6
-export const EXTRACT_PAUSE_MS = 0;            // было 10 * 60 * 1000
+export const SIMPLY_CONTEXT_LIMIT = 10_000;            // было 200_000
+export const COMPACTION_VERBATIM_WINDOW_TOKENS = 200;  // было 40_000
+export const COMPACTION_SUMMARY_TARGET_TOKENS = 300;   // было 3_000
 ```
 
 **Шаги:**
-1. Применить правки выше (⚠️ **НЕ коммитить**)
-2. Hot reload dev-сервера автоматически подхватит (Next.js watch)
-3. Открыть `/simply`, отправить 2-3 сообщения с фактами:
+1. Применить правки выше.
+2. Перезапустить dev (`rm -rf .next/cache && npm run dev`) — HMR для server-side ненадёжен.
+3. Открыть `/simply` или `/expertise`, отправить 3-5 коротких сообщений с фактами:
    - «Я работаю над Simply, мигрирую модели на xAI»
    - «Пью эспрессо по утрам»
-4. Ожидаемое в логах:
-   - `[MIND] Batch extract triggered: X% of context used ...`
-   - `[MIND] Batch extract: N facts from M messages (Xms)`
-   - `[MemoryDedup] LLM confirmed duplicate: ...` — если какой-то факт похож на другой
-5. Проверка в UI: открыть `/context` → новые факты в соответствующих категориях
-6. **ОБЯЗАТЕЛЬНО:** вернуть production defaults в context-limits.ts:
-   ```ts
-   export const EXTRACT_THRESHOLD_SOFT = 0.6;
-   export const EXTRACT_PAUSE_MS = 10 * 60 * 1000;
-   ```
-7. Перезагрузить страницу `/simply` — убедиться что batch extract больше не триггерится
+4. Ожидаемое в логах (на 3-4 сообщении):
+   - `[Compaction] chat=... action=compact tokens={...}`
+   - `[MIND] Batch extract started: N messages`
+   - `[MIND] Batch extract: M facts from N messages`
+   - `[Compaction] pre-compact-extract={processed:N, extracted:M, stored:K}`
+   - `[Compaction] Summary generated: ~Y tokens`
+5. Проверка в UI: виджет контекста → блок «📦 Разговор сжат».
+6. Проверка в `/context` → новые факты в соответствующих категориях.
+7. **ОБЯЗАТЕЛЬНО:** вернуть production defaults → снова `rm -rf .next/cache && npm run dev`.
 
-### Сценарий B — Тест per-message extract (expertise chatMode)
+### Сценарий B — ⚠️ Удалён в ТЗ-COMPACTION-UNIFY
 
-**Что проверяется:** `memory:extract` taskId (Grok 4.20) — единственное место где эта задача фактически запускается.
-
-**Без правок кода:**
-1. Дашборд → «Экспертиза» (или `/expertise` напрямую)
-2. Отправить одно осмысленное сообщение с фактами
-3. Ожидаемое в логах (сразу после finish):
-   - `[MemoryExtract] Extracted N facts for user ... (Xms)`
-   - `[MemoryExtract] Pipeline done: N extracted, M stored, K superseded`
-4. Проверка в `/context`
+Per-message extract (taskId `memory:extract`) удалён — отдельного сценария «быстрый extract одним сообщением» больше нет. Extract срабатывает только в составе compaction cycle — см. Сценарий A.
 
 ### Сценарий C — Тест consolidation
 
@@ -262,16 +260,16 @@ const MINI_CONSOLIDATION_THRESHOLD = 2;  // было 20
 
 | Параметр | Должно быть | Где проверить |
 |---|---|---|
-| `CONTEXT_BUDGET` | `140_000` | [context-limits.ts:9](../../lib/ai/context-limits.ts#L9) |
-| `SIMPLY_CONTEXT_LIMIT` | `200_000` | [context-limits.ts:12](../../lib/ai/context-limits.ts#L12) |
-| `EXTRACT_THRESHOLD_SOFT` | `0.6` | [context-limits.ts:21](../../lib/ai/context-limits.ts#L21) |
-| `EXTRACT_THRESHOLD_HARD` | `0.8` | [context-limits.ts:24](../../lib/ai/context-limits.ts#L24) |
-| `EXTRACT_PAUSE_MS` | `10 * 60 * 1000` | [context-limits.ts:27](../../lib/ai/context-limits.ts#L27) |
-| `MINI_CONSOLIDATION_THRESHOLD` | `20` | [extract.ts:47](../../lib/ai/memory/extract.ts#L47) |
+| `SIMPLY_CONTEXT_LIMIT` | `200_000` | [context-limits.ts](../../lib/ai/context-limits.ts) |
+| `COMPACTION_THRESHOLD_SOFT` | `0.5` | [context-limits.ts](../../lib/ai/context-limits.ts) |
+| `COMPACTION_THRESHOLD_HARD` | `0.85` | [context-limits.ts](../../lib/ai/context-limits.ts) |
+| `COMPACTION_VERBATIM_WINDOW_TOKENS` | `40_000` | [context-limits.ts](../../lib/ai/context-limits.ts) |
+| `COMPACTION_SUMMARY_TARGET_TOKENS` | `3_000` | [context-limits.ts](../../lib/ai/context-limits.ts) |
+| `MINI_CONSOLIDATION_THRESHOLD` | `20` | [extract.ts](../../lib/ai/memory/extract.ts) |
 
 Команда проверки:
 ```bash
-grep -E "CONTEXT_BUDGET|SIMPLY_CONTEXT_LIMIT|EXTRACT_THRESHOLD|EXTRACT_PAUSE_MS" lib/ai/context-limits.ts
+grep -E "SIMPLY_CONTEXT_LIMIT|COMPACTION_THRESHOLD|COMPACTION_VERBATIM|COMPACTION_SUMMARY_TARGET" lib/ai/context-limits.ts
 grep "MINI_CONSOLIDATION_THRESHOLD" lib/ai/memory/extract.ts
 ```
 
@@ -328,6 +326,13 @@ grep "MINI_CONSOLIDATION_THRESHOLD" lib/ai/memory/extract.ts
 
 Append-only. Новые записи сверху.
 
+- **2026-04-20 (v3.95.0, ТЗ-COMPACTION-UNIFY)** — унификация управления памятью чата:
+  - Per-turn extract удалён (`memory:extract` taskId, функции `extractFactsFromMessages` / `extractAndStoreFacts`, промпт `extract.md`, константа `MEMORY_EXTRACT_TASK`)
+  - Per-turn pipeline в expertise/create/project handler'ах удалён (~50 строк кода)
+  - Extract теперь запускается **внутри** `prepareMessagesWithCompaction` на `split.toCompact` (Mem0 best practice 2026)
+  - Все пороги от `SIMPLY_CONTEXT_LIMIT = 200_000` — константы `CONTEXT_BUDGET`, `EXTRACT_THRESHOLD_SOFT/HARD`, `EXTRACT_PAUSE_MS` удалены. Закрыт backlog-долг `TZ_UnifyContextThresholdBase`.
+  - Виджет контекста переведён на ту же базу (`lib/usage.ts`)
+  - Полное обоснование: [ADR 054](../../docs/decisions/054-single-strategy-compaction.md)
 - **2026-04-14 (v3.89.0, ТЗ-XAI-2)** — переключение 5 memory-задач на xAI:
   - `memory:extract` → `grok-4.20-0309-non-reasoning` (было `claude-sonnet-4-6`)
   - `memory:extract-batch` → `grok-4-1-fast-non-reasoning` (было `MiniMax-M2.7`)

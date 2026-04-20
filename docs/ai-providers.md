@@ -103,7 +103,7 @@ Voyage (embeddings), Deepgram (speech-to-text), Perplexity (deep research), Gemi
 
 > **SDK версии:** `ai@6.x` + `@ai-sdk/anthropic@3.x` + `@ai-sdk/google@3.x` + `@ai-sdk/react@3.x`. v6 предоставляет нативные `inputTokenDetails`/`outputTokenDetails` (включая `cacheWriteTokens`, `cacheReadTokens`, `reasoningTokens`).
 
-Используется для: projects expert chat (все tier), professor pipeline, artifacts, memory:extract, meeting:summary, simply-chat-think, simply-chat-vision, clerk'ов, всех service chats, auto-naming, vision:ocr (fallback). Полный список — через `DEFAULT_TASK_MODELS`.
+Используется для: projects expert chat (все tier), professor pipeline, artifacts, meeting:summary, simply-chat-think, simply-chat-vision, clerk'ов, всех service chats, auto-naming, vision:ocr (fallback). Полный список — через `DEFAULT_TASK_MODELS`.
 
 ### MiniMax
 
@@ -328,13 +328,13 @@ const ttsRub = calculateTtsCostRub(durationSeconds);
 
 ### Voyage (hardcoded per-token)
 
-`memory:extract` логирует Voyage embeddings через `costUsdOverride` в `lib/ai/memory/extract.ts`. TODO: вынести в catalog как non-LLM provider.
+`memory:extract-batch` логирует Voyage embeddings через `costUsdOverride` в `lib/ai/memory/extract.ts`. TODO: вынести в catalog как non-LLM provider.
 
 ---
 
 ## Context windows
 
-`getContextWindow(modelId)` из [lib/ai/providers.ts](../lib/ai/providers.ts) делегирует в `model-catalog.ts`. Используется для подсчёта percentage в Context popover UI.
+`getContextWindow(modelId)` из [lib/ai/providers.ts](../lib/ai/providers.ts) делегирует в `model-catalog.ts`. Используется как физическая характеристика модели. Для индикатора использования в UI и порогов компактации — единый `SIMPLY_CONTEXT_LIMIT` из [lib/ai/context-limits.ts](../lib/ai/context-limits.ts) (ADR 054).
 
 ---
 

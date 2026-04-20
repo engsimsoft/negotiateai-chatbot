@@ -1,7 +1,10 @@
 # ADR 052 — Context Management Strategy per Provider
 
+> **🗄️ Superseded by [ADR 054](054-single-strategy-compaction.md) (2026-04-20, v3.95.0).**
+> Per-provider многоуровневая стратегия (Extract-on-compression + Anthropic Compaction API + Sliding window + planned server-side middleware) заменена на единую Simply Compaction middleware для всех провайдеров. Capability `supportsCompaction` и `providerOptions.anthropic.contextManagement` удалены. Extract запускается только внутри compaction cycle, не per-turn. Документ ниже сохранён как исторический контекст.
+
 **Дата:** 2026-04-14
-**Статус:** Accepted
+**Статус:** Superseded by ADR 054
 **Источник решения:** TZ_CreateSnapshotAudit (v3.87.3)
 
 ---

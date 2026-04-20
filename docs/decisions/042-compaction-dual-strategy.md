@@ -1,7 +1,10 @@
 # ADR 042: Compaction API — dual strategy (snapshot + compaction)
 
+> **🗄️ Superseded by [ADR 054](054-single-strategy-compaction.md) (2026-04-20, v3.95.0).**
+> Dual-strategy подход (Anthropic Compaction API для Sonnet/Opus + snapshot/Simply Compaction для остальных) заменён на единую провайдер-агностичную Simply Compaction middleware для всех моделей. `providerOptions.anthropic.contextManagement` удалён из кода. Документ ниже сохранён как исторический контекст.
+
 **Дата:** 2026-04-07
-**Статус:** Accepted
+**Статус:** Superseded by ADR 054
 **ТЗ:** RAG-3
 
 ## Контекст

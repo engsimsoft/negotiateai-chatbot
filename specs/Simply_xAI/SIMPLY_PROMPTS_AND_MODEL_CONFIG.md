@@ -194,14 +194,15 @@
 | `clerk:task-summary` | Claude Haiku 4.5 |
 | `clerk:file-analyzer` | Claude Haiku 4.5 |
 
-### Память MIND (после ТЗ-XAI-2, апрель 2026)
+### Память MIND (после ТЗ-COMPACTION-UNIFY, апрель 2026)
 | Задача | Модель | Почему |
 |---|---|---|
-| `memory:extract` | **Grok 4.20 non-reasoning** | Mission-critical извлечение — сильная модель |
-| `memory:extract-batch` | Grok 4.1 Fast | Механический batch |
+| `memory:extract-batch` | Grok 4.1 Fast | **Единственный extract-таск.** Вызывается из compaction middleware на `split.toCompact` |
 | `memory:consolidate` | Grok 4.1 Fast | Механическая чистка |
 | `memory:profile` | Grok 4.1 Fast | Нарративный профиль |
 | `memory:dedup-verify` | Grok 4.1 Fast | Проверка дублей |
+
+> `memory:extract` (per-turn) удалён в ТЗ-COMPACTION-UNIFY — per-turn extract в expertise/create/project давал ~12× overhead на свежих сообщениях.
 
 ### Брифинг и Подкаст
 | Задача | Модель | Примечание |
@@ -345,7 +346,7 @@
 | Project expert (tier) | `project:expert:haiku` / `:sonnet` / `:opus` | 8192 / 16384 / 32000 |
 | Professor pipeline | `planning` / `review` / `pipeline-analyze` / `-execute` / `-synthesize` | 32000 / 8192 / 4096 / 8192 / 16000 |
 | Clerks | `clerk:task-summary` / `clerk:file-analyzer` | 2048 / 4096 |
-| Memory | `memory:extract` / `-batch` / `consolidate` / `profile` / `dedup-verify` | 4096 / 16000 / 4096 / 4096 / 512 |
+| Memory | `memory:extract-batch` / `consolidate` / `profile` / `dedup-verify` | 16000 / 4096 / 4096 / 512 |
 | Briefing / Podcast | `filter` / `author` (dynamic) / `section` / `podcast-script` | 1024 / 8192 fallback / 8192 / 4096 |
 | Meeting | `meeting:summary` | 8192 |
 | Service chats | `ben` / `project-creation` / `project-manager` / `briefing-onboarding` | 4096 / 8192 / 4096 / 8192 |
@@ -353,7 +354,7 @@
 | Artifacts | `artifact:text` / `markdown` / `excel` / `pptx` / `reveal` | 16384 / 16384 / 8192 / 16384 / 16384 |
 | Vision | `vision:ocr` | 4096 |
 
-**Инвариант:** каждое значение ≤ `maxOutput` default-модели этого taskId (см. [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts)). 6 taskId на Grok (`simply-chat-think`, `expertise`, `expertise-multi-agent`, `create`, `professor:pipeline-synthesize`, `memory:extract-batch`) упёрты в потолок capability Grok = 16000.
+**Инвариант:** каждое значение ≤ `maxOutput` default-модели этого taskId (см. [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts)). 6 taskId на Grok reasoning (`simply-chat-think`, `expertise`, `expertise-multi-agent`, `create`, `professor:pipeline-synthesize`) + `memory:extract-batch` на Grok non-reasoning — все упёрты в потолок capability Grok = 16000.
 
 **Особый случай `briefing:author`:** call site сохраняет dynamic `MAX_TOKENS_BY_VOLUME[volume]` (бизнес-логика объёма). Значение 8192 в SSOT = fallback + документация намерения.
 
@@ -367,15 +368,15 @@
 
 | Константа | Значение | Что делает |
 |---|---|---|
-| `CONTEXT_BUDGET` | **140 000** токенов | Рабочий бюджет для Экспертизы/Создания/задач проекта (sliding window) |
-| `SIMPLY_CONTEXT_LIMIT` | **200 000** | Лимит Simply Chat (min MiniMax 204K / Sonnet 200K) |
-| `SNAPSHOT_THRESHOLD` | **0.7** (70%) | При 70% заполнения — Эксперт предлагает сделать snapshot |
-| `FALLBACK_MESSAGE_PAIRS` | **5** | Через 5 пар сообщений после предложения — срабатывает fallback |
-| `EXTRACT_THRESHOLD_SOFT` | **0.6** (60%)* | При 60% + пауза 10 мин — запуск batch extraction фактов в MIND |
-| `EXTRACT_THRESHOLD_HARD` | **0.8** (80%) | При 80% — batch extraction немедленно |
-| `EXTRACT_PAUSE_MS` | **10 мин**\* | Минимальная пауза для срабатывания soft threshold |
+| `SIMPLY_CONTEXT_LIMIT` | **200 000** | **Единая база всех % порогов** — Compaction, UI виджет, extract trigger |
+| `COMPACTION_THRESHOLD_SOFT` | **0.5** (50%) | 100K — middleware запускает extract → compact cycle |
+| `COMPACTION_THRESHOLD_HARD` | **0.85** (85%) | 170K — observability-only (различение `action=compact` vs `action=truncate` в логах) |
+| `COMPACTION_VERBATIM_WINDOW_TOKENS` | **40 000** | Сколько токенов истории остаётся дословно после сжатия |
+| `COMPACTION_SUMMARY_TARGET_TOKENS` | **3 000** | Target размер summary в промпте (hard cap 4096 в `task-assignments`) |
+| `SNAPSHOT_THRESHOLD` | **0.7** (70%) | Legacy от Snapshot tool — к compaction отношения не имеет |
+| `FALLBACK_MESSAGE_PAIRS` | **5** | Legacy от Snapshot tool |
 
-\* В файле сейчас значения **временно изменены** для тестирования ТЗ-XAI-2 (soft = 0.001, pause = 0). Прод-дефолты указаны в комментариях.
+> Константы `CONTEXT_BUDGET`, `EXTRACT_THRESHOLD_SOFT/HARD`, `EXTRACT_PAUSE_MS` **удалены** в ТЗ-COMPACTION-UNIFY (v3.95.0). Extract теперь запускается только внутри compaction cycle — отдельного threshold нет. См. [ADR 054](../../docs/decisions/054-single-strategy-compaction.md).
 
 ## 4.4 Инструменты (tools) per режим чата
 

@@ -109,7 +109,7 @@ if (mindDynamicBlock) {
 
 5. **MIND transplant решает фундаментальное противоречие.** MIND — динамический контент (retrieved по каждому запросу разные facts), но должен влиять на генерацию. Если его поместить в system prompt, cache инвалидируется. Если в user message как inline context — кэш префикса сохраняется, влияние на модель остаётся. Trailing text-part — наиболее естественное место, которое не ломает семантику user message.
 
-6. **Capability-гейтинг через `model-catalog.ts` как SSOT.** Compaction API (`compact_20260112`) и prompt caching имеют разные capability requirements (Haiku поддерживает caching, но не compaction). Гейтинг через централизованный `capabilities.supportsCompaction` в `model-catalog.ts` позволяет dev-override'ам через `/dev/models` работать корректно для любой переназначенной модели.
+6. **Capability-гейтинг через `model-catalog.ts` как SSOT.** Prompt caching гейтится по provider-protocol (Anthropic vs MiniMax Anthropic-compat). Caching через централизованный capability check позволяет dev-override'ам через `/dev/models` работать корректно для любой переназначенной модели.
 
 ---
 
@@ -124,7 +124,7 @@ if (mindDynamicBlock) {
 - **`cacheReadTokens`/`cacheWriteTokens` теперь SSOT метрика.** DevPanel, Cost Audit Dashboard, `/admin/cost-audit` показывают реальные числа. Решения по оптимизации принимаются на основе данных, не интуиции.
 - **MIND работает без деградации кэша.** Факты обновляются на каждом запросе (retrieval делается каждый turn), но префиксный кэш сохраняется.
 - **Единый паттерн для Claude и MiniMax.** Благодаря ADR 049 (Anthropic-compat для MiniMax) оба провайдера используют идентичный `providerOptions.anthropic.cacheControl` синтаксис. Нет форков логики.
-- **Dev switchboard работает правильно.** При переключении через `/dev/models` на другую модель — capability-gate в `model-catalog.ts` автоматически корректирует поведение (например, отключает `contextManagement` для Haiku после dev-override).
+- **Dev switchboard работает правильно.** При переключении через `/dev/models` на другую модель — provider-protocol проверка (`isAnthropicProtocolModel`) автоматически корректирует расстановку breakpoints для Claude/MiniMax vs остальных.
 - **Безопасность против orphan tool_use.** `stripLegacyOpenAICompatToolParts()` санитизирует историю перед построением `messagesForRequest`, предотвращая 400 от Anthropic API на сломанных tool_use/tool_result парах.
 
 ### Минусы
@@ -132,7 +132,7 @@ if (mindDynamicBlock) {
 - **Увеличенный `cacheWriteTokens` на первом сообщении в сессии.** Breakpoints пишут кэш при первом запросе (cold start) — это стоит на 25% дороже обычного input token. Для одиночных сообщений (user задал один вопрос и ушёл) это чистая потеря. Митигация: 25% цены cold-start amortize'ится за 1.5-2 последующих сообщений, что наблюдается в типичных сессиях.
 - **Сложность дебага при рассинхроне breakpoints.** Если в `chat/route.ts` добавлен 4-й breakpoint, а в `task-expert/route.ts` его нет — разница в поведении не очевидна без чтения обоих файлов. Митигация: общий helper `withCacheControlOnLastTool` + общий паттерн построения `messagesForRequest` в обоих routes.
 - **MIND transplant менее очевиден чем плоский конкат.** Новому разработчику потребуется прочитать комментарий в коде или ADR 050 чтобы понять почему MIND идёт trailing text-part вместо system prompt. Риск: при рефакторинге могут случайно вернуть конкат → скрытая регрессия cache hit rate. Митигация: явный комментарий на месте transplant'а со ссылкой на этот ADR.
-- **Capability-гейт — дополнительная косвенность.** Caller должен помнить, что не все Claude модели поддерживают `contextManagement`. Митигация: SSOT в `model-catalog.ts` + capability read через `getModelEntry()` — compile error если capability не считано.
+- **Provider-protocol проверка — дополнительная косвенность.** Caller должен помнить, что breakpoints ставятся только для Anthropic-протокольных моделей (Claude + MiniMax через wrapper). Митигация: SSOT в `model-catalog.ts` + resolve через `getModelEntry()`.
 - **Не покрывает pipelines.** Briefing author, podcast script generator, research engine — этим routes breakpoints не расставлены (вне scope ТЗ-CacheAudit из-за блокера uncommitted changes от TZ_MindArtifacts). Будет реализовано в следующем ТЗ (`TZ_CachePipelineMetrics`).
 
 ---
@@ -200,11 +200,9 @@ if (mindDynamicBlock) {
 
 Разброс (54% vs 74%) объясняется размером системного промпта: task-expert имеет более крупный static prefix (manifest + task description), поэтому cache hit компенсирует большую долю общей стоимости.
 
-### Взаимодействие с Compaction API
+### Взаимодействие с Simply Compaction
 
-Compaction API (`compact_20260112`) — независимый механизм, работает **совместно** с cache breakpoints. Compaction автоматически суммаризует history при достижении threshold (100K input tokens по умолчанию в Simply), после чего modified history по-прежнему кэшируется с нашими breakpoints.
-
-Capability-гейт необходим потому что Compaction поддерживается только Sonnet 4+/Opus 4+ (и не всегда MiniMax — требует отдельной проверки). Гейт реализован через `effectiveCatalogEntry?.capabilities.supportsCompaction`, см. `chat/route.ts:1005` и `task-expert/route.ts:~360`.
+Simply Compaction middleware (`prepareMessagesWithCompaction`) — независимый механизм, работает **совместно** с cache breakpoints. Middleware модифицирует `ChatMessage[]` **до** `convertToModelMessages`, а breakpoints ставятся на уровне уже конвертированных messages в `streamText`. Synthetic assistant-summary (prepended в history) попадает ДО breakpoint 3 (inline на последнем user message), поэтому cache breakpoint 3 может инвалидироваться при срабатывании compaction — breakpoints 1 (system) и 2 (tools) остаются валидными. См. [ADR 054](054-single-strategy-compaction.md) для полного обоснования единой provider-agnostic стратегии compaction.
 
 ---
 

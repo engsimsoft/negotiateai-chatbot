@@ -44,11 +44,10 @@
 | **Meeting: Транскрипция** | Deepgram Nova-3 (native SDK) | ✅ Работает | Batch transcription аудио (русский, diarize) |
 | **Meeting: Суммаризация** | Grok 4.20 reasoning (`meeting:summary`) | ✅ Работает | Структурированное резюме встречи |
 | **Artifact handlers** | Claude Sonnet 4.6 (`artifact:text\|markdown\|excel\|pptx\|reveal`) | ✅ Работает | Генерация/обновление артефактов в холсте |
-| **MIND Memory: extract** | Grok 4.20 reasoning (`memory:extract`) | ✅ Работает | Mission-critical извлечение фактов из диалогов |
-| **MIND Memory: batch/consolidate/profile/dedup** | Grok 4.1 Fast (`memory:*`) | ✅ Работает | Механические задачи MIND pipeline |
+| **MIND Memory: batch-extract/consolidate/profile/dedup** | Grok 4.1 Fast (`memory:*`) | ✅ Работает | Извлечение фактов происходит пакетно из to-compact окна в момент compaction (ADR 054) |
 | **Vision OCR** | Claude Haiku 4.5 (`vision:ocr`) | ✅ Работает | OCR-экстракция текста из изображений |
 | **Title** | Grok 4.1 Fast (`util:title`) | ✅ Работает | Автонейминг чатов |
-| **Compaction Summary** | Grok 4.1 Fast non-reasoning (`compaction:summarize`) | ✅ Работает | Simply Compaction MVP — структурированное 5-секционное сжатие истории чата при достижении 50%/85% от `SIMPLY_CONTEXT_LIMIT=200K`. Активен в `expertise` / `create`. Anthropic Sonnet/Opus → provider-native API |
+| **Compaction Summary** | Grok 4.1 Fast non-reasoning (`compaction:summarize`) | ✅ Работает | Simply Compaction — структурированное 5-секционное сжатие истории чата при достижении 50%/85% от `SIMPLY_CONTEXT_LIMIT=200K`. Провайдер-агностично, активен во всех chat-модах (ADR 054) |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники (не подключены) |
 
 ---
@@ -170,9 +169,9 @@ app/(chat)/api/service-chat/route.ts                # Manager с план-кон
 7. TaskSidebar позволяет переключаться между задачами
 
 **Context Management:**
-1. Для проектных задач активирован **Anthropic Compaction API** (`providerOptions.anthropic.contextManagement`) — сжимает старые сообщения на стороне провайдера прозрачно для нас
-2. Sliding window safety cap (180K токенов) — жёсткий потолок
-3. `createSnapshot` tool, `SnapshotCard` UI, `ContextIndicator`, `snapshot-creator` клерк сняты. Подробности — [ADR 052](decisions/052-context-management-strategy-per-provider.md)
+1. Для всех chat-моделей используется **Simply Compaction middleware** (провайдер-агностично) — extract фактов в MIND → summarize старых сообщений → verbatim последних. Подробности — [ADR 054](decisions/054-single-strategy-compaction.md)
+2. Единый SIMPLY_CONTEXT_LIMIT как source of truth для всех порогов и индикатора использования
+3. `createSnapshot` tool, `SnapshotCard` UI, `snapshot-creator` клерк сняты
 
 **Завершение задачи:**
 1. Кнопка «Завершить задачу» в header → AlertDialog подтверждения → spinner

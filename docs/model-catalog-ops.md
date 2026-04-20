@@ -65,12 +65,7 @@ model-catalog.ts → resolveModelEntry(catalogId) → registry.ts → LanguageMo
 
 ### Compaction (управление длиной контекста)
 
-| Провайдер | Поддержка | Как настроено |
-|-----------|-----------|---------------|
-| **Anthropic Sonnet/Opus** | `supportsCompaction: true` | `providerOptions.anthropic.contextManagement` в streamText |
-| **Anthropic Haiku** | `supportsCompaction: false` | Legacy snapshot-клерк вместо Compaction |
-| **MiniMax** | `supportsCompaction: false` | Extract-on-compression (batch extraction при 60/80% контекста) |
-| **Остальные** | `supportsCompaction: false` | Snapshot fallback если `needsSnapshotFallback` |
+Единая стратегия для всех провайдеров — **Simply Compaction middleware** (extract → summarize → verbatim). Капабилити `supportsCompaction` удалена из каталога — компактация применяется в `prepare-messages.ts` независимо от провайдера. Подробности → [ADR 054](decisions/054-single-strategy-compaction.md).
 
 ---
 
@@ -177,7 +172,6 @@ grep -rn '"claude-\|"MiniMax\|"grok-\|"sonar-\|"nova-\|"voyage-\|"gemini-' lib/ 
 | `streaming` | Почти все LLM поддерживают; проверять для non-LLM | API / docs |
 | `documents` | PDF/file upload support (только Anthropic) | API / docs |
 | `embeddings` | Только для embedding-моделей (Voyage) | API / docs |
-| `supportsCompaction` | Только Anthropic Sonnet 4+ / Opus 4+ | Anthropic docs |
 
 ### Практическая проверка через Dev Switchboard
 

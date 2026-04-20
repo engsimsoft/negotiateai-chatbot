@@ -28,7 +28,7 @@ Simply использует AI SDK v6 (`ai@6.x`) для всех LLM-вызов�
 
 Фиксируем **5-аспектный контракт** AI SDK invocation. Каждый call site AI SDK (generateText / streamText / generateObject / streamObject) обязан явно декларировать первые **четыре** аспекта (taskId / model / cap / call mode). **Пятый аспект** (context strategy) — контекстно-зависимый, относится только к chat-handler routes (`app/(chat)/api/chat/route.ts` и аналоги), которые работают с накапливаемой историей разговора. Каждый аспект имеет SSOT и правила взаимосвязей с другими.
 
-> **История изменений:** 4 аспекта зафиксированы 2026-04-18 в первой версии ADR (ТЗ-AISDKLayerHardening). 5-й аспект добавлен 2026-04-20 в ТЗ-COMPACTION-1 — Simply Compaction MVP стал первым mature примером управления context strategy через `getCompactionStrategy(modelId)`.
+> **История изменений:** 4 аспекта зафиксированы 2026-04-18 в первой версии ADR (ТЗ-AISDKLayerHardening). 5-й аспект добавлен в ТЗ-COMPACTION-1 (Simply Compaction MVP). Упрощён в ТЗ-COMPACTION-UNIFY ([ADR 054](054-single-strategy-compaction.md), v3.95.0): убрана provider-вариантность, `getCompactionStrategy` удалён, middleware вызывается безусловно для всех chat-моделей.
 
 ### 1. `taskId` — стабильный идентификатор AI-точки
 
@@ -81,25 +81,23 @@ Simply использует AI SDK v6 (`ai@6.x`) для всех LLM-вызов�
 
 ### 5. `context strategy` — управление накапливаемой историей разговора
 
-**Что:** стратегия сжатия / адаптации истории чата при приближении к context window провайдера. Применяется только в chat-handler routes, которые работают с накапливаемой `ChatMessage[]` историей (Simply Chat, Expertise, Create, Project Chat). Не относится к stateless вызовам (artifact handlers, briefing pipeline, util:* tasks).
+**Что:** стратегия сжатия / адаптации истории чата при приближении к context window. Применяется только в chat-handler routes, которые работают с накапливаемой `ChatMessage[]` историей (Simply Chat, Expertise, Create, Project Chat). Не относится к stateless вызовам (artifact handlers, briefing pipeline, util:* tasks).
 
-**SSOT резолва:** `getCompactionStrategy(modelId)` в [lib/ai/model-catalog.ts](../../lib/ai/model-catalog.ts) → `{kind: "provider" | "simply" | "none"}`:
-- `provider` — модель имеет capability `supportsCompaction === true` (Anthropic Sonnet/Opus 4+) → используется provider-native Compaction API через `providerOptions.anthropic.contextManagement: { type: "auto" }`. Middleware `prepareMessagesWithCompaction` no-op.
-- `simply` — модель умеет генерировать структурированный output, но не имеет нативного compaction (Grok 4.1/4.20, Haiku 4.5, MiniMax M2.7, GLM 4.6) → Simply Compaction middleware ([lib/ai/compaction/](../../lib/ai/compaction/)).
-- `none` — модель не подходит для conversational context (embeddings, audio, TTS) → middleware no-op.
+**Единая стратегия — Simply Compaction middleware** (`prepareMessagesWithCompaction` в [lib/ai/compaction/](../../lib/ai/compaction/)). Провайдер-агностична: работает для всех chat-моделей одинаково (Grok, Claude, MiniMax, OpenRouter). См. [ADR 054](054-single-strategy-compaction.md) — полное обоснование и ссылки на supersede 042/052.
 
-**Параметры стратегии (для `kind === "simply"`):**
+**Параметры стратегии:**
 
 - **Триггеры (от `SIMPLY_CONTEXT_LIMIT = 200_000`):**
-  - Soft = 50% (100K) → Фаза 1/2: первое или повторное сжатие, без user warning.
-  - Hard = 85% (170K) → Фаза 3: сжатие + user-visible warning «начать новый разговор».
+  - Soft = 50% (100K) → middleware запускает extract → compact cycle.
+  - Hard = 85% (170K) → observability-only: `action=truncate` в логах. Поведение middleware идентично Soft (user-visible warning удалён в ТЗ-COMPACTION-UNIFY).
 - **Verbatim window:** `COMPACTION_VERBATIM_WINDOW_TOKENS = 40_000` — последние N токенов истории сохраняются дословно, остальное идёт в summary.
 - **Summary modal:** Grok 4.1 Fast non-reasoning (`taskId: "compaction:summarize"`, cap 4096), 5-секционный формат (Контекст / Материалы / Решения / Фокус / Вопросы).
+- **Extract orchestration:** middleware вызывает `batchExtractFacts` на `split.toCompact` **до** генерации summary (Mem0 best practice «memory formation before summarization»). Гарантия: ни одно сообщение не покидает историю без попытки извлечь факты.
 - **Полный input для расчёта `totalContext`:** `system + history + new + mind + tools` (5 компонентов). Ошибочно считать только `system + history` — без tools schemas (~1-4K в expertise) и `tool-call`/`tool-result` parts в истории (могут быть 10K+) расчёт уйдёт в 2-3x занижение. См. [lib/utils.ts → estimateMessageTokens](../../lib/utils.ts) и [lib/ai/tools/chat-tools.ts → computeToolsTokens](../../lib/ai/tools/chat-tools.ts).
 
-**Не меняется в runtime.** Стратегия резолвится один раз на старте chat handler по `effectiveModelId` (после dev override). Меняется только при смене модели для taskId.
+**Не меняется в runtime.** Middleware вызывается безусловно для chat-moделей, короткие сессии проходят как `action=noop`.
 
-**Архитектурный документ:** [specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md](../../specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md) — детали алгоритмов (verbatim window edge cases A/B, rolling-update паттерн summary, фазы работы).
+**Архитектурный документ:** [specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md](../../specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md) — детали алгоритмов (verbatim window edge cases A/B, rolling-update паттерн summary).
 
 ---
 
