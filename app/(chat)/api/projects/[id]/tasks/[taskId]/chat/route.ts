@@ -14,7 +14,6 @@ import { getProjectModel, isValidModelTier, DEFAULT_PROJECT_MODEL } from "@/lib/
 import { getProjectTierModelId, getTaskIdForTier } from "@/lib/ai/model-tiers";
 import { getMaxOutputTokensForTask, getProviderForTask, isTaskOverridden } from "@/lib/ai/getModel";
 import { DEFAULT_TASK_MODELS } from "@/lib/ai/task-assignments";
-import { getModelEntry } from "@/lib/ai/model-catalog";
 import { getStandardTools, getActiveToolNames, withCacheControlOnLastTool } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment, isSimplyDevMode } from "@/lib/constants";
 import { calculateCostRub } from "@/lib/ai/providers";
@@ -45,7 +44,12 @@ import { createStepTracker } from "@/lib/ai/tool-call-guardian";
 import { ChatSDKError } from "@/lib/errors";
 import { convertToUIMessages, estimateMessageTokens, generateUUID, sanitizeCoreMessages, stripIncompleteToolParts } from "@/lib/utils";
 import { retrieveMemoryContext } from "@/lib/ai/memory/retrieve";
-import { extractAndStoreFacts } from "@/lib/ai/memory/extract";
+// ТЗ-COMPACTION-UNIFY: Simply Compaction middleware (провайдер-агностично,
+// заменяет Anthropic contextManagement compact_20260112 — ADR 054).
+import { prepareMessagesWithCompaction } from "@/lib/ai/compaction/prepare-messages";
+import { emitCompactionEvent } from "@/lib/ai/compaction/events";
+import type { CompactionEvent } from "@/lib/ai/compaction/types";
+import { computeToolsTokens } from "@/lib/ai/tools/chat-tools";
 
 export const maxDuration = 180;
 
@@ -318,8 +322,53 @@ export async function POST(
         });
         const toolsForRequest = withCacheControlOnLastTool(standardTools);
 
+        // ТЗ-COMPACTION-UNIFY: Simply Compaction middleware — единая провайдер-
+        // агностичная логика управления памятью, заменяет Anthropic
+        // contextManagement compact_20260112 (ADR 054). Работает на ChatMessage[]
+        // ДО convertToModelMessages, пока история не смешана с system/MIND/cache.
+        //
+        // Инвариант mindTokens: учитывает ТОЛЬКО retrieved facts (mindDynamicBlock).
+        // Profile block в task-expert route НЕ инжектится в systemPromptText
+        // (у task-expert свой prompt без profile block), поэтому учёта нет —
+        // см. buildTaskExpertPrompt vs chat/route.ts systemPromptText += profileBlock.
+        const activeTaskId = getTaskIdForTier(tier);
+        const effectiveModelId = getProjectTierModelId(tier);
+        const toolsTokens = computeToolsTokens(toolsForRequest);
+        const mindTokensForCompaction = mindDynamicBlock
+          ? estimateMessageTokens([{ type: "text", text: mindDynamicBlock }])
+          : 0;
+        const totalHistoryTokens = messagesForModel.reduce(
+          (sum, m) => sum + (m.tokenCount || estimateMessageTokens(m.parts as any)),
+          0,
+        );
+
+        const cleanedHistory = stripIncompleteToolParts(uiMessages);
+        const compactionResult = await prepareMessagesWithCompaction(
+          activeTaskId,
+          cleanedHistory,
+          {
+            chatId,
+            userId: session.user.id,
+            modelId: effectiveModelId,
+            sourceType: "project",
+            sourceProjectId: projectId,
+            systemPromptTokens,
+            totalHistoryTokens,
+            newMessageTokens,
+            mindTokens: mindTokensForCompaction,
+            toolsTokens,
+          },
+          dataStream,
+        );
+        const historyForStream = compactionResult.messages;
+        const simplyCompactionEvent: CompactionEvent | undefined =
+          compactionResult.compactionEvent;
+        if (simplyCompactionEvent) {
+          emitCompactionEvent(dataStream, simplyCompactionEvent);
+        }
+
         const coreHistory = sanitizeCoreMessages(
-          await convertToModelMessages(stripIncompleteToolParts(uiMessages)),
+          await convertToModelMessages(historyForStream),
         );
 
         const messagesForRequest: Parameters<typeof streamText>[0]["messages"] = [
@@ -363,33 +412,17 @@ export async function POST(
           messagesForRequest.push({ role: "system" as const, content: mindDynamicBlock });
         }
 
-        // ТЗ-CacheAudit Этап 4 hotfix: Compaction API (`compact_20260112`)
-        // поддерживается только Sonnet/Opus. При переключении tier на executor
-        // (Haiku) в середине чата запрос падал с 400 от Anthropic. Гейтим по
-        // capability из model-catalog — SSOT для таких проверок.
-        const effectiveCatalogEntry = getModelEntry(getProjectTierModelId(tier));
-        const modelSupportsCompaction =
-          effectiveCatalogEntry?.capabilities.supportsCompaction ?? false;
-        const compactionProviderOptions = modelSupportsCompaction
-          ? {
-              anthropic: {
-                contextManagement: {
-                  edits: [{
-                    type: 'compact_20260112' as const,
-                    trigger: { type: 'input_tokens' as const, value: 100_000 },
-                    pauseAfterCompaction: false,
-                    instructions: 'Сохрани обязательно: имена людей и организаций, даты и дедлайны, принятые решения и обоснования, числа и суммы, контекст текущего проекта/задачи, незавершённые задачи и открытые вопросы, предпочтения пользователя, контекст задачи, связь с планом проекта, результаты предыдущих шагов. Удали: повторяющиеся приветствия, промежуточные рассуждения если итог зафиксирован, дублирующуюся информацию, технические детали tool calls если результат уже в контексте.',
-                  }]
-                }
-              }
-            }
-          : undefined;
+        // ТЗ-COMPACTION-UNIFY (ADR 054): Anthropic contextManagement compact_20260112
+        // удалён. Заменён на провайдер-агностичную Simply Compaction middleware
+        // (вызов выше — `prepareMessagesWithCompaction`). Преимущества: прозрачность
+        // (видим что сжалось, когда, какой размер), единый UX через widget,
+        // работает одинаково для всех tier (в т.ч. Haiku, который не поддерживал
+        // Anthropic Compaction API).
 
         const result = streamText({
           model: modelToUse,
-          maxOutputTokens: getMaxOutputTokensForTask(getTaskIdForTier(tier)),
+          maxOutputTokens: getMaxOutputTokensForTask(activeTaskId),
           messages: messagesForRequest,
-          ...(compactionProviderOptions ? { providerOptions: compactionProviderOptions } : {}),
           temperature: 1.0,
           stopWhen: stepCountIs(5),
           experimental_activeTools: getActiveToolNames(isProjectChat),
@@ -724,34 +757,9 @@ export async function POST(
           await saveMessages({ messages: messagesToSave });
         }
 
-        // ТЗ-RAG1: Extract facts from task conversation (fire-and-forget)
-        // ТЗ-RAG2: Respects memoryEnabled setting
-        if (isMemoryEnabled) {
-          const userText = message.parts
-            .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
-            .map((p: any) => p.text)
-            .join("\n");
-
-          const assistantText = messages
-            .filter((m) => m.role === "assistant")
-            .flatMap((m) => m.parts)
-            .filter((p: any) => p.type === "text" && p.text?.trim())
-            .map((p: any) => p.text)
-            .join("\n");
-
-          if (userText.length >= 10 && assistantText.length >= 10) {
-            void extractAndStoreFacts({
-              userId: session.user.id,
-              userMessage: userText,
-              assistantMessage: assistantText,
-              sourceType: "project",
-              sourceChatId: chatId,
-              sourceProjectId: projectId,
-            }).catch((err) =>
-              console.warn("[MIND] Extract failed in task chat (non-blocking):", err instanceof Error ? err.message : err)
-            );
-          }
-        }
+        // ТЗ-COMPACTION-UNIFY: per-turn extractAndStoreFacts удалён.
+        // Extract запускается внутри compaction cycle через
+        // prepareMessagesWithCompaction на сообщениях, уходящих в summary.
       },
       onError: (error: unknown) => {
         console.error("[Task Expert Stream onError]", error);
