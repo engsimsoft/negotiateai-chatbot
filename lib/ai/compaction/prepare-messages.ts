@@ -1,13 +1,20 @@
 /**
- * ТЗ-COMPACTION-1: Основная middleware Simply Compaction MVP.
+ * ТЗ-COMPACTION-1 / ТЗ-COMPACTION-UNIFY: Simply Compaction middleware.
  *
  * Вызывается из chat handler'а ДО конверсии `convertToModelMessages`.
  * Получает чистую историю `ChatMessage[]` (без system prompt); возвращает
- * либо ту же историю (no-op для provider/none стратегий и ниже Soft threshold),
- * либо новую историю с prepended synthetic assistant-summary + verbatim window.
+ * либо ту же историю (no-op ниже Soft threshold), либо новую историю с
+ * prepended synthetic assistant-summary + verbatim window.
  *
- * Архитектурный источник: specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md
- * §Единая middleware + §Дословное окно + §Фазы работы + §Подсчёт токенов.
+ * ТЗ-COMPACTION-UNIFY (v3.95.0):
+ * - Middleware теперь оркестрирует `extract → compact` на одной группе сообщений
+ *   (Mem0 best practice 2026: «memory formation before summarization»).
+ * - Гарантия: ни одно сообщение не покидает историю без попытки извлечь факты.
+ * - Strategy-check удалён — middleware вызывается для ВСЕХ chat-моделей (включая
+ *   Anthropic Opus/Sonnet, ранее использовавших нативный Compaction API).
+ * - ADR 054 Single-strategy provider-agnostic compaction.
+ *
+ * Архитектурный источник: specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md (v2.0).
  */
 
 import "server-only";
@@ -22,7 +29,7 @@ import {
   SIMPLY_CONTEXT_LIMIT,
 } from "@/lib/ai/context-limits";
 import { emitDebugWarning } from "@/lib/ai/debug-events";
-import { getCompactionStrategy } from "@/lib/ai/model-catalog";
+import { batchExtractFacts } from "@/lib/ai/memory/extract";
 import type { TaskId } from "@/lib/ai/task-assignments";
 import type { ChatMessage, CustomUIDataTypes, ChatTools } from "@/lib/types";
 import { estimateMessageTokens, estimateTokenCount, generateUUID } from "@/lib/utils";
@@ -51,14 +58,6 @@ export async function prepareMessagesWithCompaction(
   // Middleware ничего не делает если он не передан (silent degrade).
   dataStream?: Parameters<typeof emitDebugWarning>[0],
 ): Promise<PrepareMessagesResult> {
-  const strategy = getCompactionStrategy(context.modelId);
-
-  // `provider` — положимся на Anthropic Compaction API.
-  // `none` — embedding/audio/TTS или unknown модель, compaction неприменим.
-  if (strategy.kind !== "simply") {
-    return { messages };
-  }
-
   const mindTokens = context.mindTokens ?? 0;
   const toolsTokens = context.toolsTokens ?? 0;
   const totalContext =
@@ -74,7 +73,13 @@ export async function prepareMessagesWithCompaction(
     COMPACTION_THRESHOLD_HARD * SIMPLY_CONTEXT_LIMIT;
 
   // Permanent observability log — единая структурированная строка для production logs.
-  // Формат: [Compaction] chat=<id> task=<taskId> strategy=simply tokens={...} thresholds={...} action=<noop|compact|truncate>
+  // `action` различает:
+  //  - `noop` — ниже Soft, ничего не делаем
+  //  - `compact` — между Soft и Hard, обычное сжатие
+  //  - `truncate` — выше Hard (≥85%), сжатие в зоне риска деградации качества.
+  //    Для middleware поведение identical с `compact`, разница только в логе —
+  //    Hard threshold в ТЗ-COMPACTION-UNIFY observability-only (user-visible
+  //    warning убран, см. ADR 054).
   const action: "noop" | "compact" | "truncate" =
     totalContext < softThresholdTokens
       ? "noop"
@@ -82,14 +87,14 @@ export async function prepareMessagesWithCompaction(
         ? "compact"
         : "truncate";
   console.info(
-    `[Compaction] chat=${context.chatId} task=${_taskId} strategy=simply ` +
+    `[Compaction] chat=${context.chatId} task=${_taskId} ` +
       `tokens={system:${context.systemPromptTokens},history:${context.totalHistoryTokens},` +
       `new:${context.newMessageTokens},mind:${mindTokens},tools:${toolsTokens},total:${totalContext}} ` +
       `thresholds={soft:${softThresholdTokens},hard:${hardThresholdTokens}} action=${action}`,
   );
 
   // Фаза 0 — обычная работа, middleware no-op.
-  if (totalContext < softThresholdTokens) {
+  if (action === "noop") {
     return { messages };
   }
 
@@ -110,6 +115,43 @@ export async function prepareMessagesWithCompaction(
   // как есть — caller положится на sliding window в getMessagesByChatId.
   if (split.toCompact.length === 0) {
     return { messages };
+  }
+
+  // ТЗ-COMPACTION-UNIFY: extract → compact на одной группе сообщений.
+  // await блокирует compaction до завершения extract — гарантия что ни один
+  // факт не потеряется с уходящими в summary сообщениями.
+  // Graceful fallback: если extract падает — продолжаем с compact (факты
+  // могут быть потеряны в этом окне, но разговор продолжается).
+  try {
+    const extractResult = await batchExtractFacts({
+      userId: context.userId,
+      chatId: context.chatId,
+      sourceType: context.sourceType,
+      sourceProjectId: context.sourceProjectId,
+      messages: split.toCompact.map((m) => ({
+        id: m.id,
+        role: m.role,
+        parts: m.parts,
+      })),
+    });
+    console.info(
+      `[Compaction] chat=${context.chatId} pre-compact-extract={` +
+        `processed:${extractResult.processed},extracted:${extractResult.extracted},` +
+        `stored:${extractResult.stored}}`,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[Compaction] Pre-compaction extract failed for chat ${context.chatId} — ` +
+        `продолжаем с compaction (факты этого окна могут быть потеряны): ${message}`,
+    );
+    if (dataStream) {
+      emitDebugWarning(dataStream, {
+        source: "compaction:extract",
+        message: `Pre-compaction extract failed (non-blocking): ${message}`,
+        context: { chatId: context.chatId, userId: context.userId },
+      });
+    }
   }
 
   const squeezedTokens = split.toCompact.reduce(
@@ -161,9 +203,10 @@ export async function prepareMessagesWithCompaction(
     ...split.verbatim,
   ];
 
+  // ТЗ-COMPACTION-UNIFY: CompactionEvent.kind удалён — compaction работает молча,
+  // user-visible warning на Hard threshold убран (см. ADR 054, перенос ручного
+  // handoff в COMPACTION-3).
   const compactionEvent: CompactionEvent = {
-    kind:
-      totalContext >= hardThresholdTokens ? "truncation_warning" : "compaction",
     chatId: context.chatId,
     compactionIndex,
     compactionCount: newCount,

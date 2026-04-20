@@ -45,8 +45,7 @@ export type TaskId =
   | "clerk:task-summary"
   | "clerk:file-analyzer"
   // Memory (MIND / RAG)
-  | "memory:extract"          // per-message extraction (Claude Sonnet, generateObject)
-  | "memory:extract-batch"    // batch extraction (MiniMax M2.7)
+  | "memory:extract-batch"    // batch extraction (встроен в compaction cycle, ТЗ-COMPACTION-UNIFY)
   | "memory:consolidate"      // event-triggered consolidation
   | "memory:profile"          // nightly narrative profile
   | "memory:dedup-verify"     // Haiku LLM verify для двухуровневой дедупликации
@@ -145,14 +144,15 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "clerk:task-summary":       "grok-4-1-fast-non-reasoning",
   "clerk:file-analyzer":      "grok-4-1-fast-non-reasoning",
 
-  // Memory (ТЗ-XAI-4 2026-04-16)
-  // memory:extract — mission-critical задача извлечения фактов из диалогов,
-  // единственный MIND-вызов на сильной модели Grok 4.20 (reasoning variant —
-  // нужен интеллект для извлечения фактов из произвольного диалога). Остальные
-  // 4 memory-задачи — механические (batch, dedup, consolidate, profile), им
-  // достаточно рабочей лошадки Grok 4.1 Fast. Любой default можно переключить
-  // через /dev/models dev switchboard без правки кода.
-  "memory:extract":           "grok-4.20-0309-reasoning",
+  // Memory (ТЗ-COMPACTION-UNIFY 2026-04-20)
+  // memory:extract удалён — per-turn extract в expertise/create/project убран
+  // (тратил ~12× стоимости самого чата на свежих сообщениях). Extract теперь
+  // запускается только внутри compaction cycle через prepareMessagesWithCompaction
+  // на подмножестве сообщений, уходящих в summary (Mem0 best practice 2026:
+  // «memory formation before summarization»). Все 4 оставшиеся memory-задачи —
+  // механические (batch, dedup, consolidate, profile), им достаточно рабочей
+  // лошадки Grok 4.1 Fast. Любой default можно переключить через /dev/models
+  // dev switchboard без правки кода.
   "memory:extract-batch":     "grok-4-1-fast-non-reasoning",
   "memory:consolidate":       "grok-4-1-fast-non-reasoning",
   "memory:profile":           "grok-4-1-fast-non-reasoning",
@@ -256,8 +256,7 @@ export const DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number> = {
   "clerk:task-summary":       2048,   // Короткий multiline summary.
   "clerk:file-analyzer":      4096,   // JSON-анализ файла.
 
-  // Memory (MIND / RAG)
-  "memory:extract":           4096,   // per-message facts, MAX_FACTS_PER_EXTRACTION=10.
+  // Memory (MIND / RAG) — memory:extract удалён в ТЗ-COMPACTION-UNIFY
   "memory:extract-batch":     16000,  // batch extraction, MAX_BATCH_FACTS=30 × ~500 = ~15K, потолок Grok 4.1 Fast.
   "memory:consolidate":       4096,   // JSON консолидация.
   "memory:profile":           4096,   // Narrative profile JSON.

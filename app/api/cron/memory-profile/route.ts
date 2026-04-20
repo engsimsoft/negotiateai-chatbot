@@ -68,7 +68,12 @@ export async function GET(request: Request) {
           const { chatId, messages } = await getUnextractedSimplyMessages(userId, 50);
           if (messages.length === 0) return;
 
-          const result = await batchExtractFacts({ userId, chatId, messages });
+          const result = await batchExtractFacts({
+            userId,
+            chatId,
+            sourceType: "simply",
+            messages,
+          });
           extractResults.push({
             userId,
             processed: result.processed,

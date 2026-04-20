@@ -18,9 +18,9 @@ export { MEMORY_CATEGORIES, MEMORY_SOURCE_TYPES } from "./types";
 // Voyage AI client
 export { embedText, embedTexts } from "./voyage-client";
 
-// Extraction pipeline
+// Extraction pipeline (ТЗ-COMPACTION-UNIFY: per-turn extract удалён, остался только batch)
 export type { ExtractedFact } from "./extract";
-export { extractFactsFromMessages, extractAndStoreFacts, batchExtractFacts } from "./extract";
+export { batchExtractFacts } from "./extract";
 
 // Consolidation
 export type { ConsolidationStats } from "./consolidate";

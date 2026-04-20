@@ -1,12 +1,15 @@
 /**
  * ТЗ-RAG1: Memory fact extraction
  *
- * Extracts significant facts about the user from chat message pairs
- * (user message + assistant response) using Claude Sonnet.
+ * ТЗ-COMPACTION-UNIFY (v3.95.0): per-turn `extractFactsFromMessages` и
+ * `extractAndStoreFacts` удалены. Extract запускается только внутри compaction
+ * cycle через `prepareMessagesWithCompaction` — на подмножестве сообщений,
+ * уходящих в summary (Mem0 best practice 2026: «memory formation before
+ * summarization»). Файл содержит только batch-extraction pipeline + shared
+ * helper `processAndStoreFact` (экспорт для middleware) + LLM dedup verify.
  *
- * Pipeline: extract facts → embed via Voyage → deduplicate → upsert to pgvector.
- *
- * All operations are fire-and-forget — caller never waits for results.
+ * Pipeline: batch extract facts (one Grok 4.1 Fast call) → embed via Voyage
+ * → two-level deduplicate (embedding similarity + LLM verify) → upsert to pgvector.
  */
 
 import "server-only";
@@ -24,7 +27,6 @@ import {
 } from "@/lib/ai/getModel";
 import { logUsage } from "@/lib/ai/usage-utils";
 
-const MEMORY_EXTRACT_TASK = "memory:extract" as const;
 const MEMORY_EXTRACT_BATCH_TASK = "memory:extract-batch" as const;
 const MEMORY_DEDUP_VERIFY_TASK = "memory:dedup-verify" as const;
 import {
@@ -39,25 +41,13 @@ import {
   markMessagesExtracted,
 } from "./memory-queries";
 import { incrementFactsSinceConsolidation } from "@/lib/db/queries";
-import { miniConsolidateUserMemory, consolidateUserMemory } from "./consolidate";
+import { consolidateUserMemory } from "./consolidate";
 import { generateUserProfile } from "./profile";
 import { MEMORY_CATEGORIES, type MemoryCategory, type MemorySourceType, type MemorySearchResult } from "./types";
 
-/** ТЗ-RAG2: Number of new facts before triggering mini-consolidation */
-const MINI_CONSOLIDATION_THRESHOLD = 20;
-
 // ---------------------------------------------------------------------------
-// Prompt (cached at module level)
+// Batch prompt (cached at module level)
 // ---------------------------------------------------------------------------
-
-const EXTRACT_PROMPT_PATH = path.join(
-  process.cwd(),
-  "lib",
-  "prompts",
-  "memory",
-  "extract.md",
-);
-const EXTRACT_SYSTEM_PROMPT = fs.readFileSync(EXTRACT_PROMPT_PATH, "utf-8");
 
 const EXTRACT_BATCH_PROMPT_PATH = path.join(
   process.cwd(),
@@ -97,162 +87,43 @@ export type ExtractedFact = z.infer<typeof extractedFactSchema>;
  * Candidates are then verified by LLM to avoid false positives. */
 const DEDUP_CANDIDATE_THRESHOLD = 0.55;
 
-/** Max facts to extract per message pair */
-const MAX_FACTS_PER_EXTRACTION = 10;
-
-// ---------------------------------------------------------------------------
-// extractFactsFromMessages — extract facts via Claude Sonnet
-// ---------------------------------------------------------------------------
-
-interface ExtractFactsInput {
-  userId: string;
-  userMessage: string;
-  assistantMessage: string;
-  sourceType: MemorySourceType;
-  sourceChatId?: string | null;
-  sourceProjectId?: string | null;
-}
-
-/**
- * Extract facts from a user+assistant message pair using Claude Sonnet.
- * Returns structured facts with category and confidence.
- */
-export async function extractFactsFromMessages(
-  input: ExtractFactsInput,
-): Promise<ExtractedFact[]> {
-  const { userId, userMessage, assistantMessage } = input;
-
-  // Skip very short messages — unlikely to contain meaningful facts
-  if (userMessage.length < 10 && assistantMessage.length < 10) {
-    return [];
-  }
-
-  const startTime = Date.now();
-
-  const userPrompt = `<user_message>\n${userMessage}\n</user_message>\n\n<assistant_message>\n${assistantMessage}\n</assistant_message>`;
-
-  const { object, usage } = await generateObject({
-    model: getModel(MEMORY_EXTRACT_TASK),
-    maxOutputTokens: getMaxOutputTokensForTask(MEMORY_EXTRACT_TASK),
-    maxRetries: 0,
-    schema: extractionResultSchema,
-    system: EXTRACT_SYSTEM_PROMPT,
-    prompt: userPrompt,
-    temperature: 0.1,
-  });
-
-  const durationMs = Date.now() - startTime;
-
-  // Fire-and-forget usage logging
-  logUsage({
-    userId,
-    usage,
-    modelId: getModelIdForTask(MEMORY_EXTRACT_TASK),
-    provider: getProviderForTask(MEMORY_EXTRACT_TASK),
-    chatMode: "memory:extract",
-    chatId: input.sourceChatId ?? null,
-    durationMs,
-  });
-
-  // Cap the number of facts
-  const facts = object.facts.slice(0, MAX_FACTS_PER_EXTRACTION);
-
-  console.log(
-    `[MemoryExtract] Extracted ${facts.length} facts for user ${userId} (${durationMs}ms)`,
-  );
-
-  return facts;
-}
-
-// ---------------------------------------------------------------------------
-// extractAndStoreFacts — full pipeline: extract → embed → deduplicate → upsert
-// ---------------------------------------------------------------------------
-
-/**
- * Full extraction pipeline: extract facts from messages → embed → deduplicate → store.
- *
- * This is the main entry point, designed to be called fire-and-forget:
- * ```ts
- * waitUntil(extractAndStoreFacts({ ... }));
- * ```
- */
-export async function extractAndStoreFacts(
-  input: ExtractFactsInput,
-): Promise<{ extracted: number; stored: number; superseded: number }> {
-  const stats = { extracted: 0, stored: 0, superseded: 0 };
-
-  try {
-    // Step 1: Extract facts via Claude Sonnet
-    const facts = await extractFactsFromMessages(input);
-    stats.extracted = facts.length;
-
-    if (facts.length === 0) {
-      return stats;
-    }
-
-    // Step 2: For each fact — embed, deduplicate, store
-    for (const fact of facts) {
-      try {
-        await processAndStoreFact(input, fact, stats);
-      } catch (error) {
-        console.error(
-          `[MemoryExtract] Failed to store fact "${fact.content.slice(0, 50)}...":`,
-          error instanceof Error ? error.message : error,
-        );
-      }
-    }
-
-    // ТЗ-RAG2: Increment facts counter + trigger mini-consolidation at threshold
-    if (stats.stored > 0) {
-      try {
-        const newCount = await incrementFactsSinceConsolidation({ userId: input.userId });
-        if (newCount >= MINI_CONSOLIDATION_THRESHOLD) {
-          console.log(
-            `[MemoryExtract] Threshold reached (${newCount} facts), triggering mini-consolidation`,
-          );
-          void miniConsolidateUserMemory(input.userId).catch((err) =>
-            console.warn(
-              "[MemoryExtract] Mini-consolidation failed (non-blocking):",
-              err instanceof Error ? err.message : err,
-            ),
-          );
-        }
-      } catch (err) {
-        console.warn(
-          "[MemoryExtract] Failed to increment factsSinceConsolidation:",
-          err instanceof Error ? err.message : err,
-        );
-      }
-    }
-
-    console.log(
-      `[MemoryExtract] Pipeline done: ${stats.extracted} extracted, ${stats.stored} stored, ${stats.superseded} superseded`,
-    );
-
-    return stats;
-  } catch (error) {
-    console.error(
-      "[MemoryExtract] Pipeline failed:",
-      error instanceof Error ? error.message : error,
-    );
-    return stats;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// ТЗ-ExtractCompression: batchExtractFacts — batch extraction from conversation
-// ---------------------------------------------------------------------------
-
 /** Max messages per batch extraction */
 const MAX_BATCH_MESSAGES = 50;
 
 /** Max facts from a single batch extraction */
 const MAX_BATCH_FACTS = 30;
 
+// ---------------------------------------------------------------------------
+// batchExtractFacts — batch extraction from conversation (used by compaction middleware)
+// ---------------------------------------------------------------------------
+
+/**
+ * Shared input shape used by `processAndStoreFact` (origin-метаданные факта).
+ * После ТЗ-COMPACTION-UNIFY единственный caller — `batchExtractFacts` (через
+ * compaction middleware), поля про `userMessage`/`assistantMessage` удалены —
+ * они были нужны только бывшему per-turn pipeline, сейчас factory извлекается
+ * из склеенного conversation block.
+ */
+interface FactOriginInput {
+  userId: string;
+  sourceType: MemorySourceType;
+  sourceChatId?: string | null;
+  sourceProjectId?: string | null;
+}
+
 interface BatchExtractInput {
   userId: string;
   chatId: string;
-  messages: Array<{ id: string; role: string; parts: unknown; createdAt: Date }>;
+  /**
+   * Origin-метаданные для сохраняемых фактов. `sourceType` определяется
+   * chatMode caller-а (simply / expertise / create / project). Без явного
+   * значения факты сохранялись бы с неправильным `sourceType`, что ломает
+   * фильтрацию retrieve по source.
+   */
+  sourceType: MemorySourceType;
+  /** Только для project chat — иначе null/undefined. */
+  sourceProjectId?: string | null;
+  messages: Array<{ id: string; role: string; parts: unknown }>;
 }
 
 interface BatchExtractResult {
@@ -262,15 +133,17 @@ interface BatchExtractResult {
 }
 
 /**
- * Batch extraction pipeline: format conversation → extract facts (one Sonnet call) →
+ * Batch extraction pipeline: format conversation → extract facts (one Grok 4.1 Fast call) →
  * embed → deduplicate → store → mark messages as extracted.
  *
- * Designed for fire-and-forget when context approaches threshold.
+ * Вызывается из `prepareMessagesWithCompaction` на `split.toCompact` (сообщения,
+ * уходящие в summary). await блокирует compaction — гарантия: ни одно сообщение
+ * не покидает историю без попытки извлечь факты.
  */
 export async function batchExtractFacts(
   input: BatchExtractInput,
 ): Promise<BatchExtractResult> {
-  const { userId, chatId, messages } = input;
+  const { userId, chatId, sourceType, sourceProjectId, messages } = input;
   const stats: BatchExtractResult = { processed: 0, extracted: 0, stored: 0 };
 
   try {
@@ -308,11 +181,8 @@ export async function batchExtractFacts(
 
     const startTime = Date.now();
 
-    // Single batch call for the whole conversation via native generateObject
-    // (ТЗ-XAI-2: raised from legacy generateText+JSON.parse workaround that
-    // existed when this task ran on MiniMax Anthropic-compat, which didn't
-    // expose structured outputs cleanly. Verified 2026-04-14 that xAI
-    // generateObject works natively via @ai-sdk/xai).
+    // Single batch call for the whole conversation via native generateObject.
+    // Verified 2026-04-14 that xAI generateObject works natively via @ai-sdk/xai.
     const { object: parsedResult, usage } = await generateObject({
       model: getModel(MEMORY_EXTRACT_BATCH_TASK),
       maxOutputTokens: getMaxOutputTokensForTask(MEMORY_EXTRACT_BATCH_TASK),
@@ -352,10 +222,9 @@ export async function batchExtractFacts(
         await processAndStoreFact(
           {
             userId,
-            userMessage: "",
-            assistantMessage: "",
-            sourceType: "simply",
+            sourceType,
             sourceChatId: chatId,
+            sourceProjectId: sourceProjectId ?? null,
           },
           fact,
           factStats,
@@ -491,11 +360,11 @@ ${candidateList}`,
 }
 
 // ---------------------------------------------------------------------------
-// Internal: process a single fact
+// Internal: process a single fact (shared helper, используется batchExtractFacts)
 // ---------------------------------------------------------------------------
 
 async function processAndStoreFact(
-  input: ExtractFactsInput,
+  input: FactOriginInput,
   fact: ExtractedFact,
   stats: { stored: number; superseded: number },
 ): Promise<void> {

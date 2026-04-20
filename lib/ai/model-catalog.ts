@@ -67,17 +67,6 @@ export interface ModelCapabilities {
   documentSupport: DocumentSupport;
   thinking: boolean;
   embeddings: boolean;
-  /**
-   * Does this model support Anthropic's server-side Compaction API
-   * (`providerOptions.anthropic.contextManagement`). Only Sonnet/Opus 4+
-   * support it — Haiku does not. Non-Anthropic models never support it.
-   *
-   * Used by chat/route.ts to decide whether Compaction options go into
-   * streamText AND whether the legacy snapshot-injection fallback must
-   * run instead (for models that lack both, no long-context strategy is
-   * available on the provider side).
-   */
-  supportsCompaction: boolean;
 }
 
 /** Pricing в USD за 1M токенов (формат вендоров — Anthropic, OpenAI и др.). */
@@ -115,10 +104,9 @@ export interface ModelEntry {
 // Capability presets
 // ---------------------------------------------------------------------------
 
-// Sonnet/Opus 4+ support Anthropic Compaction API.
 // documentSupport дефолт = native PDF, лимит страниц 600 (для 1M-моделей Sonnet 4.6/Opus 4.6).
 // Модели с 200K context (Haiku 4.5, Sonnet 4.5 legacy) override на maxPages: 100 — это
-// official Anthropic limit (см. ANALYSIS.md, источник platform.claude.com/.../pdf-support).
+// official Anthropic limit (источник platform.claude.com/.../pdf-support).
 const CAPS_CLAUDE: ModelCapabilities = {
   streaming: true,
   tools: true,
@@ -132,7 +120,6 @@ const CAPS_CLAUDE: ModelCapabilities = {
   },
   thinking: true,
   embeddings: false,
-  supportsCompaction: true,
 };
 
 const CAPS_MINIMAX: ModelCapabilities = {
@@ -145,7 +132,6 @@ const CAPS_MINIMAX: ModelCapabilities = {
   },
   thinking: true,
   embeddings: false,
-  supportsCompaction: false,
 };
 
 const CAPS_GROK: ModelCapabilities = {
@@ -163,7 +149,6 @@ const CAPS_GROK: ModelCapabilities = {
   },
   thinking: true,
   embeddings: false,
-  supportsCompaction: false,
 };
 
 const CAPS_OPENROUTER_TEXT: ModelCapabilities = {
@@ -176,7 +161,6 @@ const CAPS_OPENROUTER_TEXT: ModelCapabilities = {
   },
   thinking: false,
   embeddings: false,
-  supportsCompaction: false,
 };
 
 // Vision-capable OpenRouter models (GLM V-series and similar multimodal).
@@ -192,7 +176,6 @@ const CAPS_OPENROUTER_VISION: ModelCapabilities = {
   },
   thinking: false,
   embeddings: false,
-  supportsCompaction: false,
 };
 
 // Override для Claude моделей с 200K context (Haiku 4.5, Sonnet 4.5 legacy).
@@ -237,7 +220,6 @@ const ENTRIES: ModelEntry[] = [
     capabilities: {
       ...CAPS_CLAUDE,
       thinking: false,
-      supportsCompaction: false,
       documentSupport: CAPS_CLAUDE_200K_DOCS,
     },
     contextWindow: 200_000,
@@ -286,7 +268,6 @@ const ENTRIES: ModelEntry[] = [
     capabilities: {
       ...CAPS_CLAUDE,
       thinking: false,
-      supportsCompaction: false,
       documentSupport: CAPS_CLAUDE_200K_DOCS,
     },
     contextWindow: 200_000,
@@ -489,7 +470,6 @@ const ENTRIES: ModelEntry[] = [
       streaming: false, tools: false, vision: false,
       documentSupport: { supported: false, reason: "Embedding model" },
       thinking: false, embeddings: true,
-      supportsCompaction: false,
     },
     contextWindow: 32_000,
     maxOutput: 0,
@@ -504,7 +484,6 @@ const ENTRIES: ModelEntry[] = [
       streaming: false, tools: false, vision: false,
       documentSupport: { supported: false, reason: "Embedding model" },
       thinking: false, embeddings: true,
-      supportsCompaction: false,
     },
     contextWindow: 32_000,
     maxOutput: 0,
@@ -526,7 +505,6 @@ const ENTRIES: ModelEntry[] = [
         reason: "Используется только через tool deepResearch — файлы не передаются в текущей интеграции",
       },
       thinking: false, embeddings: false,
-      supportsCompaction: false,
     },
     contextWindow: 200_000,
     maxOutput: 4_000,
@@ -545,7 +523,6 @@ const ENTRIES: ModelEntry[] = [
         reason: "Deep Research agent — не используется для прямых файловых запросов в Simply",
       },
       thinking: true, embeddings: false,
-      supportsCompaction: false,
     },
     contextWindow: 200_000,
     maxOutput: 8_000,
@@ -560,7 +537,6 @@ const ENTRIES: ModelEntry[] = [
       streaming: false, tools: false, vision: false,
       documentSupport: { supported: false, reason: "Audio transcription — input is audio, not text/documents" },
       thinking: false, embeddings: false,
-      supportsCompaction: false,
     },
     contextWindow: 0,
     maxOutput: 0,
@@ -576,7 +552,6 @@ const ENTRIES: ModelEntry[] = [
       streaming: false, tools: false, vision: false,
       documentSupport: { supported: false, reason: "TTS model — generates audio from text, not document analysis" },
       thinking: false, embeddings: false,
-      supportsCompaction: false,
     },
     contextWindow: 0,
     maxOutput: 0,
@@ -656,51 +631,3 @@ export function getContextWindow(id: string): number {
   return entry?.contextWindow ?? 200_000;
 }
 
-// ---------------------------------------------------------------------------
-// Compaction strategy resolver (ТЗ-COMPACTION-1, 2026-04-18)
-// ---------------------------------------------------------------------------
-
-/**
- * Стратегия сжатия контекста для конкретной модели.
- *
- *  - `provider` — модель поддерживает нативный провайдерский compaction
- *    (Anthropic Sonnet/Opus 4+ через `contextManagement`). Наш middleware
- *    делает no-op, SDK сам обрежет историю.
- *  - `simply` — провайдерского compaction нет, активируем Simply Compaction
- *    middleware (ручная подготовка summary + verbatim window).
- *  - `none` — compaction архитектурно неприменим (embedding/audio/TTS модели
- *    и прочие non-chat провайдеры). Middleware не трогает messages.
- */
-export type CompactionStrategy =
-  | { kind: "provider" }
-  | { kind: "simply" }
-  | { kind: "none" };
-
-/**
- * Резолв стратегии compaction по modelId. **Capability-driven**, не
- * provider-driven: решение принимается по `capabilities.supportsCompaction`
- * и признакам non-chat моделей, а не по списку провайдеров. Будущие
- * Anthropic-совместимые модели автоматически попадают в `provider` через
- * flag в каталоге.
- *
- * Unknown modelId → `none` (no-op): middleware ничего не делает, чтобы
- * не трогать сообщения для модели, про которую каталог ничего не знает.
- *
- * Non-chat модели (embeddings, audio, TTS) → `none` — для них compaction
- * не имеет смысла, даже если их случайно передадут в middleware.
- *
- * См. [SIMPLY_COMPACTION_ARCHITECTURE.md §Провайдер-агностичность](../../specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md).
- */
-export function getCompactionStrategy(modelId: string): CompactionStrategy {
-  const entry = getModelEntry(modelId);
-  if (!entry) return { kind: "none" };
-  if (
-    entry.capabilities.embeddings ||
-    entry.provider === "voyage" ||
-    entry.provider === "deepgram"
-  ) {
-    return { kind: "none" };
-  }
-  if (entry.capabilities.supportsCompaction) return { kind: "provider" };
-  return { kind: "simply" };
-}
