@@ -1,10 +1,8 @@
 "use client";
 
-import { AlertTriangle, Package } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Package } from "lucide-react";
 import { type ComponentProps, useMemo } from "react";
 import { useDataStream } from "@/components/data-stream-provider";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,17 +12,11 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import type { CompactionEvent } from "@/lib/ai/compaction/types";
 import type { AppUsage } from "@/lib/usage";
-import { cn, generateUUID, getChatUrl } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export type ContextProps = ComponentProps<"button"> & {
   /** Cumulative session usage — summed across all messages in this chat. */
   usage?: AppUsage;
-  /**
-   * Текущий chatMode — нужен для корректной терминологии и URL-механики
-   * «новый запрос / новое задание» в compaction-индикаторе. Если не передан —
-   * кнопка-действие скрывается (только текст-предупреждение).
-   */
-  chatMode?: string;
 };
 
 const PERCENT_MAX = 100;
@@ -38,35 +30,26 @@ const ICON_STROKE_WIDTH = 2;
 type ContextIconProps = {
   percent: number; // 0 - 100
   /**
-   * Compaction state индикатор — меняет цвет иконки чтобы пользователь
-   * заметил без открытия popover'а:
-   *  - "truncation_warning" → янтарная обводка (Фаза 3 — рекомендация нового чата)
-   *  - "compaction" → muted-foreground (просто сжатие произошло, без warning)
-   *  - undefined → стандартный currentcolor (нет compaction в этой сессии)
+   * Compaction indicator — меняет цвет иконки на muted-foreground если
+   * в сессии хотя бы раз сработал compaction. ТЗ-COMPACTION-UNIFY: warning
+   * (янтарная обводка) удалён — compaction работает молча.
    */
-  compactionKind?: "compaction" | "truncation_warning";
+  isCompacted?: boolean;
 };
 
-export const ContextIcon = ({ percent, compactionKind }: ContextIconProps) => {
+export const ContextIcon = ({ percent, isCompacted }: ContextIconProps) => {
   const radius = ICON_RADIUS;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - percent / PERCENT_MAX);
 
-  const colorClass =
-    compactionKind === "truncation_warning"
-      ? "text-amber-600 dark:text-amber-400"
-      : compactionKind === "compaction"
-        ? "text-muted-foreground"
-        : undefined;
+  const colorClass = isCompacted ? "text-muted-foreground" : undefined;
 
   return (
     <svg
       aria-label={
-        compactionKind === "truncation_warning"
-          ? `${percent.toFixed(2)}% — рекомендуем начать новый разговор`
-          : compactionKind === "compaction"
-            ? `${percent.toFixed(2)}% — разговор сжат`
-            : `${percent.toFixed(2)}% of model context used`
+        isCompacted
+          ? `${percent.toFixed(2)}% — разговор сжат`
+          : `${percent.toFixed(2)}% of model context used`
       }
       className={colorClass}
       height="28"
@@ -79,7 +62,7 @@ export const ContextIcon = ({ percent, compactionKind }: ContextIconProps) => {
         cx={ICON_CENTER}
         cy={ICON_CENTER}
         fill="none"
-        opacity={compactionKind === "truncation_warning" ? "0.5" : "0.25"}
+        opacity="0.25"
         r={radius}
         stroke="currentColor"
         strokeWidth={ICON_STROKE_WIDTH}
@@ -88,7 +71,7 @@ export const ContextIcon = ({ percent, compactionKind }: ContextIconProps) => {
         cx={ICON_CENTER}
         cy={ICON_CENTER}
         fill="none"
-        opacity={compactionKind === "truncation_warning" ? "1" : "0.7"}
+        opacity="0.7"
         r={radius}
         stroke="currentColor"
         strokeDasharray={`${circumference} ${circumference}`}
@@ -107,92 +90,24 @@ function formatRub(rub: number): string {
   return `₽${rub.toFixed(2)}`;
 }
 
-// ТЗ-COMPACTION-1: индикатор compaction в popover виджета контекста.
-// Архитектура v1.9 §Виджет контекста — 2 типа event'ов:
-//  - kind:"compaction" — Package иконка, «Разговор сжат», действий не нужно.
-//  - kind:"truncation_warning" — AlertTriangle янтарный, кнопка начать
-//    новую сессию текущего режима (терминология mode-aware — в expertise
-//    «запрос», в create «задание»; слово «чат» в этих режимах не используется).
-//
-// Кнопка-действие в MVP — **basic action**: создаёт UUID нового диалога и
-// навигирует на `getChatUrl(newId, chatMode)` по канонической механике
-// app-sidebar.tsx:79-86. Полная реализация с pre-fill summary — COMPACTION-3.
-//
-// Если `chatMode` не передан — кнопка скрывается (safety), показывается
-// только предупреждающий текст.
-function CompactionIndicator({
-  event,
-  chatMode,
-}: {
-  event: CompactionEvent;
-  chatMode?: string;
-}) {
-  const router = useRouter();
-  const isWarning = event.kind === "truncation_warning";
-
-  // Mode-aware label: в expertise/create термин «чат» НЕ используется (устойчивое
-  // продуктовое решение — «запросы» и «задания»).
-  const actionLabel =
-    chatMode === "expertise"
-      ? "Новый запрос с итогом"
-      : chatMode === "create"
-        ? "Новое задание с итогом"
-        : null;
-  const warningTitle =
-    chatMode === "expertise"
-      ? "Рекомендуем начать новый запрос"
-      : chatMode === "create"
-        ? "Рекомендуем начать новое задание"
-        : "Рекомендуем начать заново";
-
-  const handleStartNew = () => {
-    if (!chatMode) return;
-    const newId = generateUUID();
-    router.push(getChatUrl(newId, chatMode));
-    router.refresh();
-  };
-
+// ТЗ-COMPACTION-UNIFY (ADR 054): индикатор compaction в popover виджета контекста.
+// Compaction работает молча — только факт «произошло сжатие», без warning
+// и action button. Ручной handoff в новый чат перенесён в COMPACTION-3.
+function CompactionIndicator({ event }: { event: CompactionEvent }) {
   return (
-    <div className="space-y-2">
-      <div className="flex items-start gap-2">
-        {isWarning ? (
-          <AlertTriangle
-            aria-hidden
-            className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
-          />
-        ) : (
-          <Package
-            aria-hidden
-            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-          />
-        )}
-        <div className="space-y-0.5 text-xs">
-          <div
-            className={cn(
-              "font-medium",
-              isWarning && "text-amber-700 dark:text-amber-300",
-            )}
-          >
-            {isWarning ? warningTitle : "Разговор сжат"}
-          </div>
-          <div className="text-muted-foreground">
-            {event.squeezedTokens.toLocaleString()} → ~
-            {event.summaryTokens.toLocaleString()} токенов
-            {event.compactionCount > 1 && ` · сжатий: ${event.compactionCount}`}
-          </div>
+    <div className="flex items-start gap-2">
+      <Package
+        aria-hidden
+        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+      />
+      <div className="space-y-0.5 text-xs">
+        <div className="font-medium">Разговор сжат</div>
+        <div className="text-muted-foreground">
+          {event.squeezedTokens.toLocaleString()} → ~
+          {event.summaryTokens.toLocaleString()} токенов
+          {event.compactionCount > 1 && ` · сжатий: ${event.compactionCount}`}
         </div>
       </div>
-      {isWarning && actionLabel && (
-        <Button
-          className="w-full"
-          onClick={handleStartNew}
-          size="sm"
-          type="button"
-          variant="secondary"
-        >
-          {actionLabel}
-        </Button>
-      )}
     </div>
   );
 }
@@ -233,7 +148,6 @@ function InfoRow({
 export const Context = ({
   className,
   usage,
-  chatMode,
   ...props
 }: ContextProps) => {
   const contextUsed = usage?.contextWindow.used ?? 0;
@@ -268,17 +182,17 @@ export const Context = ({
           {...props}
         >
           <ContextIcon
-            compactionKind={compactionEvent?.kind}
+            isCompacted={compactionEvent !== null}
             percent={usedPercent}
           />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-fit p-3" side="top">
         <div className="min-w-[260px] space-y-2">
-          {/* ТЗ-COMPACTION-1: compaction indicator (при наличии события) */}
+          {/* ТЗ-COMPACTION-UNIFY: compaction indicator (при наличии события) */}
           {compactionEvent && (
             <>
-              <CompactionIndicator event={compactionEvent} chatMode={chatMode} />
+              <CompactionIndicator event={compactionEvent} />
               <Separator />
             </>
           )}
