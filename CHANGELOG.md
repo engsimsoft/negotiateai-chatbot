@@ -7,6 +7,21 @@
 
 ## [Unreleased]
 
+### [3.95.0] — 2026-04-21 — ТЗ-COMPACTION-UNIFY
+
+**Унификация архитектуры памяти: одна стратегия compaction для всех провайдеров, одна константа порогов.**
+
+- **Проблема.** Архитектура памяти поддерживала параллельно три механизма: (1) per-turn extract в expertise/create/project (избыточные вызовы Voyage + Grok на каждом turn), (2) Anthropic Compaction API через `providerOptions.anthropic.contextManagement` для Sonnet/Opus моделей, (3) Simply Compaction middleware для остальных. Три разных базы порогов: `SIMPLY_CONTEXT_LIMIT` для compaction, `CONTEXT_BUDGET` для MIND-пайплайна, физический `contextWindow` модели для индикатора использования в UI. В UI — tri-color warning «Рекомендуем начать новое задание», противоречащий Apple-философии.
+- **Решение (ADR 054).** Единая стратегия — **Simply Compaction middleware** для всех chat-моделей независимо от провайдера. Extract фактов (пакетно в MIND) → summarize старого окна → verbatim последних сообщений. Одна константа `SIMPLY_CONTEXT_LIMIT` как SSOT для всех порогов и индикатора. Warning-ветка снята, только муted индикация.
+- **Dead code удалён:** `extractFactsFromMessages`, `extractAndStoreFacts`, `EXTRACT_SYSTEM_PROMPT`, `MAX_FACTS_PER_EXTRACTION`, `lib/prompts/memory/extract.md` (файл), `memory:extract` taskId, `supportsCompaction` capability и `getCompactionStrategy` функция из `model-catalog.ts`, `CompactionEvent.kind`, `CONTEXT_BUDGET`/`EXTRACT_THRESHOLD_SOFT`/`EXTRACT_PAUSE_MS`. Per-turn extract-блоки в обоих route-handler'ах удалены. Anthropic `providerOptions.contextManagement` и `compactionProviderOptions` удалены.
+- **Orchestration extract → compact** добавлен в `lib/ai/compaction/prepare-messages.ts`: `batchExtractFacts` вызывается перед `summarize` на окне `toCompact`, с `sourceType`/`sourceProjectId` для корректной привязки фактов (не хардкод "simply"). Реализует best-practice Mem0 2026 «memory formation before summarization».
+- **Widget sync fix.** `lib/usage.ts` читал `getContextWindow(modelId)` из model-catalog (физический размер контекстного окна модели, 128K у Grok), а не `SIMPLY_CONTEXT_LIMIT` — из-за чего в тестах виджет показывал «0%» при реальном операционном пороге compaction 50% от 10K. Переход на `SIMPLY_CONTEXT_LIMIT` синхронизировал индикатор и логику.
+- **ADR:** новый [054-single-strategy-compaction.md](docs/decisions/054-single-strategy-compaction.md) с header `Supersedes` → ADR 042, ADR 052 помечены superseded, ADR 050 и 053 отредактированы (убраны упоминания contextManagement API).
+- **Scope расширен:** handler `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` не был в изначальном ТЗ — добавлен (критерий приёмки ТЗ требовал 0 упоминаний `extractAndStoreFacts` в активных chat-handler'ах). Scope сокращён: ручная кнопка «Новый чат с итогом» убрана из ТЗ — перенесена в COMPACTION-3.
+- **Файлы:** `lib/ai/context-limits.ts`, `lib/ai/model-catalog.ts`, `lib/ai/task-assignments.ts`, `lib/ai/memory/{extract,index}.ts`, `lib/ai/compaction/{types,prepare-messages}.ts`, `lib/prompts/memory/extract.md` (удалён), `app/(chat)/api/chat/route.ts`, `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts`, `app/api/cron/memory-profile/route.ts`, `lib/usage.ts`, `components/elements/context.tsx`, `components/multimodal-input.tsx`. Docs: 5 ADR + `ai-chats-map.md` + `ai-providers.md` + `model-catalog-ops.md` + `SIMPLY_COMPACTION_ARCHITECTURE.md` v2.0 + `MIND_ARCHITECTURE.md` v3.95.0 + `SIMPLY_PROMPTS_AND_MODEL_CONFIG.md`.
+
+---
+
 ### Docs / Chore — 2026-04-15 — CLAUDE.md cleanup + process fix
 
 **Навели порядок в главном навигационном файле и починили процессный корень деградации.**
