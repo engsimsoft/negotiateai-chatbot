@@ -22,9 +22,9 @@ import {
   calculateCostBreakdownRub,
   type CostBreakdownRub,
   extractUsageForPricing,
-  getContextWindow,
   type TokenUsageForPricing,
 } from "@/lib/ai/providers";
+import { SIMPLY_CONTEXT_LIMIT } from "@/lib/ai/context-limits";
 
 export interface AppUsage {
   /** Anthropic API model ID that produced this response. */
@@ -81,7 +81,7 @@ export function buildAppUsage(
     costRub,
     contextWindow: {
       used: contextUsed,
-      max: getContextWindow(modelId),
+      max: SIMPLY_CONTEXT_LIMIT,
     },
   };
 }
