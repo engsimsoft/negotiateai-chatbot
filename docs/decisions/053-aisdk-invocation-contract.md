@@ -26,7 +26,9 @@ Simply использует AI SDK v6 (`ai@6.x`) для всех LLM-вызов�
 
 ## Решение
 
-Фиксируем **4-аспектный контракт** AI SDK invocation. Каждый call site AI SDK (generateText / streamText / generateObject / streamObject) обязан явно декларировать все четыре аспекта. Каждый аспект имеет SSOT и правила взаимосвязей с другими.
+Фиксируем **5-аспектный контракт** AI SDK invocation. Каждый call site AI SDK (generateText / streamText / generateObject / streamObject) обязан явно декларировать первые **четыре** аспекта (taskId / model / cap / call mode). **Пятый аспект** (context strategy) — контекстно-зависимый, относится только к chat-handler routes (`app/(chat)/api/chat/route.ts` и аналоги), которые работают с накапливаемой историей разговора. Каждый аспект имеет SSOT и правила взаимосвязей с другими.
+
+> **История изменений:** 4 аспекта зафиксированы 2026-04-18 в первой версии ADR (ТЗ-AISDKLayerHardening). 5-й аспект добавлен 2026-04-20 в ТЗ-COMPACTION-1 — Simply Compaction MVP стал первым mature примером управления context strategy через `getCompactionStrategy(modelId)`.
 
 ### 1. `taskId` — стабильный идентификатор AI-точки
 
@@ -76,6 +78,28 @@ Simply использует AI SDK v6 (`ai@6.x`) для всех LLM-вызов�
 Правило касается **обоих** non-streaming API: `generateText` и `generateObject` (та же timeout-bomb при больших JSON ответах). На xAI / MiniMax / OpenRouter threshold не применяется (их tokens/second выше и SDK/провайдер сами handle non-streaming для больших output). На Anthropic — жёстко.
 
 **Как защищено:** `warnOnce` в `getMaxOutputTokensForTask` предупреждает в dev-логах при попытке собрать такую комбинацию. Production — не крашится (предупреждение game-over если появится — но лучше чем socket error).
+
+### 5. `context strategy` — управление накапливаемой историей разговора
+
+**Что:** стратегия сжатия / адаптации истории чата при приближении к context window провайдера. Применяется только в chat-handler routes, которые работают с накапливаемой `ChatMessage[]` историей (Simply Chat, Expertise, Create, Project Chat). Не относится к stateless вызовам (artifact handlers, briefing pipeline, util:* tasks).
+
+**SSOT резолва:** `getCompactionStrategy(modelId)` в [lib/ai/model-catalog.ts](../../lib/ai/model-catalog.ts) → `{kind: "provider" | "simply" | "none"}`:
+- `provider` — модель имеет capability `supportsCompaction === true` (Anthropic Sonnet/Opus 4+) → используется provider-native Compaction API через `providerOptions.anthropic.contextManagement: { type: "auto" }`. Middleware `prepareMessagesWithCompaction` no-op.
+- `simply` — модель умеет генерировать структурированный output, но не имеет нативного compaction (Grok 4.1/4.20, Haiku 4.5, MiniMax M2.7, GLM 4.6) → Simply Compaction middleware ([lib/ai/compaction/](../../lib/ai/compaction/)).
+- `none` — модель не подходит для conversational context (embeddings, audio, TTS) → middleware no-op.
+
+**Параметры стратегии (для `kind === "simply"`):**
+
+- **Триггеры (от `SIMPLY_CONTEXT_LIMIT = 200_000`):**
+  - Soft = 50% (100K) → Фаза 1/2: первое или повторное сжатие, без user warning.
+  - Hard = 85% (170K) → Фаза 3: сжатие + user-visible warning «начать новый разговор».
+- **Verbatim window:** `COMPACTION_VERBATIM_WINDOW_TOKENS = 40_000` — последние N токенов истории сохраняются дословно, остальное идёт в summary.
+- **Summary modal:** Grok 4.1 Fast non-reasoning (`taskId: "compaction:summarize"`, cap 4096), 5-секционный формат (Контекст / Материалы / Решения / Фокус / Вопросы).
+- **Полный input для расчёта `totalContext`:** `system + history + new + mind + tools` (5 компонентов). Ошибочно считать только `system + history` — без tools schemas (~1-4K в expertise) и `tool-call`/`tool-result` parts в истории (могут быть 10K+) расчёт уйдёт в 2-3x занижение. См. [lib/utils.ts → estimateMessageTokens](../../lib/utils.ts) и [lib/ai/tools/chat-tools.ts → computeToolsTokens](../../lib/ai/tools/chat-tools.ts).
+
+**Не меняется в runtime.** Стратегия резолвится один раз на старте chat handler по `effectiveModelId` (после dev override). Меняется только при смене модели для taskId.
+
+**Архитектурный документ:** [specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md](../../specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md) — детали алгоритмов (verbatim window edge cases A/B, rolling-update паттерн summary, фазы работы).
 
 ---
 

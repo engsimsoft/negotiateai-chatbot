@@ -172,6 +172,10 @@
 
 17 файлов в `lib/ai/tools/`, сгруппированы по пяти категориям: registration/infrastructure, web/research, artifacts/documents, context/files, utility.
 
+#### `lib/ai/compaction/` — Simply Compaction middleware (ТЗ-COMPACTION-1, v3.94.0)
+
+6 файлов: `types.ts` (CompactionContext / CompactionEvent / PrepareMessagesResult), `prompt.ts` (системный промпт + rolling-update паттерн), `summarize.ts` (`generateCompactionSummary` через Grok 4.1 Fast non-reasoning + Zod 5-секционная схема), `db-queries.ts` (get/saveCompactionState с собственным Neon HTTP клиентом), `prepare-messages.ts` (основная middleware с verbatim window и edge cases), `events.ts` (`emitCompactionEvent` для user-visible виджета). Capability-driven резолв через `getCompactionStrategy(modelId)` в [model-catalog.ts](../lib/ai/model-catalog.ts). Активна в `expertise` / `create` через gate в [chat/route.ts:1060](../app/(chat)/api/chat/route.ts#L1060). **Детали:** [ADR 053 § 5. context strategy](decisions/053-aisdk-invocation-contract.md), [SIMPLY_COMPACTION_ARCHITECTURE.md](../specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md).
+
 **SSOT = [ai-tools.md](ai-tools.md)** — полный список каждого tool-а с API, примерами использования, форматами, лимитами. При добавлении нового tool обновлять **там**, не здесь.
 
 ---

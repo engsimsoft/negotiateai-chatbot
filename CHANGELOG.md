@@ -65,6 +65,77 @@
 
 ---
 
+## [3.94.0] — 2026-04-20 — ТЗ-COMPACTION-1 — Simply Compaction MVP (expertise + create)
+
+**Новый механизм управления контекстом для длинных разговоров.** При накоплении истории чата выше 50% (Soft = 100K) от `SIMPLY_CONTEXT_LIMIT = 200K` middleware автоматически сжимает старые сообщения в структурированный 5-секционный summary (Контекст / Материалы / Решения / Фокус / Вопросы) через Grok 4.1 Fast non-reasoning, оставляя последние 40K токенов дословно. При 85% (Hard = 170K) — Фаза 3 с user-visible предупреждением «Рекомендуем начать новый запрос/задание». Capability-driven: для Anthropic Sonnet/Opus используется provider-native Compaction API, для остальных моделей (Grok, Haiku, MiniMax, GLM) — наша middleware. Экономит десятки тысяч output tokens на длинных сессиях, продлевает полезность одного чата без ручного управления.
+
+### Архитектура
+
+- **Capability-driven резолв** через `getCompactionStrategy(modelId)` ([lib/ai/model-catalog.ts](lib/ai/model-catalog.ts)) → `{kind: "provider" | "simply" | "none"}`. Не chatMode-driven, не provider-driven.
+- **Middleware** в [lib/ai/compaction/](lib/ai/compaction/) (6 файлов: types, prompt, summarize, db-queries, prepare-messages, events). Работает на `ChatMessage[]` ДО `convertToModelMessages` — чисто на уровне истории, без вмешательства в system prompt / tools / MIND.
+- **БД:** 3 новые колонки в `Chat` ([lib/db/schema.ts](lib/db/schema.ts)) — `compactionSummary` (text), `compactionIndex` (int), `compactionCount` (int NOT NULL DEFAULT 0). Миграция [0056_add-compaction-columns.sql](lib/db/migrations/0056_add-compaction-columns.sql).
+- **Gate:** `chatMode === "expertise" || chatMode === "create"` в [chat/route.ts:1060](app/(chat)/api/chat/route.ts#L1060). Simply Chat пока вне scope (отдельный ТЗ-COMPACTION-2 после ~недели stable production).
+- **UI индикатор** ([components/elements/context.tsx](components/elements/context.tsx)) — встроен в существующий popover виджета контекста: 📦 «Разговор сжат» / ⚠️ «Рекомендуем начать новый запрос/задание» (mode-aware терминология). Сам ContextIcon меняет цвет на янтарный при `truncation_warning` чтобы пользователь заметил без открытия popover'а.
+- **Event channel:** `data-compaction` ([lib/ai/compaction/events.ts](lib/ai/compaction/events.ts)) — отдельный от `data-debug-compaction` (Anthropic provider iterations, dev-only). Решение архитектора 2026-04-19: раздельные channels вместо discriminated union (разная семантика, разные клиенты).
+
+### Архитектурное решение по формуле подсчёта токенов (2026-04-19)
+
+При smoke test обнаружено критическое расхождение между нашим `totalContext` и реальным input провайдера: ~3x. Корневые причины (две):
+
+1. **`estimateMessageTokens` ([lib/utils.ts](lib/utils.ts))** игнорировал `tool-call` / `tool-result` / file parts — считал только text. В expertise с активными tools (deepResearch / webSearch) `tool-result` parts могли занимать 10K+ токенов в истории, не попадая в наш расчёт. **Fix:** функция теперь учитывает все три типа parts (text + tool-call.input + tool-result.output). SSOT-правка — починила одновременно Compaction, MIND extract trigger и виджет контекста.
+2. **Tools schemas** (Zod inputSchema + description) сериализуются провайдером в JSON и считаются в input_tokens, но не входили в `systemPromptText`. В expertise — ~1-1.5K токенов на 10 активных tools. **Fix:** новый helper `computeToolsTokens` ([lib/ai/tools/chat-tools.ts](lib/ai/tools/chat-tools.ts)) через `zod-to-json-schema` (транзитивная dep AI SDK, drift нулевой). Передаётся в middleware пятым полем `toolsTokens` в `CompactionContext`.
+
+После двух правок formula-accuracy ≈ ±10-15% относительно реального input провайдера (xAI Usage Explorer как источник истины). Архитектор оценил как приемлемое для threshold-решений 50%/85%.
+
+### Точечные фиксы (smoke test обнаружил)
+
+- **`util:title` cap 64 → 512** ([lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)) — модель обрывала JSON `{title, summary}` на середине строки в русском (`AI_NoObjectGeneratedError`). 4x запас под русский структурированный output, billing cap не actual cost. Закрывает с превышением долг `TZ_UtilTitleCapReasoningMargin` (рекомендовал 256).
+- **`autoNameChat` обёрнут в try/catch** ([chat/route.ts:151-218](app/(chat)/api/chat/route.ts#L151)) — graceful fallback при любых ошибках `generateObject`. Дефолтный title уже mode-aware («Новый запрос», «Новое задание»), пользователь видит штатное поведение.
+- **file parts учитываются в `newMessageTokens`** — порядок операций в [chat/route.ts:487-505](app/(chat)/api/chat/route.ts#L487-L505) переставлен: `convertTextFilePartsInMessage` ДО подсчёта. Раньше middleware видела `new=42` для сообщения с MD файлом 80K символов (~20K токенов).
+- **Permanent observability log** ([prepare-messages.ts:74-93](lib/ai/compaction/prepare-messages.ts#L74-L93)) — структурированный info-уровень `[Compaction] chat=... tokens={...} thresholds={...} action=noop|compact|truncate` на каждом вызове. Один префикс для grep в Vercel log drain.
+
+### ADR
+
+- **[ADR 053](docs/decisions/053-aisdk-invocation-contract.md)** — расширен до 5-аспектного контракта (добавлен пятый аспект «context strategy» — контекстно-зависимый, относится только к chat-handler routes). Compaction — первый mature пример этого аспекта. Полный список аспектов: taskId / model / cap / call mode / context strategy.
+
+### Findings → backlog
+
+- **Finding #1** ([Pre-existing AI SDK v6 deprecation](_archive/TZ_COMPACTION_1/FINDINGS.md)) — `generateObject` помечен `@deprecated`. Миграция codebase-wide на `generateText({ output: Output.object({ schema }) })` — отдельный ТЗ. Не блокирует.
+- **Finding #2** (формула подсчёта) — ✅ закрыт архитекторским решением в этой версии (двухкомпонентный fix выше).
+- **Finding #3** (Haiku в project chat без Anthropic Compaction) — ✅ закрыт удалением заплатки `|| isProjectChat` в `supportsCompaction` rewrite.
+- **Finding #4** (точка интеграции middleware) — ✅ закрыт: middleware на `ChatMessage[]` до `convertToModelMessages`.
+- **Финансовый учёт `compaction:summarize` не пишется в `ai_usage_log`** — обнаружено в финальной сверке с xAI Console. `userId` не передаётся в `generateCompactionSummary` из middleware — `logUsage` пропускается. Не блокирует MVP, отложено в [specs/_backlog/](specs/_backlog/) как hand-off для следующей итерации (владелец — «потом разберёмся»).
+- **🟥 [TZ_ExpertiseCreateVisionRouting](specs/_backlog/TZ_ExpertiseCreateVisionRouting.md)** (High impact, 0.5 сессии) — в expertise/create нет vision-routing'а на Haiku 4.5 (как в Simply через `simply-chat-vision`). Сканированные PDF (CAD/чертежи) падают с `AI_UnsupportedFunctionalityError`. Архитектурный пробел — был и до COMPACTION-1, обнаружен в smoke test.
+- **🟩 [TZ_CompactionActualCalibration](specs/_backlog/TZ_CompactionActualCalibration.md)** (Low impact, 0.3 сессии) — sanity-check delta нашего `estimate` vs реального `actual.promptTokens` через `ai_usage_log` после ~недели MVP в production. Если ratio за пределами 0.85-1.15 — калибровать коэффициенты `estimateTokenCount`. Иначе закрыть как невостребованный.
+- **🟧 [TZ_UnifyContextThresholdBase](specs/_backlog/TZ_UnifyContextThresholdBase.md)** — унификация баз расчёта MIND (`CONTEXT_BUDGET=140K`) и Compaction (`SIMPLY_CONTEXT_LIMIT=200K`). Production behavior не затронут, долг семантический. Создано в Фазе 1 ТЗ.
+
+### Validation
+
+- `npx tsc --noEmit` → 0 ошибок на каждом этапе (A1-A6, B1, архитектурные правки).
+- `npm run build` → успешен с автомиграцией 0056 (3 колонки в Chat).
+- **Мануальный smoke test владельцем end-to-end:**
+  - Этап A (тестовые пороги `SIMPLY_CONTEXT_LIMIT=10K`, `VERBATIM=2K`): compaction цепочка middleware → summary → БД → UI виджет, `compactionCount=2`, summary 5 секций.
+  - Этап B (production пороги 200K/40K): в `create` чате `765e9f27` достигнут hard threshold (`total=174K → 183K → action=truncate`), summary ~896 токенов, UI иконка янтарная, регрессия MIND extract отсутствует (5 extracted, 5 stored, 3 superseded).
+- **SQL верификация миграции:** 3 колонки `compactionSummary` (text, YES, null) / `compactionIndex` (integer, YES, null) / `compactionCount` (integer, NO, 0).
+- **xAI Usage Explorer как источник истины** для сверки расчёта токенов с реальным input провайдера.
+
+### Backlog impact
+
+- ✅ `TZ_UtilTitleCapReasoningMargin` (🟩 Low) — закрыт **с превышением** рекомендованного значения (cap=512 вместо 256).
+- ➕ `TZ_ExpertiseCreateVisionRouting` (🟥 High) — новый, обнаружен в smoke test Этапа B1.
+- ➕ `TZ_CompactionActualCalibration` (🟩 Low) — новый, sanity-check после недели MVP.
+- 🔄 `TZ_UnifyContextThresholdBase` (🟧 Medium) — открыт, не блокирует MVP.
+
+### Урок сессии (для будущего)
+
+**Не отмахиваться от обнаруженных проблем словами «не наша зона».** В smoke test ТЗ-COMPACTION-1 была фраза «это не баг COMPACTION-1, это известное ограничение архитектуры» (про сканированные PDF в expertise) — владелец справедливо указал что это код приложения, мы за него отвечаем. Правильное действие — детальный аудит, заведение конкретного backlog ТЗ с решением, **не предложение костылей** (распространить gate без понимания root cause). Зафиксировано в memory.
+
+**Архитектурные правки делегировать архитектору.** Расхождение в 3x между нашей оценкой и реальным input провайдера — не «проблема измерения», а вопрос **что считается context size** на разных слоях. Выявить можно разработчику; решить как — отдельная Opus-сессия архитектора. Сэкономило контекстное окно главного исполнителя, дало готовый план реализации.
+
+**Архивирование:** папка ТЗ перемещена в `_archive/TZ_COMPACTION_1/` (HANDOFF, FINDINGS, ROADMAP, ANALYSIS, ARCHITECT_ANSWERS сохранены).
+
+---
+
 ## [3.93.0] — 2026-04-18 — ТЗ-AISDKLayerHardening — укрепление слоя AI SDK invocations
 
 **Umbrella ТЗ: 3 backlog-долга закрыты одним релизом** — `TZ_DevOverridesSideEffectImportAudit` (🟥 High), `TZ_MaxOutputTokensAudit` (🟧), `TZ_ProfessorPlanStreaming` (🟧). Цель — устранить накопленный технический долг в слое AI SDK invocations и закодифицировать 4-аспектный контракт (taskId / model / cap / call mode) через ADR.

@@ -50,7 +50,6 @@
 
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
-| [TZ_UtilTitleCapReasoningMargin](TZ_UtilTitleCapReasoningMargin.md) | Cap `util:title` = 64 рассчитан на non-reasoning default. При dev override на `grok-4-1-fast-reasoning` (через `/dev/models`) safety-net обрезает финальный ответ ровно по cap (506 thinking + 64 output = 570 total, final JSON на границе). Production не затронут. Решение — поднять cap до 256 для запаса при reasoning variant. **NB:** при ТЗ-COMPACTION-1 (2026-04-19) cap уже поднят до 512 для решения проблемы #3 (autoNameChat обрывал JSON на русском) — этот долг по сути закрыт **с превышением рекомендованного значения**. Финальная проверка/закрытие при следующем backlog-review. | < 0.25 сессии | ТЗ-AISDKLayerHardening Finding #1 |
 | [TZ_CompactionActualCalibration](TZ_CompactionActualCalibration.md) | Compaction формула `totalContext = system + history + new + mind + tools` доведена до ±10-15% точности (ТЗ-COMPACTION-1). После недели MVP в production — sanity-check delta нашего `estimate` vs `actual.promptTokens` из `ai_usage_log`. Если ratio за пределами 0.85-1.15 — калибровать коэффициенты `estimateTokenCount` или перейти на tiktoken-based tokenizer. Иначе закрыть как невостребованный. | 0.3 сессии (или 0 если ratio ок) | Архитектор по решению Проблемы #2 ТЗ-COMPACTION-1 |
 
 ---

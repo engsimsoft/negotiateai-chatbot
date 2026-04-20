@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-04-18
+**Обновлено:** 2026-04-20 — добавлен `compaction:summarize` taskId (ТЗ-COMPACTION-1, v3.94.0)
 
 ---
 
@@ -48,6 +48,7 @@
 | **MIND Memory: batch/consolidate/profile/dedup** | Grok 4.1 Fast (`memory:*`) | ✅ Работает | Механические задачи MIND pipeline |
 | **Vision OCR** | Claude Haiku 4.5 (`vision:ocr`) | ✅ Работает | OCR-экстракция текста из изображений |
 | **Title** | Grok 4.1 Fast (`util:title`) | ✅ Работает | Автонейминг чатов |
+| **Compaction Summary** | Grok 4.1 Fast non-reasoning (`compaction:summarize`) | ✅ Работает | Simply Compaction MVP — структурированное 5-секционное сжатие истории чата при достижении 50%/85% от `SIMPLY_CONTEXT_LIMIT=200K`. Активен в `expertise` / `create`. Anthropic Sonnet/Opus → provider-native API |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники (не подключены) |
 
 ---

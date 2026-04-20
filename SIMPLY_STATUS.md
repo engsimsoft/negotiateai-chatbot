@@ -1,7 +1,7 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.93.0
-**Статус:** Active development (**серия Simply_xAI закрыта** 2026-04-16 в v3.92.1)
+**Версия:** 3.94.0
+**Статус:** Active development (**серия Simply_xAI закрыта** 2026-04-16 в v3.92.1, **ТЗ-COMPACTION-1 закрыт** 2026-04-20 в v3.94.0)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** snapshot «что работает прямо сейчас» на один взгляд. История изменений → [CHANGELOG.md](CHANGELOG.md). Архитектура → [docs/architecture.md](docs/architecture.md). Карта моделей → [docs/ai-chats-map.md](docs/ai-chats-map.md).
@@ -36,6 +36,7 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 | **Создание** (одноразовые creation-чаты) | ✅ | Grok 4.20 reasoning (мигрировано 2026-04-16) |
 | **Проекты** (изолированные рабочие пространства) | ✅ | Claude Haiku / Sonnet / Opus по tier, Профессор (Opus planning/review + Haiku execute) |
 | **База знаний — MIND** (Слой 3 RAG, auto из разговоров) | ✅ | Grok 4.20 reasoning (extract) + Grok 4.1 Fast (batch, consolidate, profile, dedup) + Voyage AI (embeddings) + pgvector |
+| **Simply Compaction** (автосжатие истории чата при пороге 50%/85% от 200K) | ✅ | Grok 4.1 Fast non-reasoning (`compaction:summarize`) + capability-driven middleware. Активен в `expertise` / `create`. Anthropic Sonnet/Opus используют provider-native Compaction API. Simply Chat — план ТЗ-COMPACTION-2 |
 | **База знаний — Collections** (Слой 3 RAG, явная загрузка документов) | 📋 план | xAI Grok Collections API из коробки (`knowledge_search` / `file_search`). Отдельного векторного стека не строим. ТЗ-XAI-COL-1 |
 | **Briefing** (hourly Vercel Cron) | ✅ | Grok 4.1 Fast (filter) · MiniMax M2.7-long (author, section) · MiniMax M2.7 (podcast-script). Миграция author/section на Grok разблокирована 2026-04-16 (URL hallucination оказалась metric bug в `verifyArticleUrls`, не проблемой моделей — commit `58d9d2e`); планируется в ТЗ-XAI-6 |
 | **Podcast** (attached to briefing) | ✅ | Gemini TTS (длинный формат, blob storage) |
