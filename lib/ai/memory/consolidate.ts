@@ -1,11 +1,8 @@
 /**
- * ТЗ-RAG2: Memory consolidation — Sonnet reviews facts for contradictions, duplicates, and staleness.
+ * ТЗ-RAG2: Memory consolidation — LLM reviews facts for contradictions, duplicates, and staleness.
  *
- * Two modes:
- * - Full: all active facts, for nightly cron
- * - Mini: recent facts vs existing, event-triggered every N new facts
- *
- * Both modes use the same prompt and action schema — differ only in input scope.
+ * Triggered event-chain from `batchExtractFacts` when ≥10 facts are stored in one batch
+ * (see extract.ts). Reviews all active facts (capped at FULL_CONSOLIDATION_MAX_FACTS).
  */
 
 import "server-only";
@@ -55,13 +52,10 @@ const CONSOLIDATE_SYSTEM_PROMPT = fs.readFileSync(
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Mini-consolidation: how many recent facts to review */
-const MINI_RECENT_FACTS_LIMIT = 30;
-
-/** Max actions Sonnet can return per call */
+/** Max actions LLM can return per call */
 const MAX_ACTIONS_PER_CALL = 20;
 
-/** Max facts to send to Sonnet in full consolidation (avoid token overflow) */
+/** Max facts to send to LLM in full consolidation (avoid token overflow) */
 const FULL_CONSOLIDATION_MAX_FACTS = 200;
 
 // ---------------------------------------------------------------------------
@@ -268,12 +262,13 @@ async function applyConsolidationActions(
 }
 
 // ---------------------------------------------------------------------------
-// consolidateUserMemory — FULL review (for nightly cron)
+// consolidateUserMemory — FULL review
 // ---------------------------------------------------------------------------
 
 /**
- * Full consolidation: review ALL active facts for a user.
- * Used by nightly cron before Opus profile generation.
+ * Full consolidation: review ALL active facts for a user (capped at
+ * FULL_CONSOLIDATION_MAX_FACTS). Triggered event-chain from batchExtractFacts
+ * when ≥10 facts are stored in one batch.
  */
 export async function consolidateUserMemory(
   userId: string,
@@ -297,36 +292,3 @@ export async function consolidateUserMemory(
   return stats;
 }
 
-// ---------------------------------------------------------------------------
-// miniConsolidateUserMemory — MINI review (event-triggered)
-// ---------------------------------------------------------------------------
-
-/**
- * Mini consolidation: review only recent facts against existing ones.
- * Triggered every N new facts (fire-and-forget from extract.ts).
- *
- * Scope: latest MINI_RECENT_FACTS_LIMIT facts — finds contradictions
- * with each other and with older facts visible in the same batch.
- */
-export async function miniConsolidateUserMemory(
-  userId: string,
-): Promise<ConsolidationStats> {
-  // Load recent facts (ordered by createdAt desc, most recent first)
-  const recentFacts = await getMemoryEntriesByUser(userId, {
-    activeOnly: true,
-    limit: MINI_RECENT_FACTS_LIMIT,
-  });
-
-  const stats = await runConsolidation(userId, recentFacts);
-
-  // Reset counter + update lastConsolidatedAt
-  await updateMemorySettings({
-    userId,
-    patch: {
-      lastConsolidatedAt: new Date(),
-      factsSinceConsolidation: 0,
-    },
-  });
-
-  return stats;
-}

@@ -49,6 +49,18 @@ export const COMPACTION_VERBATIM_WINDOW_TOKENS = 40_000;
 /** Target объём summary в промпте (hard cap 4096 задан в task-assignments.ts для compaction:summarize). */
 export const COMPACTION_SUMMARY_TARGET_TOKENS = 3_000;
 
+/**
+ * MIND consolidation cumulative trigger.
+ *
+ * Consolidation запускается, когда `factsSinceConsolidation + storedCount >= 15`
+ * (альтернатива к мгновенному триггеру `storedCount >= 10`). Накопительный порог
+ * гарантирует периодический health-check памяти даже при малом потоке фактов
+ * на compaction cycle.
+ *
+ * Источник: specs/_backlog/TZ_MindConsolidationTriggers.md (v2, 2026-04-21).
+ */
+export const CONSOLIDATION_THRESHOLD_CUMULATIVE = 15;
+
 /** Calculate usage percentage (0-100). Default budget — `SIMPLY_CONTEXT_LIMIT`. */
 export function calcUsagePercent(
   tokens: number,

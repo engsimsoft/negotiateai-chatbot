@@ -838,11 +838,9 @@ export const memorySettings = pgTable(
     memoryEnabled: boolean("memoryEnabled").notNull().default(true),
     /** Timestamp when facts were last updated (for profile regeneration gate) */
     factsUpdatedSince: timestamp("factsUpdatedSince"),
-    /** Counter: new facts since last consolidation (triggers mini-consolidation at threshold) */
     factsSinceConsolidation: integer("factsSinceConsolidation")
       .notNull()
       .default(0),
-    /** When was the last consolidation (full or mini) run */
     lastConsolidatedAt: timestamp("lastConsolidatedAt"),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
     updatedAt: timestamp("updatedAt").notNull().defaultNow(),

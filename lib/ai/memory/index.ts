@@ -24,7 +24,7 @@ export { batchExtractFacts } from "./extract";
 
 // Consolidation
 export type { ConsolidationStats } from "./consolidate";
-export { consolidateUserMemory, miniConsolidateUserMemory } from "./consolidate";
+export { consolidateUserMemory } from "./consolidate";
 
 // Profile generation
 export type { ProfileGenerationResult } from "./profile";

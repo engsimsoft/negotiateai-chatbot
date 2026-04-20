@@ -10,6 +10,8 @@
 **Последняя major ревизия: ТЗ-COMPACTION-UNIFY (v3.95.0, 2026-04-20).**
 Per-turn extract (taskId `memory:extract`, промпт `extract.md`, функции `extractFactsFromMessages` / `extractAndStoreFacts`) удалён. Extract запускается только внутри compaction cycle через `prepareMessagesWithCompaction` — на подмножестве сообщений, уходящих в summary (Mem0 best practice 2026 «memory formation before summarization»). Все пороги считаются от `SIMPLY_CONTEXT_LIMIT = 200_000` — константы `CONTEXT_BUDGET`, `EXTRACT_THRESHOLD_SOFT/HARD`, `EXTRACT_PAUSE_MS` удалены из кода. Полное обоснование: [ADR 054](../../docs/decisions/054-single-strategy-compaction.md).
 
+**Правка 2026-04-21: ТЗ-MindConsolidationTriggers v2.** Mini-consolidation (`miniConsolidateUserMemory`, константы `MINI_CONSOLIDATION_THRESHOLD` / `MINI_RECENT_FACTS_LIMIT`) удалена — дублировала full-проход без преимуществ. Триггер consolidation стал двойным: мгновенный (`storedCount >= 10` на одном compaction) **ИЛИ** накопительный (`factsSinceConsolidation + storedCount >= 15`, константа `CONSOLIDATION_THRESHOLD_CUMULATIVE`). Счётчик `factsSinceConsolidation` реанимирован — обнуляется при запуске `consolidateUserMemory`. Обоснование дизайна (Mem0 v3, Letta sleep-time compute, Dream gate) — [specs/_backlog/TZ_MindConsolidationTriggers.md](../_backlog/TZ_MindConsolidationTriggers.md) (v2).
+
 ---
 
 ## 1. Картина за 2 минуты
@@ -63,16 +65,19 @@ Per-turn extract (taskId `memory:extract`, промпт `extract.md`, функц
      │   incrementFactsSinceConsolidation│
      └──────────────┬────────────────────┘
                     │
-       ┌────────────┴─────────────┐
-       │ ≥ 10 фактов подряд?       │
-       └───────┬──────────┬────────┘
+       ┌────────────┴──────────────────────┐
+       │ storedCount ≥ 10 ?                 │
+       │  ИЛИ                                │
+       │ factsSinceConsolidation +          │
+       │   storedCount ≥ 15 ?               │
+       └───────┬──────────┬─────────────────┘
                │ да       │ нет
                ▼          │
      ┌─────────────────┐  │
      │ ЭТАП 4:         │  │
      │ CONSOLIDATE     │  │
-     │ mini (recent)   │  │
-     │ или full (cron) │  │
+     │ full review     │  │
+     │ (сброс счётчика)│  │
      └────────┬────────┘  │
               │           │
               │ ≥ 10 изменений?
@@ -191,8 +196,7 @@ Per-turn extract (taskId `memory:extract`, промпт `extract.md`, функц
 | `MAX_BATCH_MESSAGES` | `50` | [extract.ts](../../lib/ai/memory/extract.ts) | Лимит сообщений per batch extract call | Не трогать |
 | `MAX_BATCH_FACTS` | `30` | [extract.ts](../../lib/ai/memory/extract.ts) | Кап на факты per batch extract | Не трогать |
 | `DEDUP_CANDIDATE_THRESHOLD` | `0.55` | [extract.ts](../../lib/ai/memory/extract.ts) | Cosine similarity threshold для dedup кандидатов (уровень 1) | Если шум в памяти: поднять до 0.65; если пропуски дубликатов: снизить до 0.5 |
-| `MINI_CONSOLIDATION_THRESHOLD` | `20` | [extract.ts](../../lib/ai/memory/extract.ts) | Каждые N фактов → mini-consolidation | ⚡ Для теста consolidation: `2` |
-| `MINI_RECENT_FACTS_LIMIT` | `30` | [consolidate.ts](../../lib/ai/memory/consolidate.ts) | Скольки фактов смотрит mini-consolidate | Не трогать |
+| `CONSOLIDATION_THRESHOLD_CUMULATIVE` | `15` | [context-limits.ts](../../lib/ai/context-limits.ts) | Накопительный триггер consolidation: запуск когда `factsSinceConsolidation + storedCount >= 15` | ⚡ Для теста: `2` |
 | `FULL_CONSOLIDATION_MAX_FACTS` | `200` | [consolidate.ts](../../lib/ai/memory/consolidate.ts) | Кап на full consolidation (ночная ревизия) | Не трогать |
 | `MAX_ACTIONS_PER_CALL` | `20` | [consolidate.ts](../../lib/ai/memory/consolidate.ts) | Кап на действия per LLM call | Не трогать |
 | `MAX_FACTS_FOR_PROFILE` | `300` | [profile.ts](../../lib/ai/memory/profile.ts) | Кап фактов для генерации профиля | Не трогать |
@@ -238,15 +242,15 @@ Per-message extract (taskId `memory:extract`) удалён — отдельно�
 
 ### Сценарий C — Тест consolidation
 
-**Временные изменения в [lib/ai/memory/extract.ts:47](../../lib/ai/memory/extract.ts#L47):**
+**Временное изменение в [lib/ai/context-limits.ts](../../lib/ai/context-limits.ts):**
 ```ts
-const MINI_CONSOLIDATION_THRESHOLD = 2;  // было 20
+export const CONSOLIDATION_THRESHOLD_CUMULATIVE = 2;  // было 15
 ```
 
 **Шаги:**
-1. Запустить сценарий A или B чтобы накопить ≥2 факта
-2. Ожидаемое: после второго сохранённого факта — `[MemoryConsolidate] Done for user ...`
-3. Вернуть дефолт `20`
+1. Запустить сценарий A чтобы вызвать batch extract
+2. Ожидаемое при накоплении ≥2 фактов (через один или два compaction-цикла): `[MIND] Batch extract: triggering consolidation (stored=..., cumulative=...)` → `[MemoryConsolidate] Done for user ...`
+3. Вернуть дефолт `15`
 
 ### Сценарий D — Тест profile generation
 
@@ -265,12 +269,11 @@ const MINI_CONSOLIDATION_THRESHOLD = 2;  // было 20
 | `COMPACTION_THRESHOLD_HARD` | `0.85` | [context-limits.ts](../../lib/ai/context-limits.ts) |
 | `COMPACTION_VERBATIM_WINDOW_TOKENS` | `40_000` | [context-limits.ts](../../lib/ai/context-limits.ts) |
 | `COMPACTION_SUMMARY_TARGET_TOKENS` | `3_000` | [context-limits.ts](../../lib/ai/context-limits.ts) |
-| `MINI_CONSOLIDATION_THRESHOLD` | `20` | [extract.ts](../../lib/ai/memory/extract.ts) |
+| `CONSOLIDATION_THRESHOLD_CUMULATIVE` | `15` | [context-limits.ts](../../lib/ai/context-limits.ts) |
 
 Команда проверки:
 ```bash
-grep -E "SIMPLY_CONTEXT_LIMIT|COMPACTION_THRESHOLD|COMPACTION_VERBATIM|COMPACTION_SUMMARY_TARGET" lib/ai/context-limits.ts
-grep "MINI_CONSOLIDATION_THRESHOLD" lib/ai/memory/extract.ts
+grep -E "SIMPLY_CONTEXT_LIMIT|COMPACTION_THRESHOLD|COMPACTION_VERBATIM|COMPACTION_SUMMARY_TARGET|CONSOLIDATION_THRESHOLD_CUMULATIVE" lib/ai/context-limits.ts
 ```
 
 ---
@@ -308,7 +311,7 @@ grep "MINI_CONSOLIDATION_THRESHOLD" lib/ai/memory/extract.ts
   - `createdAt`, `updatedAt`
 - `memory_settings` — per-user
   - `memoryEnabled` (bool) — глобальный toggle
-  - `factsSinceConsolidation` (int) — счётчик для mini-consolidation триггера
+  - `factsSinceConsolidation` (int) — накопительный счётчик для cumulative-триггера consolidation (порог `CONSOLIDATION_THRESHOLD_CUMULATIVE = 15`)
   - `lastConsolidatedAt` (timestamp)
 - `user_profile_summary` — narrative Opus-профиль
   - `content`, `factCount`, `tokenCount`, `costUsd`, `modelId`, `createdAt`

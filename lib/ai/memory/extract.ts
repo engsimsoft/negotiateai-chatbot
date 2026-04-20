@@ -40,7 +40,8 @@ import {
   supersedeMemoryEntry,
   markMessagesExtracted,
 } from "./memory-queries";
-import { incrementFactsSinceConsolidation } from "@/lib/db/queries";
+import { getMemorySettings, incrementFactsSinceConsolidation } from "@/lib/db/queries";
+import { CONSOLIDATION_THRESHOLD_CUMULATIVE } from "@/lib/ai/context-limits";
 import { consolidateUserMemory } from "./consolidate";
 import { generateUserProfile } from "./profile";
 import { MEMORY_CATEGORIES, type MemoryCategory, type MemorySourceType, type MemorySearchResult } from "./types";
@@ -244,10 +245,28 @@ export async function batchExtractFacts(
     // Mark ALL batch messages as extracted (even if no facts found)
     await markMessagesExtracted(batch.map((m) => m.id));
 
-    // ТЗ-ExtractCompression V2: Event chain — consolidation if ≥10 facts stored
-    if (storedCount >= 10) {
+    // ТЗ-MindConsolidationTriggers v2 (2026-04-21): двойной триггер —
+    // (1) мгновенный: storedCount >= 10 (большой batch на одном compaction)
+    // (2) накопительный: factsSinceConsolidation + storedCount >= 15
+    //     (периодический health-check при малом потоке фактов)
+    let cumulativeCount = 0;
+    try {
+      const settings = await getMemorySettings({ userId });
+      cumulativeCount = settings.factsSinceConsolidation ?? 0;
+    } catch (err) {
+      console.warn(
+        "[MIND] Batch extract: failed to read factsSinceConsolidation, cumulative trigger skipped:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+
+    const shouldConsolidate =
+      storedCount >= 10 ||
+      cumulativeCount + storedCount >= CONSOLIDATION_THRESHOLD_CUMULATIVE;
+
+    if (shouldConsolidate) {
       console.log(
-        `[MIND] Batch extract: ${storedCount} facts stored, triggering consolidation`,
+        `[MIND] Batch extract: triggering consolidation (stored=${storedCount}, cumulative=${cumulativeCount})`,
       );
       void (async () => {
         try {
@@ -270,7 +289,8 @@ export async function batchExtractFacts(
         }
       })().catch(() => {});
     } else if (storedCount > 0) {
-      // Fewer than 10 — just increment counter for future mini-consolidation
+      // Накапливаем для cumulative-триггера. Счётчик обнуляется внутри
+      // consolidateUserMemory() при старте полного прохода.
       try {
         await incrementFactsSinceConsolidation({ userId });
       } catch (err) {
