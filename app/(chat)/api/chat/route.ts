@@ -25,7 +25,7 @@ import {
   getProviderForTask,
   isTaskOverridden,
 } from "@/lib/ai/getModel";
-import { getCompactionStrategy, getModelEntry, type ModelCapabilities } from "@/lib/ai/model-catalog";
+import { getModelEntry, type ModelCapabilities } from "@/lib/ai/model-catalog";
 import { prepareMessagesWithCompaction } from "@/lib/ai/compaction/prepare-messages";
 import { emitCompactionEvent } from "@/lib/ai/compaction/events";
 import type { CompactionEvent } from "@/lib/ai/compaction/types";
@@ -37,13 +37,9 @@ import {
   DEFAULT_PROJECT_MODEL,
   type ProjectModelTier,
 } from "@/lib/ai/model-tiers";
-import {
-  SIMPLY_CONTEXT_LIMIT,
-  EXTRACT_THRESHOLD_SOFT,
-  EXTRACT_THRESHOLD_HARD,
-  EXTRACT_PAUSE_MS,
-  calcUsagePercent,
-} from "@/lib/ai/context-limits";
+// ТЗ-COMPACTION-UNIFY: context-limits больше не нужен в этом handler —
+// Simply Compaction middleware (prepareMessagesWithCompaction) сам читает
+// пороги из context-limits.ts.
 import { executeProfessorPipeline } from "@/lib/ai/professor-pipeline";
 import { computeToolsTokens, getStandardTools, getActiveToolNames, withCacheControlOnLastTool } from "@/lib/ai/tools/chat-tools";
 import { isProductionEnvironment, isSimplyDevMode } from "@/lib/constants";
@@ -65,7 +61,8 @@ import {
 } from "@/lib/ai/debug-events";
 import { retrieveMemoryContext } from "@/lib/ai/memory/retrieve";
 import { getProfileBlock } from "@/lib/ai/memory/profile";
-import { extractAndStoreFacts, batchExtractFacts } from "@/lib/ai/memory/extract";
+// ТЗ-COMPACTION-UNIFY: extract вызывается внутри prepareMessagesWithCompaction —
+// main handler больше не импортирует extract функции.
 import {
   createStreamId,
   deleteChatById,
@@ -802,43 +799,11 @@ export async function POST(request: Request) {
           }
         }
 
-        // ТЗ-ExtractCompression: threshold-based batch extraction for simply
-        if (isSimplyChat && isMemoryEnabled) {
-          const systemPromptTokensForExtract = estimateMessageTokens([
-            { type: "text", text: systemPromptText },
-          ]);
-          const mindTokens = mindDynamicBlock
-            ? estimateMessageTokens([{ type: "text", text: mindDynamicBlock }])
-            : 0;
-          const totalContext = systemPromptTokensForExtract + mindTokens + totalHistoryTokens + newMessageTokens;
-          const usagePercent = calcUsagePercent(totalContext, SIMPLY_CONTEXT_LIMIT);
-
-          // Determine pause since last message
-          const lastMessageTime = messagesFromDb.length > 0
-            ? messagesFromDb[messagesFromDb.length - 1].createdAt.getTime()
-            : 0;
-          const pauseMs = lastMessageTime > 0 ? Date.now() - lastMessageTime : 0;
-
-          const shouldExtract =
-            usagePercent >= EXTRACT_THRESHOLD_HARD * 100 ||
-            (usagePercent >= EXTRACT_THRESHOLD_SOFT * 100 && pauseMs >= EXTRACT_PAUSE_MS);
-
-          if (shouldExtract) {
-            console.log(
-              `[MIND] Batch extract triggered: ${usagePercent}% of context used (${totalContext} tokens), pause=${Math.round(pauseMs / 1000)}s`,
-            );
-            void batchExtractFacts({
-              userId: session.user.id,
-              chatId: id,
-              messages: messagesFromDb,
-            }).catch((err) =>
-              console.warn(
-                "[MIND] Batch extract failed (non-blocking):",
-                err instanceof Error ? err.message : err,
-              ),
-            );
-          }
-        }
+        // ТЗ-COMPACTION-UNIFY: раздельный threshold-based batch extract для Simply
+        // удалён. Extract теперь запускается внутри `prepareMessagesWithCompaction`
+        // (ниже) на подмножестве сообщений `split.toCompact` — Mem0 best practice
+        // 2026 «memory formation before summarization». Единый event чтобы ни
+        // одно сообщение не уходило из окна без попытки извлечь факты.
 
         // ТЗ-PX: Emit research depth override for dev UI
         if (researchDepth) {
@@ -965,38 +930,17 @@ export async function POST(request: Request) {
           return; // Exit execute for professor mode
         }
 
-        // ТЗ-COMPACTION-1: capability-driven compaction strategy resolution.
-        // Старая заплатка `|| isProjectChat` (Finding #3) удалена: для project chat
-        // effectiveModelId совпадает с projectModelConfig.model.modelId через
-        // project:expert:* taskId mapping в DEFAULT_TASK_MODELS, поэтому
-        // forced-enable больше не нужен. Побочный эффект корректен:
-        // project:expert:haiku больше НЕ получает Anthropic Compaction API
-        // (Haiku.supportsCompaction = false — модель его не умеет), ранее был
-        // форсированно включён заплаткой. Это возврат к корректному поведению.
-        const compactionStrategy = effectiveModelId
-          ? getCompactionStrategy(effectiveModelId)
-          : { kind: "none" as const };
-        const compactionOptions = compactionStrategy.kind === "provider" ? {
-          anthropic: {
-            contextManagement: {
-              edits: [{
-                type: 'compact_20260112' as const,
-                trigger: { type: 'input_tokens' as const, value: 100_000 },
-                pauseAfterCompaction: false,
-                instructions: 'Сохрани обязательно: имена людей и организаций, даты и дедлайны, принятые решения и обоснования, числа и суммы, контекст текущего проекта/задачи, незавершённые задачи и открытые вопросы, предпочтения пользователя. Удали: повторяющиеся приветствия, промежуточные рассуждения если итог зафиксирован, дублирующуюся информацию, технические детали tool calls если результат уже в контексте.',
-              }]
-            }
-          }
-        } : undefined;
+        // ТЗ-COMPACTION-UNIFY (ADR 054): capability-driven compaction strategy удалён.
+        // Единая Simply Compaction middleware (`prepareMessagesWithCompaction` ниже)
+        // работает для ВСЕХ chat-моделей одинаково. Anthropic `contextManagement`
+        // (`compact_20260112`) больше не используется — наша логика провайдер-
+        // агностична и даёт прозрачность (мы видим что сжалось, когда, какой размер).
 
         // ТЗ-CacheAudit Этап 3: Anthropic-protocol providers — пакет
         // `vercel-minimax-ai-provider` под капотом проксирует запросы через
         // `AnthropicMessagesLanguageModel` из `@ai-sdk/anthropic/internal`,
         // поэтому MiniMax принимает тот же синтаксис `providerOptions.anthropic.*`
         // что и чистый Claude: `cacheControl`, reasoning parts и т.д.
-        // `contextManagement` (Claude Compaction) MiniMax игнорирует — для него
-        // capability-driven: `getCompactionStrategy(modelId)` вернёт "simply",
-        // и Anthropic compactionOptions не будут переданы в streamText (ТЗ-COMPACTION-1).
         const isAnthropicProtocolModel =
           effectiveProvider === "anthropic" || effectiveProvider === "minimax";
 
@@ -1051,35 +995,46 @@ export async function POST(request: Request) {
               )
             : textInlinedHistory;
 
-        // ТЗ-COMPACTION-1: Simply Compaction middleware gate.
-        // Этап A — expertise. Этап B расширил на create (2026-04-19).
+        // ТЗ-COMPACTION-UNIFY: Simply Compaction middleware — единый путь для
+        // всех пользовательских chat modes (simply / expertise / create) +
+        // project chat (внутри main handler когда нет task-expert). Professor
+        // pipeline обрабатывается отдельно выше (executeProfessorPipeline) —
+        // сюда не попадает.
+        //
         // Middleware работает на ChatMessage[] ДО convertToModelMessages, пока
         // история ещё не смешана с system/MIND/cache-control метками.
+        //
+        // Инвариант mindTokens: учитывает ТОЛЬКО retrieved facts (mindDynamicBlock).
+        // Profile block уже включён в systemPromptText (inject выше ~line 730
+        // через `systemPromptText += profileBlock`), значит его токены уже
+        // учтены в `systemPromptTokensForCompaction`. Двойной учёт недопустим.
         let historyForStream = preparedHistory;
         let simplyCompactionEvent: CompactionEvent | undefined;
-        if (
-          (chatMode === "expertise" || chatMode === "create") &&
-          effectiveModelId &&
-          activeTaskId
-        ) {
+        if (effectiveModelId && activeTaskId) {
           const systemPromptTokensForCompaction = estimateMessageTokens([
             { type: "text", text: systemPromptText },
           ]);
           const mindTokensForCompaction = mindDynamicBlock
             ? estimateMessageTokens([{ type: "text", text: mindDynamicBlock }])
             : 0;
-          // ТЗ-COMPACTION-1 fix #2 (архитекторское решение 2026-04-19):
-          // Tools schemas (Zod inputSchema + description) входят в payload провайдера,
-          // но не в systemPromptText. Считаем явно — это свойство call site.
-          // Сериализация через zod-to-json-schema (транзитивная dep AI SDK,
-          // одна версия → нулевой drift).
+          // Tools schemas (Zod inputSchema + description) входят в payload
+          // провайдера, но не в systemPromptText. Считаем явно — свойство call site.
           const toolsTokens = computeToolsTokens(toolsForRequest);
+
+          // sourceType определяется по приоритету: project → всё остальное по chatMode.
+          // Project chat в main handler (isProjectChat && chatMode="simply|..." но без task)
+          // сохраняет факты как "project" в memory_entry для корректной retrieve-фильтрации.
+          const compactionSourceType = isProjectChat ? "project" : chatMode;
+
           const compactionResult = await prepareMessagesWithCompaction(
             activeTaskId,
             preparedHistory,
             {
               chatId: id,
+              userId: session.user.id,
               modelId: effectiveModelId,
+              sourceType: compactionSourceType,
+              sourceProjectId: isProjectChat ? projectId : null,
               systemPromptTokens: systemPromptTokensForCompaction,
               totalHistoryTokens,
               newMessageTokens,
@@ -1164,7 +1119,6 @@ export async function POST(request: Request) {
           model: modelToUse,
           maxOutputTokens: getMaxOutputTokensForTask(activeTaskId),
           messages: messagesForRequest,
-          providerOptions: compactionOptions,
           // ТЗ-XAI-3: Simply Chat — 0.7 для всех провайдеров (стабильность
           // дворецкого, продуктовое решение, не провайдер-компромисс). Прочие
           // chatModes (expertise, create, project) — 1.0 дефолт.
@@ -1621,34 +1575,11 @@ export async function POST(request: Request) {
         // must still be open for DevPanel sub-call event to reach client.
         // See streamText.onFinish for the call site and detailed rationale.
 
-        // ТЗ-RAG1: Extract facts from conversation (fire-and-forget)
-        // ТЗ-RAG2: Respects memoryEnabled setting (checked earlier in execute)
-        // ТЗ-MinimaxCleanup: Skip extract for simply — will be replaced by Extract-on-compaction
-        if (isMemoryEnabled && chatMode !== "simply") {
-          const userText = message.parts
-            .filter((p: any): p is { type: "text"; text: string } => p.type === "text")
-            .map((p: any) => p.text)
-            .join("\n");
-
-          const assistantText = messages
-            .filter((m) => m.role === "assistant")
-            .flatMap((m) => m.parts)
-            .filter((p: any) => p.type === "text" && p.text?.trim())
-            .map((p: any) => p.text)
-            .join("\n");
-
-          if (userText.length >= 10 && assistantText.length >= 10) {
-            void extractAndStoreFacts({
-              userId: session.user.id,
-              userMessage: userText,
-              assistantMessage: assistantText,
-              sourceType: chatMode,
-              sourceChatId: id,
-            }).catch((err) =>
-              console.warn("[MIND] Extract failed (non-blocking):", err instanceof Error ? err.message : err)
-            );
-          }
-        }
+        // ТЗ-COMPACTION-UNIFY: per-turn extractAndStoreFacts удалён.
+        // Extract запускается только внутри compaction cycle через
+        // `prepareMessagesWithCompaction` на подмножестве сообщений, уходящих
+        // в summary (Mem0 best practice 2026). Это убирает ~12× overhead
+        // per-turn вызова extract на свежих сообщениях.
 
         if (finalMergedUsage) {
           try {
