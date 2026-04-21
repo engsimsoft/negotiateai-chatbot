@@ -9,10 +9,12 @@ import {
   gt,
   gte,
   inArray,
+  isNotNull,
   isNull,
   ne,
   notInArray,
   lt,
+  or,
   sql,
   type SQL,
 } from "drizzle-orm";
@@ -272,6 +274,9 @@ export async function getOrCreateSimplyChat(userId: string) {
 /**
  * ТЗ-ExtractCompression: Get unextracted messages from simply chats for a user.
  * Returns oldest messages first (ASC) — they are first candidates for extraction.
+ *
+ * @deprecated ТЗ-MindOnVisit: используйте `getUnextractedMessagesForUser({ sourceType, ... })`.
+ * Эта функция оставлена для обратной совместимости, но больше не вызывается production-кодом.
  */
 export async function getUnextractedSimplyMessages(
   userId: string,
@@ -307,6 +312,11 @@ export async function getUnextractedSimplyMessages(
  * ТЗ-ExtractCompression: Find users who have stale unextracted simply messages.
  * "Stale" = extractedAt IS NULL AND createdAt older than minAgeMs.
  * Used by nightly cron as a safety net.
+ */
+/**
+ * @deprecated ТЗ-MindOnVisit: используйте `getUsersWithStaleMessagesByStrategy`,
+ * которая поддерживает все 4 sourceType + фильтр по `factExtractionStrategy`.
+ * Эта функция оставлена для обратной совместимости, в production-коде не используется.
  */
 export async function getUsersWithStaleSimplyMessages(
   minAgeMs: number,
@@ -4425,9 +4435,11 @@ export async function updateMemorySettings({
     Pick<
       MemorySettings,
       | "memoryEnabled"
+      | "factExtractionStrategy"
       | "factsUpdatedSince"
       | "factsSinceConsolidation"
       | "lastConsolidatedAt"
+      | "lastMindCheckAt"
     >
   >;
 }): Promise<void> {
@@ -4435,6 +4447,129 @@ export async function updateMemorySettings({
     .update(memorySettings)
     .set({ ...patch, updatedAt: new Date() })
     .where(eq(memorySettings.userId, userId));
+}
+
+/**
+ * Atomic claim: try to acquire on-visit check lock. Returns true if claim won
+ * (lastMindCheckAt was null or older than debounceMs ago), false if debounced.
+ * Updates lastMindCheckAt to NOW on successful claim.
+ *
+ * Source: TZ_MindOnVisit — prevents race conditions when user opens multiple
+ * chats quickly, and limits extraction frequency to MIND_CHECK_DEBOUNCE_MS.
+ */
+export async function claimMindCheck({
+  userId,
+  debounceMs,
+}: {
+  userId: string;
+  debounceMs: number;
+}): Promise<boolean> {
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - debounceMs);
+
+  // Ensure settings row exists (no-op if already present)
+  await db
+    .insert(memorySettings)
+    .values({ userId, createdAt: now, updatedAt: now })
+    .onConflictDoNothing();
+
+  const [result] = await db
+    .update(memorySettings)
+    .set({ lastMindCheckAt: now, updatedAt: now })
+    .where(
+      and(
+        eq(memorySettings.userId, userId),
+        or(
+          isNull(memorySettings.lastMindCheckAt),
+          lt(memorySettings.lastMindCheckAt, cutoff),
+        ),
+      ),
+    )
+    .returning({ userId: memorySettings.userId });
+
+  return !!result;
+}
+
+/**
+ * Get unextracted messages for a given user + sourceType (Simply / Expertise /
+ * Create / Project). Obобщённая версия `getUnextractedSimplyMessages` — принимает
+ * sourceType параметром, возвращает chat info и до `limit` сообщений.
+ *
+ * sourceType mapping:
+ *  - 'simply' / 'expertise' / 'create' → Chat.chatMode
+ *  - 'project' → chats where isProjectChat = true OR chatMode = 'project' (по факту нужен отдельный join)
+ *
+ * Source: TZ_MindOnVisit — обобщён для on-visit и расширенного cron.
+ */
+export async function getUnextractedMessagesForUser({
+  userId,
+  sourceType,
+  limit = 50,
+}: {
+  userId: string;
+  sourceType: "simply" | "expertise" | "create" | "project";
+  limit?: number;
+}): Promise<{ chatId: string | null; messages: Array<{ id: string; role: string; parts: unknown }> }> {
+  // For non-project sourceType — match by chat.chatMode
+  // For project — match on Chat.isProjectChat=true (project task chats live in ProjectTask + have their own chat)
+  const rows = await db
+    .select({
+      id: message.id,
+      role: message.role,
+      parts: message.parts,
+      chatId: message.chatId,
+    })
+    .from(message)
+    .innerJoin(chat, eq(message.chatId, chat.id))
+    .where(
+      and(
+        eq(chat.userId, userId),
+        isNull(message.extractedAt),
+        sourceType === "project"
+          ? isNotNull(chat.projectId)
+          : and(eq(chat.chatMode, sourceType), isNull(chat.projectId)),
+      ),
+    )
+    .orderBy(message.createdAt)
+    .limit(limit);
+
+  return {
+    chatId: rows[0]?.chatId ?? null,
+    messages: rows.map((r) => ({ id: r.id, role: r.role, parts: r.parts })),
+  };
+}
+
+/**
+ * List users with stale unextracted messages, filtered by factExtractionStrategy.
+ * Used by cron to skip users who have opted out ('on-visit' strategy).
+ *
+ * Source: TZ_MindOnVisit — replaces `getUsersWithStaleSimplyMessages` (which
+ * was simply-only and strategy-agnostic).
+ */
+export async function getUsersWithStaleMessagesByStrategy({
+  strategies,
+  minAgeMs,
+}: {
+  strategies: Array<"always" | "on-visit" | "cron">;
+  minAgeMs: number;
+}): Promise<Array<{ userId: string }>> {
+  const cutoff = new Date(Date.now() - minAgeMs);
+
+  const rows = await db
+    .selectDistinct({ userId: chat.userId })
+    .from(chat)
+    .innerJoin(message, eq(message.chatId, chat.id))
+    .innerJoin(memorySettings, eq(memorySettings.userId, chat.userId))
+    .where(
+      and(
+        inArray(memorySettings.factExtractionStrategy, strategies),
+        eq(memorySettings.memoryEnabled, true),
+        isNull(message.extractedAt),
+        lt(message.createdAt, cutoff),
+      ),
+    );
+
+  return rows;
 }
 
 /**

@@ -50,6 +50,16 @@ export const COMPACTION_VERBATIM_WINDOW_TOKENS = 40_000;
 export const COMPACTION_SUMMARY_TARGET_TOKENS = 3_000;
 
 /**
+ * Дебаунс on-visit триггера обработки хвостов памяти (ТЗ_MindOnVisit).
+ *
+ * При каждом сообщении пользователя сервер пытается атомарно обновить
+ * `memory_settings.lastMindCheckAt`. Если последнее обновление было меньше
+ * `MIND_CHECK_DEBOUNCE_MS` назад — пропускаем. Защищает от частых проверок
+ * БД у активного пользователя (пишет 50 сообщений за 30 мин — 1 проверка).
+ */
+export const MIND_CHECK_DEBOUNCE_MS = 30 * 60 * 1000;
+
+/**
  * MIND consolidation cumulative trigger.
  *
  * Consolidation запускается, когда `factsSinceConsolidation + storedCount >= 15`

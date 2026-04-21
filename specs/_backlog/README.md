@@ -45,6 +45,7 @@
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
 | [TZ_UnifyContextThresholdBase](TZ_UnifyContextThresholdBase.md) | MIND пороги (`EXTRACT_THRESHOLD_*`) считаются от `CONTEXT_BUDGET=140K`, пороги Compaction от `SIMPLY_CONTEXT_LIMIT=200K` — две разные базы в одном приложении. Production behavior не затронут, долг семантический. Решение — унифицировать на `SIMPLY_CONTEXT_LIMIT`. | 0.5 сессии | Архитектор, в процессе Compaction-1 Фаза 1 |
+| [TZ_MindDeepConsolidation](TZ_MindDeepConsolidation.md) | Tiered processing для памяти: новый ночной `memory:deep-consolidate` на reasoning-модели (Grok 4.2 / Sonnet 4.6 / Opus — A/B). Дешёвая Grok 4.1 Fast остаётся в hot path, умная модель ночью «причёсывает» базу — тонкие повторы, противоречия, устаревшие факты. Mem0 OSS v3 / Letta sleep-time pattern. | 0.5-1 сессия | Владелец, ТЗ-MindOnVisit (2026-04-21) |
 
 ### 🟩 Low impact (косметика)
 

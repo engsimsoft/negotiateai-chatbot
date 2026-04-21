@@ -1,17 +1,24 @@
-// ТЗ-ExtractCompression V2: Nightly cron — ONLY safety net for stale simply messages
-// Consolidation + profile are now event-triggered (inside batchExtractFacts chain)
+// ТЗ-MindOnVisit: Nightly cron — safety net для пользователей со стратегией
+// 'always' (on-visit + cron) и 'cron' (только cron). Пользователи со стратегией
+// 'on-visit' НЕ обрабатываются ночью — они выбрали обработку только при визитах.
+//
+// Покрытие: все 4 chat-режима (simply / expertise / create / project) — раньше
+// был только simply, что оставляло 3 режима без safety net.
+//
 // Schedule: 0 0 * * * (0:00 UTC = 3:00 MSK, before briefing at 5:00 UTC)
 
 import { batchExtractFacts } from "@/lib/ai/memory/extract";
 import {
-  getUsersWithStaleSimplyMessages,
-  getUnextractedSimplyMessages,
+  getUnextractedMessagesForUser,
+  getUsersWithStaleMessagesByStrategy,
   saveCronRunLog,
 } from "@/lib/db/queries";
 import pLimit from "p-limit";
 
 /** 24 hours in milliseconds */
 const STALE_MESSAGE_AGE_MS = 24 * 60 * 60 * 1000;
+
+const SOURCE_TYPES = ["simply", "expertise", "create", "project"] as const;
 
 export const maxDuration = 240;
 
@@ -29,7 +36,6 @@ export async function GET(request: Request) {
     `[cron/memory-profile] Triggered at ${startedAt.toISOString()}`,
   );
 
-  // Find users with unextracted simply messages older than 24h
   const extractResults: Array<{
     userId: string;
     processed: number;
@@ -38,7 +44,11 @@ export async function GET(request: Request) {
   }> = [];
 
   try {
-    const staleUsers = await getUsersWithStaleSimplyMessages(STALE_MESSAGE_AGE_MS);
+    // Только пользователи со стратегией 'always' или 'cron' — пропускаем 'on-visit'
+    const staleUsers = await getUsersWithStaleMessagesByStrategy({
+      strategies: ["always", "cron"],
+      minAgeMs: STALE_MESSAGE_AGE_MS,
+    });
 
     if (staleUsers.length === 0) {
       console.log("[cron/memory-profile] No stale messages found, nothing to do");
@@ -56,33 +66,52 @@ export async function GET(request: Request) {
     }
 
     console.log(
-      `[cron/memory-profile] Found ${staleUsers.length} user(s) with stale simply messages`,
+      `[cron/memory-profile] Found ${staleUsers.length} user(s) with stale messages (strategies: always, cron)`,
     );
 
-    // batchExtractFacts handles the full chain:
-    // extract → consolidation (if ≥10 stored) → profile (if ≥10 changed)
     const limit = pLimit(3);
-    const tasks = staleUsers.map((userId) =>
+    const tasks = staleUsers.map(({ userId }) =>
       limit(async () => {
         try {
-          const { chatId, messages } = await getUnextractedSimplyMessages(userId, 50);
-          if (messages.length === 0) return;
+          let userProcessed = 0;
+          let userExtracted = 0;
+          let userStored = 0;
+          let userChatId: string | null = null;
 
-          const result = await batchExtractFacts({
-            userId,
-            chatId,
-            sourceType: "simply",
-            messages,
-          });
-          extractResults.push({
-            userId,
-            processed: result.processed,
-            extracted: result.extracted,
-            stored: result.stored,
-          });
-          console.log(
-            `[cron/memory-profile] User ${userId}: batch extracted ${result.extracted} facts from ${result.processed} messages`,
-          );
+          // Идём по всем 4 sourceType, обрабатываем хвосты каждого
+          for (const sourceType of SOURCE_TYPES) {
+            const { chatId, messages } = await getUnextractedMessagesForUser({
+              userId,
+              sourceType,
+              limit: 50,
+            });
+            if (messages.length === 0) continue;
+
+            const result = await batchExtractFacts({
+              userId,
+              chatId: chatId ?? "",
+              sourceType,
+              messages,
+            });
+            userProcessed += result.processed;
+            userExtracted += result.extracted;
+            userStored += result.stored;
+            userChatId = chatId ?? userChatId;
+
+            console.log(
+              `[cron/memory-profile] User ${userId} sourceType=${sourceType}: ` +
+                `extracted ${result.extracted} facts from ${result.processed} messages`,
+            );
+          }
+
+          if (userProcessed > 0) {
+            extractResults.push({
+              userId,
+              processed: userProcessed,
+              extracted: userExtracted,
+              stored: userStored,
+            });
+          }
         } catch (err) {
           console.error(
             `[cron/memory-profile] User ${userId}: batch extract failed:`,

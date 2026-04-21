@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { geolocation } from "@vercel/functions";
 import {
   convertToModelMessages,
@@ -61,6 +62,7 @@ import {
 } from "@/lib/ai/debug-events";
 import { retrieveMemoryContext } from "@/lib/ai/memory/retrieve";
 import { getProfileBlock } from "@/lib/ai/memory/profile";
+import { processStaleFactsOnVisit, type OnVisitSourceType } from "@/lib/ai/memory/on-visit";
 // ТЗ-COMPACTION-UNIFY: extract вызывается внутри prepareMessagesWithCompaction —
 // main handler больше не импортирует extract функции.
 import {
@@ -1620,6 +1622,25 @@ export async function POST(request: Request) {
         return "Произошла ошибка при генерации ответа. Попробуйте повторить.";
       },
     });
+
+    // ТЗ-MindOnVisit: after response — дотянуть хвосты памяти (все sourceTypes).
+    // Fire-and-forget через Next.js `after()` — гарантирует завершение на Vercel
+    // через waitUntil. Дебаунс и проверка стратегии — внутри processStaleFactsOnVisit.
+    const onVisitSourceType: OnVisitSourceType | null = projectId
+      ? "project"
+      : chatMode === "simply" || chatMode === "expertise" || chatMode === "create"
+        ? chatMode
+        : null;
+    if (onVisitSourceType && session?.user?.id) {
+      const userId = session.user.id;
+      after(async () => {
+        await processStaleFactsOnVisit({
+          userId,
+          sourceType: onVisitSourceType,
+          chatId: id,
+        });
+      });
+    }
 
     return new Response(stream.pipeThrough(new JsonToSseTransformStream()));
   } catch (error) {

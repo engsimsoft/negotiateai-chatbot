@@ -7,6 +7,22 @@
 
 ## [Unreleased]
 
+### [3.96.0] — 2026-04-21 — ТЗ-MindOnVisit
+
+**On-visit обработка хвостов памяти + выбор стратегии пользователем + расширение cron на все режимы.**
+
+- **Проблема.** После ТЗ-COMPACTION-UNIFY (3.95.0) extract срабатывал только через compaction (≥50% контекста = 100K токенов) + ночной cron только для `chatMode='simply'`. Хвосты из expertise/create/projects (короткие сессии без compaction) **не попадали в память никогда** — открытая дыра. Активный пользователь с короткими сессиями накапливал десятки необработанных сообщений на режим, факты терялись.
+- **Решение.** Третий триггер extract — **on-visit через Next.js `after()` API** (стабилен с Next.js 15.1, у нас 15.5.10). После каждого ответа пользователю — fire-and-forget вызов `processStaleFactsOnVisit` с дебаунсом 30 минут (`MIND_CHECK_DEBOUNCE_MS`) через атомарный `claimMindCheck`. Обрабатывает хвосты циклом до 6 итераций × 50 сообщений = до 300 сообщений за визит. Cron расширен на все 4 sourceType (раньше только simply).
+- **Выбор стратегии пользователем.** Новое поле `factExtractionStrategy` в `memory_settings` (text enum, дефолт `'always'`). Радио-группа в [memory-section.tsx](components/settings/memory-section.tsx) с описаниями:
+  - 🟢 **«Всегда актуально»** (`always`, on-visit + cron) — рекомендуется большинству
+  - 💰 **«Только при работе»** (`on-visit`) — 0 затрат при неактивности
+  - 🌙 **«Только ночью»** (`cron`) — классика, обработка раз в сутки
+- **Архитектурное обоснование (best practices апрель 2026):** Next.js `after()` (официальный паттерн, [docs](https://nextjs.org/docs/app/api-reference/functions/after)), Spring AI AutoMemoryToolsAdvisor predicate-triggered consolidation, Mem0 v1.0.0 async-default. Один extract — одна модель (`memory:extract-batch` = Grok 4.1 Fast non-reasoning, та же модель для compaction / on-visit / cron, переключается через `/dev/models`).
+- **Файлы.** Новые: `lib/ai/memory/on-visit.ts`, `lib/db/migrations/0057_mind-strategy-and-check-at.sql`. Изменены: `lib/db/schema.ts` (+2 колонки в `memory_settings`), `lib/db/queries.ts` (+`claimMindCheck` / `getUnextractedMessagesForUser` / `getUsersWithStaleMessagesByStrategy`, старые simply-only функции `@deprecated`), `lib/ai/context-limits.ts` (+`MIND_CHECK_DEBOUNCE_MS`), `lib/ai/memory/index.ts`, `app/(chat)/api/chat/route.ts` + `app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts` (интеграция через `after()`), `app/(chat)/api/user/memory/settings/route.ts` (расширение PATCH), `app/api/cron/memory-profile/route.ts` (4 sourceType + фильтр стратегии), `components/settings/memory-section.tsx` (радио-группа), `specs/Simply_xAI/MIND_ARCHITECTURE.md` (новые §1/§2/§5 + анонс).
+- **Backlog.** Идея tiered processing (qualified consolidation на reasoning-модели раз в ночь) вынесена как `TZ_MindDeepConsolidation`.
+
+---
+
 ### [3.95.0] — 2026-04-21 — ТЗ-COMPACTION-UNIFY
 
 **Унификация архитектуры памяти: одна стратегия compaction для всех провайдеров, одна константа порогов.**

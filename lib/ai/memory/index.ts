@@ -22,6 +22,9 @@ export { embedText, embedTexts } from "./voyage-client";
 export type { ExtractedFact } from "./extract";
 export { batchExtractFacts } from "./extract";
 
+// On-visit trigger (ТЗ-MindOnVisit)
+export { processStaleFactsOnVisit } from "./on-visit";
+
 // Consolidation
 export type { ConsolidationStats } from "./consolidate";
 export { consolidateUserMemory } from "./consolidate";

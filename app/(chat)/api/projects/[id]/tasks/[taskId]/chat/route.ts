@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import {
   convertToModelMessages,
   createUIMessageStream,
@@ -7,6 +8,7 @@ import {
   streamText,
   type UIMessageStreamWriter,
 } from "ai";
+import { processStaleFactsOnVisit } from "@/lib/ai/memory/on-visit";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { buildTaskExpertPrompt } from "@/lib/prompts/build-task-expert-prompt";
@@ -773,6 +775,16 @@ export async function POST(
         }
         return "Произошла ошибка при генерации ответа. Попробуйте повторить.";
       },
+    });
+
+    // ТЗ-MindOnVisit: after response — дотянуть хвосты памяти для project task chat.
+    const userId = session.user.id;
+    after(async () => {
+      await processStaleFactsOnVisit({
+        userId,
+        sourceType: "project",
+        chatId,
+      });
     });
 
     return new Response(stream.pipeThrough(new JsonToSseTransformStream()));

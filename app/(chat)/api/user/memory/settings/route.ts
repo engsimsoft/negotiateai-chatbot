@@ -1,4 +1,5 @@
 // ТЗ-RAG2: Memory settings API — get/update memoryEnabled toggle
+// ТЗ-MindOnVisit: + factExtractionStrategy (always / on-visit / cron)
 import { auth } from "@/app/(auth)/auth";
 import {
   getMemorySettings,
@@ -7,6 +8,13 @@ import {
 } from "@/lib/db/queries";
 import { countUserMemories } from "@/lib/ai/memory/memory-queries";
 import { ChatSDKError } from "@/lib/errors";
+
+const VALID_STRATEGIES = ["always", "on-visit", "cron"] as const;
+type FactExtractionStrategy = (typeof VALID_STRATEGIES)[number];
+
+function isValidStrategy(v: unknown): v is FactExtractionStrategy {
+  return typeof v === "string" && (VALID_STRATEGIES as readonly string[]).includes(v);
+}
 
 /**
  * GET /api/user/memory/settings
@@ -27,6 +35,7 @@ export async function GET() {
 
     return Response.json({
       memoryEnabled: settings.memoryEnabled,
+      factExtractionStrategy: settings.factExtractionStrategy,
       factCount,
       profile: profile
         ? {
@@ -43,7 +52,7 @@ export async function GET() {
 
 /**
  * PATCH /api/user/memory/settings
- * Body: { memoryEnabled: boolean }
+ * Body: { memoryEnabled?: boolean, factExtractionStrategy?: 'always' | 'on-visit' | 'cron' }
  */
 export async function PATCH(request: Request) {
   try {
@@ -53,10 +62,34 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
+    const patch: {
+      memoryEnabled?: boolean;
+      factExtractionStrategy?: FactExtractionStrategy;
+    } = {};
 
-    if (typeof body.memoryEnabled !== "boolean") {
+    if (body.memoryEnabled !== undefined) {
+      if (typeof body.memoryEnabled !== "boolean") {
+        return Response.json(
+          { error: "memoryEnabled must be a boolean" },
+          { status: 400 },
+        );
+      }
+      patch.memoryEnabled = body.memoryEnabled;
+    }
+
+    if (body.factExtractionStrategy !== undefined) {
+      if (!isValidStrategy(body.factExtractionStrategy)) {
+        return Response.json(
+          { error: `factExtractionStrategy must be one of: ${VALID_STRATEGIES.join(", ")}` },
+          { status: 400 },
+        );
+      }
+      patch.factExtractionStrategy = body.factExtractionStrategy;
+    }
+
+    if (Object.keys(patch).length === 0) {
       return Response.json(
-        { error: "memoryEnabled must be a boolean" },
+        { error: "No settings to update" },
         { status: 400 },
       );
     }
@@ -66,10 +99,10 @@ export async function PATCH(request: Request) {
 
     await updateMemorySettings({
       userId: session.user.id,
-      patch: { memoryEnabled: body.memoryEnabled },
+      patch,
     });
 
-    return Response.json({ ok: true, memoryEnabled: body.memoryEnabled });
+    return Response.json({ ok: true, ...patch });
   } catch (error) {
     if (error instanceof ChatSDKError) return error.toResponse();
     return new ChatSDKError("bad_request:api", "Failed to update memory settings").toResponse();

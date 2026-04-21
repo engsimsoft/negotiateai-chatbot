@@ -12,6 +12,8 @@ Per-turn extract (taskId `memory:extract`, промпт `extract.md`, функц
 
 **Правка 2026-04-21: ТЗ-MindConsolidationTriggers v2.** Mini-consolidation (`miniConsolidateUserMemory`, константы `MINI_CONSOLIDATION_THRESHOLD` / `MINI_RECENT_FACTS_LIMIT`) удалена — дублировала full-проход без преимуществ. Триггер consolidation стал двойным: мгновенный (`storedCount >= 10` на одном compaction) **ИЛИ** накопительный (`factsSinceConsolidation + storedCount >= 15`, константа `CONSOLIDATION_THRESHOLD_CUMULATIVE`). Счётчик `factsSinceConsolidation` реанимирован — обнуляется при запуске `consolidateUserMemory`. Обоснование дизайна (Mem0 v3, Letta sleep-time compute, Dream gate) — [specs/_backlog/TZ_MindConsolidationTriggers.md](../_backlog/TZ_MindConsolidationTriggers.md) (v2).
 
+**Правка 2026-04-21: ТЗ-MindOnVisit (v3.96.0).** Добавлен on-visit trigger через Next.js `after()` API — обработка хвостов памяти после ответа пользователю с дебаунсом 30 минут (`MIND_CHECK_DEBOUNCE_MS`). Cron (`memory-profile`) расширен на все 4 chat-режима (раньше только simply). Пользователь сам выбирает стратегию обработки в настройках памяти ([memory-section.tsx](../../components/settings/memory-section.tsx)): `'always'` (on-visit + cron, дефолт) / `'on-visit'` (только при визитах) / `'cron'` (только ночью). Хранится в `memory_settings.factExtractionStrategy`. Источник: `specs/_archive/TZ_MindOnVisit/SPEC.md`.
+
 ---
 
 ## 1. Картина за 2 минуты
@@ -94,18 +96,34 @@ Per-turn extract (taskId `memory:extract`, промпт `extract.md`, функц
 
 ---
 
-## 2. Кто что вызывает — по chatMode
+## 2. Кто и когда триггерит extract — по режиму и стратегии
 
-| chatMode | Per-message extract | Batch extract | Файл-триггер |
+После ТЗ-MindOnVisit (2026-04-21) extract запускается **тремя независимыми путями**. Все используют один фильтр `Message.extractedAt IS NULL` — кто первый обработал, помечает поле, остальные эти сообщения уже не видят. Конфликта нет.
+
+| Триггер | Когда срабатывает | На каких режимах | Зависит от `factExtractionStrategy` |
 |---|---|---|---|
-| **`simply`** | ❌ отключён (v3.77.0 ТЗ-MinimaxCleanup) | ✅ при 60%/80% контекста + пауза | [chat/route.ts:734](../../app/(chat)/api/chat/route.ts#L734), [chat/route.ts:1468](../../app/(chat)/api/chat/route.ts#L1468) |
-| **`expertise`** | ✅ после каждого finish | ❌ | [chat/route.ts:1468](../../app/(chat)/api/chat/route.ts#L1468) |
-| **`create`** | ✅ после каждого finish | ❌ | [chat/route.ts:1468](../../app/(chat)/api/chat/route.ts#L1468) |
-| **`project:expert:*`** (Expert Task Chat) | ✅ после каждого finish | ❌ | [tasks/[taskId]/chat/route.ts:746](../../app/(chat)/api/projects/[id]/tasks/[taskId]/chat/route.ts#L746) |
-| **Сервисные чаты** (ben, project-creation, ...) | ❌ | ❌ | — не пишут в MIND |
-| **Cron (ночной)** | — | ✅ stale messages >24ч | [app/api/cron/memory-profile/route.ts](../../app/api/cron/memory-profile/route.ts) |
+| **Compaction middleware** | При заполнении контекста ≥50% (100K токенов из 200K) | simply / expertise / create / project | НЕТ — работает всегда |
+| **On-visit (`after()` после ответа)** | На каждое сообщение пользователя, с дебаунсом 30 минут | simply / expertise / create / project | ДА — пропускается при стратегии `'cron'` |
+| **Ночной cron** (`/api/cron/memory-profile`, 03:00 МСК) | Раз в сутки, для сообщений старше 24 часов | simply / expertise / create / project | ДА — пропускается при стратегии `'on-visit'` |
 
-**Важно для тестов:** в Simply Chat обычная короткая беседа **не триггерит** MIND pipeline вообще. Чтобы проверить MIND end-to-end через Simply, нужно либо понизить пороги (см. §6), либо дойти до реального 60% заполнения, либо переключиться на `expertise`/`create` chatMode.
+**Стратегии `factExtractionStrategy` (выбираются пользователем в настройках памяти):**
+
+| Стратегия | Compaction | On-visit | Cron | Для кого |
+|---|---|---|---|---|
+| `'always'` (дефолт) | ✅ | ✅ | ✅ | Большинство — память всегда свежая, double safety net |
+| `'on-visit'` | ✅ | ✅ | ❌ | Нерегулярные пользователи: 0 затрат когда не пользуются |
+| `'cron'` | ✅ | ❌ | ✅ | Те кто не хочет фоновой работы во время сессий |
+
+**Сервисные чаты** (ben, project-creation, …) — НЕ пишут в MIND, ни одним триггером.
+
+### Связанные модули
+
+- [lib/ai/compaction/prepare-messages.ts](../../lib/ai/compaction/prepare-messages.ts) — compaction middleware
+- [lib/ai/memory/on-visit.ts](../../lib/ai/memory/on-visit.ts) — `processStaleFactsOnVisit` + дебаунс
+- [app/api/cron/memory-profile/route.ts](../../app/api/cron/memory-profile/route.ts) — ночной cron
+- [components/settings/memory-section.tsx](../../components/settings/memory-section.tsx) — UI выбора стратегии
+
+**Важно для тестов:** в Simply короткая беседа compaction не триггерит, но **on-visit (при стратегиях `'always'` и `'on-visit'`) подбирает её сразу после ответа**. То есть факты появляются в памяти при следующем заходе/сообщении, не нужно ждать 60% заполнения как раньше.
 
 ### ⚠️ Known behavior: задержка извлечения на одно сообщение (Simply Chat)
 
@@ -197,6 +215,8 @@ Per-turn extract (taskId `memory:extract`, промпт `extract.md`, функц
 | `MAX_BATCH_FACTS` | `30` | [extract.ts](../../lib/ai/memory/extract.ts) | Кап на факты per batch extract | Не трогать |
 | `DEDUP_CANDIDATE_THRESHOLD` | `0.55` | [extract.ts](../../lib/ai/memory/extract.ts) | Cosine similarity threshold для dedup кандидатов (уровень 1) | Если шум в памяти: поднять до 0.65; если пропуски дубликатов: снизить до 0.5 |
 | `CONSOLIDATION_THRESHOLD_CUMULATIVE` | `15` | [context-limits.ts](../../lib/ai/context-limits.ts) | Накопительный триггер consolidation: запуск когда `factsSinceConsolidation + storedCount >= 15` | ⚡ Для теста: `2` |
+| `MIND_CHECK_DEBOUNCE_MS` | `30 * 60 * 1000` (30 мин) | [context-limits.ts](../../lib/ai/context-limits.ts) | Дебаунс on-visit: повторная проверка хвостов памяти не чаще раза в 30 мин на пользователя | Для теста: `60 * 1000` (1 мин) |
+| `factExtractionStrategy` (per-user, БД) | `'always'` (дефолт) | [memory_settings](../../lib/db/schema.ts), [memory-section.tsx](../../components/settings/memory-section.tsx) | Стратегия пользователя: `'always'` (on-visit + cron) / `'on-visit'` / `'cron'` | Меняется в UI (Настройки → Память) |
 | `FULL_CONSOLIDATION_MAX_FACTS` | `200` | [consolidate.ts](../../lib/ai/memory/consolidate.ts) | Кап на full consolidation (ночная ревизия) | Не трогать |
 | `MAX_ACTIONS_PER_CALL` | `20` | [consolidate.ts](../../lib/ai/memory/consolidate.ts) | Кап на действия per LLM call | Не трогать |
 | `MAX_FACTS_FOR_PROFILE` | `300` | [profile.ts](../../lib/ai/memory/profile.ts) | Кап фактов для генерации профиля | Не трогать |

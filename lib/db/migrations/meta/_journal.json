@@ -400,6 +400,13 @@
       "when": 1777000000000,
       "tag": "0056_add-compaction-columns",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1777500000000,
+      "tag": "0057_mind-strategy-and-check-at",
+      "breakpoints": true
     }
   ]
 }

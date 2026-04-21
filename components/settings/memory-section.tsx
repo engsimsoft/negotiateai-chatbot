@@ -6,6 +6,7 @@ import { Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,8 +45,11 @@ interface MemoryData {
   } | null;
 }
 
+type FactExtractionStrategy = "always" | "on-visit" | "cron";
+
 interface MemorySettingsData {
   memoryEnabled: boolean;
+  factExtractionStrategy: FactExtractionStrategy;
   factCount: number;
   profile: {
     generatedAt: string;
@@ -77,6 +81,7 @@ export function MemorySection() {
     useSWR<MemoryData>("/api/user/memory?limit=100", fetcher);
 
   const [isToggling, setIsToggling] = useState(false);
+  const [isChangingStrategy, setIsChangingStrategy] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
 
@@ -99,6 +104,23 @@ export function MemorySection() {
       toast({ type: "error", description: "Не удалось обновить настройку" });
     } finally {
       setIsToggling(false);
+    }
+  };
+
+  const handleStrategyChange = async (strategy: FactExtractionStrategy) => {
+    setIsChangingStrategy(true);
+    try {
+      await fetch("/api/user/memory/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ factExtractionStrategy: strategy }),
+      });
+      await mutateSettings();
+      toast({ type: "success", description: "Стратегия обработки обновлена" });
+    } catch {
+      toast({ type: "error", description: "Не удалось обновить стратегию" });
+    } finally {
+      setIsChangingStrategy(false);
     }
   };
 
@@ -166,6 +188,79 @@ export function MemorySection() {
           onCheckedChange={handleToggleMemory}
           disabled={isToggling}
         />
+      </div>
+
+      {/* Fact extraction strategy — ТЗ-MindOnVisit */}
+      <div className="rounded-lg border border-border p-4 space-y-3">
+        <div>
+          <Label className="text-sm font-medium">
+            Когда обрабатывать факты для памяти
+          </Label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Как Simply подхватывает факты, если они не попали в память во время
+            разговора (короткие сессии).
+          </p>
+        </div>
+
+        <RadioGroup
+          value={settings?.factExtractionStrategy ?? "always"}
+          onValueChange={(v) => handleStrategyChange(v as FactExtractionStrategy)}
+          disabled={!settings?.memoryEnabled || isChangingStrategy}
+          className="gap-3"
+        >
+          <label
+            htmlFor="strategy-always"
+            className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/60"
+          >
+            <RadioGroupItem value="always" id="strategy-always" className="mt-0.5" />
+            <div className="space-y-1">
+              <div className="text-sm font-medium">
+                🟢 Всегда актуально <span className="text-muted-foreground font-normal">(on-visit + cron)</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Обработка при заходе в чат + ночная «уборка» в 3:00. Память
+                всегда свежая и полная. Стоимость — средняя.
+                <span className="block mt-1 text-foreground/70">Рекомендуется большинству.</span>
+              </p>
+            </div>
+          </label>
+
+          <label
+            htmlFor="strategy-on-visit"
+            className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/60"
+          >
+            <RadioGroupItem value="on-visit" id="strategy-on-visit" className="mt-0.5" />
+            <div className="space-y-1">
+              <div className="text-sm font-medium">
+                💰 Только при работе <span className="text-muted-foreground font-normal">(on-visit)</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Обработка только когда вы сами заходите. Ночной сервер не
+                работает. 0 затрат, если не пользуетесь. Если копится много
+                хвостов — могут обрабатываться порциями.
+                <span className="block mt-1 text-foreground/70">Для редких или нерегулярных пользователей.</span>
+              </p>
+            </div>
+          </label>
+
+          <label
+            htmlFor="strategy-cron"
+            className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/60"
+          >
+            <RadioGroupItem value="cron" id="strategy-cron" className="mt-0.5" />
+            <div className="space-y-1">
+              <div className="text-sm font-medium">
+                🌙 Только ночью <span className="text-muted-foreground font-normal">(cron)</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Обработка только раз в сутки в 3:00 МСК. Во время разговора —
+                ничего. Дёшево и предсказуемо. Факты из сегодняшних разговоров
+                попадут в память только к следующему утру.
+                <span className="block mt-1 text-foreground/70">Если не нужна актуальная память в течение дня.</span>
+              </p>
+            </div>
+          </label>
+        </RadioGroup>
       </div>
 
       {/* Profile */}

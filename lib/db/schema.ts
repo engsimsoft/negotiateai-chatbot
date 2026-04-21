@@ -836,7 +836,12 @@ export const memorySettings = pgTable(
       .references(() => user.id),
     /** Global toggle: enable/disable MIND memory extraction + retrieval */
     memoryEnabled: boolean("memoryEnabled").notNull().default(true),
-    /** Timestamp when facts were last updated (for profile regeneration gate) */
+    /** Strategy for processing unextracted message tails: 'always' (on-visit + cron) | 'on-visit' | 'cron'. Default 'always'. Source: TZ_MindOnVisit. */
+    factExtractionStrategy: text("factExtractionStrategy")
+      .notNull()
+      .default("always"),
+    /** Last time on-visit trigger checked this user's tails. Used for 30-min debounce. */
+    lastMindCheckAt: timestamp("lastMindCheckAt"),
     factsUpdatedSince: timestamp("factsUpdatedSince"),
     factsSinceConsolidation: integer("factsSinceConsolidation")
       .notNull()
