@@ -15,7 +15,7 @@ import { calcStepCostRub } from "@/lib/ai/tokenlens-catalog";
 import { extractUsageFields, extractUsageForPricing, logUsage } from "@/lib/ai/usage-utils";
 import { auth } from "@/app/(auth)/auth";
 import { userEntitlements } from "@/lib/ai/entitlements";
-import { getTaskIdForChatMode } from "@/lib/ai/chat-mode-config";
+import { resolveActiveTaskId } from "@/lib/ai/routing";
 import { buildChatPrompt, buildExpertisePrompt, buildCreatePrompt } from "@/lib/prompts/server";
 import type { BuildContext } from "@/lib/prompts";
 import { buildProjectContext } from "@/lib/prompts/contexts";
@@ -277,17 +277,6 @@ async function convertTextFilesInAllMessages(
   return Promise.all(messages.map(convertTextFilePartsInMessage));
 }
 
-
-/**
- * ТЗ-MinimaxCleanup: Check if user message contains non-text attachments
- * (images, PDFs, documents — but NOT text/plain which is already converted to text parts)
- */
-function hasAttachments(parts: any[]): boolean {
-  return parts.some((p: any) =>
-    p.type === "image" ||
-    (p.type === "file" && p.mediaType !== "text/plain")
-  );
-}
 
 /**
  * ТЗ-SimplyReadDocumentTool + R-6 correction (v3.90.2): Capability-aware history
@@ -608,27 +597,19 @@ export async function POST(request: Request) {
           : DEFAULT_PROJECT_MODEL;
         const isProfessorMode = isProjectChat && tier === "professor";
 
-        // ТЗ-2 Dev Switchboard: track the TaskId used for this request so
-        // we can (a) emit it in debug events for the DevPanel switcher and
-        // (b) reuse it in usage logging instead of re-deriving the routing.
-        // ТЗ-SimplyChatModeInjection: activeTaskId is now resolved BEFORE
-        // the prompt builder so composer can inject the real <current_model>
-        // display name via getModelEntry(getModelIdForTask(activeTaskId)).
-        let activeTaskId: TaskId;
-        if (isProjectChat && project) {
-          activeTaskId = `project:expert:${tier}` as TaskId;
-        } else if (chatMode === "simply") {
-          // Priority: think → Grok 4.20, attachments → Haiku 4.5 (vision), default → Grok 4.1 Fast
-          if (think) {
-            activeTaskId = "simply-chat-think";
-          } else if (hasAttachments(message.parts)) {
-            activeTaskId = "simply-chat-vision";
-          } else {
-            activeTaskId = "simply-chat";
-          }
-        } else {
-          activeTaskId = getTaskIdForChatMode(chatMode);
-        }
+        // ТЗ-ExpertiseCreateVisionRouting (2026-04-21): единая SSOT-точка резолва
+        // activeTaskId. Capability-driven fallback на `chat-vision` (Haiku 4.5)
+        // срабатывает только когда default-модель режима не тянет тип вложения
+        // (у Grok — PDF). См. lib/ai/routing.ts и ADR. До этого ТЗ routing был
+        // хардкод на simply, expertise/create падали на скан-PDF, project chat
+        // собирал несуществующие taskId через template string.
+        const activeTaskId: TaskId = resolveActiveTaskId({
+          chatMode,
+          think,
+          isProjectChat,
+          tier: isProjectChat ? tier : undefined,
+          parts: message.parts,
+        });
 
         if (isProjectChat && project) {
           // Project chat: use Claude model and project context
@@ -966,36 +947,24 @@ export async function POST(request: Request) {
           ? withCacheControlOnLastTool(standardTools)
           : standardTools;
 
-        // Очистка и конверсия истории сообщений. Три шага:
+        // Очистка и конверсия истории сообщений — единый pipeline на все chat modes
+        // (ТЗ-ExpertiseCreateVisionRouting, 2026-04-21: gate `chatMode === "simply"`
+        // снят после унификации routing'а через resolveActiveTaskId + chat-vision).
         //
         // 1. stripIncompleteToolParts — универсальный (все провайдеры)
-        // 2. convertTextFilesInAllMessages — async helper который fetchit
-        //    содержимое text/plain file parts по URL (Vercel Blob) и инлайнит
-        //    как text. Применяется ко ВСЕЙ истории (не только к новому
-        //    сообщению) — нужно для legacy строк в БД от предыдущих провайдеров
-        //    + для чатов где первое сообщение с файлом было сохранено в
-        //    parts-оригинале (до фикса saveMessages). Провайдер-агностично:
-        //    Grok и Claude оба не принимают text/plain как file part.
-        //    (fix ТЗ-XAI-3 после регрессии 2026-04-15)
-        // 3. adaptHistoryToCapabilities — provider-agnostic R-6 correction:
-        //    для каждого file part в истории проверяет capabilities целевой
-        //    модели (vision, documentSupport) из SSOT model-catalog и заменяет
-        //    неподдерживаемые типы на текстовые placeholder-ы. Gate на chatMode
-        //    simply: проектные чаты используют Claude с полным capability set,
-        //    expertise/create идут через собственные адаптеры если понадобится.
-        //    (v3.90.2 — ТЗ-SimplyReadDocumentTool + R-6 correction)
+        // 2. convertTextFilesInAllMessages — инлайнит text/plain file parts
+        //    (legacy строки БД + чаты до фикса saveMessages). Grok и Claude оба
+        //    не принимают text/plain как file part.
+        // 3. adaptHistoryToCapabilities — capability-driven R-6 correction:
+        //    file parts, которые целевая модель не поддерживает, заменяются на
+        //    текстовый placeholder. Безопасно для project chats (Claude tiers
+        //    поддерживают всё → ничего не вырезается).
         const cleanedHistory = stripIncompleteToolParts(uiMessages);
-        const textInlinedHistory =
-          chatMode === "simply"
-            ? await convertTextFilesInAllMessages(cleanedHistory)
-            : cleanedHistory;
-        const preparedHistory =
-          chatMode === "simply"
-            ? adaptHistoryToCapabilities(
-                textInlinedHistory,
-                effectiveCatalogEntry?.capabilities,
-              )
-            : textInlinedHistory;
+        const textInlinedHistory = await convertTextFilesInAllMessages(cleanedHistory);
+        const preparedHistory = adaptHistoryToCapabilities(
+          textInlinedHistory,
+          effectiveCatalogEntry?.capabilities,
+        );
 
         // ТЗ-COMPACTION-UNIFY: Simply Compaction middleware — единый путь для
         // всех пользовательских chat modes (simply / expertise / create) +

@@ -59,25 +59,29 @@
 
 ### Слой 1 — KITT: обработка в чате
 
-#### Текстовые файлы (text/plain) → Grok
+**Архитектура (после ТЗ-ExpertiseCreateVisionRouting, 2026-04-21):** единый capability-driven routing на все chat modes. См. [ADR 055](../../docs/decisions/055-capability-driven-attachment-routing.md) и `lib/ai/routing.ts`.
 
-Все файлы, сконвертированные в text/plain на Слое 0.
+Принцип: если default-модель chat mode поддерживает тип вложения по SSOT `model-catalog.ts` — обрабатывает сама. Если нет — fallback на Claude Haiku 4.5 (`chat-vision` taskId). Учитывает override из `/dev/models`.
 
-Содержимое вставляется в сообщение как текст. Grok видит его напрямую и отвечает. Содержимое сохраняется в БД — Grok помнит файл в последующих сообщениях.
+#### Текстовые файлы (text/plain) → default-модель режима
 
-#### Изображения (jpg/png) → Haiku
+Все файлы, сконвертированные в text/plain на Слое 0. Содержимое инлайнится в сообщение через `convertTextFilesInAllMessages` (ТЗ-ExpertiseCreateVisionRouting: gate на simply снят, работает для всех режимов). Grok / Claude / любая активная модель видит файл как обычный текст, помнит в последующих сообщениях.
 
-**Текущее решение (принято):** Запрос с изображением маршрутизируется на Claude Haiku 4.5. Haiku видит картинку и отвечает пользователю. Ответ Haiku сохраняется в истории чата. Следующее сообщение без вложения — обратно на Grok. Grok видит ответ Haiku в истории и продолжает разговор.
+#### Изображения (jpg/png)
 
-**Будущее улучшение (после миграции xAI):** Двухшаговый подход — Haiku описывает изображение (специальный промпт PE-команды), описание в историю, Grok даёт умный ответ. Или: A/B тест Grok vision vs Haiku, если Grok достаточно хорош — убрать Haiku из этого маршрута.
+Capability-driven: если default-модель режима имеет `vision=true` (Grok 4.1 Fast, Grok 4.20, Claude-tiers) — картинка идёт на неё напрямую. Никакого лишнего прокси-вызова через Haiku. До ТЗ-ExpertiseCreateVisionRouting в simply было хардкод «image → Haiku» — убран, Grok справляется сам.
 
-#### PDF (текстовый) → Grok (после ТЗ-ATTACH-1)
+Если override через `/dev/models` поставил модель без vision (MiniMax) — fallback на Haiku автоматически.
 
-Текст извлечён при upload (Слой 0) → стал text/plain → Grok видит как обычный текст. Никакой маршрутизации на Haiku не нужно.
+#### PDF (текстовый) → default-модель режима (через Layer 0)
 
-#### PDF (сканированный) → Haiku
+Текст извлечён при upload → стал text/plain → default-модель видит как обычный текст. Никакого routing'а на Haiku.
 
-Текстовое извлечение не дало результата → файл остаётся как PDF → маршрутизация на Haiku. Haiku умеет PDF нативно (до 100 страниц).
+#### PDF (сканированный/не-извлекаемый) → Haiku через chat-vision
+
+Layer 0 не справился с извлечением (`isLikelyScan=true`) → файл остаётся как `application/pdf`. Capability-check в `resolveActiveTaskId`:
+- Для Grok-режимов (simply/expertise/create): `documentSupport.supported=false` → routing на `chat-vision` → Haiku (умеет PDF до 100 страниц).
+- Для project:expert (Claude-tiers): `documentSupport.supported=true` → tier-модель обрабатывает PDF сама, Haiku не включается.
 
 #### Большие документы → KITT предлагает варианты
 
@@ -179,9 +183,9 @@ Grok 4.20 с tools. Для серьёзной работы с документо
 | DOCX → text при upload | ✅ | ✅ | — |
 | XLSX → CSV при upload | ✅ | ✅ | — |
 | TXT/MD/CSV → text | ✅ | ✅ | — |
-| PDF → text при upload | ❌ PDF идёт на Haiku как есть | ✅ Текстовые PDF → text/plain | ТЗ-ATTACH-1 |
-| Изображения | Haiku (один вызов, полный ответ) | Haiku или двухшаговый | После миграции xAI |
-| Скан PDF | Haiku как PDF | Haiku как PDF | Без изменений |
+| PDF → text при upload | ✅ Текстовые PDF → text/plain | ✅ | ТЗ-ATTACH-1 (закрыто) |
+| Изображения | ✅ default-модель режима (capability-driven) | ✅ | ТЗ-ExpertiseCreateVisionRouting (закрыто) |
+| Скан PDF | ✅ `chat-vision` (Haiku) через capability fallback | ✅ | ТЗ-ExpertiseCreateVisionRouting (закрыто) |
 | Большие документы | Нет ограничения / предложения | KITT предлагает Экспертизу / Библиотеку | После миграции xAI |
 | RAG — MIND | ✅ Voyage + pgvector | ✅ | — |
 | RAG — Collections | ❌ | ✅ xAI Collections API | ТЗ-XAI-COL-1 |
@@ -191,12 +195,12 @@ Grok 4.20 с tools. Для серьёзной работы с документо
 
 ## Принятые решения (не пересматриваются до завершения миграции)
 
-1. **Гибрид Grok + Haiku** для KITT. Текст → Grok. Изображения и документы → Haiku. Решение утверждено 2026-04-14.
+1. **Capability-driven routing (ТЗ-ExpertiseCreateVisionRouting, 2026-04-21).** Единый механизм для всех chat modes через `lib/ai/routing.ts`. Fallback на `chat-vision` (Haiku 4.5) срабатывает только когда default-модель режима не поддерживает тип вложения. См. ADR 055. Заменил хардкод «simply: любое вложение → Haiku» (утв. 2026-04-14) — Grok теперь обрабатывает картинки сам.
 
-2. **Haiku отвечает пользователю напрямую** при вложении (один вызов, не два). Двухшаговый подход — будущее улучшение.
+2. **Haiku отвечает пользователю напрямую** при fallback'е (один вызов, не два). Двухшаговый подход — будущее улучшение.
 
-3. **adaptHistoryToCapabilities** через SSOT capabilities каталога — единственный механизм адаптации истории. Никаких `isSimplyNonAnthropicModel`, никаких хардкодных strip-функций.
+3. **adaptHistoryToCapabilities** через SSOT capabilities каталога — единственный механизм адаптации истории. Применяется ко всем chat modes (gate на simply снят в ТЗ-ExpertiseCreateVisionRouting). Никаких `isSimplyNonAnthropicModel`, никаких хардкодных strip-функций.
 
-4. **PDF text extraction при upload** — приоритетное улучшение (ТЗ-ATTACH-1), но не блокирует миграцию xAI.
+4. **PDF text extraction при upload** — ТЗ-ATTACH-1 закрыто. Текстовые PDF становятся text/plain до чата.
 
 5. **Пороги размеров** — подбираются эмпирически, не назначаются с потолка.

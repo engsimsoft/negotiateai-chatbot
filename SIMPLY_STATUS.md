@@ -1,7 +1,7 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.97.0
-**Статус:** Active development (**серия Simply_xAI закрыта** 2026-04-16 в v3.92.1, **ТЗ-COMPACTION-UNIFY закрыт** 2026-04-21 в v3.95.0, **ТЗ-MindOnVisit закрыт** 2026-04-21 в v3.96.0, **ТЗ-MindDeepConsolidation закрыт** 2026-04-21 в v3.97.0)
+**Версия:** 3.98.0
+**Статус:** Active development (**серия Simply_xAI закрыта** 2026-04-16 в v3.92.1, **ТЗ-COMPACTION-UNIFY закрыт** 2026-04-21 в v3.95.0, **ТЗ-MindOnVisit закрыт** 2026-04-21 в v3.96.0, **ТЗ-MindDeepConsolidation закрыт** 2026-04-21 в v3.97.0, **ТЗ-ExpertiseCreateVisionRouting закрыт** 2026-04-21 в v3.98.0)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** snapshot «что работает прямо сейчас» на один взгляд. История изменений → [CHANGELOG.md](CHANGELOG.md). Архитектура → [docs/architecture.md](docs/architecture.md). Карта моделей → [docs/ai-chats-map.md](docs/ai-chats-map.md).
@@ -18,7 +18,7 @@
 - **Подсобка** — xAI Grok 4.1 Fast (`util:*`, `clerk:*`, `briefing:filter`, `memory:extract-batch/consolidate/profile/dedup-verify`, `compaction:summarize`)
 - **Кухня** — MiniMax M2.7 / M2.7-long (`briefing:author`, `briefing:section`, `briefing:podcast-script` — by design, фоновые pipelines)
 - **Зал** — xAI Grok 4.20 reasoning (`simply-chat-think`, `expertise`, `create`, `meeting:summary`)
-- **Автор** — Anthropic Claude Opus/Sonnet/Haiku (`professor:*`, `artifact:*`, `vision:ocr`, `service-chat:*`, `simply-chat-vision`)
+- **Автор** — Anthropic Claude Opus/Sonnet/Haiku (`professor:*`, `artifact:*`, `vision:ocr`, `service-chat:*`, `chat-vision` — capability-driven fallback для PDF-сканов во всех режимах, ADR 055)
 - **Dev-инструмент** — OpenRouter (только через `/dev/models` override для тестирования новых моделей)
 
 SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) + [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts).
@@ -31,7 +31,7 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 
 | Компонент | Статус | Модели / стек |
 |---|---|---|
-| **Simply Chat** (persistent, один на пользователя) | ✅ | Grok 4.1 Fast (default) · Grok 4.20 reasoning (кнопка «Думать») · Claude Haiku 4.5 (vision) |
+| **Simply Chat** (persistent, один на пользователя) | ✅ | Grok 4.1 Fast (default, включая картинки через нативный vision) · Grok 4.20 reasoning (кнопка «Думать») · Claude Haiku 4.5 — fallback для PDF-сканов через `chat-vision` |
 | **Экспертиза** (одноразовые экспертные запросы) | ✅ | Grok 4.20 reasoning (single-agent, R-5 резолв 2026-04-16). Multi-agent вариант 🔒 зарезервирован под ТЗ-XAI-MA-1 |
 | **Создание** (одноразовые creation-чаты) | ✅ | Grok 4.20 reasoning (мигрировано 2026-04-16) |
 | **Проекты** (изолированные рабочие пространства) | ✅ | Claude Haiku / Sonnet / Opus по tier, Профессор (Opus planning/review + Haiku execute) |

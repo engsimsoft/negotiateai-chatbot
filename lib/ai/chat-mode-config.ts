@@ -52,7 +52,8 @@ export const CHAT_MODE_CONFIG: Record<ChatMode, ChatModeEntry> = {
 /**
  * ТЗ-1 CoreRegistry: map chatMode → TaskId for use with getModel().
  * Note: `simply` maps to the default "simply-chat" taskId, but the chat route
- * overrides this for "Думать" (simply-chat-think) and vision (simply-chat-vision).
+ * overrides this via `resolveActiveTaskId` (lib/ai/routing.ts): "Думать" →
+ * "simply-chat-think", capability-driven vision fallback → "chat-vision".
  */
 export function getTaskIdForChatMode(mode: ChatMode): TaskId {
   switch (mode) {

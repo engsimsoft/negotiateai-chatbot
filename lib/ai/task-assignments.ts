@@ -26,7 +26,7 @@ export type TaskId =
   // Simply Chat (основной чат продукта)
   | "simply-chat"           // default text → Grok 4.1 Fast (non-reasoning)
   | "simply-chat-think"     // кнопка «Думать» = tier upgrade → Grok 4.20 (reasoning)
-  | "simply-chat-vision"    // attachments (image/pdf) → Claude Haiku 4.5
+  | "chat-vision"           // capability-driven fallback для вложений (все chat modes) → Claude Haiku 4.5
   // Экспертиза и Создание — разовые ветки
   | "expertise"             // chatMode=expertise → Grok 4.20 (reasoning)
   | "expertise-multi-agent" // RESERVED для ТЗ-XAI-MA-1 (Premium «Команда агентов»)
@@ -92,7 +92,7 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   // уже в проекте (Opus).
   "simply-chat":              "grok-4-1-fast-non-reasoning",
   "simply-chat-think":        "grok-4.20-0309-reasoning",
-  "simply-chat-vision":       "claude-haiku-4-5-20251001",
+  "chat-vision":              "claude-haiku-4-5-20251001",
 
   // Экспертиза и Создание (ТЗ-XAI-4 2026-04-16)
   // Обе ветки переведены на Grok 4.20 reasoning — это «зал», пользователь видит
@@ -244,7 +244,7 @@ export const DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number> = {
   // Simply Chat
   "simply-chat":              8192,   // Grok 4.1 Fast, типичные ответы 1-4K.
   "simply-chat-think":        16000,  // Grok 4.20 reasoning — потолок capability Grok.
-  "simply-chat-vision":       4096,   // Haiku vision, OCR + summary.
+  "chat-vision":              4096,   // Haiku vision fallback для вложений во всех chat modes.
 
   // Экспертиза / Создание / Multi-agent
   "expertise":                16000,  // Grok 4.20 reasoning — потолок capability Grok.
@@ -323,7 +323,7 @@ export const TASK_DESCRIPTIONS: Record<TaskId, string> = {
   // Simply Chat
   "simply-chat":              "Simply Chat — обычные ответы (быстрая модель)",
   "simply-chat-think":        "Simply Chat — кнопка «Думать» (умная модель)",
-  "simply-chat-vision":       "Simply Chat — OCR вложений (картинки, PDF)",
+  "chat-vision":              "Chat — fallback для вложений (PDF-сканы) во всех режимах",
 
   // Экспертиза и Создание
   "expertise":                "Экспертиза — одноразовый экспертный запрос",

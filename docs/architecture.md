@@ -172,6 +172,10 @@
 
 17 файлов в `lib/ai/tools/`, сгруппированы по пяти категориям: registration/infrastructure, web/research, artifacts/documents, context/files, utility.
 
+#### `lib/ai/routing.ts` — capability-driven attachment routing (ТЗ-ExpertiseCreateVisionRouting, v3.98.0)
+
+Чистый модуль без I/O. Две экспортируемые функции: `resolveActiveTaskId(ctx)` — единая SSOT-точка резолва активного taskId для запроса; `needsVisionFallback(parts, defaultTaskId)` — capability-check через `getModelEntry(getModelIdForTask(taskId))?.capabilities` из SSOT каталога. Алгоритм: резолв default taskId по `chatMode` / project tier → capability-check против типов attachments → если default-модель не тянет хотя бы один тип, fallback на `chat-vision` (Claude Haiku 4.5). Ортогонален `/dev/models` override (capability читается у реально активной модели). См. [ADR 055](decisions/055-capability-driven-attachment-routing.md).
+
 #### `lib/ai/compaction/` — Simply Compaction middleware (ТЗ-COMPACTION-1, v3.94.0)
 
 6 файлов: `types.ts` (CompactionContext / CompactionEvent / PrepareMessagesResult), `prompt.ts` (системный промпт + rolling-update паттерн), `summarize.ts` (`generateCompactionSummary` через Grok 4.1 Fast non-reasoning + Zod 5-секционная схема), `db-queries.ts` (get/saveCompactionState с собственным Neon HTTP клиентом), `prepare-messages.ts` (основная middleware с verbatim window и edge cases), `events.ts` (`emitCompactionEvent` для user-visible виджета). Capability-driven резолв через `getCompactionStrategy(modelId)` в [model-catalog.ts](../lib/ai/model-catalog.ts). Активна в `expertise` / `create` через gate в [chat/route.ts:1060](../app/(chat)/api/chat/route.ts#L1060). **Детали:** [ADR 053 § 5. context strategy](decisions/053-aisdk-invocation-contract.md), [SIMPLY_COMPACTION_ARCHITECTURE.md](../specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md).
@@ -244,20 +248,20 @@
 
 ### Simply Chat (persistent)
 - **Route:** `app/(chat)/simply/`, `app/(chat)/api/chat/route.ts` (streaming endpoint)
-- **Models:** `simply-chat` / `simply-chat-think` / `simply-chat-vision` → Grok 4.1 Fast / Grok 4.20 / Claude Haiku (через [lib/ai/task-assignments.ts](../lib/ai/task-assignments.ts))
+- **Models:** `simply-chat` / `simply-chat-think` + capability-driven fallback на `chat-vision` для PDF-сканов → Grok 4.1 Fast / Grok 4.20 / Claude Haiku (через [lib/ai/task-assignments.ts](../lib/ai/task-assignments.ts) + [lib/ai/routing.ts](../lib/ai/routing.ts))
 - **UI:** top-level `components/chat.tsx` + `components/messages.tsx` + `components/input/`
 - **БД:** `Chat` (chatMode='simply'), `Message_v2`
 - **Особенность:** ОДИН вечный чат на userId (нет операции «новый Simply чат»)
 
 ### Expertise (одноразовые экспертные запросы)
 - **Route:** `app/(dashboard)/expertise/page.tsx` (landing) + `app/(expertise)/expertise/[id]/` (chat view)
-- **Model:** `expertise` → Grok 4.20 Multi-Agent
+- **Model:** `expertise` → Grok 4.20 reasoning (+ capability-driven fallback на `chat-vision` → Haiku для PDF-сканов, ADR 055)
 - **UI:** переиспользует `components/chat.tsx`
 - **БД:** `Chat` (chatMode='expertise')
 
 ### Create (одноразовые creation-чаты)
 - **Route:** `app/(dashboard)/create/page.tsx` (landing) + `app/(create)/create/[id]/`
-- **Model:** `create` → MiniMax M2.7
+- **Model:** `create` → Grok 4.20 reasoning (+ capability-driven fallback на `chat-vision` → Haiku для PDF-сканов, ADR 055)
 - **UI:** переиспользует `components/chat.tsx`
 - **БД:** `Chat` (chatMode='create')
 

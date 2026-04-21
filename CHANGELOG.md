@@ -7,6 +7,23 @@
 
 ## [Unreleased]
 
+### [3.98.0] — 2026-04-21 — ТЗ-ExpertiseCreateVisionRouting
+
+**Capability-driven роутинг вложений: единый механизм для всех chat modes, закрыто падение на сканированных PDF в expertise/create.**
+
+- **Проблема.** В expertise/create сканированный PDF (CAD-чертёж или любой PDF без извлекаемого текста) падал с `AI_UnsupportedFunctionalityError` — Grok 4.20 не поддерживает `application/pdf` как file part, routing-блока на Haiku не было. В simply был хардкод «любое вложение → Haiku» даже когда Grok умел картинки сам. В project chat `activeTaskId = \`project:expert:${tier}\`` собирал несуществующие taskId (`project:expert:executor/expert/professor` вместо `haiku/sonnet/opus`).
+- **Решение.** Единый **capability-driven** механизм через новый модуль [lib/ai/routing.ts](lib/ai/routing.ts): `resolveActiveTaskId()` + `needsVisionFallback()`. Если default-модель режима не поддерживает тип вложения по SSOT `model-catalog.ts` — fallback на `chat-vision` (Haiku 4.5). Иначе — модель режима обрабатывает сама. Ортогонален `/dev/models` override (capability читается у реально активной модели).
+- **Изменение поведения simply.** Картинки теперь идут на Grok 4.1 Fast (раньше всегда Haiku). Smoke-тест владельцем подтвердил приемлемое качество. Экономия: Grok $0.2/$0.5 vs Haiku $1/$5.
+- **Переименование taskId.** `simply-chat-vision` → `chat-vision` (теперь универсальный fallback, не частный случай simply).
+- **Снятие двух gate'ов** на `chatMode === "simply"`: `convertTextFilesInAllMessages` и `adaptHistoryToCapabilities` применяются ко всем chat modes → единый pipeline. Подтверждено в smoke-тесте (text-PDF в expertise конвертируется корректно).
+- **Параллельный фикс:** `getTaskIdForTier(tier)` вместо template-string в project chat — устранил data-consistency issue в `ai_usage_log` для project taskId.
+- **Удалены:** `hasAttachments()` helper (избыточен после `needsVisionFallback`), хардкод routing-ветки на simply.
+- **ADR.** [docs/decisions/055-capability-driven-attachment-routing.md](docs/decisions/055-capability-driven-attachment-routing.md) — принцип capability-driven как третий SSOT-паттерн проекта (после core model registry и dev switchboard).
+- **Smoke-валидация (2026-04-21).** Expertise + скан CAD-чертёж → `task=chat-vision, model=haiku` ✅. Expertise + текстовый PDF (Layer 0 извлечение) → `task=expertise, model=grok-4-1-fast` (с override) ✅. Все 5 сценариев ТЗ подтверждены владельцем.
+- **Файлы.** Новые: `lib/ai/routing.ts`, `docs/decisions/055-capability-driven-attachment-routing.md`. Изменены: `lib/ai/task-assignments.ts` (rename 4 места), `app/(chat)/api/chat/route.ts` (routing-блок → один вызов, два gate сняты, удалён `hasAttachments`), `lib/ai/chat-mode-config.ts` (комментарий), `lib/ai/tools/chat-tools.ts` (комментарий), `scripts/debug-orphan-tool-use.ts` (taskId), `docs/ai-chats-map.md`, `specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md`, `SIMPLY_STATUS.md`.
+
+---
+
 ### [3.97.0] — 2026-04-21 — ТЗ-MindDeepConsolidation
 
 **Двухуровневая консолидация памяти: ночной cron на reasoning-модели «причёсывает» базу фактов.**

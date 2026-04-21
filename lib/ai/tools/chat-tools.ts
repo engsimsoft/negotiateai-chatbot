@@ -42,7 +42,7 @@ interface GetStandardToolsParams {
  * Attached file handling (non-project chats):
  *  - DOCX/TXT/MD/CSV are converted to text/plain on upload ([app/(chat)/api/files/upload/route.ts])
  *    and inlined into the prompt by `convertTextFilesInAllMessages` in chat/route.ts
- *  - PDF/images flow through vision models directly (simply-chat-vision task → Claude Haiku 4.5)
+ *  - PDF/images flow through vision fallback when default model lacks capability (chat-vision task → Claude Haiku 4.5)
  *  - .xlsx/.xls/.csv structured data → `parseExcel` tool
  *
  * There is no file-system knowledge base in Simply — the legacy `readDocument`

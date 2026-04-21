@@ -157,7 +157,7 @@ async function main() {
   ): Promise<{ ok: boolean; error?: string }> {
     try {
       const res = streamText({
-        model: getModel("simply-chat-vision"),
+        model: getModel("chat-vision"),
         messages: [
           { role: "system", content: "Ты ассистент. Отвечай кратко." },
           ...messages,

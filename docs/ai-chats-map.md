@@ -18,7 +18,7 @@
 |---|---|---|---|
 | **Simply Chat** (default text) | Grok 4.1 Fast (`simply-chat`) | ✅ Работает | Дворецкий KITT — быстрый дешёвый основной чат |
 | **Simply Chat** — кнопка «Думать» | Grok 4.20 reasoning (`simply-chat-think`) | ✅ Работает | Tier upgrade на сильную модель |
-| **Simply Chat** — vision (image/PDF) | Claude Haiku 4.5 (`simply-chat-vision`) | ✅ Работает | Маршрутизация вложений — Haiku поддерживает native PDF |
+| **Vision fallback** (все режимы, capability-driven) | Claude Haiku 4.5 (`chat-vision`) | ✅ Работает | Срабатывает когда default-модель режима не тянет тип вложения (Grok ↛ PDF). Читает capability из SSOT каталога. См. ADR 055 |
 | **Экспертиза** (chatMode=expertise) | Grok 4.20 reasoning (`expertise`) | ✅ Работает | Точные ответы, разовые экспертные запросы |
 | **Экспертиза Premium** (toggle «Команда агентов») | Grok 4.20 Multi-Agent (`expertise-multi-agent`) | 🔒 Reserved (ТЗ-XAI-MA-1) | Premium-режим рядом с обычной expertise через Responses API + MCP. Placeholder taskId зарезервирован, реализация в отдельном ТЗ |
 | **Создание** (chatMode=create) | Grok 4.20 reasoning (`create`) | ✅ Работает | Презентации, отчёты, длинные тексты |
@@ -421,7 +421,7 @@ lib/prompts/briefing/briefing-scriptwriter.md       # Промпт скрипт�
 |---|---|---|---|---|
 | `simply` (text) | `simply-chat` | Grok 4.1 Fast | `/simply` | Дворецкий KITT — persistent чат |
 | `simply` (think) | `simply-chat-think` | Grok 4.20 reasoning | `/simply` (кнопка «Думать») | Tier upgrade на сильную модель |
-| `simply` (vision) | `simply-chat-vision` | Claude Haiku 4.5 | `/simply` (при загрузке image/PDF) | Vision/native PDF |
+| любой (vision fallback) | `chat-vision` | Claude Haiku 4.5 | все chat modes | Capability-driven fallback через `resolveActiveTaskId` (lib/ai/routing.ts). Для Grok-режимов (simply/expertise/create) срабатывает на PDF-сканах. Для project:expert (Claude-tiers) не срабатывает — tier сам умеет. См. ADR 055 |
 | `expertise` | `expertise` | Grok 4.20 reasoning | `/expertise/[id]` | Точные ответы с проверкой фактов |
 | `expertise` (Premium toggle) | `expertise-multi-agent` 🔒 | Grok 4.20 Multi-Agent | `/expertise/[id]` (toggle «Команда агентов», ТЗ-XAI-MA-1) | Premium-режим, пока reserved |
 | `create` | `create` | Grok 4.20 reasoning | `/create/[id]` | Презентации, отчёты, длинные тексты |
