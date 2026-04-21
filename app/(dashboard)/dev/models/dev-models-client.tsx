@@ -209,8 +209,13 @@ function TaskRowItem({
 
   return (
     <tr className="border-b border-border/50 hover:bg-muted/30">
-      <td className="px-2 py-1.5 font-mono text-xs">{row.taskId}</td>
-      <td className="px-2 py-1.5 font-mono text-xs text-muted-foreground">
+      <td className="px-2 py-1.5 align-top">
+        <div className="font-mono text-xs">{row.taskId}</div>
+        <div className="text-[11px] text-muted-foreground mt-0.5 max-w-[320px]">
+          {row.description}
+        </div>
+      </td>
+      <td className="px-2 py-1.5 font-mono text-xs text-muted-foreground align-top">
         {shortenCatalogId(row.defaultCatalogId)}
       </td>
       <td className="px-2 py-1.5">
@@ -276,6 +281,7 @@ export function DevModelsClient({ data }: { data: DevModelsPageData }) {
     return data.tasks.filter(
       (t) =>
         t.taskId.toLowerCase().includes(q) ||
+        t.description.toLowerCase().includes(q) ||
         t.defaultCatalogId.toLowerCase().includes(q) ||
         t.effectiveCatalogId.toLowerCase().includes(q),
     );

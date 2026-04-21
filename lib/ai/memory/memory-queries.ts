@@ -7,7 +7,7 @@
 
 import "server-only";
 
-import { and, eq, inArray, isNull, sql, desc } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, sql, desc } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 
@@ -169,6 +169,10 @@ export async function searchSimilarMemories(
 
 /**
  * Get all memory entries for a user, with optional filters.
+ *
+ * `beforeTs` — snapshot cursor для background-консолидации (ТЗ-MindDeepConsolidation):
+ * возвращает только факты, созданные до указанного timestamp. Защита от race
+ * condition с hot path (Letta sleep-time pattern `last_processed_message_id`).
  */
 export async function getMemoryEntriesByUser(
   userId: string,
@@ -176,9 +180,10 @@ export async function getMemoryEntriesByUser(
     category?: MemoryCategory;
     activeOnly?: boolean;
     limit?: number;
+    beforeTs?: Date;
   },
 ): Promise<typeof memoryEntry.$inferSelect[]> {
-  const conditions: ReturnType<typeof eq>[] = [
+  const conditions: Array<ReturnType<typeof eq> | ReturnType<typeof lt>> = [
     eq(memoryEntry.userId, userId),
   ];
 
@@ -188,6 +193,10 @@ export async function getMemoryEntriesByUser(
 
   if (options?.category) {
     conditions.push(eq(memoryEntry.category, options.category));
+  }
+
+  if (options?.beforeTs) {
+    conditions.push(lt(memoryEntry.createdAt, options.beforeTs));
   }
 
   return db
@@ -276,6 +285,22 @@ export async function updateMemoryMetadata(
   await db
     .update(memoryEntry)
     .set({ metadata, updatedAt: new Date() })
+    .where(eq(memoryEntry.id, id));
+}
+
+/**
+ * Rephrase action (ТЗ-MindDeepConsolidation): update content + re-embed,
+ * сохраняя id. Без supersede/нового id — значит references на этот факт
+ * (если они появятся в будущем) продолжат работать.
+ */
+export async function updateMemoryEntryContent(
+  id: string,
+  content: string,
+  embedding: number[],
+): Promise<void> {
+  await db
+    .update(memoryEntry)
+    .set({ content, embedding, updatedAt: new Date() })
     .where(eq(memoryEntry.id, id));
 }
 

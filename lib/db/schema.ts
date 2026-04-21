@@ -847,6 +847,8 @@ export const memorySettings = pgTable(
       .notNull()
       .default(0),
     lastConsolidatedAt: timestamp("lastConsolidatedAt"),
+    /** Timestamp последнего прогона ночного deep-consolidate. Используется idempotency-гвардом (skip если <12h назад). Source: TZ_MindDeepConsolidation. */
+    lastDeepConsolidatedAt: timestamp("lastDeepConsolidatedAt"),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
     updatedAt: timestamp("updatedAt").notNull().defaultNow(),
   },

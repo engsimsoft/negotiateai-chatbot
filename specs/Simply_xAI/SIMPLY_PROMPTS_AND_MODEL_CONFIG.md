@@ -112,7 +112,8 @@
 
 - [extract.md](lib/prompts/memory/extract.md) — как вытаскивать факты из одного сообщения (старая версия)
 - [extract-batch.md](lib/prompts/memory/extract-batch.md) — как вытаскивать факты из целого куска разговора (новая, используется сейчас)
-- [consolidate.md](lib/prompts/memory/consolidate.md) — как наводить порядок в накопленных фактах
+- [consolidate.md](lib/prompts/memory/consolidate.md) — быстрая чистка накопленных фактов (hot path, дешёвая модель)
+- [deep-consolidate.md](lib/prompts/memory/deep-consolidate.md) — **ночная глубокая консолидация** на reasoning-модели (01:00 МСК). Можно редактировать под свои предпочтения: что сжимать агрессивнее, какие категории не трогать и т.д. Поддерживает 4 действия: merge / supersede / **rephrase** (сжатие длинного факта с сохранением id) / remove.
 - [profile.md](lib/prompts/memory/profile.md) — как писать связный нарративный «портрет пользователя» (800–1200 слов)
 
 **Влияние:** что AI помнит на странице `/context` — определяется именно этими инструкциями.
@@ -194,13 +195,17 @@
 | `clerk:task-summary` | Claude Haiku 4.5 |
 | `clerk:file-analyzer` | Claude Haiku 4.5 |
 
-### Память MIND (после ТЗ-COMPACTION-UNIFY, апрель 2026)
-| Задача | Модель | Почему |
-|---|---|---|
-| `memory:extract-batch` | Grok 4.1 Fast | **Единственный extract-таск.** Вызывается из compaction middleware на `split.toCompact` |
-| `memory:consolidate` | Grok 4.1 Fast | Механическая чистка |
-| `memory:profile` | Grok 4.1 Fast | Нарративный профиль |
-| `memory:dedup-verify` | Grok 4.1 Fast | Проверка дублей |
+### Память MIND (после ТЗ-MindDeepConsolidation, апрель 2026)
+
+**Двухуровневая консолидация (tiered pattern, Letta sleep-time):** hot path на дешёвой Grok 4.1 Fast ловит очевидные дубликаты в момент накопления фактов; ночной cron на reasoning-модели причёсывает базу глубже — тонкие переформулированные дубли, противоречия, устаревшие факты, сжатие многословных формулировок (`rephrase`).
+
+| Задача | Модель | Когда | Что делает |
+|---|---|---|---|
+| `memory:extract-batch` | Grok 4.1 Fast | В процессе compaction | Извлекает факты из пачки сообщений, уходящих в summary |
+| `memory:consolidate` | Grok 4.1 Fast | Hot path: по триггеру ≥10 новых фактов | Быстрая механическая чистка (merge/supersede/remove) |
+| `memory:deep-consolidate` | **Grok 4.20 reasoning** | Ночной cron `0 22 * * *` = **01:00 МСК** | Глубокая консолидация reasoning-моделью. 4 действия: merge / supersede / **rephrase** / remove. Фильтры: активность за 24ч + idempotency 12ч + факт-count ≥5. Snapshot cursor защищает от race condition с hot path. Через `/dev/models` можно A/B с Haiku 4.5 / Sonnet / Opus. |
+| `memory:profile` | Grok 4.1 Fast | Ночной cron `0 0 * * *` = 03:00 МСК | Нарративный профиль пользователя |
+| `memory:dedup-verify` | Grok 4.1 Fast | При записи нового факта | LLM-проверка дубля (второй уровень после embedding similarity) |
 
 > `memory:extract` (per-turn) удалён в ТЗ-COMPACTION-UNIFY — per-turn extract в expertise/create/project давал ~12× overhead на свежих сообщениях.
 
@@ -337,7 +342,7 @@
 1. `Math.min(requested, capability)` — защищает от смены default-модели при которой cap окажется выше capability (через `/dev/models` override или правку `DEFAULT_TASK_MODELS`). Runtime молча режет до capability, без крахов.
 2. `warnOnce` при cap > 21333 на Anthropic — предупреждает dev'а что call site обязан использовать `streamText`/`streamObject` (иначе timeout-bomb, `UND_ERR_SOCKET`).
 
-**Текущие значения (37 taskId):**
+**Текущие значения (38 taskId):**
 
 | Группа | TaskId | Cap |
 |---|---|---|
@@ -346,7 +351,7 @@
 | Project expert (tier) | `project:expert:haiku` / `:sonnet` / `:opus` | 8192 / 16384 / 32000 |
 | Professor pipeline | `planning` / `review` / `pipeline-analyze` / `-execute` / `-synthesize` | 32000 / 8192 / 4096 / 8192 / 16000 |
 | Clerks | `clerk:task-summary` / `clerk:file-analyzer` | 2048 / 4096 |
-| Memory | `memory:extract-batch` / `consolidate` / `profile` / `dedup-verify` | 16000 / 4096 / 4096 / 512 |
+| Memory | `memory:extract-batch` / `consolidate` / `deep-consolidate` / `profile` / `dedup-verify` | 16000 / 4096 / 8192 / 4096 / 512 |
 | Briefing / Podcast | `filter` / `author` (dynamic) / `section` / `podcast-script` | 1024 / 8192 fallback / 8192 / 4096 |
 | Meeting | `meeting:summary` | 8192 |
 | Service chats | `ben` / `project-creation` / `project-manager` / `briefing-onboarding` | 4096 / 8192 / 4096 / 8192 |

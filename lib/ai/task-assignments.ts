@@ -46,7 +46,8 @@ export type TaskId =
   | "clerk:file-analyzer"
   // Memory (MIND / RAG)
   | "memory:extract-batch"    // batch extraction (встроен в compaction cycle, ТЗ-COMPACTION-UNIFY)
-  | "memory:consolidate"      // event-triggered consolidation
+  | "memory:consolidate"      // event-triggered consolidation (hot path, Grok 4.1 Fast)
+  | "memory:deep-consolidate" // nightly tiered consolidation на reasoning-модели (ТЗ-MindDeepConsolidation)
   | "memory:profile"          // nightly narrative profile
   | "memory:dedup-verify"     // Haiku LLM verify для двухуровневой дедупликации
   // Compaction (Simply Compaction MVP — ТЗ-COMPACTION-1)
@@ -155,6 +156,16 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   // dev switchboard без правки кода.
   "memory:extract-batch":     "grok-4-1-fast-non-reasoning",
   "memory:consolidate":       "grok-4-1-fast-non-reasoning",
+
+  // memory:deep-consolidate (ТЗ-MindDeepConsolidation, v3.97.0) — ночной cron
+  // 01:00 МСК на reasoning-модели. Tiered pattern (Letta sleep-time / Mem0 v3):
+  // hot path на Grok 4.1 Fast остаётся для ADD-only + event-triggered consolidate,
+  // а ночью Grok 4.20 reasoning причёсывает базу — тонкие повторы, противоречия,
+  // устаревшие факты, rephrase длинных формулировок. Через /dev/models можно
+  // A/B сравнить с Claude Haiku 4.5 (Letta рекомендация: consolidation не
+  // требует reasoning). После недели production принять решение о даунгрейде.
+  "memory:deep-consolidate":  "grok-4.20-0309-reasoning",
+
   "memory:profile":           "grok-4-1-fast-non-reasoning",
   "memory:dedup-verify":      "grok-4-1-fast-non-reasoning",
 
@@ -259,6 +270,7 @@ export const DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number> = {
   // Memory (MIND / RAG) — memory:extract удалён в ТЗ-COMPACTION-UNIFY
   "memory:extract-batch":     16000,  // batch extraction, MAX_BATCH_FACTS=30 × ~500 = ~15K, потолок Grok 4.1 Fast.
   "memory:consolidate":       4096,   // JSON консолидация.
+  "memory:deep-consolidate":  8192,   // reasoning consolidation на всей памяти (до 200 фактов) + rephrase до 20 actions с длинным mergedContent/rephrasedContent.
   "memory:profile":           4096,   // Narrative profile JSON.
   "memory:dedup-verify":      512,    // Haiku дедуп-верификация, крошечный ответ.
 
@@ -298,3 +310,82 @@ export const DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number> = {
   // Vision
   "vision:ocr":               4096,   // Haiku non-streaming, cap критичен (capability 64K = timeout-bomb иначе).
 };
+
+/**
+ * Человекочитаемые описания каждого taskId — для панели /dev/models.
+ * Источник: когда/где задача вызывается + что делает (русский язык).
+ *
+ * Зачем: таск-id = технический идентификатор (`memory:deep-consolidate`),
+ * по нему разработчик понимает контекст, но дежурный инженер / владелец
+ * в `/dev/models` должны видеть «что именно переключают», без чтения кода.
+ */
+export const TASK_DESCRIPTIONS: Record<TaskId, string> = {
+  // Simply Chat
+  "simply-chat":              "Simply Chat — обычные ответы (быстрая модель)",
+  "simply-chat-think":        "Simply Chat — кнопка «Думать» (умная модель)",
+  "simply-chat-vision":       "Simply Chat — OCR вложений (картинки, PDF)",
+
+  // Экспертиза и Создание
+  "expertise":                "Экспертиза — одноразовый экспертный запрос",
+  "expertise-multi-agent":    "Экспертиза — режим «Команда агентов» (reserved, не вызывается)",
+  "create":                   "Создание — одноразовая креативная задача",
+
+  // Проект — экспертный чат (tier)
+  "project:expert:haiku":     "Проект — эксперт-чат уровня Haiku (базовый)",
+  "project:expert:sonnet":    "Проект — эксперт-чат уровня Sonnet (средний)",
+  "project:expert:opus":      "Проект — эксперт-чат уровня Opus (максимальный)",
+
+  // Профессор (pipeline)
+  "professor:planning":              "Профессор — планирование всего проекта",
+  "professor:review":                "Профессор — ревью завершённой задачи",
+  "professor:pipeline-analyze":      "Профессор — анализ задачи перед выполнением",
+  "professor:pipeline-execute":      "Профессор — выполнение subtask",
+  "professor:pipeline-synthesize":   "Профессор — синтез финального результата",
+
+  // Клерки
+  "clerk:task-summary":       "Клерк — суммаризация завершённой задачи",
+  "clerk:file-analyzer":      "Клерк — анализ загруженного файла",
+
+  // Memory (MIND / RAG)
+  "memory:extract-batch":     "MIND — извлечение фактов из пачки сообщений (внутри compaction)",
+  "memory:consolidate":       "MIND — быстрая консолидация (hot path, по триггеру ≥10 новых фактов)",
+  "memory:deep-consolidate":  "MIND — глубокая ночная консолидация (ежедневно 01:00 МСК, reasoning)",
+  "memory:profile":           "MIND — ночной narrative-профиль пользователя (ежедневно 03:00 МСК)",
+  "memory:dedup-verify":      "MIND — LLM-проверка дубля при записи нового факта",
+
+  // Compaction
+  "compaction:summarize":     "Compaction — сжатие истории чата при заполнении контекста",
+
+  // Briefing + Podcast
+  "briefing:filter":          "Брифинг — фильтрация новостей из потока (hourly cron)",
+  "briefing:author":          "Брифинг — автор статьи (длинная кухонная задача)",
+  "briefing:section":         "Брифинг — секция статьи",
+  "briefing:podcast-script":  "Брифинг — сценарий подкаста",
+
+  // Meeting
+  "meeting:summary":          "Meeting Recorder — суммаризация встречи",
+
+  // Service chats
+  "service-chat:ben":                 "Сервис-чат — Ben (deprecated)",
+  "service-chat:project-creation":    "Сервис-чат — онбординг при создании проекта",
+  "service-chat:project-manager":     "Сервис-чат — менеджер внутри проекта",
+  "service-chat:briefing-onboarding": "Сервис-чат — онбординг при настройке брифинга",
+
+  // Утилиты
+  "util:title":               "Утилита — автогенерация названия чата",
+
+  // Artifacts
+  "artifact:text":            "Артефакт — текстовый документ в холсте",
+  "artifact:markdown":        "Артефакт — markdown-документ",
+  "artifact:excel":           "Артефакт — Excel-таблица",
+  "artifact:pptx":            "Артефакт — презентация PPTX",
+  "artifact:reveal":          "Артефакт — презентация Reveal.js",
+
+  // Vision
+  "vision:ocr":               "Vision — OCR изображений и сканов",
+};
+
+/** Getter для описания taskId (человекочитаемое). */
+export function getTaskDescription(taskId: TaskId): string {
+  return TASK_DESCRIPTIONS[taskId];
+}

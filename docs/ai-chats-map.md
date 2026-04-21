@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-04-20 — добавлен `compaction:summarize` taskId (ТЗ-COMPACTION-1, v3.94.0)
+**Обновлено:** 2026-04-21 — добавлен `memory:deep-consolidate` taskId на Grok 4.20 reasoning (ТЗ-MindDeepConsolidation, v3.97.0)
 
 ---
 
@@ -44,7 +44,8 @@
 | **Meeting: Транскрипция** | Deepgram Nova-3 (native SDK) | ✅ Работает | Batch transcription аудио (русский, diarize) |
 | **Meeting: Суммаризация** | Grok 4.20 reasoning (`meeting:summary`) | ✅ Работает | Структурированное резюме встречи |
 | **Artifact handlers** | Claude Sonnet 4.6 (`artifact:text\|markdown\|excel\|pptx\|reveal`) | ✅ Работает | Генерация/обновление артефактов в холсте |
-| **MIND Memory: batch-extract/consolidate/profile/dedup** | Grok 4.1 Fast (`memory:*`) | ✅ Работает | Извлечение фактов происходит пакетно из to-compact окна в момент compaction (ADR 054) |
+| **MIND Memory: extract/consolidate/profile/dedup** (hot path) | Grok 4.1 Fast (`memory:extract-batch` / `memory:consolidate` / `memory:profile` / `memory:dedup-verify`) | ✅ Работает | Извлечение фактов пакетно из to-compact окна в момент compaction (ADR 054) + быстрая консолидация по триггеру ≥10 новых фактов |
+| **MIND Memory: deep-consolidate** (ночной cron) | **Grok 4.20 reasoning** (`memory:deep-consolidate`) | ✅ Работает | Ночной cron `0 22 * * *` = 01:00 МСК. Глубокая tiered-консолидация (Letta sleep-time pattern) — тонкие дубли, противоречия, rephrase длинных фактов. Фильтры: активность 24ч + idempotency 12ч + факт-count ≥5. A/B с Haiku/Sonnet/Opus через `/dev/models` (ТЗ-MindDeepConsolidation) |
 | **Vision OCR** | Claude Haiku 4.5 (`vision:ocr`) | ✅ Работает | OCR-экстракция текста из изображений |
 | **Title** | Grok 4.1 Fast (`util:title`) | ✅ Работает | Автонейминг чатов |
 | **Compaction Summary** | Grok 4.1 Fast non-reasoning (`compaction:summarize`) | ✅ Работает | Simply Compaction — структурированное 5-секционное сжатие истории чата при достижении 50%/85% от `SIMPLY_CONTEXT_LIMIT=200K`. Провайдер-агностично, активен во всех chat-модах (ADR 054) |

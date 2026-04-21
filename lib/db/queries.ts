@@ -4439,6 +4439,7 @@ export async function updateMemorySettings({
       | "factsUpdatedSince"
       | "factsSinceConsolidation"
       | "lastConsolidatedAt"
+      | "lastDeepConsolidatedAt"
       | "lastMindCheckAt"
     >
   >;
@@ -4691,6 +4692,52 @@ export async function getUsersForMemoryProfile({
       AND (
         ups."generatedAt" IS NULL
         OR ms."factsUpdatedSince" > ups."generatedAt"
+      )
+  `);
+
+  return rows.rows.map((r: any) => ({
+    userId: String(r.userId),
+    factCount: Number(r.factCount),
+  }));
+}
+
+/**
+ * ТЗ-MindDeepConsolidation: кандидаты для ночного cron memory-deep-consolidate.
+ *
+ * Фильтры:
+ * - memoryEnabled = true
+ * - активность: factsUpdatedSince > NOW() - activeWithinHours (факты действительно
+ *   писались недавно — иначе консолидировать нечего)
+ * - idempotency: lastDeepConsolidatedAt IS NULL ИЛИ lastDeepConsolidatedAt старше
+ *   idempotencyHours (защита от двойного запуска Vercel retry / ручной дубль)
+ * - factCount ≥ minFacts (нет смысла деревянить базу из <5 фактов)
+ */
+export async function getUsersForDeepConsolidation({
+  activeWithinHours = 24,
+  idempotencyHours = 12,
+  minFacts = 5,
+}: {
+  activeWithinHours?: number;
+  idempotencyHours?: number;
+  minFacts?: number;
+} = {}): Promise<Array<{ userId: string; factCount: number }>> {
+  const rows = await db.execute(sql`
+    SELECT
+      ms."userId",
+      COALESCE(fc.cnt, 0)::int AS "factCount"
+    FROM "memory_settings" ms
+    LEFT JOIN (
+      SELECT "userId", COUNT(*) AS cnt
+      FROM "memory_entry"
+      WHERE "supersededBy" IS NULL
+      GROUP BY "userId"
+    ) fc ON fc."userId" = ms."userId"
+    WHERE ms."memoryEnabled" = true
+      AND COALESCE(fc.cnt, 0) >= ${minFacts}
+      AND ms."factsUpdatedSince" > NOW() - (${activeWithinHours} || ' hours')::interval
+      AND (
+        ms."lastDeepConsolidatedAt" IS NULL
+        OR ms."lastDeepConsolidatedAt" < NOW() - (${idempotencyHours} || ' hours')::interval
       )
   `);
 

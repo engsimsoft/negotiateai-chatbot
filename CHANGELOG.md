@@ -7,6 +7,22 @@
 
 ## [Unreleased]
 
+### [3.97.0] — 2026-04-21 — ТЗ-MindDeepConsolidation
+
+**Двухуровневая консолидация памяти: ночной cron на reasoning-модели «причёсывает» базу фактов.**
+
+- **Проблема.** После ТЗ-MindOnVisit (3.96.0) все 4 операции памяти работали на Grok 4.1 Fast non-reasoning — правильно для hot path (скорость и стоимость), но дешёвая модель пропускала тонкие переформулированные дубли, противоречия и многословные факты. База со временем «замусоривается».
+- **Решение.** Добавлен пятый taskId `memory:deep-consolidate` на **Grok 4.20 reasoning** (через `/dev/models` можно A/B с Sonnet/Opus/Haiku). Отдельный ночной cron `/api/cron/memory-deep-consolidate` в **01:00 МСК** (22:00 UTC) обрабатывает активных пользователей. Hot path (`memory:consolidate`) не трогаем — он остаётся быстрым.
+- **Новое действие `rephrase`** (в дополнение к merge/supersede/remove): сжимает длинный факт (например, «Пользователь упомянул что его жена Юлия работает в отделе продаж розничной торговой сети…») в короткую точную формулировку с **сохранением id** (references не теряются).
+- **Архитектура (Letta sleep-time pattern).** Фильтры пользователей: `memoryEnabled=true` + активность за 24ч (`factsUpdatedSince`) + факт-count ≥5 + idempotency `lastDeepConsolidatedAt > 12h`. Snapshot cursor `runStartTs` + новый фильтр `getMemoryEntriesByUser({ beforeTs })` защищает от race condition с hot path. pLimit(3) concurrency, maxDuration 240s.
+- **`/dev/models` — человекочитаемые описания.** Новый SSOT `TASK_DESCRIPTIONS` в [task-assignments.ts](lib/ai/task-assignments.ts) — 38 записей с описаниями на русском (что именно делает каждый taskId). В панели под каждым taskId теперь вторая строка-пояснение; поиск работает и по описанию.
+- **Промпт для владельца.** Файл [lib/prompts/memory/deep-consolidate.md](lib/prompts/memory/deep-consolidate.md) — владелец может редактировать правила консолидации (например: «категорию preference сжимай агрессивнее», «факты о семье не удалять»). Модель подхватит при следующем прогоне.
+- **Валидация на production.** Прогон на 91 факте: reviewed=91, merged=3, superseded=6, rephrased=0, removed=0, ratioPercent≈10%, cost $0.1049 за прогон, duration 52s. Idempotency проверена (повторный curl → usersProcessed=0). ai_usage_log пишет `chatMode='memory:deep-consolidate'`.
+- **Миграция 0058.** Колонка `memorySettings.lastDeepConsolidatedAt` (timestamp, nullable) — cursor для idempotency.
+- **Файлы.** Новые: `app/api/cron/memory-deep-consolidate/route.ts`, `lib/prompts/memory/deep-consolidate.md`, `lib/db/migrations/0058_mind-deep-consolidated-at.sql`. Изменены: `lib/ai/task-assignments.ts` (+`TASK_DESCRIPTIONS`), `lib/ai/memory/consolidate.ts` (параметризация + rephrase), `lib/ai/memory/memory-queries.ts` (+`updateMemoryEntryContent`, `beforeTs` filter), `lib/db/schema.ts` (+колонка), `lib/db/queries.ts` (+`getUsersForDeepConsolidation`, расширен patch `updateMemorySettings`), `app/(dashboard)/dev/models/page.tsx` + `dev-models-client.tsx` (description rendering), `vercel.json` (+cron), `specs/Simply_xAI/SIMPLY_PROMPTS_AND_MODEL_CONFIG.md`, `docs/ai-chats-map.md`.
+
+---
+
 ### [3.96.0] — 2026-04-21 — ТЗ-MindOnVisit
 
 **On-visit обработка хвостов памяти + выбор стратегии пользователем + расширение cron на все режимы.**

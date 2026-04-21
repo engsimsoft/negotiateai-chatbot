@@ -1,8 +1,14 @@
 /**
  * ТЗ-RAG2: Memory consolidation — LLM reviews facts for contradictions, duplicates, and staleness.
  *
- * Triggered event-chain from `batchExtractFacts` when ≥10 facts are stored in one batch
- * (see extract.ts). Reviews all active facts (capped at FULL_CONSOLIDATION_MAX_FACTS).
+ * Two modes (tiered processing, ТЗ-MindDeepConsolidation):
+ * - `consolidateUserMemory` (hot path) — Grok 4.1 Fast, event-triggered at ≥10
+ *   stored ИЛИ ≥15 cumulative. Actions: merge / supersede / remove.
+ * - `deepConsolidateUserMemory` (ночной cron 01:00 МСК) — reasoning-модель
+ *   (Grok 4.20 по умолчанию), проходит по всей памяти пользователя.
+ *   Actions: merge / supersede / remove + **rephrase** (сжатие длинных
+ *   формулировок с сохранением id). Snapshot cursor `beforeTs` защищает
+ *   от race condition с hot path (Letta sleep-time pattern).
  */
 
 import "server-only";
@@ -19,13 +25,12 @@ import {
   getProviderForTask,
 } from "@/lib/ai/getModel";
 import { logUsage } from "@/lib/ai/usage-utils";
-
-const MEMORY_CONSOLIDATE_TASK = "memory:consolidate" as const;
 import {
   getMemoryEntriesByUser,
   insertMemoryEntry,
   supersedeMemoryEntry,
   deleteMemoryEntry,
+  updateMemoryEntryContent,
 } from "./memory-queries";
 import { embedText } from "./voyage-client";
 import type { MemoryCategory, MemorySourceType } from "./types";
@@ -33,7 +38,18 @@ import { updateMemorySettings } from "@/lib/db/queries";
 import type { MemoryEntry } from "@/lib/db/schema";
 
 // ---------------------------------------------------------------------------
-// Prompt (cached at module level)
+// Task IDs
+// ---------------------------------------------------------------------------
+
+const MEMORY_CONSOLIDATE_TASK = "memory:consolidate" as const;
+const MEMORY_DEEP_CONSOLIDATE_TASK = "memory:deep-consolidate" as const;
+
+type ConsolidationTaskId =
+  | typeof MEMORY_CONSOLIDATE_TASK
+  | typeof MEMORY_DEEP_CONSOLIDATE_TASK;
+
+// ---------------------------------------------------------------------------
+// Prompts (cached at module level)
 // ---------------------------------------------------------------------------
 
 const CONSOLIDATE_PROMPT_PATH = path.join(
@@ -45,6 +61,18 @@ const CONSOLIDATE_PROMPT_PATH = path.join(
 );
 const CONSOLIDATE_SYSTEM_PROMPT = fs.readFileSync(
   CONSOLIDATE_PROMPT_PATH,
+  "utf-8",
+);
+
+const DEEP_CONSOLIDATE_PROMPT_PATH = path.join(
+  process.cwd(),
+  "lib",
+  "prompts",
+  "memory",
+  "deep-consolidate.md",
+);
+const DEEP_CONSOLIDATE_SYSTEM_PROMPT = fs.readFileSync(
+  DEEP_CONSOLIDATE_PROMPT_PATH,
   "utf-8",
 );
 
@@ -65,7 +93,7 @@ const FULL_CONSOLIDATION_MAX_FACTS = 200;
 const consolidationActionSchema = z.object({
   factId: z.string().describe("UUID факта, к которому применяется действие"),
   action: z
-    .enum(["supersede", "merge", "remove"])
+    .enum(["supersede", "merge", "remove", "rephrase"])
     .describe("Тип действия"),
   supersededById: z
     .string()
@@ -75,6 +103,10 @@ const consolidationActionSchema = z.object({
     .string()
     .optional()
     .describe("Объединённый текст (только для action=merge)"),
+  rephrasedContent: z
+    .string()
+    .optional()
+    .describe("Сжатая формулировка (только для action=rephrase)"),
   reason: z.string().describe("Краткое обоснование действия"),
 });
 
@@ -95,11 +127,23 @@ export interface ConsolidationStats {
   superseded: number;
   merged: number;
   removed: number;
+  rephrased: number;
   durationMs: number;
 }
 
+function emptyStats(reviewed: number): ConsolidationStats {
+  return {
+    reviewed,
+    superseded: 0,
+    merged: 0,
+    removed: 0,
+    rephrased: 0,
+    durationMs: 0,
+  };
+}
+
 // ---------------------------------------------------------------------------
-// formatFactsForPrompt — prepare facts list for Sonnet
+// formatFactsForPrompt
 // ---------------------------------------------------------------------------
 
 function formatFactsForPrompt(facts: MemoryEntry[]): string {
@@ -113,58 +157,50 @@ function formatFactsForPrompt(facts: MemoryEntry[]): string {
 }
 
 // ---------------------------------------------------------------------------
-// runConsolidation — shared logic for both full and mini modes
+// runConsolidation — shared logic parameterized by taskId + prompt
 // ---------------------------------------------------------------------------
 
 async function runConsolidation(
   userId: string,
   facts: MemoryEntry[],
+  config: {
+    taskId: ConsolidationTaskId;
+    systemPrompt: string;
+    logLabel: string;
+  },
 ): Promise<ConsolidationStats> {
   const startTime = Date.now();
-  const stats: ConsolidationStats = {
-    reviewed: facts.length,
-    superseded: 0,
-    merged: 0,
-    removed: 0,
-    durationMs: 0,
-  };
+  const stats = emptyStats(facts.length);
 
   if (facts.length < 2) {
     stats.durationMs = Date.now() - startTime;
     return stats;
   }
 
-  // Build prompt
   const factsText = formatFactsForPrompt(facts);
   const userPrompt = `<facts>\n${factsText}\n</facts>`;
 
-  // Call resolved memory:consolidate model via native generateObject
-  // (ТЗ-XAI-2: raised from legacy generateText+JSON.parse workaround that
-  // existed when this task ran on MiniMax Anthropic-compat. Verified
-  // 2026-04-14 that xAI generateObject works natively.)
   const { object, usage } = await generateObject({
-    model: getModel(MEMORY_CONSOLIDATE_TASK),
-    maxOutputTokens: getMaxOutputTokensForTask(MEMORY_CONSOLIDATE_TASK),
+    model: getModel(config.taskId),
+    maxOutputTokens: getMaxOutputTokensForTask(config.taskId),
     maxRetries: 0,
     schema: consolidationResultSchema,
-    system: CONSOLIDATE_SYSTEM_PROMPT,
+    system: config.systemPrompt,
     prompt: userPrompt,
     temperature: 0.1,
   });
 
   const durationMs = Date.now() - startTime;
 
-  // Log usage
   logUsage({
     userId,
     usage,
-    modelId: getModelIdForTask(MEMORY_CONSOLIDATE_TASK),
-    provider: getProviderForTask(MEMORY_CONSOLIDATE_TASK),
-    chatMode: "memory:consolidate",
+    modelId: getModelIdForTask(config.taskId),
+    provider: getProviderForTask(config.taskId),
+    chatMode: config.taskId,
     durationMs,
   });
 
-  // Apply actions (cap at MAX_ACTIONS_PER_CALL)
   const actions = object.actions.slice(0, MAX_ACTIONS_PER_CALL);
   const factMap = new Map(facts.map((f) => [f.id, f]));
 
@@ -172,15 +208,24 @@ async function runConsolidation(
 
   stats.durationMs = Date.now() - startTime;
 
+  const ratioPercent =
+    stats.reviewed > 0
+      ? Math.round(
+          ((stats.superseded + stats.merged + stats.removed + stats.rephrased) /
+            stats.reviewed) *
+            100,
+        )
+      : 0;
+
   console.log(
-    `[MemoryConsolidate] Done for user ${userId}: reviewed=${stats.reviewed}, superseded=${stats.superseded}, merged=${stats.merged}, removed=${stats.removed} (${stats.durationMs}ms)`,
+    `[${config.logLabel}] user=${userId} reviewed=${stats.reviewed} actions={merged:${stats.merged}, superseded:${stats.superseded}, removed:${stats.removed}, rephrased:${stats.rephrased}} ratioPercent=${ratioPercent}% durationMs=${stats.durationMs}`,
   );
 
   return stats;
 }
 
 // ---------------------------------------------------------------------------
-// applyConsolidationActions — execute Sonnet's decisions
+// applyConsolidationActions — execute LLM decisions
 // ---------------------------------------------------------------------------
 
 async function applyConsolidationActions(
@@ -191,7 +236,6 @@ async function applyConsolidationActions(
 ): Promise<void> {
   for (const action of actions) {
     try {
-      // Validate that the fact exists in our input set
       if (!factMap.has(action.factId)) {
         console.warn(
           `[MemoryConsolidate] Unknown factId ${action.factId}, skipping`,
@@ -222,13 +266,11 @@ async function applyConsolidationActions(
 
           const oldFact = factMap.get(action.factId)!;
 
-          // Embed the merged content
           const { embedding } = await embedText(
             action.mergedContent,
             "document",
           );
 
-          // Insert new merged fact
           const newId = await insertMemoryEntry({
             userId,
             content: action.mergedContent,
@@ -240,9 +282,29 @@ async function applyConsolidationActions(
             sourceProjectId: oldFact.sourceProjectId ?? null,
           });
 
-          // Supersede the old fact
           await supersedeMemoryEntry(action.factId, newId);
           stats.merged++;
+          break;
+        }
+
+        case "rephrase": {
+          if (!action.rephrasedContent) {
+            console.warn(
+              `[MemoryConsolidate] No rephrasedContent for ${action.factId}, skipping`,
+            );
+            break;
+          }
+
+          const { embedding } = await embedText(
+            action.rephrasedContent,
+            "document",
+          );
+          await updateMemoryEntryContent(
+            action.factId,
+            action.rephrasedContent,
+            embedding,
+          );
+          stats.rephrased++;
           break;
         }
 
@@ -262,7 +324,7 @@ async function applyConsolidationActions(
 }
 
 // ---------------------------------------------------------------------------
-// consolidateUserMemory — FULL review
+// consolidateUserMemory — HOT PATH (Grok 4.1 Fast, event-triggered)
 // ---------------------------------------------------------------------------
 
 /**
@@ -278,9 +340,12 @@ export async function consolidateUserMemory(
     limit: FULL_CONSOLIDATION_MAX_FACTS,
   });
 
-  const stats = await runConsolidation(userId, facts);
+  const stats = await runConsolidation(userId, facts, {
+    taskId: MEMORY_CONSOLIDATE_TASK,
+    systemPrompt: CONSOLIDATE_SYSTEM_PROMPT,
+    logLabel: "MemoryConsolidate",
+  });
 
-  // Update lastConsolidatedAt + reset counter
   await updateMemorySettings({
     userId,
     patch: {
@@ -292,3 +357,35 @@ export async function consolidateUserMemory(
   return stats;
 }
 
+// ---------------------------------------------------------------------------
+// deepConsolidateUserMemory — BACKGROUND (ночной cron, reasoning-модель)
+// ---------------------------------------------------------------------------
+
+/**
+ * Deep consolidation: reasoning-модель (Grok 4.20 по умолчанию) проходит по
+ * всей активной памяти пользователя. Снимок `runStartTs` гарантирует что
+ * факты добавленные hot path во время прогона не попадут в обработку
+ * (race condition guard, Letta sleep-time pattern).
+ *
+ * Actions: merge / supersede / remove + **rephrase** — сжатие длинных
+ * формулировок с сохранением id (hot path этого не умеет).
+ *
+ * Called from `/api/cron/memory-deep-consolidate` с фильтром пользователей
+ * активных за последние 24 часа.
+ */
+export async function deepConsolidateUserMemory(
+  userId: string,
+  runStartTs: Date = new Date(),
+): Promise<ConsolidationStats> {
+  const facts = await getMemoryEntriesByUser(userId, {
+    activeOnly: true,
+    limit: FULL_CONSOLIDATION_MAX_FACTS,
+    beforeTs: runStartTs,
+  });
+
+  return runConsolidation(userId, facts, {
+    taskId: MEMORY_DEEP_CONSOLIDATE_TASK,
+    systemPrompt: DEEP_CONSOLIDATE_SYSTEM_PROMPT,
+    logLabel: "cron/memory-deep-consolidate",
+  });
+}

@@ -407,6 +407,13 @@
       "when": 1777500000000,
       "tag": "0057_mind-strategy-and-check-at",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1778000000000,
+      "tag": "0058_mind-deep-consolidated-at",
+      "breakpoints": true
     }
   ]
 }

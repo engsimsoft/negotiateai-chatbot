@@ -11,6 +11,7 @@ import { readCurrentOverrides } from "@/lib/ai/model-overrides-node";
 import {
   ALL_TASK_IDS,
   DEFAULT_TASK_MODELS,
+  TASK_DESCRIPTIONS,
   type TaskId,
 } from "@/lib/ai/task-assignments";
 import { isSimplyDevMode } from "@/lib/constants";
@@ -65,6 +66,7 @@ function collectProviderEnvStatus(): ProviderEnvStatus[] {
 
 export interface TaskRow {
   taskId: TaskId;
+  description: string;
   defaultCatalogId: string;
   effectiveCatalogId: string;
   hasOverride: boolean;
@@ -101,6 +103,7 @@ export default async function DevModelsPage() {
     const override = overrides[taskId];
     return {
       taskId,
+      description: TASK_DESCRIPTIONS[taskId],
       defaultCatalogId,
       effectiveCatalogId: override ?? defaultCatalogId,
       hasOverride: Boolean(override),

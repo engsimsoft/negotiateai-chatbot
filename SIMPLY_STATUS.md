@@ -1,7 +1,7 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.95.0
-**Статус:** Active development (**серия Simply_xAI закрыта** 2026-04-16 в v3.92.1, **ТЗ-COMPACTION-1 закрыт** 2026-04-20 в v3.94.0, **ТЗ-COMPACTION-UNIFY закрыт** 2026-04-21 в v3.95.0)
+**Версия:** 3.97.0
+**Статус:** Active development (**серия Simply_xAI закрыта** 2026-04-16 в v3.92.1, **ТЗ-COMPACTION-UNIFY закрыт** 2026-04-21 в v3.95.0, **ТЗ-MindOnVisit закрыт** 2026-04-21 в v3.96.0, **ТЗ-MindDeepConsolidation закрыт** 2026-04-21 в v3.97.0)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** snapshot «что работает прямо сейчас» на один взгляд. История изменений → [CHANGELOG.md](CHANGELOG.md). Архитектура → [docs/architecture.md](docs/architecture.md). Карта моделей → [docs/ai-chats-map.md](docs/ai-chats-map.md).
@@ -35,7 +35,7 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 | **Экспертиза** (одноразовые экспертные запросы) | ✅ | Grok 4.20 reasoning (single-agent, R-5 резолв 2026-04-16). Multi-agent вариант 🔒 зарезервирован под ТЗ-XAI-MA-1 |
 | **Создание** (одноразовые creation-чаты) | ✅ | Grok 4.20 reasoning (мигрировано 2026-04-16) |
 | **Проекты** (изолированные рабочие пространства) | ✅ | Claude Haiku / Sonnet / Opus по tier, Профессор (Opus planning/review + Haiku execute) |
-| **База знаний — MIND** (Слой 3 RAG, auto из разговоров) | ✅ | Grok 4.1 Fast (batch-extract, consolidate, profile, dedup-verify) + Voyage AI (embeddings) + pgvector. Extract выполняется пакетно из окна to-compact в момент compaction (ADR 054) |
+| **База знаний — MIND** (Слой 3 RAG, auto из разговоров) | ✅ | **Hot path:** Grok 4.1 Fast (batch-extract, consolidate, profile, dedup-verify) + Voyage AI (embeddings) + pgvector. Extract пакетно из to-compact окна в момент compaction (ADR 054). **Ночная глубокая консолидация (v3.97.0):** Grok 4.20 reasoning (`memory:deep-consolidate`) в 01:00 МСК — причёсывает базу на reasoning-модели (tiered Letta sleep-time pattern), 4 действия включая `rephrase`. A/B через `/dev/models` |
 | **Simply Compaction** (автосжатие истории чата при пороге 50%/85% от 200K) | ✅ | Grok 4.1 Fast non-reasoning (`compaction:summarize`) + provider-agnostic middleware. Активен во всех chat-модах (simply, expertise, create, project). Orchestration: pre-compact batch-extract → summarize → verbatim window (ADR 054) |
 | **База знаний — Collections** (Слой 3 RAG, явная загрузка документов) | 📋 план | xAI Grok Collections API из коробки (`knowledge_search` / `file_search`). Отдельного векторного стека не строим. ТЗ-XAI-COL-1 |
 | **Briefing** (hourly Vercel Cron) | ✅ | Grok 4.1 Fast (filter) · MiniMax M2.7-long (author, section) · MiniMax M2.7 (podcast-script). Миграция author/section на Grok разблокирована 2026-04-16 (URL hallucination оказалась metric bug в `verifyArticleUrls`, не проблемой моделей — commit `58d9d2e`); планируется в ТЗ-XAI-6 |
