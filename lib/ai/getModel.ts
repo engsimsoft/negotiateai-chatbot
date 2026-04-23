@@ -13,9 +13,10 @@
  * например per-user overrides из БД).
  */
 
-import type { LanguageModel } from "ai";
+import { wrapLanguageModel, type LanguageModel } from "ai";
 
 import { isTestEnvironment } from "../constants";
+import { reasoningReconciliationMiddleware } from "./middleware/reasoning-reconciliation";
 import { getModelEntry, resolveModelEntry } from "./model-catalog";
 import { getActiveOverrides } from "./model-overrides";
 import { registry, type RegistryProviderId } from "./registry";
@@ -176,6 +177,14 @@ export function getModel(
     // cast: registry type expects literal union; тут taskId динамический
     registryId as Parameters<typeof registry.languageModel>[0],
   );
+
+  const resolved = resolveModelEntry(catalogId);
+  if (resolved?.provider === "xai" && resolved.capabilities.thinking === true) {
+    return wrapLanguageModel({
+      model,
+      middleware: reasoningReconciliationMiddleware,
+    });
+  }
 
   return model;
 }

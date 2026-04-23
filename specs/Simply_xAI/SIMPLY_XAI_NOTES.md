@@ -9,6 +9,24 @@
 
 ---
 
+## 2026-04-23 — reasoning-reconciliation middleware для xAI reasoning-моделей
+
+**Контекст:** в Экспертизе (Grok 4.20 reasoning) при параллельных tool calls (`webSearch` + `librarySearch`) AI SDK v6 выбрасывал `reasoning part {id} not found` в `onError` streamText, stream закрывался HTTP 200 без ответа, клиент виснул. Корневая причина — xAI-провайдер (`@ai-sdk/xai@3.0.83`) присылал `reasoning-delta`/`reasoning-end` для id, для которого не было `reasoning-start`. Пробовали: апдейт `ai@6.0.116 → 6.0.168` (помогло на одном тесте, баг вернулся), `providerOptions.xai.reasoningEffort` — **не поддерживается** `grok-4.20-reasoning` (docs.x.ai, модель рассуждает автоматически).
+
+### Решение
+
+Custom `LanguageModelMiddleware` ([lib/ai/middleware/reasoning-reconciliation.ts](../../lib/ai/middleware/reasoning-reconciliation.ts)), подключённый через `wrapLanguageModel` в [lib/ai/getModel.ts](../../lib/ai/getModel.ts) только для xAI-моделей с `capabilities.thinking === true`. Ловит orphan `reasoning-delta`/`reasoning-end` и синтезирует недостающий `reasoning-start` перед ними. Anthropic/MiniMax/OpenRouter не задеты.
+
+Следует паттерну [vercel/ai PR #12055](https://github.com/vercel/ai/pull/12055) (fix `extractReasoningMiddleware` для GLM), но точечно для Grok и на уровне приложения.
+
+### Технический долг
+
+- Баг на стороне xAI / `@ai-sdk/xai` — репорт отправить отдельно.
+- Мониторить [vercel/ai issue #12054](https://github.com/vercel/ai/issues/12054) и #7311 — Vercel может ввести общий reconciliation middleware, тогда наш заменяется upstream-версией.
+- Если xAI не исправит — рассмотреть: (а) sequential tool calls для reasoning в Экспертизе вместо параллельных, (б) переход на Responses API (xAI продвигает его для agentic workflows).
+
+---
+
 ## 2026-04-18 — Порядок будущих расширений после ТЗ-AISDKLayerHardening (v3.93.0)
 
 **Контекст:** серия Simply_xAI закрыта (v3.92.1). ТЗ-AISDKLayerHardening закрыт как umbrella на 3 долга (v3.93.0, ADR 053 «AI SDK invocation contract» зафиксировал 4-аспектный контракт). В backlog «Будущих расширений» ROADMAP три направления (MA-1, COL-1, VOICE-1) + готовый архитектурный документ [SIMPLY_COMPACTION_ARCHITECTURE.md v1.0](SIMPLY_COMPACTION_ARCHITECTURE.md) от 2026-04-17 (утверждён, не реализован). Владелец запросил анализ: куда оптимально вставить ТЗ-COMPACTION-1 в дорожную карту.

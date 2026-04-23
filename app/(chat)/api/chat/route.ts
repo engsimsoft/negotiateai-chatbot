@@ -16,7 +16,8 @@ import { extractUsageFields, extractUsageForPricing, logUsage } from "@/lib/ai/u
 import { auth } from "@/app/(auth)/auth";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import { resolveActiveTaskId } from "@/lib/ai/routing";
-import { buildChatPrompt, buildExpertisePrompt, buildCreatePrompt } from "@/lib/prompts/server";
+import { buildChatPrompt, buildExpertisePrompt, buildCreatePrompt, buildLibraryDocumentPrompt } from "@/lib/prompts/server";
+import { getLibraryDocumentById } from "@/lib/ai/library/db";
 import type { BuildContext } from "@/lib/prompts";
 import { buildProjectContext } from "@/lib/prompts/contexts";
 import {
@@ -63,6 +64,7 @@ import {
 import { retrieveMemoryContext } from "@/lib/ai/memory/retrieve";
 import { getProfileBlock } from "@/lib/ai/memory/profile";
 import { processStaleFactsOnVisit, type OnVisitSourceType } from "@/lib/ai/memory/on-visit";
+import { listLibraryCollectionsSummaryByUser } from "@/lib/ai/library/db";
 // ТЗ-COMPACTION-UNIFY: extract вызывается внутри prepareMessagesWithCompaction —
 // main handler больше не импортирует extract функции.
 import {
@@ -399,6 +401,7 @@ export async function POST(request: Request) {
       projectModelTier,
       researchDepth,
       think,
+      lockedDocumentId,
     } = requestBody;
 
     const session = await auth();
@@ -407,12 +410,49 @@ export async function POST(request: Request) {
       return new ChatSDKError("unauthorized:chat").toResponse();
     }
 
+    let lockedDoc: { id: string; filename: string } | null = null;
+    if (chatMode === "library-document") {
+      if (!lockedDocumentId) {
+        return new ChatSDKError(
+          "bad_request:api",
+          "lockedDocumentId is required for library-document mode",
+        ).toResponse();
+      }
+      const doc = await getLibraryDocumentById(lockedDocumentId);
+      if (!doc) {
+        return new ChatSDKError(
+          "not_found:database",
+          "Document not found",
+        ).toResponse();
+      }
+      if (doc.userId !== session.user.id) {
+        return new ChatSDKError(
+          "unauthorized:chat",
+          "Document not owned",
+        ).toResponse();
+      }
+      lockedDoc = { id: doc.id, filename: doc.filename };
+    }
+
     // Performance: Parallelize independent DB queries
-    const [userProfile, messageCount, chat] = await Promise.all([
-      getUserById(session.user.id),
-      getMessageCountByUserId({ id: session.user.id, differenceInHours: 24 }),
-      getChatById({ id }),
-    ]);
+    const [userProfile, messageCount, chat, libraryCollectionsSummary] =
+      await Promise.all([
+        getUserById(session.user.id),
+        getMessageCountByUserId({
+          id: session.user.id,
+          differenceInHours: 24,
+        }),
+        getChatById({ id }),
+        listLibraryCollectionsSummaryByUser(session.user.id).catch((err) => {
+          console.warn(
+            "[Chat API] library summary fetch failed:",
+            err instanceof Error ? err.message : err,
+          );
+          return [] as Awaited<
+            ReturnType<typeof listLibraryCollectionsSummaryByUser>
+          >;
+        }),
+      ]);
 
     // ТЗ-03: Fetch project data if projectId is provided
     let project = null;
@@ -529,6 +569,11 @@ export async function POST(request: Request) {
         occupation: userProfile.occupation,
         bio: userProfile.bio,
       } : undefined,
+      library: libraryCollectionsSummary.map((c) => ({
+        name: c.name,
+        documentsCount: c.documentsCount,
+        isDefault: c.isDefault,
+      })),
       requestHints: {
         longitude: longitude ?? undefined,
         latitude: latitude ?? undefined,
@@ -652,6 +697,12 @@ export async function POST(request: Request) {
               break;
             case "simply":
               builtPrompt = buildChatPrompt(promptContext, activeTaskId);
+              break;
+            case "library-document":
+              builtPrompt = buildLibraryDocumentPrompt(
+                lockedDoc?.filename ?? "документ",
+                activeTaskId,
+              );
               break;
           }
           systemPromptText = builtPrompt.systemPrompt;
@@ -942,6 +993,7 @@ export async function POST(request: Request) {
           chatId: id,
           chatMode,
           researchDepth,
+          lockedFileId: lockedDoc?.id,
         });
         const toolsForRequest = isAnthropicProtocolModel
           ? withCacheControlOnLastTool(standardTools)
@@ -995,7 +1047,11 @@ export async function POST(request: Request) {
           // sourceType определяется по приоритету: project → всё остальное по chatMode.
           // Project chat в main handler (isProjectChat && chatMode="simply|..." но без task)
           // сохраняет факты как "project" в memory_entry для корректной retrieve-фильтрации.
-          const compactionSourceType = isProjectChat ? "project" : chatMode;
+          const compactionSourceType = isProjectChat
+            ? "project"
+            : chatMode === "library-document"
+              ? "simply"
+              : chatMode;
 
           const compactionResult = await prepareMessagesWithCompaction(
             activeTaskId,
@@ -1090,10 +1146,8 @@ export async function POST(request: Request) {
           model: modelToUse,
           maxOutputTokens: getMaxOutputTokensForTask(activeTaskId),
           messages: messagesForRequest,
-          // ТЗ-XAI-3: Simply Chat — 0.7 для всех провайдеров (стабильность
-          // дворецкого, продуктовое решение, не провайдер-компромисс). Прочие
-          // chatModes (expertise, create, project) — 1.0 дефолт.
-          temperature: chatMode === "simply" ? 0.7 : 1.0,
+          temperature:
+            chatMode === "simply" ? 0.7 : chatMode === "expertise" ? 0.3 : 1.0,
           stopWhen: stepCountIs(5),
           // ТЗ-SimplyToolsMinimax: Tools enabled for all models including MiniMax.
           // deepResearch filtered for simply (MiniMax) via SIMPLY_MODE_EXCLUDED_TOOLS in chat-tools.ts

@@ -13,6 +13,7 @@ import path from 'path';
 import type { BuildContext, ModelId } from '../types';
 import { buildFullUserContext } from '../contexts/user-profile';
 import { buildSimpleMemoryContext } from '../contexts/chat-memory';
+import { buildLibraryContext } from '../contexts/library';
 import { getSkillsRegistry, type SkillMetadata } from './registry';
 import { loadAgent, type Agent } from './agent-loader';
 import { loadSkill, type Skill } from './skill-loader';
@@ -143,6 +144,10 @@ function combineContextBlocks(context: BuildContext): string {
   const memoryContext = buildSimpleMemoryContext(context.memory);
   if (memoryContext) blocks.push(memoryContext);
 
+  // Library context (user's xAI Collections for RAG discovery)
+  const libraryContext = buildLibraryContext(context.library);
+  if (libraryContext) blocks.push(libraryContext);
+
   // Request hints
   const hintsContext = buildRequestHintsContext(context.requestHints);
   if (hintsContext) blocks.push(hintsContext);
@@ -225,14 +230,43 @@ export function composeChatPrompt(
 /**
  * Compose prompt for expertise chat mode
  *
- * Delegates to composeChatPrompt with chatMode='expertise'.
- * PE will replace with real expertise prompt later.
+ * Structure: core blocks → expertise.md → user context → skills metadata.
+ * Single-agent режим на Grok 4.20 reasoning, без подмены current_mode/current_model.
  */
 export function composeExpertisePrompt(
   context: BuildContext = {},
-  activeTaskId?: TaskId,
+  _activeTaskId?: TaskId,
 ): ComposedPrompt {
-  return composeChatPrompt(context, 'expertise', activeTaskId);
+  const parts: string[] = [];
+
+  parts.push(getAllCoreBlocks());
+
+  const expertisePromptPath = path.join(process.cwd(), 'lib', 'prompts', 'chat', 'expertise.md');
+  try {
+    const expertisePrompt = fs.readFileSync(expertisePromptPath, 'utf-8').trim();
+    if (expertisePrompt) {
+      parts.push('---\n\n' + expertisePrompt);
+    }
+  } catch (e) {
+    console.warn('Expertise prompt not found, falling back to core blocks only');
+  }
+
+  const userContext = combineContextBlocks(context);
+  if (userContext) {
+    parts.push('---\n\n' + userContext);
+  }
+
+  const skills = getSkillsRegistry();
+  if (skills.length > 0) {
+    parts.push('---\n\n' + buildSkillsMetadataBlock(skills));
+  }
+
+  return {
+    systemPrompt: parts.join('\n\n'),
+    model: 'claude-sonnet',
+    greeting: 'Привет! Чем могу помочь?',
+    toolAccess: null,
+  };
 }
 
 /**
@@ -246,6 +280,43 @@ export function composeCreatePrompt(
   activeTaskId?: TaskId,
 ): ComposedPrompt {
   return composeChatPrompt(context, 'create', activeTaskId);
+}
+
+/**
+ * Compose prompt for library-document chat mode (split-view, single-doc chat).
+ *
+ * Isolation requirements (ANALYSIS П-2):
+ *  - MIND не подключается (gated выше в chat/route.ts)
+ *  - Tool set = только `librarySearch` с hardcoded lockedFileId
+ *  - Ничего не подмешивается: ни профиль, ни память, ни список коллекций
+ *  - «Нет в документе» = правильный ответ
+ */
+export function composeLibraryDocumentPrompt(
+  documentName: string,
+  activeTaskId?: TaskId,
+): ComposedPrompt {
+  const parts: string[] = [];
+
+  parts.push(getMinimalCoreBlocks());
+
+  parts.push(
+    `---\n\n## Режим работы — Помощник по одному документу\n\n` +
+      `Ты отвечаешь ТОЛЬКО на основе содержимого одного документа пользователя: **«${documentName}»**.\n\n` +
+      `### Правила\n\n` +
+      `- Перед ответом всегда вызывай инструмент \`librarySearch\` с запросом на естественном языке (на русском). ` +
+      `Не передавай параметры \`collectionIds\` или \`fileIds\` — tool сам ограничен этим документом.\n` +
+      `- Отвечай строго на основе фрагментов, которые вернул \`librarySearch\`. Цитируй конкретные фразы.\n` +
+      `- Если информации в документе нет — прямо скажи: «В документе нет такой информации.» Не дополняй из общих знаний.\n` +
+      `- У тебя НЕТ доступа к интернету, к другим документам пользователя, к его профилю или памяти.\n` +
+      `- Отвечай коротко и по делу. Без приветствий и воды.\n`,
+  );
+
+  return {
+    systemPrompt: parts.join("\n\n"),
+    model: "claude-sonnet",
+    greeting: `Готов отвечать по документу «${documentName}». Задай вопрос.`,
+    toolAccess: ["librarySearch"],
+  };
 }
 
 /**
