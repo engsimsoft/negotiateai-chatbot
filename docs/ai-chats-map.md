@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-04-21 — добавлен `memory:deep-consolidate` taskId на Grok 4.20 reasoning (ТЗ-MindDeepConsolidation, v3.97.0)
+**Обновлено:** 2026-04-24 — ТЗ-XAI-COL-1 закрыт в v3.99.0. Все 3 Library taskId (`library:auto-analyze`, `library:generate-summary`, `library-document-chat`) на Grok 4.1 Fast non-reasoning, состояние ✅
 
 ---
 
@@ -49,6 +49,9 @@
 | **Vision OCR** | Claude Haiku 4.5 (`vision:ocr`) | ✅ Работает | OCR-экстракция текста из изображений |
 | **Title** | Grok 4.1 Fast (`util:title`) | ✅ Работает | Автонейминг чатов |
 | **Compaction Summary** | Grok 4.1 Fast non-reasoning (`compaction:summarize`) | ✅ Работает | Simply Compaction — структурированное 5-секционное сжатие истории чата при достижении 50%/85% от `SIMPLY_CONTEXT_LIMIT=200K`. Провайдер-агностично, активен во всех chat-модах (ADR 054) |
+| **Library: Автоанализ** | Grok 4.1 Fast non-reasoning (`library:auto-analyze`) | ✅ Работает | ТЗ-XAI-COL-1 · Один вызов при upload документа в Библиотеку — определяет autoType + autoTags[3-5] + autoDescription (≤200 знаков, подпись для карточки в списке) через `generateObject` со Zod enum. Работает на локально извлечённом тексте (`extractPdfText`, `mammoth`, `xlsx`) до upload в xAI — видит только первые 4000 символов |
+| **Library: Обзор для split-view** | Grok 4.1 Fast non-reasoning (`library:generate-summary`) | ✅ Работает | ТЗ-XAI-COL-1 A6.1c · Развёрнутый `autoSummary` (≤2500 знаков, ~300-400 слов) для левой панели `/library/[docId]`. Работает поверх уже проиндексированных chunks в xAI Collections — 3 запроса через `librarySearch` (тема/структура/выводы) → объединение chunks → `generateObject`. Охватывает **весь** документ любой длины (в отличие от auto-analyze, который видит только первые 4000 символов). Fire-and-forget через Vercel `after()` после successful attach, polling ≤90 сек на завершение indexing |
+| **Library: Документ-чат** (split-view) | Grok 4.1 Fast non-reasoning (`library-document-chat`) | ✅ Работает | ТЗ-XAI-COL-1 A6 · Мини-чат в правой панели страницы `/library/[docId]`. `chatMode='library-document'`, tool set = ТОЛЬКО `librarySearch` с `lockedFileId=doc.id`, MIND off, без user-context/memory/коллекций в промпте — полная изоляция на один документ. QA-ответы строятся из цитат `librarySearch`, reasoning-overhead не нужен. A/B через `/dev/models` (Haiku / Grok 4.20 если потребуется) |
 | **Помощники проекта** | — | 🚧 Заглушка | Кастомные помощники (не подключены) |
 
 ---

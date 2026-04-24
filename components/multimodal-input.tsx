@@ -47,6 +47,7 @@ import { PreviewAttachment } from "./preview-attachment";
 import { VoiceButton } from "./voice-button";
 import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { SuggestedActions } from "./suggested-actions";
+import { SourcePickerTrigger } from "./library/source-picker-trigger";
 import { Button } from "./ui/button";
 import type { VisibilityType } from "./visibility-selector";
 
@@ -77,6 +78,9 @@ function PureMultimodalInput({
   onResearchDepthChange,
   think,
   onThinkChange,
+  librarySources,
+  onOpenLibrarySources,
+  onClearLibrarySources,
 }: {
   chatId: string;
   chatMode?: string;
@@ -106,6 +110,10 @@ function PureMultimodalInput({
   // ТЗ-KITT: Think mode (one-shot Sonnet)
   think?: boolean;
   onThinkChange?: (think: boolean) => void;
+  // ТЗ-XAI-COL-1 A6.2: SourcePickerModal scope
+  librarySources?: import("./library/source-picker-modal").LibrarySourcesValue | null;
+  onOpenLibrarySources?: () => void;
+  onClearLibrarySources?: () => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -459,6 +467,17 @@ function PureMultimodalInput({
                 disabled={status === "submitted" || status === "streaming"}
               />
             )}
+            {/* ТЗ-XAI-COL-1 A6.2: SourcePickerModal trigger для Экспертизы/Создания.
+                В Simply, проектах и library-document scope не используется. */}
+            {(chatMode === "expertise" || chatMode === "create") &&
+              !isProjectChat &&
+              onOpenLibrarySources && (
+                <SourcePickerTrigger
+                  value={librarySources ?? null}
+                  onOpen={onOpenLibrarySources}
+                  onClear={onClearLibrarySources}
+                />
+              )}
             {/* ТЗ-KITT: Think button — one-shot Sonnet for Simply mode */}
             {chatMode === "simply" && onThinkChange && (
               <Button
@@ -591,6 +610,9 @@ export const MultimodalInput = memo(
       return false;
     }
     if (prevProps.think !== nextProps.think) {
+      return false;
+    }
+    if (!equal(prevProps.librarySources, nextProps.librarySources)) {
       return false;
     }
 

@@ -38,6 +38,18 @@ export const postRequestBodySchema = z.object({
   researchDepth: z.enum(["pro", "deep"]).optional(),
   // ТЗ-KITT: Think mode — use Sonnet for this message
   think: z.boolean().optional(),
+  // ТЗ-XAI-COL-1 A6: split-view — UUID of the single Library document the
+  // chat is locked to. Required when chatMode === 'library-document'.
+  lockedDocumentId: z.string().uuid().optional(),
+  // ТЗ-XAI-COL-1 A6.2: SourcePickerModal — пользователь явно выбрал источники
+  // в Экспертизе/Создании. librarySearch замыкается на эти UUID, модель не
+  // может выйти за scope. Лимиты дублируются в UI (до 5 docs / 3 collections).
+  librarySources: z
+    .object({
+      collectionIds: z.array(z.string().uuid()).max(3).optional(),
+      documentIds: z.array(z.string().uuid()).max(5).optional(),
+    })
+    .optional(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

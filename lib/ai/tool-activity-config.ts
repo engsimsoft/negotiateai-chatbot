@@ -8,7 +8,7 @@
  */
 
 import type { LucideIcon } from "lucide-react";
-import { FileText, FlaskConical, FolderOpen, Globe, Pencil, Search, Send, Table2 } from "lucide-react";
+import { FileText, FlaskConical, FolderOpen, Globe, Library, Pencil, Search, Send, Table2 } from "lucide-react";
 
 export interface ToolActivityConfig {
   icon: LucideIcon;
@@ -125,6 +125,23 @@ export const TOOL_ACTIVITY_CONFIG: Record<string, ToolActivityConfig> = {
     resultCounter: (result) => {
       if (!result?.isValid) return 0;
       return result?.posts?.length ?? 0;
+    },
+  },
+
+  librarySearch: {
+    icon: Library,
+    activeLabel: "Ищу в Библиотеке",
+    doneLabel: "Найдено в Библиотеке",
+    argsFormatter: (args) => args?.query || null,
+    resultFormatter: (result) => {
+      if (result?.error) return null;
+      const count = result?.total ?? result?.chunks?.length;
+      if (typeof count === "number") return `${count} фрагментов`;
+      return null;
+    },
+    resultCounter: (result) => {
+      if (!result || result.error) return 0;
+      return result.total ?? result.chunks?.length ?? 0;
     },
   },
 };

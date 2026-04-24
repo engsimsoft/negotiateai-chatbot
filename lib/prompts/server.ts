@@ -26,6 +26,7 @@ export {
   buildChatPrompt,
   buildExpertisePrompt,
   buildCreatePrompt,
+  buildLibraryDocumentPrompt,
   buildAgentPrompt,
   buildBenPrompt,
   buildSkillPrompt,
@@ -46,6 +47,7 @@ export {
   composeChatPrompt,
   composeExpertisePrompt,
   composeCreatePrompt,
+  composeLibraryDocumentPrompt,
   composeAgentPrompt,
   composeSkillPrompt,
 

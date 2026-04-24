@@ -93,7 +93,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │  External Services                                          │
 │  ├── xAI Grok          - Simply Chat + MIND extract +     │
-│  │                       Collections RAG (план ТЗ-XAI-COL-1)│
+│  │                       Collections RAG (Библиотека ✅)   │
 │  ├── Anthropic Claude  - Expertise, vision, artifacts, clerks │
 │  ├── MiniMax           - create chatMode + briefing pipeline │
 │  ├── Google Gemini     - reserved (TTS / fallback)         │
@@ -299,9 +299,9 @@
 - **UI:** `components/groups/` (UI для Telegram groups)
 - **БД:** `TelegramConnection`, `TelegramLinkToken`, `TelegramGroup`, `TelegramGroupTopic`, `TelegramMessage`
 
-### База знаний (Слой 3 RAG) — MIND + Collections
+### База знаний (Слой 3 RAG) — MIND + Библиотека
 
-Два хранилища, один интерфейс `knowledge_search`. SSOT будущей архитектуры → [specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md § Слой 3](../specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md).
+Два независимых хранилища, разные tool: `librarySearch` для явно загруженных документов, MIND retrieve через системный промпт для авто-извлечённых фактов из разговоров.
 
 #### MIND (Voyage AI + pgvector) — ✅ работает
 
@@ -313,16 +313,20 @@
 - **External:** Voyage AI для embeddings
 - **Архитектура:** [specs/Simply_xAI/MIND_ARCHITECTURE.md](../specs/Simply_xAI/MIND_ARCHITECTURE.md)
 
-#### Collections (xAI Grok native) — 📋 планируется (ТЗ-XAI-COL-1)
+#### Библиотека (xAI Collections) — ✅ работает (v3.99.0, ТЗ-XAI-COL-1)
 
 Явная загрузка документов пользователем в Библиотеку. xAI индексирует, хранит, ищет фрагменты «из коробки» — **никакой собственной векторной инфраструктуры не строим**.
 
-- **Status:** в коде ничего нет, формально в [SIMPLY_XAI_ROADMAP.md](../specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md) как ТЗ-XAI-COL-1
-- **Provider API:** Grok Collections API (`collections_search` / `file_search`)
-- **Стоимость:** ~$2.50 / 1000 поисков + storage
-- **UI:** пользователь явно загружает документ в «Библиотеку», не автоматически как MIND
-- **Взаимодействие:** любая модель находит нужный кусок через единый `knowledge_search` tool
-- **Принцип:** для персональной памяти (разговоры) → Voyage. Для документов-знаний → берём из коробки у xAI, не изобретаем.
+- **Pipeline:** `lib/ai/library/` (xai-collections, db, auto-analyze, summary-generator, citations-parser, types)
+- **Tool:** `lib/ai/tools/library-search.ts` — подключён в Simply / Экспертиза / Создание / project chats
+- **Routes:** `app/(chat)/api/library/` (collections CRUD, documents CRUD, content proxy, status polling)
+- **UI:** `app/(dashboard)/library/` (страница `/library` + split-view `/library/[docId]`), `components/library/` (12 компонентов: page, grid, dialogs, source-picker-modal, library-sources-badge, document-split-view), карточка на главной `components/glavnaya/library-card.tsx`
+- **БД:** `library_collection`, `library_document`, `library_collection_document` (миграции 0059–0063)
+- **Models:** `library:auto-analyze` (автотип/теги/описание при upload), `library:generate-summary` (развёрнутый автообзор после indexing), `library-document-chat` (split-view мини-чат). Все на Grok 4.1 Fast non-reasoning
+- **chatMode:** `library-document` (изолированный мини-чат, MIND off, tool set = только `librarySearch` с `lockedFileId`)
+- **Архитектура:** [specs/Simply_xAI/TZ_xai_col_1/SIMPLY_LIBRARY_ARCHITECTURE.md](../specs/Simply_xAI/TZ_xai_col_1/SIMPLY_LIBRARY_ARCHITECTURE.md)
+- **ADR:** [056-library-upload-collections-endpoint.md](decisions/056-library-upload-collections-endpoint.md) (почему management-api/v1/collections/{id}/documents вместо /v1/files)
+- **Принцип:** для персональной памяти (разговоры) → Voyage + pgvector. Для документов-знаний → xAI Collections из коробки, не изобретаем.
 
 ### Service Chats (Ben, project-creation, project-manager, briefing-onboarding)
 - **Route:** `app/(chat)/api/service-chat/route.ts` + `app/(chat)/api/ben/route.ts`

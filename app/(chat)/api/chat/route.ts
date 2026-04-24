@@ -64,7 +64,11 @@ import {
 import { retrieveMemoryContext } from "@/lib/ai/memory/retrieve";
 import { getProfileBlock } from "@/lib/ai/memory/profile";
 import { processStaleFactsOnVisit, type OnVisitSourceType } from "@/lib/ai/memory/on-visit";
-import { listLibraryCollectionsSummaryByUser } from "@/lib/ai/library/db";
+import {
+  listCollectionsOwnedByUser,
+  listDocumentsOwnedByUser,
+  listLibraryCollectionsSummaryByUser,
+} from "@/lib/ai/library/db";
 // ТЗ-COMPACTION-UNIFY: extract вызывается внутри prepareMessagesWithCompaction —
 // main handler больше не импортирует extract функции.
 import {
@@ -402,6 +406,7 @@ export async function POST(request: Request) {
       researchDepth,
       think,
       lockedDocumentId,
+      librarySources: librarySourcesRaw,
     } = requestBody;
 
     const session = await auth();
@@ -432,6 +437,50 @@ export async function POST(request: Request) {
         ).toResponse();
       }
       lockedDoc = { id: doc.id, filename: doc.filename };
+    }
+
+    // A6.2: SourcePickerModal scope. Сужаем librarySearch до выбранных
+    // пользователем источников. Ownership-фильтрация: невладельческие UUID
+    // молча отбрасываются; пустой scope === нет ограничений.
+    let librarySources:
+      | {
+          collectionIds?: string[];
+          documentIds?: string[];
+          collectionNames?: string[];
+          documentNames?: string[];
+        }
+      | undefined;
+    if (
+      librarySourcesRaw &&
+      ((librarySourcesRaw.collectionIds?.length ?? 0) > 0 ||
+        (librarySourcesRaw.documentIds?.length ?? 0) > 0)
+    ) {
+      const [ownedCols, ownedDocs] = await Promise.all([
+        librarySourcesRaw.collectionIds?.length
+          ? listCollectionsOwnedByUser(
+              session.user.id,
+              librarySourcesRaw.collectionIds,
+            )
+          : Promise.resolve([] as Awaited<
+              ReturnType<typeof listCollectionsOwnedByUser>
+            >),
+        librarySourcesRaw.documentIds?.length
+          ? listDocumentsOwnedByUser(
+              session.user.id,
+              librarySourcesRaw.documentIds,
+            )
+          : Promise.resolve([] as Awaited<
+              ReturnType<typeof listDocumentsOwnedByUser>
+            >),
+      ]);
+      if (ownedCols.length > 0 || ownedDocs.length > 0) {
+        librarySources = {
+          collectionIds: ownedCols.length > 0 ? ownedCols.map((c) => c.id) : undefined,
+          documentIds: ownedDocs.length > 0 ? ownedDocs.map((d) => d.id) : undefined,
+          collectionNames: ownedCols.map((c) => c.name),
+          documentNames: ownedDocs.map((d) => d.filename),
+        };
+      }
     }
 
     // Performance: Parallelize independent DB queries
@@ -574,6 +623,12 @@ export async function POST(request: Request) {
         documentsCount: c.documentsCount,
         isDefault: c.isDefault,
       })),
+      librarySourcesScope: librarySources
+        ? {
+            collectionNames: librarySources.collectionNames,
+            documentNames: librarySources.documentNames,
+          }
+        : undefined,
       requestHints: {
         longitude: longitude ?? undefined,
         latitude: latitude ?? undefined,
@@ -994,6 +1049,12 @@ export async function POST(request: Request) {
           chatMode,
           researchDepth,
           lockedFileId: lockedDoc?.id,
+          librarySources: librarySources
+            ? {
+                collectionIds: librarySources.collectionIds,
+                documentIds: librarySources.documentIds,
+              }
+            : undefined,
         });
         const toolsForRequest = isAnthropicProtocolModel
           ? withCacheControlOnLastTool(standardTools)
@@ -1108,24 +1169,34 @@ export async function POST(request: Request) {
         if (mindDynamicBlock) {
           const lastIdx = messagesForRequest.length - 1;
           const lastMsg = messagesForRequest[lastIdx];
-          if (isAnthropicProtocolModel && lastMsg?.role === "user") {
-            // Normalize content to array form, mark last existing part with
-            // cacheControl, append MIND block as trailing dynamic part.
-            // Cast через `unknown` — AI SDK v6 union типы (TextPart | ImagePart
-            // | FilePart) не дают прямого доступа к `providerOptions`, но оно
-            // валидное поле на любом part (SharedV2 protocol).
+          if (lastMsg?.role === "user") {
+            // Универсально для всех провайдеров: MIND-блок инжектится как
+            // trailing text-part в последнее user-сообщение. Раньше для
+            // не-Anthropic-протокола он добавлялся отдельным trailing system
+            // сообщением — это ломало xAI prompt-cache: каждый запрос имел
+            // меняющийся блок ПОСЛЕ всей истории, и кэш обрывался на первой
+            // точке расхождения, не покрывая историю.
+            //
+            // Теперь история между запросами идентична побайтно (статичный
+            // префикс system + tools + история до текущего user message),
+            // что даёт xAI Grok кэшировать растущую историю как Anthropic.
+            //
+            // Для Anthropic дополнительно ставим cacheControl на предыдущую
+            // часть user-сообщения — явный breakpoint для prompt caching.
             const existingParts: any[] = Array.isArray(lastMsg.content)
               ? [...(lastMsg.content as unknown as any[])]
               : [{ type: "text", text: String(lastMsg.content) }];
             const lastPartIdx = existingParts.length - 1;
             const lastPart = existingParts[lastPartIdx];
-            existingParts[lastPartIdx] = {
-              ...lastPart,
-              providerOptions: {
-                ...(lastPart.providerOptions ?? {}),
-                anthropic: { cacheControl: { type: "ephemeral" as const } },
-              },
-            };
+            if (isAnthropicProtocolModel) {
+              existingParts[lastPartIdx] = {
+                ...lastPart,
+                providerOptions: {
+                  ...(lastPart.providerOptions ?? {}),
+                  anthropic: { cacheControl: { type: "ephemeral" as const } },
+                },
+              };
+            }
             existingParts.push({
               type: "text",
               text: `\n\n${mindDynamicBlock}`,
@@ -1135,8 +1206,8 @@ export async function POST(request: Request) {
               content: existingParts as unknown as typeof lastMsg.content,
             };
           } else {
-            // Legacy path: non-Anthropic-protocol or last message is not user.
-            // Append MIND as a separate system message (behavior pre-ТЗ-CacheAudit Этап 3).
+            // Edge case: последнее сообщение не user (например, после tool-call
+            // последовательности). Fallback на trailing system message.
             messagesForRequest.push({ role: "system" as const, content: mindDynamicBlock });
           }
         }

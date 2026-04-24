@@ -7,6 +7,42 @@
 
 ## [Unreleased]
 
+### [3.99.0] — 2026-04-24 — ТЗ-XAI-COL-1 — Библиотека через xAI Collections
+
+**Персональная Библиотека пользователя на xAI Collections API: загрузка, авто-разбор, поиск из всех чатов, изолированный split-view, scoping в Экспертизе/Создании.**
+
+- **Что появилось у пользователя:**
+  - Страница `/library` с коллекциями, документами, фильтрами, поиском, drag-and-drop загрузкой. Карточка «Библиотека» на главной.
+  - Поддержка форматов: PDF, DOCX, XLSX, PPTX, CSV, TXT, MD, JPG, PNG (до 100 MB).
+  - Авто-анализ при загрузке: автотип (договор / отчёт / статья / книга …), автотеги, краткое описание (Grok 4.1 Fast).
+  - Развёрнутый авто-обзор документа любой длины (≤2500 символов) после indexing — через `librarySearch`+`generateObject` на всех chunks xAI.
+  - Split-view документа `/library/[docId]`: overview-card слева, изолированный мини-чат справа (отвечает строго по документу, MIND и другие коллекции не примешиваются).
+  - В Simply / Экспертизе / Создании / project chats — новый AI-tool `librarySearch`: модель сама ищет в Библиотеке когда вопрос касается личных документов.
+  - В Экспертизе/Создании — `SourcePickerModal` (выбор до 3 коллекций / 5 документов) для жёсткого scope librarySearch + плашка «Из Библиотеки · N источников» с переходом на split-view.
+
+- **Архитектура SSOT:**
+  - 3 новые таблицы: `library_collection`, `library_document`, `library_collection_document` (миграции 0059–0063, поле `autoSummary` в 0063).
+  - Новый модуль `lib/ai/library/`: `xai-collections.ts` (тонкая обёртка), `db.ts`, `auto-analyze.ts`, `summary-generator.ts`, `citations-parser.ts`, `types.ts`.
+  - Новый AI-tool `lib/ai/tools/library-search.ts` подключён в Simply/Экспертиза/Создание/project chats; service-chats и briefing — НЕ подключены.
+  - Новые taskId: `library:auto-analyze`, `library:generate-summary`, `library-document-chat` (все на Grok 4.1 Fast non-reasoning).
+  - Новый chatMode `library-document` с собственным изолированным промптом.
+  - Route group `app/(chat)/api/library/`: collections CRUD, documents CRUD, content proxy.
+  - Новые UI-компоненты: `components/library/*` (12 компонентов), карточка «Библиотека» в `components/glavnaya/`.
+
+- **Закрытые блокеры (зафиксированы для будущего):**
+  - **A5.13:** xAI `/v1/files` сниффит MIME по байтам и ломает Office-форматы (DOCX/XLSX/PPTX → octet-stream → DOCUMENT_STATUS_FAILED). Решение — `POST management-api.x.ai/v1/collections/{id}/documents` с `content_type` как полем формы. ADR: [docs/decisions/056-library-upload-collections-endpoint.md](docs/decisions/056-library-upload-collections-endpoint.md).
+  - **Race condition UI status:** если xAI indexing занимает >search-probe окна — UI заклинивало в `processing`. Summary-generator теперь сам обновляет `status='ready'` при обнаружении xAI PROCESSED.
+  - **F5 после upload:** добавлен SWR-poll autoSummary в split-view — UI автоматически подхватывает обзор без перезагрузки страницы.
+
+- **Бонус (вне scope ТЗ, но в одном коммите):**
+  - **Фикс кэша Grok в Экспертизе/Создании.** MIND-блок раньше для не-Anthropic-протокола инжектился как trailing system message — это обрывало xAI prompt-cache на первой точке расхождения после первого user-сообщения. Теперь MIND для всех провайдеров инжектится как trailing text-part в последнее user-сообщение (для Anthropic дополнительно ставится `cacheControl: ephemeral`). Кэш Grok в Экспертизе теперь растёт вместе с историей — экономия input-токенов на длинных диалогах.
+
+- **Scope-cut:** A6.3 (кнопка «Сохранить в Библиотеку» у вложений чата) отменён продуктовым решением — дублирует `Библиотека → Загрузить`, создаёт скрытый «шестой маршрут» поверх 4 явных.
+
+- **Файлы.** ~50 новых, ~25 изменённых. Полная карта работы — [specs/Simply_xAI/TZ_xai_col_1/](specs/Simply_xAI/TZ_xai_col_1/).
+
+---
+
 ### [3.98.0] — 2026-04-21 — ТЗ-ExpertiseCreateVisionRouting
 
 **Capability-driven роутинг вложений: единый механизм для всех chat modes, закрыто падение на сканированных PDF в expertise/create.**

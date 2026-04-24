@@ -890,3 +890,95 @@ export const userProfileSummary = pgTable(
 );
 
 export type UserProfileSummary = InferSelectModel<typeof userProfileSummary>;
+
+// ============================================================================
+// Library (ТЗ-XAI-COL-1) — пользовательский архив документов через xAI Collections
+// ============================================================================
+
+export const libraryCollection = pgTable(
+  "library_collection",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    xaiCollectionId: text("xaiCollectionId").notNull().unique(),
+    name: varchar("name", { length: 255 }).notNull(),
+    emoji: varchar("emoji", { length: 10 }),
+    sortOrder: integer("sortOrder").notNull().default(0),
+    documentCount: integer("documentCount").notNull().default(0),
+    isDefault: boolean("isDefault").notNull().default(false),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+  },
+  (table) => ({
+    userSortIdx: index("library_collection_user_sort_idx").on(
+      table.userId,
+      table.sortOrder
+    ),
+    userDefaultUnique: uniqueIndex("library_collection_user_default_unique")
+      .on(table.userId)
+      .where(sql`"isDefault" = true`),
+  })
+);
+
+export type LibraryCollection = InferSelectModel<typeof libraryCollection>;
+
+export const libraryDocument = pgTable(
+  "library_document",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    xaiFileId: text("xaiFileId").notNull().unique(),
+    filename: varchar("filename", { length: 512 }).notNull(),
+    mimeType: varchar("mimeType", { length: 100 }).notNull(),
+    size: integer("size").notNull(),
+    /** uploading | processing | ready | error */
+    status: varchar("status", { length: 20 }).notNull().default("uploading"),
+    statusError: text("statusError"),
+    autoType: text("autoType"),
+    autoTags: jsonb("autoTags").$type<string[]>(),
+    autoDescription: text("autoDescription"),
+    autoSummary: text("autoSummary"),
+    originalFileUrl: text("originalFileUrl"),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+  },
+  (table) => ({
+    userCreatedIdx: index("library_document_user_created_idx").on(
+      table.userId,
+      table.createdAt
+    ),
+    userAutoTypeIdx: index("library_document_user_autotype_idx").on(
+      table.userId,
+      table.autoType
+    ),
+  })
+);
+
+export type LibraryDocument = InferSelectModel<typeof libraryDocument>;
+
+export const libraryCollectionDocument = pgTable(
+  "library_collection_document",
+  {
+    collectionId: uuid("collectionId")
+      .notNull()
+      .references(() => libraryCollection.id, { onDelete: "cascade" }),
+    documentId: uuid("documentId")
+      .notNull()
+      .references(() => libraryDocument.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.collectionId, table.documentId] }),
+    documentIdx: index("library_collection_document_document_idx").on(
+      table.documentId
+    ),
+  })
+);
+
+export type LibraryCollectionDocument = InferSelectModel<
+  typeof libraryCollectionDocument
+>;

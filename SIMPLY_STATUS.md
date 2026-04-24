@@ -1,7 +1,7 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.98.0
-**Статус:** Active development (**серия Simply_xAI закрыта** 2026-04-16 в v3.92.1, **ТЗ-COMPACTION-UNIFY закрыт** 2026-04-21 в v3.95.0, **ТЗ-MindOnVisit закрыт** 2026-04-21 в v3.96.0, **ТЗ-MindDeepConsolidation закрыт** 2026-04-21 в v3.97.0, **ТЗ-ExpertiseCreateVisionRouting закрыт** 2026-04-21 в v3.98.0)
+**Версия:** 3.99.0
+**Статус:** Active development (**ТЗ-ExpertiseCreateVisionRouting закрыт** 2026-04-21 в v3.98.0, **ТЗ-XAI-COL-1 закрыт** 2026-04-24 в v3.99.0 — Библиотека через xAI Collections)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** snapshot «что работает прямо сейчас» на один взгляд. История изменений → [CHANGELOG.md](CHANGELOG.md). Архитектура → [docs/architecture.md](docs/architecture.md). Карта моделей → [docs/ai-chats-map.md](docs/ai-chats-map.md).
@@ -37,7 +37,7 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 | **Проекты** (изолированные рабочие пространства) | ✅ | Claude Haiku / Sonnet / Opus по tier, Профессор (Opus planning/review + Haiku execute) |
 | **База знаний — MIND** (Слой 3 RAG, auto из разговоров) | ✅ | **Hot path:** Grok 4.1 Fast (batch-extract, consolidate, profile, dedup-verify) + Voyage AI (embeddings) + pgvector. Extract пакетно из to-compact окна в момент compaction (ADR 054). **Ночная глубокая консолидация (v3.97.0):** Grok 4.20 reasoning (`memory:deep-consolidate`) в 01:00 МСК — причёсывает базу на reasoning-модели (tiered Letta sleep-time pattern), 4 действия включая `rephrase`. A/B через `/dev/models` |
 | **Simply Compaction** (автосжатие истории чата при пороге 50%/85% от 200K) | ✅ | Grok 4.1 Fast non-reasoning (`compaction:summarize`) + provider-agnostic middleware. Активен во всех chat-модах (simply, expertise, create, project). Orchestration: pre-compact batch-extract → summarize → verbatim window (ADR 054) |
-| **База знаний — Collections** (Слой 3 RAG, явная загрузка документов) | 📋 план | xAI Grok Collections API из коробки (`knowledge_search` / `file_search`). Отдельного векторного стека не строим. ТЗ-XAI-COL-1 |
+| **Библиотека — Collections** (Слой 3 RAG, явная загрузка документов) | ✅ | xAI Grok Collections API из коробки. Tool `librarySearch` подключён в Simply/Экспертизе/Создании/проектах. Авто-анализ (Grok 4.1 Fast) + развёрнутый авто-обзор после indexing. Split-view изолированного мини-чата. Source picker (до 3 коллекций / 5 документов) для scoping в Экспертизе/Создании. Закрыто в v3.99.0 (ТЗ-XAI-COL-1) |
 | **Briefing** (hourly Vercel Cron) | ✅ | Grok 4.1 Fast (filter) · MiniMax M2.7-long (author, section) · MiniMax M2.7 (podcast-script). Миграция author/section на Grok разблокирована 2026-04-16 (URL hallucination оказалась metric bug в `verifyArticleUrls`, не проблемой моделей — commit `58d9d2e`); планируется в ТЗ-XAI-6 |
 | **Podcast** (attached to briefing) | ✅ | Gemini TTS (длинный формат, blob storage) |
 | **Meeting Recorder** | ✅ | Deepgram Nova-3 (STT) + Grok 4.20 reasoning (summary, мигрировано 2026-04-16) |
@@ -121,24 +121,19 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 
 ## Известные проблемы (открытые хвосты)
 
-SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). Сводка на сегодня:
+SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). История закрытых: [specs/_archive/BACKLOG_CLOSED.md](specs/_archive/BACKLOG_CLOSED.md).
 
 ### 🟥 High impact
 
-- **[TZ_ErrorRecoveryUI](specs/_backlog/TZ_ErrorRecoveryUI.md)** — Stage 2 root cause fix: useChat state recovery через `clearError`. Stage 1 (hint в красном флаге) уже сделан.
+- **[TZ_BriefingStuckRecovery](specs/_backlog/TZ_BriefingStuckRecovery.md)** — `/briefing` блокируется stuck `status='generating'` записями, пользователь не может восстановиться сам. Нужны UI-guard, watchdog в cron, UPSERT в pipeline. Инцидент 2026-04-21 разблокирован вручную.
 
 ### 🟧 Medium impact
 
-- **[TZ_DevPanelFooterHidesSubCalls](specs/_backlog/TZ_DevPanelFooterHidesSubCalls.md)** — DevPanel footer скрывает nested subcalls (artifacts, clerks, tools). Backend `ai_usage_log` корректен, только frontend aggregation.
-- **[TZ_TaskExpertChatInputMissingOnFirstOpen](specs/_backlog/TZ_TaskExpertChatInputMissingOnFirstOpen.md)** — `multimodal-input` не рендерится при входе в task expert chat из режима планирования. Hard reload лечит.
-- **[TZ_UrlVerificationMetricNormalization](specs/_backlog/TZ_UrlVerificationMetricNormalization.md)** — follow-up hardening после correction 2026-04-16 (unit tests, tracking params audit, ADR). Основной фикс уже в `58d9d2e`.
-- **[TZ_SimplyContextUsageWidget](specs/_backlog/TZ_SimplyContextUsageWidget.md)** — виджет контекста показывает не ту шкалу (привязан к `contextWindow` модели, не к `SIMPLY_CONTEXT_LIMIT`).
-- **[TZ_PromptsDeadCodeCleanup](specs/_backlog/TZ_PromptsDeadCodeCleanup.md)** — удалить мёртвые экспорты из `lib/ai/prompts.ts`. 90% файла dead.
-- **[TZ_SimplyChatRaceCondition](specs/_backlog/TZ_SimplyChatRaceCondition.md)** — `getOrCreateSimplyChat` без partial unique index.
+_(нет открытых долгов)_
 
 ### 🟩 Low impact (косметика)
 
-- **[TZ_UtilTitleCapReasoningMargin](specs/_backlog/TZ_UtilTitleCapReasoningMargin.md)** — cap `util:title`=64 тесен при dev override на reasoning variant. Production не затронут (default = non-reasoning). Решение — поднять cap до 256.
+- **[TZ_CompactionActualCalibration](specs/_backlog/TZ_CompactionActualCalibration.md)** — sanity-check delta `estimate` vs `actual.promptTokens` после недели Compaction MVP в production. Если ratio в 0.85-1.15 — закрыть как невостребованный, иначе калибровать `estimateTokenCount`.
 
 **Правило backlog (из `specs/WORKFLOW.md`):** перед стартом нового крупного ТЗ — пройтись по списку и предложить владельцу закрыть или игнорировать. Решение за владельцем.
 
@@ -178,4 +173,4 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). Сводка на с
 
 ---
 
-**Обновлено:** 2026-04-18 (**ТЗ-AISDKLayerHardening v3.93.0** — umbrella закрыл 3 backlog долга: централизованный overrides reader через `instrumentation.ts`, SSOT `DEFAULT_MAX_OUTPUT_TOKENS` + safety-net getter на 37 taskId, архитектурный инвариант «cap > 21333 на Anthropic ⇒ streamText»; + ADR 053 «AI SDK invocation contract» фиксирует 4-аспектный контракт для будущих изменений)
+**Обновлено:** 2026-04-24 — закрыт ТЗ-XAI-COL-1 (Библиотека через xAI Collections) в v3.99.0. Бонус: фикс xAI prompt-cache в Экспертизе/Создании (MIND-блок переехал из trailing system в trailing user-part).

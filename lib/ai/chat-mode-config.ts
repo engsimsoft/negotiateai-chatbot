@@ -17,7 +17,12 @@ import { z } from "zod";
 import { getModelIdForTask } from "./getModel";
 import type { TaskId } from "./task-assignments";
 
-export const chatModeSchema = z.enum(["expertise", "create", "simply"]);
+export const chatModeSchema = z.enum([
+  "expertise",
+  "create",
+  "simply",
+  "library-document",
+]);
 export type ChatMode = z.infer<typeof chatModeSchema>;
 
 interface ChatModeEntry {
@@ -47,6 +52,10 @@ export const CHAT_MODE_CONFIG: Record<ChatMode, ChatModeEntry> = {
     tools: null, // All standard tools
     reservedTools: ["create_presentation", "create_image", "file_generation"],
   },
+  "library-document": {
+    displayName: "Документ",
+    tools: ["librarySearch"],
+  },
 };
 
 /**
@@ -63,6 +72,8 @@ export function getTaskIdForChatMode(mode: ChatMode): TaskId {
       return "create";
     case "simply":
       return "simply-chat";
+    case "library-document":
+      return "library-document-chat";
   }
 }
 

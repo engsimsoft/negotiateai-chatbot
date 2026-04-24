@@ -22,6 +22,7 @@ import {
   composeChatPrompt,
   composeExpertisePrompt,
   composeCreatePrompt,
+  composeLibraryDocumentPrompt,
   composeAgentPrompt,
   composeSkillPrompt,
   type ComposedPrompt,
@@ -58,6 +59,7 @@ export {
   composeChatPrompt,
   composeExpertisePrompt,
   composeCreatePrompt,
+  composeLibraryDocumentPrompt,
   composeAgentPrompt,
   composeSkillPrompt,
 };
@@ -119,6 +121,23 @@ export function buildCreatePrompt(
   activeTaskId?: TaskId,
 ): BuiltPrompt {
   const composed = composeCreatePrompt(context, activeTaskId);
+
+  return {
+    systemPrompt: composed.systemPrompt,
+    model: composed.model,
+    greeting: composed.greeting,
+    toolAccess: composed.toolAccess,
+  };
+}
+
+/**
+ * Build prompt for library-document chat mode (split-view, single-doc chat).
+ */
+export function buildLibraryDocumentPrompt(
+  documentName: string,
+  activeTaskId?: TaskId,
+): BuiltPrompt {
+  const composed = composeLibraryDocumentPrompt(documentName, activeTaskId);
 
   return {
     systemPrompt: composed.systemPrompt,

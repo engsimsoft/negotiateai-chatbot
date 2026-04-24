@@ -1,0 +1,140 @@
+<div style="padding: 1rem 0; font-family: var(--font-sans);">
+  <h2 class="sr-only">Макет страницы Библиотеки с коллекциями, фильтрами и списком документов</h2>
+
+  <div style="background: #FAF7F0; border-radius: var(--border-radius-lg); border: 0.5px solid var(--color-border-tertiary); padding: 1.5rem 1.75rem;">
+
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.25rem;">
+      <div>
+        <h2 style="font-family: var(--font-serif); font-size: 22px; font-weight: 500; margin: 0 0 4px;">Библиотека</h2>
+        <p style="font-size: 13px; color: var(--color-text-secondary); margin: 0;">23 документа · 3 коллекции</p>
+      </div>
+      <button style="font-size: 13px; padding: 8px 14px;">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="display: inline-block; vertical-align: -1px; margin-right: 4px;"><path d="M8 3v10M3 8h10"/></svg>
+        Загрузить
+      </button>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 8px 12px; margin-bottom: 1.5rem;">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+      <span style="font-size: 13px; color: var(--color-text-tertiary);">Поиск по содержанию документов…</span>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+        <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0; letter-spacing: 0.5px;">МОИ КОЛЛЕКЦИИ</p>
+        <span style="font-size: 12px; color: var(--color-text-tertiary);">+ новая</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+
+        <div style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#5F5E5A" stroke-width="1.3"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1h-5l-2-2h-4a1 1 0 0 0-1 1z"/></svg>
+            <span style="font-size: 13px; font-weight: 500;">Клиент Ромашка</span>
+          </div>
+          <p style="font-size: 11px; color: var(--color-text-secondary); margin: 0;">7 документов · 2 подколлекции</p>
+        </div>
+
+        <div style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#5F5E5A" stroke-width="1.3"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1h-5l-2-2h-4a1 1 0 0 0-1 1z"/></svg>
+            <span style="font-size: 13px; font-weight: 500;">Книги по ДВС</span>
+          </div>
+          <p style="font-size: 11px; color: var(--color-text-secondary); margin: 0;">3 документа</p>
+        </div>
+
+        <div style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#5F5E5A" stroke-width="1.3"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1h-5l-2-2h-4a1 1 0 0 0-1 1z"/></svg>
+            <span style="font-size: 13px; font-weight: 500;">Бухгалтерия 2026</span>
+          </div>
+          <p style="font-size: 11px; color: var(--color-text-secondary); margin: 0;">12 документов</p>
+        </div>
+
+      </div>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+      <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0 0 10px; letter-spacing: 0.5px;">ПО ТИПУ</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <span style="font-size: 12px; padding: 5px 12px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary); border-radius: 999px;">Все 23</span>
+        <span style="font-size: 12px; padding: 5px 12px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 999px; color: var(--color-text-secondary);">Договоры 5</span>
+        <span style="font-size: 12px; padding: 5px 12px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 999px; color: var(--color-text-secondary);">Отчёты 8</span>
+        <span style="font-size: 12px; padding: 5px 12px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 999px; color: var(--color-text-secondary);">Книги 2</span>
+        <span style="font-size: 12px; padding: 5px 12px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 999px; color: var(--color-text-secondary);">Статьи 7</span>
+        <span style="font-size: 12px; padding: 5px 12px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 999px; color: var(--color-text-secondary);">Другое 1</span>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+      <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0 0 10px; letter-spacing: 0.5px;">ПОПУЛЯРНЫЕ ТЕГИ</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <span style="font-size: 12px; padding: 5px 10px; background: #EEEDFE; color: #3C3489; border-radius: var(--border-radius-md);">Ромашка</span>
+        <span style="font-size: 12px; padding: 5px 10px; background: #EEEDFE; color: #3C3489; border-radius: var(--border-radius-md);">2026</span>
+        <span style="font-size: 12px; padding: 5px 10px; background: #EEEDFE; color: #3C3489; border-radius: var(--border-radius-md);">поставка</span>
+        <span style="font-size: 12px; padding: 5px 10px; background: #EEEDFE; color: #3C3489; border-radius: var(--border-radius-md);">финансы</span>
+        <span style="font-size: 12px; padding: 5px 10px; background: #EEEDFE; color: #3C3489; border-radius: var(--border-radius-md);">ДВС</span>
+        <span style="font-size: 12px; padding: 5px 10px; color: var(--color-text-tertiary);">ещё 8</span>
+      </div>
+    </div>
+
+    <div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+        <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0; letter-spacing: 0.5px;">НЕДАВНИЕ</p>
+        <span style="font-size: 12px; color: var(--color-text-tertiary);">по дате ↓</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+
+        <div style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+          <div style="width: 32px; height: 40px; background: #FCEBEB; border-radius: 3px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span style="font-size: 10px; font-weight: 500; color: #791F1F;">PDF</span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <p style="font-size: 14px; font-weight: 500; margin: 0 0 3px;">Договор с Ромашкой</p>
+            <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0 0 6px;">Договор поставки · 12 стр · 15 марта</p>
+            <div style="display: flex; gap: 4px;">
+              <span style="font-size: 11px; padding: 2px 8px; background: #EEEDFE; color: #3C3489; border-radius: 4px;">Ромашка</span>
+              <span style="font-size: 11px; padding: 2px 8px; background: #EEEDFE; color: #3C3489; border-radius: 4px;">поставка</span>
+              <span style="font-size: 11px; padding: 2px 8px; background: #EEEDFE; color: #3C3489; border-radius: 4px;">2026</span>
+            </div>
+          </div>
+          <span style="font-size: 11px; color: #0F6E56; white-space: nowrap;">готов</span>
+        </div>
+
+        <div style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+          <div style="width: 32px; height: 40px; background: #FCEBEB; border-radius: 3px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span style="font-size: 10px; font-weight: 500; color: #791F1F;">PDF</span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <p style="font-size: 14px; font-weight: 500; margin: 0 0 3px;">Теория ДВС. Учебник</p>
+            <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0 0 6px;">Книга · 312 стр · 10 марта</p>
+            <div style="display: flex; gap: 4px;">
+              <span style="font-size: 11px; padding: 2px 8px; background: #EEEDFE; color: #3C3489; border-radius: 4px;">ДВС</span>
+              <span style="font-size: 11px; padding: 2px 8px; background: #EEEDFE; color: #3C3489; border-radius: 4px;">теория</span>
+              <span style="font-size: 11px; padding: 2px 8px; background: #EEEDFE; color: #3C3489; border-radius: 4px;">учебник</span>
+            </div>
+          </div>
+          <span style="font-size: 11px; color: #0F6E56; white-space: nowrap;">готов</span>
+        </div>
+
+        <div style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+          <div style="width: 32px; height: 40px; background: #EAF3DE; border-radius: 3px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span style="font-size: 10px; font-weight: 500; color: #27500A;">XLS</span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <p style="font-size: 14px; font-weight: 500; margin: 0 0 3px;">Смета Q1 2026</p>
+            <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0 0 6px;">Отчёт · 4 листа · 10 марта</p>
+            <div style="display: flex; gap: 4px;">
+              <span style="font-size: 11px; padding: 2px 8px; background: #EEEDFE; color: #3C3489; border-radius: 4px;">бюджет</span>
+              <span style="font-size: 11px; padding: 2px 8px; background: #EEEDFE; color: #3C3489; border-radius: 4px;">подряд</span>
+              <span style="font-size: 11px; padding: 2px 8px; background: #EEEDFE; color: #3C3489; border-radius: 4px;">Q1</span>
+            </div>
+          </div>
+          <span style="font-size: 11px; color: #BA7517; white-space: nowrap;">обрабатывается 1:30</span>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>

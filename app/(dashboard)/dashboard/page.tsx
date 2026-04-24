@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { getUserById, getBriefingHistory, getBriefingSettings, getMeetingRecords, getMeetingRecordsCount } from "@/lib/db/queries";
 import { countUserMemories } from "@/lib/ai/memory/memory-queries";
+import {
+  listLibraryCollectionsByUser,
+  listLibraryDocumentsByUser,
+} from "@/lib/ai/library/db";
 import { getSimplyNewsData } from "@/lib/briefing/simply-news-utils";
 import {
   GlavnayaHeader,
@@ -10,6 +14,7 @@ import {
   GlavnayaInput,
   ModeCardsSection,
   ContextCard,
+  LibraryCard,
   ToolsSection,
 } from "@/components/glavnaya";
 
@@ -21,13 +26,15 @@ export default async function DashboardPage() {
   }
 
   // Get user profile, chat count, latest briefing, and meeting records from database
-  const [userProfile, memoryFactCount, briefingHistoryRows, briefingSettings, meetingRecords, meetingRecordCount] = await Promise.all([
+  const [userProfile, memoryFactCount, briefingHistoryRows, briefingSettings, meetingRecords, meetingRecordCount, libraryCollections, libraryDocsPage] = await Promise.all([
     getUserById(session.user.id),
     countUserMemories(session.user.id),
     getBriefingHistory({ userId: session.user.id, limit: 1 }),
     getBriefingSettings({ userId: session.user.id }),
     getMeetingRecords({ userId: session.user.id, limit: 1 }),
     getMeetingRecordsCount({ userId: session.user.id }),
+    listLibraryCollectionsByUser(session.user.id),
+    listLibraryDocumentsByUser(session.user.id, { limit: 1 }),
   ]);
   const latestBriefing = briefingHistoryRows[0] ?? null;
 
@@ -53,9 +60,17 @@ export default async function DashboardPage() {
         {/* Greeting + Input */}
         <section className="mb-12">
           <GlavnayaGreeting displayName={displayName} />
-          <div className="flex items-stretch gap-3">
-            <ContextCard factCount={memoryFactCount} />
-            <GlavnayaInput />
+          <div className="flex items-start gap-3">
+            <div className="flex shrink-0 flex-col gap-2">
+              <ContextCard factCount={memoryFactCount} />
+              <LibraryCard
+                documentCount={libraryDocsPage.total}
+                collectionCount={libraryCollections.length}
+              />
+            </div>
+            <div className="flex-1">
+              <GlavnayaInput />
+            </div>
           </div>
         </section>
 

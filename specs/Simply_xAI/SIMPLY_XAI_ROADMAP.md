@@ -1,7 +1,7 @@
 # Simply — Дорожная карта миграции на xAI
 
 **Создано:** 2026-04-14  
-**Обновлено:** 2026-04-16 (**серия закрыта** в v3.92.1 через финализацию ТЗ-XAI-6)  
+**Обновлено:** 2026-04-21 — секция «Будущие расширения» актуализирована: COMPACTION-1 ✅ закрыт через v3.94.0 + COMPACTION-UNIFY v3.95.0, добавлены MindOnVisit (v3.96.0) / MindDeepConsolidation (v3.97.0) / ExpertiseCreateVisionRouting (v3.98.0), COL-1 → следующий. **Серия Simply_xAI закрыта** 2026-04-16 в v3.92.1 (ТЗ-XAI-6).  
 **Статус:** ✅ **Завершена**  
 **Серия:** ТЗ-XAI-1 → ТЗ-XAI-6 (+ ТЗ-ATTACH-1). Будущие расширения (ТЗ-XAI-MA-1, ТЗ-XAI-COL-1, ТЗ-XAI-VOICE-1) — отдельные ветки
 
@@ -214,38 +214,50 @@
 
 ## Будущие расширения (не в текущей серии)
 
-**Порядок выполнения** (утверждён владельцем 2026-04-18, после закрытия ТЗ-AISDKLayerHardening v3.93.0):
+**Порядок выполнения** (утверждён владельцем 2026-04-18, актуализирован 2026-04-21):
 
 ```
 [серия xAI закрыта v3.92.1]
   ↓
 ТЗ-AISDKLayerHardening ✅ v3.93.0 (umbrella, 3 долга + ADR 053)
   ↓
-1. ТЗ-COMPACTION-1 ← СЛЕДУЮЩИЙ (фундамент, блокирует COL-1)
+ТЗ-COMPACTION-1 ✅ v3.94.0 (фундамент) → ТЗ-COMPACTION-UNIFY ✅ v3.95.0 (унификация порогов)
   ↓
-2. ТЗ-XAI-COL-1 (продуктовая ценность: загрузка документов в RAG)
+ТЗ-MindOnVisit ✅ v3.96.0 (on-visit обработка хвостов памяти + выбор стратегии)
   ↓
-3. ТЗ-XAI-MA-1 (Multi-Agent premium-режим)
+ТЗ-MindDeepConsolidation ✅ v3.97.0 (ночная reasoning-консолидация в 01:00 МСК)
   ↓
-4. ТЗ-XAI-VOICE-1 (голосовой канал)
+ТЗ-ExpertiseCreateVisionRouting ✅ v3.98.0 (capability-driven vision routing, ADR 055)
+  ↓
+ТЗ-XAI-COL-1 ✅ v3.99.0 (Библиотека через xAI Collections — загрузка, авто-разбор, librarySearch, split-view, source picker; ADR 056; бонус-фикс xAI prompt-cache)
+  ↓
+1. ТЗ-XAI-MA-1 ← СЛЕДУЮЩИЙ (Multi-Agent premium-режим)
+  ↓
+2. ТЗ-XAI-VOICE-1 (голосовой канал)
 ```
 
-**Обоснование порядка (владелец 2026-04-18):**
-- COMPACTION-1 первым — фундамент: чинит молчаливую потерю контекста в expertise/create/projects-on-Grok (реальная UX-деградация в 3 chat-режимах) + блокирует COL-1 (большие документы переполнят контекст мгновенно) + расширяет ADR 053 до 5-го аспекта (compaction strategy) пока контракт свежий.
-- COL-1 вторым, а не MA-1 — ближе к продуктовому видению (пользователь загружает документы), понятнее в реализации (Grok Collections из коробки). MA-1 требует MCP-сервер + auth layer — больше работы, меньше сразу осязаемой ценности.
-- MA-1 третьим — бонусно закрывает Finding #2 (thinking tokens на Anthropic естественно переходом Professor Planning на Grok Multi-Agent).
+**Обоснование порядка (владелец 2026-04-18, подтверждено 2026-04-21):**
+- COMPACTION-1 был первым — фундамент: починил молчаливую потерю контекста в expertise/create/projects-on-Grok + разблокировал COL-1 (большие документы переполнят контекст мгновенно). ✅ Сделано.
+- COL-1 следующим — ближе к продуктовому видению (пользователь загружает документы), понятнее в реализации (Grok Collections из коробки). MA-1 требует MCP-сервер + auth layer — больше работы, меньше сразу осязаемой ценности.
+- MA-1 третьим — бонусно закрывает thinking tokens issue на Anthropic естественно переходом Professor Planning на Grok Multi-Agent.
 - VOICE-1 последним — отдельный канал, не зависит от остального, продуктовая приоритизация.
 
 | № | ID | Название | Зависимости | Описание |
 |---|---|---|---|---|
-| 1 | **ТЗ-COMPACTION-1** | Simply Compaction MVP | ADR 053 (v3.93.0 ✅) | Summary Buffer для Grok-чатов (expertise/create как pilot). Capability-driven middleware `applyContextStrategy`, новый taskId `compaction:summarize`, 5-й аспект ADR 053. Архитектура — [SIMPLY_COMPACTION_ARCHITECTURE.md](SIMPLY_COMPACTION_ARCHITECTURE.md) v1.0 → v1.1 в Фазе 1. Поглощает backlog-хвост `TZ_SimplyContextUsageWidget`. |
-| 2 | ТЗ-XAI-COL-1 | Collections (Библиотека) | ТЗ-XAI-1 + COMPACTION-1 | Grok Collections API для RAG документов пользователя. Unified `knowledge_search` с MIND. |
-| 3 | ТЗ-XAI-MA-1 | Multi-Agent Экспертиза | ТЗ-XAI-5 + A/B тест | Responses API + MCP сервер для custom tools в режиме multi-agent. **TaskId `expertise-multi-agent` зарезервирован в [task-assignments.ts](../../lib/ai/task-assignments.ts) с 2026-04-16** (placeholder, call sites нет). Полное обоснование архитектуры — [BRAINSTORM_GrokMultiAgent.md](BRAINSTORM_GrokMultiAgent.md). Попутно закрывает Finding #2 (Anthropic thinking tokens) естественным переходом Professor Planning на Grok Multi-Agent. |
-| 4 | ТЗ-XAI-VOICE-1 | Voice Agent | — | Grok Voice Agent API для голосового режима. |
+| ✅ | ТЗ-COMPACTION-1 | Simply Compaction MVP | ADR 053 (v3.93.0 ✅) | **Завершён v3.94.0.** Capability-driven middleware `applyContextStrategy`, taskId `compaction:summarize`, 5-й аспект ADR 053. Поглотил `TZ_SimplyContextUsageWidget`. Архитектура — [SIMPLY_COMPACTION_ARCHITECTURE.md](SIMPLY_COMPACTION_ARCHITECTURE.md). |
+| ✅ | ТЗ-COMPACTION-UNIFY | Унификация порогов compaction | COMPACTION-1 | **Завершён v3.95.0.** Единый базис порогов 50%/85% от 200K во всех chat modes. Закрыл `TZ_UnifyContextThresholdBase`. |
+| ✅ | ТЗ-XAI-COL-1 | Collections (Библиотека) | ТЗ-XAI-1 + COMPACTION-1 (✅) | **Завершён v3.99.0.** Полная Библиотека через xAI Collections: загрузка/CRUD коллекций и документов, auto-analyze + autoSummary (Grok 4.1 Fast), `librarySearch` tool во всех чатах, split-view изолированного мини-чата, `SourcePickerModal` для scoping в Экспертизе/Создании, плашка citations. Архитектура — [SIMPLY_LIBRARY_ARCHITECTURE.md](TZ_xai_col_1/SIMPLY_LIBRARY_ARCHITECTURE.md), ADR — [056](../../docs/decisions/056-library-upload-collections-endpoint.md). Бонус: фикс xAI prompt-cache в Экспертизе/Создании. |
+| 1 | **ТЗ-XAI-MA-1** | Multi-Agent Экспертиза | ТЗ-XAI-5 + A/B тест | Responses API + MCP сервер для custom tools в режиме multi-agent. **TaskId `expertise-multi-agent` зарезервирован в [task-assignments.ts](../../lib/ai/task-assignments.ts) с 2026-04-16** (placeholder, call sites нет). Полное обоснование — [BRAINSTORM_GrokMultiAgent.md](BRAINSTORM_GrokMultiAgent.md). Попутно закрывает thinking tokens issue (Anthropic) переходом Professor Planning на Grok Multi-Agent. **Следующий по плану.** |
+| 2 | ТЗ-XAI-VOICE-1 | Voice Agent | — | Grok Voice Agent API для голосового режима. |
+
+**Сделано вне исходного плана (между COMPACTION-1 и COL-1):**
+- ТЗ-MindOnVisit ✅ v3.96.0 — on-visit обработка хвостов памяти, пользователь выбирает стратегию.
+- ТЗ-MindDeepConsolidation ✅ v3.97.0 — двухуровневая консолидация: hot path (Grok 4.1 Fast) + ночная reasoning (Grok 4.20) в 01:00 МСК.
+- ТЗ-ExpertiseCreateVisionRouting ✅ v3.98.0 — единый capability-driven routing вложений во всех chat modes (ADR 055), `simply-chat-vision` → `chat-vision` (универсальный fallback).
 
 **Отложены (не независимые серии, вплетаются по мере необходимости):**
-- ТЗ-COMPACTION-2 — расширение Simply Compaction на Simply Chat как страховочная сетка поверх MIND (для сверхдлинных сессий). После COMPACTION-1 MVP.
-- ТЗ-COMPACTION-3 — «Новый чат с итогом» (UX Фазы 3 из архитектуры). После COMPACTION-1/COMPACTION-2.
+- ТЗ-COMPACTION-2 — расширение Simply Compaction на Simply Chat как страховочная сетка поверх MIND (для сверхдлинных сессий).
+- ТЗ-COMPACTION-3 — «Новый чат с итогом» (UX Фазы 3 из архитектуры).
 
 ---
 

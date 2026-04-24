@@ -145,7 +145,10 @@ function combineContextBlocks(context: BuildContext): string {
   if (memoryContext) blocks.push(memoryContext);
 
   // Library context (user's xAI Collections for RAG discovery)
-  const libraryContext = buildLibraryContext(context.library);
+  const libraryContext = buildLibraryContext(
+    context.library,
+    context.librarySourcesScope,
+  );
   if (libraryContext) blocks.push(libraryContext);
 
   // Request hints
@@ -293,7 +296,7 @@ export function composeCreatePrompt(
  */
 export function composeLibraryDocumentPrompt(
   documentName: string,
-  activeTaskId?: TaskId,
+  _activeTaskId?: TaskId,
 ): ComposedPrompt {
   const parts: string[] = [];
 

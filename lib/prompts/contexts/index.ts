@@ -22,3 +22,8 @@ export {
   buildSimpleProjectContext,
   type ProjectContext,
 } from './project-context';
+
+export {
+  buildLibraryContext,
+  type LibraryCollectionInfo,
+} from './library';

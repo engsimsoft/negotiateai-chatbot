@@ -36,6 +36,10 @@ import { DevPanelErrorBoundary } from "./dev-panel/dev-panel-error-boundary";
 import { reportClientError } from "@/lib/client/error-bus";
 import { ChatSidebar } from "./chat-sidebar";
 import { useDataStream } from "./data-stream-provider";
+import {
+  SourcePickerModal,
+  type LibrarySourcesValue,
+} from "./library";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
 // ТЗ-LegacyChatCleanup: ContextIndicator удалён вместе с legacy `chat` snapshot fallback
@@ -102,6 +106,12 @@ export function Chat({
   // ТЗ-KITT: "Think" mode — one-shot Sonnet for current message
   const [think, setThink] = useState(false);
   const thinkRef = useRef(think);
+  // ТЗ-XAI-COL-1 A6.2: SourcePickerModal scope для Экспертизы/Создания.
+  // Жёстко ограничивает librarySearch на сервере.
+  const [librarySources, setLibrarySources] =
+    useState<LibrarySourcesValue | null>(null);
+  const librarySourcesRef = useRef(librarySources);
+  const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
   const [retryState, setRetryState] = useState({ count: 0, maxRetries: 3 });
   const [delayState, setDelayState] = useState<"normal" | "slow" | "timeout">(
     "normal"
@@ -137,6 +147,10 @@ export function Chat({
   useEffect(() => {
     thinkRef.current = think;
   }, [think]);
+
+  useEffect(() => {
+    librarySourcesRef.current = librarySources;
+  }, [librarySources]);
 
   const clearDelayTimers = useCallback(() => {
     if (slowTimerRef.current) {
@@ -218,6 +232,21 @@ export function Chat({
               ...(researchDepthRef.current && { researchDepth: researchDepthRef.current }),
               // ТЗ-KITT: Think mode (one-shot Sonnet)
               ...(thinkRef.current && { think: true }),
+              // ТЗ-XAI-COL-1 A6.2: SourcePickerModal scope
+              ...(librarySourcesRef.current &&
+              ((librarySourcesRef.current.collectionIds.length > 0) ||
+                (librarySourcesRef.current.documentIds.length > 0))
+                ? {
+                    librarySources: {
+                      ...(librarySourcesRef.current.collectionIds.length > 0 && {
+                        collectionIds: librarySourcesRef.current.collectionIds,
+                      }),
+                      ...(librarySourcesRef.current.documentIds.length > 0 && {
+                        documentIds: librarySourcesRef.current.documentIds,
+                      }),
+                    },
+                  }
+                : {}),
               ...request.body,
             },
           };
@@ -526,11 +555,33 @@ export function Chat({
                 onResearchDepthChange={setResearchDepth}
                 think={think}
                 onThinkChange={setThink}
+                librarySources={librarySources}
+                onOpenLibrarySources={() => setSourcePickerOpen(true)}
+                onClearLibrarySources={() => setLibrarySources(null)}
               />
             )}
         </div>
       </div>
       </DevPanelErrorBoundary>
+
+      {(currentChatMode === "expertise" || currentChatMode === "create") &&
+        !projectId && (
+          <SourcePickerModal
+            open={sourcePickerOpen}
+            onOpenChange={setSourcePickerOpen}
+            initialValue={librarySources ?? undefined}
+            onSelect={(value) => {
+              if (
+                value.collectionIds.length === 0 &&
+                value.documentIds.length === 0
+              ) {
+                setLibrarySources(null);
+              } else {
+                setLibrarySources(value);
+              }
+            }}
+          />
+        )}
 
       <Artifact
         attachments={attachments}

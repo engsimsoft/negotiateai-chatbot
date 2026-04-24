@@ -27,6 +27,10 @@ import { PreviewAttachment } from "./preview-attachment";
 import { ToolActivityIndicator } from "./tool-activity-indicator";
 import { TOOL_ACTIVITY_CONFIG, type ToolActivityConfig } from "@/lib/ai/tool-activity-config";
 import { DevPanelFooter } from "./dev-panel/dev-panel-footer";
+import {
+  LibrarySourcesBadge,
+  type LibrarySourceCitation,
+} from "./library";
 import { Weather } from "./weather";
 
 /**
@@ -123,6 +127,41 @@ const PurePreviewMessage = ({
     const parts = dataStream.filter(p => p.type === "data-research-depth");
     return (parts[parts.length - 1]?.data as { depth?: string } | undefined)?.depth ?? null;
   }, [dataStream]);
+
+  // ТЗ-XAI-COL-1 A6.2: Сбор citations из всех вызовов librarySearch внутри
+  // одного assistant-сообщения. Дедупликация по (fileId + pageNumber):
+  // одна страница одного документа = одна строка в плашке. Берём лучший score
+  // как «верхний» для возможной сортировки в будущем.
+  const librarySourceCitations = useMemo<LibrarySourceCitation[]>(() => {
+    if (message.role !== "assistant") return [];
+    const map = new Map<string, LibrarySourceCitation>();
+    for (const part of message.parts ?? []) {
+      const p = part as any;
+      if (p?.type !== "tool-librarySearch") continue;
+      const output = unwrapToolResult<any>(p.output);
+      const chunks = output?.chunks;
+      if (!Array.isArray(chunks)) continue;
+      for (const c of chunks) {
+        if (!c?.fileId) continue;
+        const key = `${c.fileId}::${c.pageNumber ?? 0}`;
+        const prev = map.get(key);
+        const next: LibrarySourceCitation = {
+          fileId: c.fileId,
+          documentId: typeof c.documentId === "string" ? c.documentId : undefined,
+          filename: typeof c.filename === "string" ? c.filename : undefined,
+          pageNumber:
+            typeof c.pageNumber === "number" ? c.pageNumber : undefined,
+          topScore: typeof c.score === "number" ? c.score : undefined,
+        };
+        if (!prev) {
+          map.set(key, next);
+        } else if ((next.topScore ?? 0) > (prev.topScore ?? 0)) {
+          map.set(key, { ...prev, ...next, topScore: next.topScore });
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [message.parts, message.role]);
 
   // ТЗ-07: Unified tool activity groups
   // Merges active (data stream) + completed (message.parts) indicators,
@@ -464,6 +503,11 @@ const PurePreviewMessage = ({
 
             return null;
           })}
+
+          {/* ТЗ-XAI-COL-1 A6.2: плашка citations из librarySearch */}
+          {librarySourceCitations.length > 0 && (
+            <LibrarySourcesBadge citations={librarySourceCitations} />
+          )}
 
           {!isReadonly && (
             <MessageActions

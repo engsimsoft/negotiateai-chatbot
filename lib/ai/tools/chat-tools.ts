@@ -13,6 +13,7 @@ import { createDocument } from "./create-document";
 import { parseExcel } from "./excel";
 import { getCurrentDate } from "./get-current-date";
 import { getWeather } from "./get-weather";
+import { librarySearch } from "./library-search";
 import { readProjectFile } from "./read-project-file";
 import { updateDocument } from "./update-document";
 import { webSearch } from "./web-search";
@@ -31,6 +32,16 @@ interface GetStandardToolsParams {
   chatMode?: ChatMode;
   /** ТЗ-PX: Override depth for deepResearch (from dev-mode UI switcher) */
   researchDepth?: "pro" | "deep";
+  /** A6 split-view: restrict librarySearch to one document (our UUID). */
+  lockedFileId?: string;
+  /**
+   * A6.2 SourcePickerModal scope. Уже отвалидированные UUID нашей БД,
+   * librarySearch замыкается на них (модель не может выйти за scope).
+   */
+  librarySources?: {
+    collectionIds?: string[];
+    documentIds?: string[];
+  };
 }
 
 /**
@@ -60,7 +71,10 @@ export function getStandardTools({
   chatId,
   chatMode,
   researchDepth,
+  lockedFileId,
+  librarySources,
 }: GetStandardToolsParams) {
+  const userId = session.user?.id;
   return {
     getCurrentDate,
     getWeather,
@@ -71,9 +85,18 @@ export function getStandardTools({
     updateDocument: updateDocument({ session, dataStream }),
     webSearch,
     fetchUrl,
-    deepResearch: deepResearch({ defaultDepth: researchDepth, userId: session.user?.id }),
+    deepResearch: deepResearch({ defaultDepth: researchDepth, userId }),
     parseExcel,
     loadSkill,
+    ...(userId
+      ? {
+          librarySearch: librarySearch({
+            userId,
+            lockedFileId,
+            scopedSourceIds: librarySources,
+          }),
+        }
+      : {}),
     readTelegramChannel,
   };
 }
@@ -174,6 +197,7 @@ const ALL_TOOL_NAMES = [
   "updateDocument",
   "parseExcel",
   "loadSkill",
+  "librarySearch",
   "readProjectFile",
   "readTelegramChannel",
 ] as const;
@@ -203,9 +227,14 @@ export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode, 
       "updateDocument",
       "parseExcel",
       "loadSkill",
+      "librarySearch",
       "readProjectFile",
       "readTelegramChannel",
     ];
+  }
+
+  if (chatMode === "library-document") {
+    return ["librarySearch"];
   }
 
   const baseTools: ToolName[] = [
@@ -218,6 +247,7 @@ export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode, 
     "updateDocument",
     "parseExcel",
     "loadSkill",
+    "librarySearch",
     "readTelegramChannel",
   ];
 

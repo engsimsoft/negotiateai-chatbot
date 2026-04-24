@@ -66,6 +66,10 @@ export type TaskId =
   | "service-chat:briefing-onboarding"
   // Утилиты
   | "util:title"                 // автонейминг чата
+  // Library (ТЗ-XAI-COL-1)
+  | "library:auto-analyze"       // autoType + autoTags + autoDescription при upload в Библиотеку
+  | "library:generate-summary"   // autoSummary (~300-400 слов) через librarySearch по всем chunks (A6.1c)
+  | "library-document-chat"      // split-view мини-чат по одному документу из Библиотеки (A6)
   // Artifact generation (document handlers)
   | "artifact:text"
   | "artifact:markdown"
@@ -205,6 +209,25 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   // Grok 4.1 Fast. Подробности в SIMPLY_XAI_NOTES.md запись 2026-04-16.
   "util:title":                 "grok-4-1-fast-non-reasoning",
 
+  // Library (ТЗ-XAI-COL-1)
+  // Один вызов при upload документа: извлекаем первые N символов локально
+  // (mammoth/pdf-extract/xlsx), отдаём в Grok 4.1 Fast со structured output
+  // (Zod enum для autoType). Быстро, дёшево, качества достаточно для подсказки.
+  "library:auto-analyze":       "grok-4-1-fast-non-reasoning",
+
+  // library:generate-summary (ТЗ-XAI-COL-1 A6.1c) — генерирует autoSummary
+  // (~300-400 слов) через librarySearch по всем chunks проиндексированного
+  // документа. Fire-and-forget после indexing. Grok 4.1 Fast достаточно: задача
+  // механическая — объединить цитаты в связный структурированный обзор.
+  "library:generate-summary":   "grok-4-1-fast-non-reasoning",
+
+  // library-document-chat (ТЗ-XAI-COL-1 A6) — изолированный мини-чат в split-view
+  // одного документа Библиотеки. Grok 4.1 Fast non-reasoning: QA-ответы строятся
+  // из цитат librarySearch, reasoning-overhead не нужен. Отдельный taskId от
+  // simply-chat — семантика другая (RAG по цитатам vs собеседник), через
+  // /dev/models можно A/B сравнить с Haiku / Grok 4.20.
+  "library-document-chat":      "grok-4-1-fast-non-reasoning",
+
   // Artifact generation — все 5 типов используют Sonnet
   "artifact:text":              "claude-sonnet-4-6",
   "artifact:markdown":          "claude-sonnet-4-6",
@@ -300,6 +323,11 @@ export const DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number> = {
                                       // на середине строки в русском (NoObjectGeneratedError). 512 даёт
                                       // 4x запас под русский структурированный output, billing cap не cost.
 
+  // Library
+  "library:auto-analyze":     1024,   // Короткий JSON {autoType, autoTags[3-5], autoDescription≤200}, русский.
+  "library:generate-summary": 2048,   // autoSummary ≤2500 знаков ≈ 300-400 слов русского + буфер на JSON.
+  "library-document-chat":    4096,   // Мини-чат split-view — QA по цитатам librarySearch, ответы короткие.
+
   // Artifacts (document handlers, все на Sonnet capability 64K)
   "artifact:text":            16384,
   "artifact:markdown":        16384,
@@ -373,6 +401,11 @@ export const TASK_DESCRIPTIONS: Record<TaskId, string> = {
 
   // Утилиты
   "util:title":               "Утилита — автогенерация названия чата",
+
+  // Library
+  "library:auto-analyze":     "Библиотека — автоанализ документа при загрузке (тип, теги, описание)",
+  "library:generate-summary": "Библиотека — развёрнутый обзор документа для split-view (по chunks после indexing)",
+  "library-document-chat":    "Библиотека — мини-чат в split-view одного документа (QA по цитатам)",
 
   // Artifacts
   "artifact:text":            "Артефакт — текстовый документ в холсте",

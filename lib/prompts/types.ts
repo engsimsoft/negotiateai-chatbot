@@ -66,6 +66,23 @@ export interface BuildContext {
   /** Chat memory (previous context) */
   memory?: string;
 
+  /** User's Library collections with document counts (для RAG-разведки) */
+  library?: Array<{
+    name: string;
+    documentsCount: number;
+    isDefault?: boolean;
+  }>;
+
+  /**
+   * A6.2: SourcePickerModal scope — пользователь явно выбрал источники для
+   * этой сессии. При наличии scope library context переключается на блок
+   * «Выбранные источники» и librarySearch замыкается на них.
+   */
+  librarySourcesScope?: {
+    collectionNames?: string[];
+    documentNames?: string[];
+  };
+
   /** Request hints (geo, time) */
   requestHints?: {
     latitude?: string;
