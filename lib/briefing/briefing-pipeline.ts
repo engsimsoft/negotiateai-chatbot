@@ -27,6 +27,7 @@ import {
   getBriefingTopics,
   getPreviousBriefing,
   saveBriefingHistory,
+  updateBriefingHistory,
 } from "@/lib/db/queries";
 import { getTokenlensCatalog } from "@/lib/ai/tokenlens-catalog";
 
@@ -53,6 +54,10 @@ export async function runBriefingPipeline({
   const catalog = await getTokenlensCatalog();
   const trace = new TraceCollector("briefing", catalog);
   const emitTrace = onTrace ?? (() => {});
+
+  // ТЗ-BriefingStuckRecovery: id of the in-progress row, captured after first INSERT.
+  // Final branches (no-items, success, catch) UPDATE this row instead of INSERT'ing a second one.
+  let briefingId: string | undefined;
 
   try {
     // Step 1: Connecting — load settings, topics, sources
@@ -101,12 +106,13 @@ export async function runBriefingPipeline({
     // ТЗ-BF5: Keep last ready briefing for dedup context (sliding window)
     await deleteOldBriefingHistory({ userId, keepLast: 1 });
 
-    await saveBriefingHistory({
+    const initialRow = await saveBriefingHistory({
       userId,
       briefingJson: {},
       sourcesChecked: sourcesToFetch.length,
       status: "generating",
     });
+    briefingId = initialRow.id;
 
     emit({
       step: "connecting",
@@ -168,8 +174,8 @@ export async function runBriefingPipeline({
     if (allItems.length === 0) {
       const failTraceSummary = trace.isEnabled ? trace.getSummary() : undefined;
       const failFullTrace = trace.isEnabled ? trace.getFullTrace() : undefined;
-      await saveBriefingHistory({
-        userId,
+      await updateBriefingHistory({
+        id: briefingId,
         briefingJson: {
           error: "No content fetched",
           errors: allErrors,
@@ -324,8 +330,8 @@ export async function runBriefingPipeline({
     const fullTrace = trace.isEnabled ? trace.getFullTrace() : undefined;
 
     // Save final result (with full trace metadata if dev mode)
-    await saveBriefingHistory({
-      userId,
+    await updateBriefingHistory({
+      id: briefingId,
       briefingJson: article,
       sourcesChecked: sourcesToFetch.length,
       itemsIncluded: article.meta.totalNews,
@@ -361,12 +367,21 @@ export async function runBriefingPipeline({
 
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
 
-    // ТЗ-DEV2: Fix silent catch — surface DB save errors as warnings
-    await saveBriefingHistory({
-      userId,
-      briefingJson: { error: errorMessage },
-      status: "failed",
-    }).catch((saveErr) => {
+    // ТЗ-BriefingStuckRecovery: prefer UPDATE on the in-progress row.
+    // Fall back to INSERT only if the initial INSERT itself failed (briefingId undefined).
+    const finalize = briefingId
+      ? updateBriefingHistory({
+          id: briefingId,
+          briefingJson: { error: errorMessage },
+          status: "failed",
+        })
+      : saveBriefingHistory({
+          userId,
+          briefingJson: { error: errorMessage },
+          status: "failed",
+        });
+
+    await finalize.catch((saveErr) => {
       console.error("[Briefing] Failed to save error status to DB:", saveErr);
     });
 

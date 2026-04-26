@@ -7,6 +7,30 @@
 
 ## [Unreleased]
 
+### [3.99.1] — 2026-04-26 — ТЗ-BriefingStuckRecovery — self-recovery для застрявшего /briefing
+
+**Утренний брифинг больше не блокируется зависшими записями `status='generating'`. Pipeline создаёт одну запись на прогон вместо двух. Watchdog автоматически отмечает stuck-записи 'failed' через 10 минут.**
+
+- **Что появилось у пользователя:**
+  - Карточка «Утренний брифинг» на главной больше не зависает в состоянии «Генерируется...» при stuck-записях. Watchdog авто-чистит при заходе на /dashboard или /briefing.
+  - На /briefing — баннер «Предыдущая генерация не завершилась» с кнопкой «Запустить заново», когда последняя попытка упала. Defense-in-depth для редких race-кейсов.
+  - В cron-старте — глобальный sweep stuck-записей всех пользователей.
+
+- **Архитектура:**
+  - `STUCK_THRESHOLD_MINUTES = 10` в [lib/briefing/briefing-config.ts](lib/briefing/briefing-config.ts) — единая константа порога.
+  - `markStuckBriefingsAsFailed({userId?, thresholdMinutes})` в [lib/db/queries.ts](lib/db/queries.ts) — идемпотентный UPDATE, non-blocking при ошибке. Подключён в 4 точках: cron-старт (sweep), `/api/briefing/latest` GET (defense), `/briefing` page server component, `/dashboard` page server component.
+  - `updateBriefingHistory({id, ...})` в [lib/db/queries.ts](lib/db/queries.ts) — новый явный helper для UPSERT-паттерна.
+  - [lib/briefing/briefing-pipeline.ts](lib/briefing/briefing-pipeline.ts) — `briefingId` захватывается из первого INSERT, три финальные ветки (no-items, success, catch) делают UPDATE той же записи. Один row на прогон вместо двух INSERT'ов.
+
+- **Найденные проблемы (задокументированы вне scope):**
+  - **🟥 Critical: MiniMax briefing:author silent hang** — pipeline после filter-stage висит >11 минут на `streamText` через MiniMax-M2.7-long. Корень — гипотеза регрессии в `ai@6.0.168` (апгрейд от 23 апреля). Последний успешный прогон briefing:author — 2026-04-23. **Briefing полностью неработоспособен в production.** Watchdog маскирует как 'failed', но не лечит. → новый backlog `TZ_BriefingMiniMaxHang`.
+  - **Polish:** publishedAt отсутствует для web-источников (5 warnings), Хабр RSS 404, orphan endpoint `/api/briefing/latest` — задокументированы в [специальном аудите для архитектора](specs/_archive/TZ_BriefingStuckRecovery/AUDIT_BRIEFING.md).
+  - Concurrency guard cron ↔ ручная кнопка → новый backlog `TZ_BriefingConcurrencyGuard`.
+
+- **Файлы.** 8 изменённых: 4 server pages + 1 cron route + 1 client component + 2 server-side libs.
+
+---
+
 ### [3.99.0] — 2026-04-24 — ТЗ-XAI-COL-1 — Библиотека через xAI Collections
 
 **Персональная Библиотека пользователя на xAI Collections API: загрузка, авто-разбор, поиск из всех чатов, изолированный split-view, scoping в Экспертизе/Создании.**

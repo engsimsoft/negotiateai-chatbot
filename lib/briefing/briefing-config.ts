@@ -34,3 +34,12 @@ export const CRON_CONCURRENCY_LIMIT = 3;
 
 /** ТЗ-TG4a: Max duration for cron route (seconds). Vercel Pro allows up to 300s. */
 export const CRON_MAX_DURATION = 240;
+
+// --- Stuck generation watchdog (ТЗ-BriefingStuckRecovery) ---
+
+/**
+ * BriefingHistory rows with status='generating' older than this are auto-marked
+ * 'failed' by watchdog at cron start and on /api/briefing/latest GET.
+ * Pipeline budget is CRON_MAX_DURATION (240s) — 10 min gives 6× headroom.
+ */
+export const STUCK_THRESHOLD_MINUTES = 10;

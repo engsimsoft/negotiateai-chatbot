@@ -2774,6 +2774,102 @@ export async function saveBriefingHistory({
 }
 
 /**
+ * ТЗ-BriefingStuckRecovery: Update existing BriefingHistory row by id.
+ * Used by pipeline to finalize a `generating` row into `ready` or `failed`
+ * without creating a second row. Pipeline captures `id` from initial INSERT
+ * and passes it back here in finalization branches.
+ */
+export async function updateBriefingHistory({
+  id,
+  briefingJson,
+  sourcesChecked,
+  itemsIncluded,
+  duplicatesRemoved,
+  tokensUsed,
+  status,
+  metadata,
+}: {
+  id: string;
+  briefingJson: unknown;
+  sourcesChecked?: number;
+  itemsIncluded?: number;
+  duplicatesRemoved?: number;
+  tokensUsed?: number;
+  status: string;
+  metadata?: Record<string, unknown>;
+}) {
+  try {
+    const [updated] = await db
+      .update(briefingHistory)
+      .set({
+        briefingJson,
+        sourcesChecked: sourcesChecked ?? null,
+        itemsIncluded: itemsIncluded ?? null,
+        duplicatesRemoved: duplicatesRemoved ?? null,
+        tokensUsed: tokensUsed ?? null,
+        status,
+        metadata: metadata ?? null,
+      })
+      .where(eq(briefingHistory.id, id))
+      .returning();
+
+    return updated;
+  } catch (error) {
+    throw new ChatSDKError("bad_request:database", error);
+  }
+}
+
+/**
+ * ТЗ-BriefingStuckRecovery: Watchdog — mark stuck `generating` rows as `failed`.
+ * Called at cron start (sweep) and on /api/briefing/latest GET (per-user).
+ * Idempotent: WHERE filter ensures fresh runs are never touched. Non-blocking on error.
+ */
+export async function markStuckBriefingsAsFailed({
+  userId,
+  thresholdMinutes,
+}: {
+  userId?: string;
+  thresholdMinutes: number;
+}): Promise<number> {
+  try {
+    const conditions: SQL[] = [eq(briefingHistory.status, "generating")];
+    if (userId) {
+      conditions.push(eq(briefingHistory.userId, userId));
+    }
+    conditions.push(
+      lt(
+        briefingHistory.generatedAt,
+        sql`NOW() - INTERVAL '1 minute' * ${thresholdMinutes}`,
+      ),
+    );
+
+    const result = await db
+      .update(briefingHistory)
+      .set({
+        status: "failed",
+        briefingJson: {
+          error: "stuck generation detected by watchdog",
+          stuckThresholdMinutes: thresholdMinutes,
+          markedFailedAt: new Date().toISOString(),
+        },
+      })
+      .where(and(...conditions))
+      .returning({ id: briefingHistory.id });
+
+    if (result.length > 0) {
+      console.warn(
+        `[markStuckBriefingsAsFailed] Marked ${result.length} stuck row(s) as failed${userId ? ` (userId=${userId})` : " (sweep)"}`,
+      );
+    }
+
+    return result.length;
+  } catch (error) {
+    console.error("[markStuckBriefingsAsFailed] DB update failed:", error);
+    return 0;
+  }
+}
+
+/**
  * Get briefing history for a user (most recent first)
  */
 export async function getBriefingHistory({

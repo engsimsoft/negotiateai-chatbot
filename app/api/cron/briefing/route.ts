@@ -4,11 +4,15 @@
 import { runBriefingPipeline } from "@/lib/briefing/briefing-pipeline";
 import { runPodcastPipeline } from "@/lib/podcast/podcast-pipeline";
 import { mergeAndUploadPodcast } from "@/lib/podcast/audio-merger";
-import { CRON_CONCURRENCY_LIMIT } from "@/lib/briefing/briefing-config";
+import {
+  CRON_CONCURRENCY_LIMIT,
+  STUCK_THRESHOLD_MINUTES,
+} from "@/lib/briefing/briefing-config";
 import {
   getBriefingHistory,
   getTelegramConnection,
   getUsersForDelivery,
+  markStuckBriefingsAsFailed,
   saveCronRunLog,
   updateBriefingDeliveryStatus,
   updateBriefingMetadata,
@@ -32,6 +36,11 @@ export async function GET(request: Request) {
 
   const startedAt = new Date();
   console.log(`[cron/briefing] Triggered at ${startedAt.toISOString()}`);
+
+  // ТЗ-BriefingStuckRecovery: global watchdog sweep before any new work
+  await markStuckBriefingsAsFailed({
+    thresholdMinutes: STUCK_THRESHOLD_MINUTES,
+  });
 
   // Find users due for delivery (Hobby: all with deliveryEnabled=true + active Telegram)
   const users = await getUsersForDelivery({ currentUtcTime: startedAt });

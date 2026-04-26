@@ -1,7 +1,7 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.99.0
-**Статус:** Active development (**ТЗ-ExpertiseCreateVisionRouting закрыт** 2026-04-21 в v3.98.0, **ТЗ-XAI-COL-1 закрыт** 2026-04-24 в v3.99.0 — Библиотека через xAI Collections)
+**Версия:** 3.99.1
+**Статус:** Active development (**ТЗ-XAI-COL-1 закрыт** 2026-04-24 в v3.99.0 — Библиотека через xAI Collections, **ТЗ-BriefingStuckRecovery закрыт** 2026-04-26 в v3.99.1 — self-recovery для застрявшего /briefing)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** snapshot «что работает прямо сейчас» на один взгляд. История изменений → [CHANGELOG.md](CHANGELOG.md). Архитектура → [docs/architecture.md](docs/architecture.md). Карта моделей → [docs/ai-chats-map.md](docs/ai-chats-map.md).
@@ -125,11 +125,12 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). История за�
 
 ### 🟥 High impact
 
-- **[TZ_BriefingStuckRecovery](specs/_backlog/TZ_BriefingStuckRecovery.md)** — `/briefing` блокируется stuck `status='generating'` записями, пользователь не может восстановиться сам. Нужны UI-guard, watchdog в cron, UPSERT в pipeline. Инцидент 2026-04-21 разблокирован вручную.
+- **[TZ_BriefingMiniMaxHang](specs/_backlog/TZ_BriefingMiniMaxHang.md)** — Pipeline briefing:author/section silent hang на `MiniMax-M2.7-long` через AI SDK 6.0.168 (>11 мин без ответа). Гипотеза — регрессия SDK на парсинге MiniMax stream с reasoning chunks. Последний успешный прогон 2026-04-23. **Briefing полностью неработоспособен в production**, watchdog (закрытого ТЗ-BriefingStuckRecovery) маскирует stuck как 'failed' через 10 мин. Подробности в [AUDIT_BRIEFING.md](specs/_archive/TZ_BriefingStuckRecovery/AUDIT_BRIEFING.md).
 
 ### 🟧 Medium impact
 
-_(нет открытых долгов)_
+- **[TZ_ExpertiseReasoningRestore](specs/_backlog/TZ_ExpertiseReasoningRestore.md)** — Экспертиза временно понижена с `grok-4.20-reasoning` на non-reasoning из-за регрессии `@ai-sdk/xai@3.0.83` (`reasoning part not found` при параллельных tool calls). Качество Экспертизы снижено. Существует с 2026-04-23.
+- **[TZ_BriefingConcurrencyGuard](specs/_backlog/TZ_BriefingConcurrencyGuard.md)** — Гонка cron-запуска и user-triggered «Сгенерировать» для одного userId; partial unique index или optimistic lock. Новый, найден в финализации ТЗ-BriefingStuckRecovery.
 
 ### 🟩 Low impact (косметика)
 
@@ -173,4 +174,4 @@ _(нет открытых долгов)_
 
 ---
 
-**Обновлено:** 2026-04-24 — закрыт ТЗ-XAI-COL-1 (Библиотека через xAI Collections) в v3.99.0. Бонус: фикс xAI prompt-cache в Экспертизе/Создании (MIND-блок переехал из trailing system в trailing user-part).
+**Обновлено:** 2026-04-26 — закрыт ТЗ-BriefingStuckRecovery в v3.99.1 (watchdog stuck-записей + UPSERT pipeline + UI-баннер). Найдена и зафиксирована новая High-проблема: silent hang briefing:author на AI SDK 6.0.168 — отдельный backlog TZ_BriefingMiniMaxHang. Также добавлен пропущенный backlog TZ_ExpertiseReasoningRestore (существует с 2026-04-23) и новый TZ_BriefingConcurrencyGuard.

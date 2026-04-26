@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
-import { getUserById, getBriefingHistory, getBriefingSettings, getMeetingRecords, getMeetingRecordsCount } from "@/lib/db/queries";
+import { STUCK_THRESHOLD_MINUTES } from "@/lib/briefing/briefing-config";
+import { getUserById, getBriefingHistory, getBriefingSettings, getMeetingRecords, getMeetingRecordsCount, markStuckBriefingsAsFailed } from "@/lib/db/queries";
 import { countUserMemories } from "@/lib/ai/memory/memory-queries";
 import {
   listLibraryCollectionsByUser,
@@ -24,6 +25,13 @@ export default async function DashboardPage() {
   if (!session || !session.user) {
     redirect("/login");
   }
+
+  // ТЗ-BriefingStuckRecovery: per-user watchdog before reading state
+  // (BriefingCard reads latest of any status — stuck `generating` would block navigation)
+  await markStuckBriefingsAsFailed({
+    userId: session.user.id,
+    thresholdMinutes: STUCK_THRESHOLD_MINUTES,
+  });
 
   // Get user profile, chat count, latest briefing, and meeting records from database
   const [userProfile, memoryFactCount, briefingHistoryRows, briefingSettings, meetingRecords, meetingRecordCount, libraryCollections, libraryDocsPage] = await Promise.all([

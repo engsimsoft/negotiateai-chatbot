@@ -55,6 +55,9 @@ interface BriefingPageClientProps {
   /** ТЗ-DEV2: Full traces from DB metadata (persistent across page loads) */
   initialBriefingTrace?: PipelineTrace | null;
   initialPodcastTrace?: PipelineTrace | null;
+  /** ТЗ-BriefingStuckRecovery: latest BriefingHistory row is 'failed' (auto-cleaned by watchdog or pipeline catch) */
+  lastAttemptFailed?: boolean;
+  lastErrorMessage?: string | null;
 }
 
 export function BriefingPageClient({
@@ -68,6 +71,8 @@ export function BriefingPageClient({
   initialAudioDurations = {},
   initialBriefingTrace,
   initialPodcastTrace,
+  lastAttemptFailed = false,
+  lastErrorMessage = null,
 }: BriefingPageClientProps) {
   const { steps, isGenerating, error, redirectUrl, startGeneration, traceStages, traceSummary } =
     useBriefingGeneration();
@@ -374,6 +379,28 @@ export function BriefingPageClient({
           ) : undefined
         }
       />
+
+      {/* ТЗ-BriefingStuckRecovery: stale-attempt banner (defense-in-depth — watchdog already converted stuck 'generating' to 'failed') */}
+      {lastAttemptFailed && (
+        <div className="border-b border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm">
+          <div className="mx-auto flex max-w-[880px] items-center gap-3">
+            <span aria-hidden>⚠️</span>
+            <div className="min-w-0 flex-1">
+              <span className="font-medium text-foreground">Предыдущая генерация не завершилась.</span>
+              {lastErrorMessage ? (
+                <span className="ml-1.5 text-muted-foreground">{lastErrorMessage}</span>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={startGeneration}
+              className="shrink-0 rounded-md border border-border bg-background px-3 py-1 text-xs font-medium transition-colors hover:bg-muted"
+            >
+              Запустить заново
+            </button>
+          </div>
+        </div>
+      )}
 
       {hasValidArticle && article ? (
         <BriefingIssueContent

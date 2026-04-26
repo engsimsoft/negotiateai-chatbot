@@ -1,5 +1,10 @@
 import { auth } from "@/app/(auth)/auth";
-import { getBriefingHistory, getBriefingSettings } from "@/lib/db/queries";
+import { STUCK_THRESHOLD_MINUTES } from "@/lib/briefing/briefing-config";
+import {
+  getBriefingHistory,
+  getBriefingSettings,
+  markStuckBriefingsAsFailed,
+} from "@/lib/db/queries";
 import { ChatSDKError } from "@/lib/errors";
 
 export async function GET() {
@@ -10,6 +15,12 @@ export async function GET() {
   }
 
   const userId = session.user.id;
+
+  // ТЗ-BriefingStuckRecovery: per-user watchdog before reading state
+  await markStuckBriefingsAsFailed({
+    userId,
+    thresholdMinutes: STUCK_THRESHOLD_MINUTES,
+  });
 
   const [historyRows, settings] = await Promise.all([
     getBriefingHistory({ userId, limit: 1, status: "ready" }),

@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
+import { STUCK_THRESHOLD_MINUTES } from "@/lib/briefing/briefing-config";
 import {
   getBriefingSettings,
   getBriefingHistory,
   getSavedBriefingTopics,
   getUserById,
+  markStuckBriefingsAsFailed,
 } from "@/lib/db/queries";
 import { getSimplyNewsData, getSimplyOverviewContent } from "@/lib/briefing/simply-news-utils";
 import { BriefingPage } from "@/components/briefing/briefing-page";
@@ -21,6 +23,13 @@ export default async function BriefingRoute() {
   }
 
   const userId = session.user.id;
+
+  // ТЗ-BriefingStuckRecovery: per-user watchdog before reading state
+  await markStuckBriefingsAsFailed({
+    userId,
+    thresholdMinutes: STUCK_THRESHOLD_MINUTES,
+  });
+
   const [settings, userProfile] = await Promise.all([
     getBriefingSettings({ userId }),
     getUserById(userId),
@@ -54,11 +63,18 @@ export default async function BriefingRoute() {
   }
 
   // Load latest briefing + saved topics in parallel
-  const [readyBriefings, savedTopicsRaw] = await Promise.all([
+  // ТЗ-BriefingStuckRecovery: latestAnyStatus — surface 'failed' state if last attempt didn't reach 'ready'
+  const [readyBriefings, latestAnyRows, savedTopicsRaw] = await Promise.all([
     getBriefingHistory({ userId, limit: 1, status: "ready" }),
+    getBriefingHistory({ userId, limit: 1 }),
     getSavedBriefingTopics({ userId }),
   ]);
   const latestBriefing = readyBriefings[0] ?? null;
+  const latestAnyRow = latestAnyRows[0] ?? null;
+  const lastAttemptFailed = latestAnyRow?.status === "failed";
+  const lastErrorMessage = lastAttemptFailed
+    ? ((latestAnyRow.briefingJson as { error?: string } | null)?.error ?? null)
+    : null;
 
   // Parse article, guard against old format
   const article = latestBriefing
@@ -115,6 +131,8 @@ export default async function BriefingRoute() {
       initialAudioDurations={audioDurations}
       initialBriefingTrace={briefingTrace}
       initialPodcastTrace={podcastTrace}
+      lastAttemptFailed={lastAttemptFailed}
+      lastErrorMessage={lastErrorMessage}
     />
   );
 }
