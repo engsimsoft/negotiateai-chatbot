@@ -249,3 +249,17 @@ vercel --prod
 ---
 
 **Документация обновлена:** 2026-01-27
+
+---
+
+## 🧪 Integrity Scripts
+
+### `integrity-artifact-skills.ts`
+
+Проверяет целостность skills `lib/prompts/skills/artifact-generation/` (excel/pptx/reveal): body `SKILL.md` (без frontmatter и trailing footer) должен быть substring `references/update.md`. Защищает от тихого расхождения create/update при правке одного файла без другого.
+
+```bash
+pnpm exec tsx scripts/integrity-artifact-skills.ts
+```
+
+Exit code 0 — все skills синхронны. Exit code 1 — есть расхождение, в логе указан kind и approximate offset.

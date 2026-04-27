@@ -1,5 +1,5 @@
 import { smoothStream, streamText } from "ai";
-import { updateDocumentPrompt } from "@/lib/ai/artifact-prompts";
+import { loadArtifactSkill } from "@/lib/prompts/skills/artifact-generation/loader";
 import { getMaxOutputTokensForTask, getModel, getModelIdForTask } from "@/lib/ai/getModel";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { logUsage } from "@/lib/ai/usage-utils";
@@ -17,30 +17,7 @@ export const textDocumentHandler = createDocumentHandler<"text">({
     const result = streamText({
       model: getModel(ARTIFACT_TASK),
       maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
-      system: `Write about the given topic in PLAIN TEXT format.
-
-IMPORTANT RULES:
-- DO NOT use Markdown formatting (no #, **, *, -, etc.)
-- Use emoji for visual structure instead of bullets: ✅ 📌 🔹 💡 ⭐ 🎯
-- Use blank lines to separate sections
-- Use CAPS or emoji for section titles instead of ## headers
-- Text must copy-paste perfectly to VK, Telegram, Instagram
-- Keep formatting simple and clean
-
-Example format:
-🎯 ЗАГОЛОВОК
-
-Первый параграф текста здесь.
-
-📌 ВАЖНЫЕ ПУНКТЫ
-
-✅ Первый пункт
-✅ Второй пункт
-✅ Третий пункт
-
-💡 ИТОГ
-
-Заключительный текст.`,
+      system: loadArtifactSkill("text", "create"),
       experimental_transform: smoothStream({ chunking: "word" }),
       prompt: title,
     });
@@ -80,7 +57,9 @@ Example format:
     const result = streamText({
       model: getModel(ARTIFACT_TASK),
       maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
-      system: updateDocumentPrompt(document.content, "text"),
+      system: loadArtifactSkill("text", "update", {
+        currentContent: document.content ?? "",
+      }),
       experimental_transform: smoothStream({ chunking: "word" }),
       prompt: description,
       providerOptions: {

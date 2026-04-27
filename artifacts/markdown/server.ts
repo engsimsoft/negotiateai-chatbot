@@ -1,5 +1,5 @@
 import { smoothStream, streamText } from "ai";
-import { updateDocumentPrompt } from "@/lib/ai/artifact-prompts";
+import { loadArtifactSkill } from "@/lib/prompts/skills/artifact-generation/loader";
 import { getMaxOutputTokensForTask, getModel, getModelIdForTask } from "@/lib/ai/getModel";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { logUsage } from "@/lib/ai/usage-utils";
@@ -17,29 +17,7 @@ export const markdownDocumentHandler = createDocumentHandler<"markdown">({
     const result = streamText({
       model: getModel(ARTIFACT_TASK),
       maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
-      system: `Напиши документ на тему, используя Markdown форматирование.
-
-ПРАВИЛА ОФОРМЛЕНИЯ:
-- Используй заголовки: # для главного, ## для разделов, ### для подразделов
-- Используй списки: - для маркированных, 1. для нумерованных
-- Используй **жирный** для важных терминов
-- Используй *курсив* для акцентов
-- Используй \`код\` для технических терминов
-- Используй таблицы там где это уместно (GFM формат)
-- Используй > для цитат
-- Разделяй разделы пустыми строками
-
-СТРУКТУРА ДОКУМЕНТА:
-1. Начни с заголовка #
-2. Добавь краткое введение
-3. Разбей на логичные разделы с ## заголовками
-4. Используй подразделы ### если нужно
-5. Заверши итогами или выводами
-
-Документ должен быть:
-- Структурированным и легко читаемым
-- Профессиональным по тону
-- С чёткой иерархией информации`,
+      system: loadArtifactSkill("markdown", "create"),
       experimental_transform: smoothStream({ chunking: "word" }),
       prompt: title,
     });
@@ -77,7 +55,9 @@ export const markdownDocumentHandler = createDocumentHandler<"markdown">({
     const result = streamText({
       model: getModel(ARTIFACT_TASK),
       maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
-      system: updateDocumentPrompt(document.content, "markdown"),
+      system: loadArtifactSkill("markdown", "update", {
+        currentContent: document.content ?? "",
+      }),
       experimental_transform: smoothStream({ chunking: "word" }),
       prompt: description,
       providerOptions: {

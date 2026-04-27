@@ -6,6 +6,7 @@ import { createDocumentHandler } from "@/lib/artifacts/server";
 import { streamText } from "ai";
 import { getMaxOutputTokensForTask, getModel, getModelIdForTask } from "@/lib/ai/getModel";
 import { emitArtifactDebugStep } from "@/lib/ai/debug-events";
+import { loadArtifactSkill } from "@/lib/prompts/skills/artifact-generation/loader";
 
 const ARTIFACT_TASK = "artifact:excel" as const;
 const ARTIFACT_KIND = "excel" as const;
@@ -23,47 +24,9 @@ import {
 import { isTotalRow, calculateColumnWidth, convertToRowData } from "@/lib/ai/tools/excel/utils";
 import { templatesList, getTemplate } from "@/lib/ai/tools/excel/templates";
 
-// System prompt for Excel generation
-const EXCEL_SYSTEM_PROMPT = `Ты помощник для создания профессиональных Excel-таблиц.
-
-Твоя задача: проанализировать запрос пользователя и сгенерировать JSON со структурой таблицы.
-
-ДОСТУПНЫЕ ШАБЛОНЫ:
-${templatesList.map((t) => `- ${t.name}: ${t.description}`).join("\n")}
-
-ФОРМАТ ОТВЕТА (только JSON, без markdown):
-{
-  "filename": "название-файла.xlsx",
-  "sheets": [{
-    "name": "Название листа",
-    "columns": [
-      { "header": "Название колонки", "key": "ключ", "type": "text|number|currency|percent|date", "width": 15 }
-    ],
-    "data": [
-      { "ключ": "значение", ... }
-    ],
-    "formulas": [
-      { "cell": "C2", "formula": "=B2*0.2" }
-    ],
-    "styles": {
-      "theme": "corporate-blue|forest-green|warm-orange|professional-gray|modern-teal",
-      "freezeHeader": true,
-      "alternateRows": true
-    }
-  }]
+function formatTemplatesList(): string {
+  return templatesList.map((t) => `- ${t.name}: ${t.description}`).join("\n");
 }
-
-ПРАВИЛА:
-1. Используй русские названия колонок и данных
-2. Для денег используй type: "currency" (формат: "15 000 ₽")
-3. Для процентов используй type: "percent" (формат: "68%")
-4. Для дат используй type: "date" (формат: DD.MM.YYYY)
-5. Добавляй формулы для автоподсчёта (SUM, AVERAGE, IF)
-6. Добавляй итоговую строку где уместно
-7. Выбирай подходящую цветовую тему
-8. Если запрос похож на шаблон — используй его структуру
-
-ОТВЕЧАЙ ТОЛЬКО JSON, без пояснений и markdown.`;
 
 /**
  * Generate Excel workbook from ExcelData
@@ -179,7 +142,9 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
       const result = streamText({
         model: getModel(ARTIFACT_TASK),
         maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
-        system: EXCEL_SYSTEM_PROMPT,
+        system: loadArtifactSkill("excel", "create", {
+          templatesList: formatTemplatesList(),
+        }),
         prompt: title,
       });
 
@@ -275,12 +240,10 @@ export const excelDocumentHandler = createDocumentHandler<"excel">({
     const result = streamText({
       model: getModel(ARTIFACT_TASK),
       maxOutputTokens: getMaxOutputTokensForTask(ARTIFACT_TASK),
-      system: `${EXCEL_SYSTEM_PROMPT}
-
-ТЕКУЩАЯ ТАБЛИЦА:
-${JSON.stringify(excelData, null, 2)}
-
-ЗАДАЧА: Обнови таблицу согласно запросу пользователя. Верни ПОЛНЫЙ обновлённый JSON.`,
+      system: loadArtifactSkill("excel", "update", {
+        templatesList: formatTemplatesList(),
+        currentExcelData: JSON.stringify(excelData, null, 2),
+      }),
       prompt: description,
     });
 

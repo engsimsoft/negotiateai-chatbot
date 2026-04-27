@@ -1,7 +1,7 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.99.2
-**Статус:** Active development (**ТЗ-BR-AUTHOR-KIMI закрыт** 2026-04-27 в v3.99.2 — миграция briefing pipeline с MiniMax на Kimi K2.6, MiniMax удалён из проекта; **ТЗ-BriefingStuckRecovery закрыт** 2026-04-26 в v3.99.1 — self-recovery для застрявшего /briefing; **ТЗ-XAI-COL-1 закрыт** 2026-04-24 в v3.99.0 — Библиотека через xAI Collections)
+**Версия:** 3.99.3
+**Статус:** Active development (**ТЗ-MigrateArtifactPromptsToSkills закрыт** 2026-04-27 в v3.99.3 — inline промпты артефактов вынесены в `lib/prompts/skills/artifact-generation/`, разблокирован A/B Шаг 7 серии Simply_Migration; **ТЗ-BR-AUTHOR-KIMI закрыт** 2026-04-27 в v3.99.2 — миграция briefing pipeline с MiniMax на Kimi K2.6; **ТЗ-BriefingStuckRecovery закрыт** 2026-04-26 в v3.99.1; **ТЗ-XAI-COL-1 закрыт** 2026-04-24 в v3.99.0)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** snapshot «что работает прямо сейчас» на один взгляд. История изменений → [CHANGELOG.md](CHANGELOG.md). Архитектура → [docs/architecture.md](docs/architecture.md). Карта моделей → [docs/ai-chats-map.md](docs/ai-chats-map.md).
@@ -42,7 +42,7 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 | **Podcast** (attached to briefing) | ✅ | Gemini TTS (длинный формат, blob storage) |
 | **Meeting Recorder** | ✅ | Deepgram Nova-3 (STT) + Grok 4.20 reasoning (summary, мигрировано 2026-04-16) |
 | **Telegram Bot + Groups** | ✅ | Custom bot + ingestion pipeline |
-| **Artifacts** (text, markdown, excel, reveal, pptx) | ✅ | Claude Sonnet для всех 5 типов |
+| **Artifacts** (text, markdown, excel, reveal, pptx) | ✅ | Claude Sonnet для всех 5 типов. System-промпты в `lib/prompts/skills/artifact-generation/<kind>/` (вынесены из inline в v3.99.3 — provider-agnostic база для A/B Шага 7) |
 | **Service Chats** (project-creation, project-manager, briefing-onboarding) | ✅ | Claude Haiku / Sonnet |
 | **Service Chat: Ben** | ⚠️ deprecated | Будет убран, не инвестировать время |
 | **Dev Switchboard** (`/dev/models`) | ✅ | File-based overrides (dev-only) |
@@ -68,7 +68,7 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 - Архитектура MIND (SSOT): [specs/Simply_xAI/MIND_ARCHITECTURE.md](specs/Simply_xAI/MIND_ARCHITECTURE.md)
 - Завершённая серия Simply_xAI: [specs/_archive/Simply_xAI/](specs/_archive/Simply_xAI/)
 
-**План работ:** 11 ТЗ в 4 фазы (А — закрыть боль, Б — унификация чата, В — A/B тесты, Г — большие блоки). **ТЗ-1 BR-AUTHOR-KIMI закрыт 2026-04-27 в v3.99.2** (silent hang устранён, MiniMax удалён). Следующий — ТЗ-2 **MigrateArtifactPromptsToSkills** (Фаза А, шаг 2 — перенос inline-промптов артефактов в SKILL.md, блокер A/B теста артефактов).
+**План работ:** 11 ТЗ в 4 фазы (А — закрыть боль, Б — унификация чата, В — A/B тесты, Г — большие блоки). **ТЗ-1 BR-AUTHOR-KIMI закрыт 2026-04-27 в v3.99.2** (silent hang устранён, MiniMax удалён). **ТЗ-2 MigrateArtifactPromptsToSkills закрыт 2026-04-27 в v3.99.3** (10 .md файлов + loader, A/B Шаг 7 разблокирован). Следующий — ТЗ-3 (план в концепте миграции, Фаза А/Б).
 
 **Правило серии:** не отвлекаться на другие ТЗ до завершения.
 
@@ -126,10 +126,23 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 
 SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). История закрытых: [specs/_archive/BACKLOG_CLOSED.md](specs/_archive/BACKLOG_CLOSED.md).
 
+### 🟥 Critical impact
+
+- **TZ_SimplyChatMemoryRegression** (новое) — Simply Chat «помнит только последнее сообщение». Архитектурный фильтр `excludeExtracted=true` режет inline-историю до сообщений с `extractedAt IS NULL`, при этом контекст модели grok-4-1-fast = 200k токенов используется на 3.5%. История 192 сообщения / ~50k токенов помещалась бы целиком. UX-катастрофа: «не помню artefact про X» при том что модель сама его создала 30 минут назад. Найдено в Этапе 7 ТЗ-MigrateArtifactPromptsToSkills.
+
+### 🟥 High impact
+
+- **TZ_MindAtomicityFix** (новое) — `markMessagesExtracted` в [lib/ai/memory/extract.ts:235-246](lib/ai/memory/extract.ts#L235-L246) безусловно отмечает сообщения как extracted даже при провале `processAndStoreFact` (Voyage 403). Память безвозвратно теряется. Нужна атомарность.
+- **TZ_ChatModeUndefinedSubmit** (новое) — Runtime error `getChatUrl: chatMode "undefined"` блокирует submit формы при открытом артефакте. Требует TS-fix контракта пропов в [components/multimodal-input.tsx](components/multimodal-input.tsx).
+- **TZ_GrokSkipsUpdateDocumentTool** (новое) — Grok 4.1 Fast иногда генерит ответ как обычный chat-message вместо вызова `updateDocument` tool. Нужно усилить tool description / системный промпт.
+- **TZ_PptxRevealUpdateRender** (новое) — Презентации не перерисовываются в холсте после `onUpdateDocument` (БД и blob обновлены, превью генерится — но клиент показывает старую версию). Скачанный файл — свежий.
+
 ### 🟧 Medium impact
 
 - **[TZ_ExpertiseReasoningRestore](specs/_backlog/TZ_ExpertiseReasoningRestore.md)** — Экспертиза временно понижена с `grok-4.20-reasoning` на non-reasoning из-за регрессии `@ai-sdk/xai@3.0.83` (`reasoning part not found` при параллельных tool calls). Качество Экспертизы снижено. Существует с 2026-04-23.
 - **[TZ_BriefingConcurrencyGuard](specs/_backlog/TZ_BriefingConcurrencyGuard.md)** — Гонка cron-запуска и user-triggered «Сгенерировать» для одного userId; partial unique index или optimistic lock.
+- **TZ_RevealVsPptxToolSelection** (новое) — AI стабильно выбирает `presentation-pptx` когда пользователь просит `reveal`. Reveal-артефакт практически недоступен через AI-канал. Нужно уточнить tool description.
+- **TZ_ChatInputBlockedOnDocumentFetchHang** (новое) — Chat input блокируется когда `GET /api/document` висит в timeout (Neon ConnectTimeoutError). UI должен иметь fail-fast fallback.
 
 > **TZ_BriefingMiniMaxHang** перенесён в архив — закрывается через `Simply_Migration/BR-AUTHOR-KIMI` (Фаза А концепта миграции).
 
@@ -171,4 +184,5 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). История за�
 
 ---
 
-**Обновлено:** 2026-04-27 — открыта новая активная серия **Simply_Migration** (концепт миграции + концепт Briefing). Серия Simply_xAI закрыта, рабочие ТЗ-папки перенесены в `specs/_archive/Simply_xAI/`. Backlog почищен: TZ_BriefingMiniMaxHang ушёл в архив (закрывается через BR-AUTHOR-KIMI), TZ_CompactionActualCalibration — как невостребованный sanity-check.
+**Обновлено:** 2026-04-27 — закрыт ТЗ-MigrateArtifactPromptsToSkills (v3.99.3): inline промпты артефактов вынесены в `lib/prompts/skills/artifact-generation/`, добавлено 7 новых записей в backlog (1 critical: SimplyChatMemoryRegression; 4 high: MindAtomicityFix, ChatModeUndefinedSubmit, GrokSkipsUpdateDocumentTool, PptxRevealUpdateRender; 2 medium). Все находки выявлены через мануальный смок Этапа 7 ТЗ-2.
+**До этого:** 2026-04-27 — открыта новая активная серия **Simply_Migration** (концепт миграции + концепт Briefing).

@@ -168,6 +168,8 @@
 
 `lib/prompts/` — файловая система промптов (skills / agents / service-chats / professors / experts / clerks / briefing / core). Структура и детали — в [Карте фич → Prompt System](#prompt-system--skills--agents) ниже, полная документация → [ai-agents.md](ai-agents.md).
 
+С v3.99.3 (ТЗ-MigrateArtifactPromptsToSkills) добавлена категория `lib/prompts/skills/artifact-generation/<kind>/` — system-промпты артефактов (text/markdown/excel/pptx/reveal) в формате Anthropic Agent Skills с loader-ом (`loader.ts`) и плейсхолдер-substitution через существующий `render()` из [lib/prompts/template.ts](../lib/prompts/template.ts). Подробности → [ai-artifacts.md § System-промпты артефактов](ai-artifacts.md#system-промпты-артефактов).
+
 #### `lib/ai/tools/` — AI-инструменты
 
 17 файлов в `lib/ai/tools/`, сгруппированы по пяти категориям: registration/infrastructure, web/research, artifacts/documents, context/files, utility.

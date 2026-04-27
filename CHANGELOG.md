@@ -7,6 +7,53 @@
 
 ## [Unreleased]
 
+### [3.99.3] — 2026-04-27 — ТЗ-MigrateArtifactPromptsToSkills — inline промпты артефактов вынесены в Anthropic Skills
+
+**Подготовка к Шагу 7 серии Simply_Migration (A/B Sonnet vs Kimi vs Grok на артефактах). Server-side рефакторинг без изменения поведения промптов.**
+
+- **Что появилось у разработчика:**
+  - System-промпты всех 5 артефактов (text/markdown/excel/pptx/reveal) живут в `lib/prompts/skills/artifact-generation/<kind>/SKILL.md` + `references/update.md` — один файл на kind+op, легко править без recompile.
+  - `loadArtifactSkill(kind, op, vars?)` через [lib/prompts/skills/artifact-generation/loader.ts](lib/prompts/skills/artifact-generation/loader.ts) — единая точка загрузки. Использует существующий `render()` из [lib/prompts/template.ts](lib/prompts/template.ts) для подстановки `{{templatesList}}`, `{{currentContent}}`, `{{currentExcelData}}`, `{{currentSlides}}`, `{{description}}`. Кэш сырого template — только в `NODE_ENV === 'production'` (HMR работает в dev).
+  - Footer `For update operations, see [references/update.md]` в SKILL.md служит навигацией для разработчика, loader его strip-ит перед подачей в `system:` параметр streamText (не попадает в контекст модели).
+
+- **Архитектура:**
+  - 10 новых .md файлов + 1 loader. Body 1:1 с оригинальными inline-промптами (без `# header`, без trailing footer) — поведение `streamText` идентично pre-migration.
+  - Для excel/pptx/reveal `references/update.md` физически дублирует body create-промпта + delta (concat в исходнике через `${EXCEL_SYSTEM_PROMPT}` теперь хранится явно). Защита от тихого расхождения — integrity-скрипт `scripts/integrity-artifact-skills.ts` (substring containment SKILL.md ⊂ update.md).
+  - Provider-agnostic формат: никаких Sonnet-specific конструкций (`<thinking>`, XML-теги). Тот же файл будет работать при подмене модели в `DEFAULT_TASK_MODELS` в Шаге 7.
+
+- **Удалено:**
+  - [lib/ai/artifact-prompts.ts](lib/ai/artifact-prompts.ts) — единственная функция `updateDocumentPrompt()` инлайнится в text/markdown через `loadArtifactSkill('<kind>', 'update', { currentContent })`
+  - Inline констант `EXCEL_SYSTEM_PROMPT`, `PPTX_SYSTEM_PROMPT`, `PRESENTATION_SYSTEM_PROMPT` в 3 server.ts
+  - Inline create-промптов в text/server.ts и markdown/server.ts
+  - Mortvy import `updateDocumentPrompt` в [artifacts/presentation-reveal/server.ts](artifacts/presentation-reveal/server.ts) (импортировался, не вызывался)
+
+- **Добавлено:**
+  - `lib/prompts/skills/artifact-generation/{text,markdown,excel,pptx,reveal}/SKILL.md` (5 файлов)
+  - `lib/prompts/skills/artifact-generation/{text,markdown,excel,pptx,reveal}/references/update.md` (5 файлов)
+  - `lib/prompts/skills/artifact-generation/loader.ts` — `loadArtifactSkill()` API
+  - `scripts/integrity-artifact-skills.ts` — integrity check для excel/pptx/reveal
+  - Запись в `scripts/README.md` про новый integrity-скрипт
+
+- **Документация:**
+  - [docs/ai-artifacts.md](docs/ai-artifacts.md) — новый раздел «System-промпты артефактов» с таблицей плейсхолдеров
+  - [docs/ai-agents.md](docs/ai-agents.md) — категория `artifact-generation` в структуре `lib/prompts/skills/`
+  - [docs/architecture.md](docs/architecture.md) — упоминание новой папки в Prompt System
+
+- **Backlog (FINDINGS — 7 находок выявлены через мануальный смок):**
+  - Frontend не перерисовывает презентации после `onUpdateDocument` (data-pptxComplete state issue) — high
+  - AI выбирает `pptx` когда просят `reveal` (tool description issue) — medium
+  - Chat input блокируется при висящем `GET /api/document` (race condition при Neon timeout) — medium
+  - **MIND atomicity bug** ([lib/ai/memory/extract.ts:235-246](lib/ai/memory/extract.ts#L235-L246)): `markMessagesExtracted` вызывается даже если все `processAndStoreFact` упали (Voyage 403) — потеря памяти безвозвратно — high
+  - **CRITICAL: Simply Chat «помнит только последнее сообщение»** — `excludeExtracted=true` фильтр режет историю агрессивно (3.5% окна модели используется при 192 сообщениях в БД) — critical
+  - Runtime error `getChatUrl: chatMode "undefined"` при submit с открытым артефактом — high
+  - Grok 4.1 Fast пропускает `updateDocument` tool, генерит ответ как обычный chat-message — high
+
+  Все 7 → `specs/_backlog/` для отдельных follow-up ТЗ.
+
+- **Версия проекта:** 3.99.2 → 3.99.3 (patch, server-side рефакторинг без изменения поведения)
+
+---
+
 ### [3.99.2] — 2026-04-27 — ТЗ-BR-AUTHOR-KIMI — миграция briefing pipeline с MiniMax на Kimi K2.6
 
 **Закрыт production silent hang briefing-генерации (с 23.04.2026 после апгрейда `ai@6.0.168`). Three briefing taskId переведены на Kimi K2.6 через официальный `@ai-sdk/moonshotai`. MiniMax удалён из проекта полностью.**

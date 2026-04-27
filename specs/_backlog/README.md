@@ -9,7 +9,7 @@
 > Этот файл и папку создаёт правило 8 WORKFLOW.md (FINDINGS → backlog).
 >
 > Создан: 2026-04-13
-> Обновлён: 2026-04-27 — добавлен TZ_BriefingScriptwriterPromptUpdate (low impact, найден в Этапе 5 ТЗ-BR-AUTHOR-KIMI). TZ_BriefingMiniMaxHang перенесён в архив (закрыт через `Simply_Migration/BR-AUTHOR-KIMI`, Фаза А); TZ_CompactionActualCalibration перенесён в архив как невостребованный sanity-check.
+> Обновлён: 2026-04-27 — добавлены 7 новых записей из FINDINGS ТЗ-MigrateArtifactPromptsToSkills (1 critical: SimplyChatMemoryRegression; 4 high: MindAtomicityFix, ChatModeUndefinedSubmit, GrokSkipsUpdateDocumentTool, PptxRevealUpdateRender; 2 medium: RevealVsPptxToolSelection, ChatInputBlockedOnDocumentFetchHang). До этого: добавлен TZ_BriefingScriptwriterPromptUpdate; TZ_BriefingMiniMaxHang и TZ_CompactionActualCalibration перенесены в архив.
 
 ---
 
@@ -34,12 +34,29 @@
 
 ## Открытые долги
 
+### 🟥 Critical impact
+
+| ТЗ | Описание | Оценка | Источник |
+|---|---|---|---|
+| [TZ_SimplyChatMemoryRegression](TZ_SimplyChatMemoryRegression.md) | Simply Chat «помнит только последнее сообщение». Архитектурный фильтр `excludeExtracted=true` режет inline-историю агрессивно: 192 сообщения в БД (49k tokens), используется 3.5% окна модели grok-4-1-fast (200k). Модель не помнит artefact, который сама создала 30 минут назад. Решения: адаптивный фильтр (фильтровать только при превышении soft_threshold) / гибрид (последние N + retrieve старого) / усилить retrieve / улучшить facts с привязкой к entities. | 1-2 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #5 |
+
+### 🟥 High impact
+
+| ТЗ | Описание | Оценка | Источник |
+|---|---|---|---|
+| [TZ_MindAtomicityFix](TZ_MindAtomicityFix.md) | `markMessagesExtracted` в [lib/ai/memory/extract.ts:235-246](../../lib/ai/memory/extract.ts#L235-L246) безусловно отмечает сообщения как extracted даже при провале `processAndStoreFact` (Voyage 403). Память безвозвратно теряется. Fix: условный mark + retry с backoff. | 0.3-0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #4 |
+| [TZ_ChatModeUndefinedSubmit](TZ_ChatModeUndefinedSubmit.md) | Runtime error `getChatUrl: chatMode "undefined"` в `submitForm` блокирует submit при открытом артефакте. Контракт `chatMode?: string` опциональный — TS не возражает, родители не передают. F5 помогает временно. | 0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #6 |
+| [TZ_GrokSkipsUpdateDocumentTool](TZ_GrokSkipsUpdateDocumentTool.md) | Grok 4.1 Fast иногда генерит ответ как обычный chat-message вместо вызова `updateDocument` tool. Артефакт не обновляется, пользователь видит «модель ничего не сделала». Усилить tool description / system prompt. | 0.3-0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #7 |
+| [TZ_PptxRevealUpdateRender](TZ_PptxRevealUpdateRender.md) | Презентации (pptx/reveal) не перерисовываются в холсте после `onUpdateDocument` — БД и blob обновлены, превью генерится, но клиент показывает старую версию. Скачанный файл свежий. Скорее всего проблема в client-side state / data-pptxComplete handler. | 0.5-1 сессия | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #1 |
+
 ### 🟧 Medium impact
 
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
 | [TZ_ExpertiseReasoningRestore](TZ_ExpertiseReasoningRestore.md) | Экспертиза руками понижена с `grok-4.20-reasoning` → `grok-4.20-non-reasoning` из-за регрессии `@ai-sdk/xai@3.0.83`: при параллельных tool calls `webSearch+librarySearch` ломается reasoning-stream (`reasoning part not found`), запрос виснет с пустым ответом. Качество Экспертизы снижено. Что пробовали и не помогло: апдейт SDK, `reasoningEffort:high` (xAI не поддерживает), кастомный `reasoningReconciliationMiddleware`. Самый дешёвый путь — попробовать sequential tool calls (`xai.parallel_function_calling: false`). | 0.5-1 сессия | Существует с 2026-04-23 (commit `a469c51`); в README ранее не отражён, добавлен в финализации ТЗ-BriefingStuckRecovery |
 | [TZ_BriefingConcurrencyGuard](TZ_BriefingConcurrencyGuard.md) | Гонка cron-запуска и user-triggered `/api/briefing/generate` для одного userId. Оба INSERT'нут 'generating' (после ТЗ-BriefingStuckRecovery — сделают два UPDATE'а), приведёт к двойной работе и потенциальному overwrite готового брифинга. Решение: partial unique index `(userId) WHERE status='generating'` (как для simply-chat) или `SELECT FOR UPDATE` lock. | 0.3-0.5 сессии | Найден в B5 ANALYSIS ТЗ-BriefingStuckRecovery (вынесен из scope) |
+| [TZ_RevealVsPptxToolSelection](TZ_RevealVsPptxToolSelection.md) | AI выбирает `presentation-pptx` когда пользователь просит `reveal`. Reveal-артефакт практически недоступен через AI-канал. Уточнить tool description, или deprecate reveal если мало используется. | 0.2-1 сессия | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #2 |
+| [TZ_ChatInputBlockedOnDocumentFetchHang](TZ_ChatInputBlockedOnDocumentFetchHang.md) | Chat input блокируется когда `GET /api/document` висит в Neon timeout 10s. UX полностью замораживается. Расцепить input ↔ artifact loading + timeout 5s + graceful UI fallback. | 0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #3 |
 
 ### 🟦 Low impact
 

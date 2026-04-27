@@ -1,7 +1,7 @@
 # Система артефактов (документы в холсте)
 
-**Версия:** 2.9.0
-**Последнее обновление:** 2026-01-29
+**Версия:** 2.9.1
+**Последнее обновление:** 2026-04-27
 **Статус:** 5 типов документов (text, markdown, excel, presentation-reveal, presentation-pptx)
 
 ---
@@ -13,6 +13,40 @@
 **Связанные документы:**
 - [ai-agents.md](ai-agents.md) — AI-агенты
 - [ai-tools.md](ai-tools.md) — инструменты агентов
+
+---
+
+## System-промпты артефактов
+
+С v2.9.1 (ТЗ-MigrateArtifactPromptsToSkills) inline промпты в `artifacts/<kind>/server.ts` вынесены в формат Anthropic Agent Skills. Это даёт provider-agnostic базу для будущего A/B тестирования модели per-type (Sonnet vs Kimi vs Grok) без правок кода.
+
+**Расположение:** `lib/prompts/skills/artifact-generation/<kind>/`
+- `SKILL.md` — system prompt для `onCreateDocument` (frontmatter + body)
+- `references/update.md` — system prompt для `onUpdateDocument` (без frontmatter)
+
+**Загрузчик:** `lib/prompts/skills/artifact-generation/loader.ts`
+```ts
+loadArtifactSkill(kind, op, vars?) → string
+// kind: 'text' | 'markdown' | 'excel' | 'pptx' | 'reveal'
+// op: 'create' | 'update'
+// vars: подстановка {{placeholder}} через render() из lib/prompts/template.ts
+```
+
+**Плейсхолдеры** (caller форматирует данные перед передачей):
+
+| kind | SKILL.md (create) | references/update.md |
+|---|---|---|
+| text, markdown | — | `{{currentContent}}` |
+| excel | `{{templatesList}}` | `{{templatesList}}`, `{{currentExcelData}}` |
+| pptx, reveal | — | `{{currentSlides}}`, `{{description}}` |
+
+Кэш сырого template — только в `NODE_ENV === 'production'` (в dev HMR подхватывает правки .md мгновенно).
+
+**Integrity-проверка** (для excel/pptx/reveal — где `update.md` дублирует body `SKILL.md` + delta):
+```bash
+pnpm exec tsx scripts/integrity-artifact-skills.ts
+```
+Проверяет что body `SKILL.md` (без frontmatter и trailing footer) — substring `references/update.md`. Защита от тихого расхождения create/update при правке одного файла без другого.
 
 ---
 
@@ -556,4 +590,5 @@ GET /share/{token}
 
 ---
 
-**Обновлено:** 2026-01-29 (v2.9.0 — добавлен Excel)
+**Обновлено:** 2026-04-27 (v2.9.1 — inline промпты вынесены в `lib/prompts/skills/artifact-generation/`, ТЗ-MigrateArtifactPromptsToSkills)
+**До этого:** 2026-01-29 (v2.9.0 — добавлен Excel)

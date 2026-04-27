@@ -76,17 +76,25 @@ tools: [tool1, tool2]
 ```
 lib/prompts/skills/
 ├── _template/SKILL.md      # Шаблон для новых skills
-├── document/               # Skills для документов
+├── document/               # Skills для документов (AI-tool invocation)
 │   ├── create-presentation/SKILL.md
 │   ├── create-spreadsheet/SKILL.md
 │   ├── create-text-document/SKILL.md
 │   └── analyze-document/SKILL.md
 ├── research/               # Skills для исследований
 │   └── web-research/SKILL.md
-└── utility/
-    └── prompt-helper/
-        └── SKILL.md        # Skill для улучшения промптов
+├── utility/
+│   └── prompt-helper/SKILL.md  # Skill для улучшения промптов
+└── artifact-generation/    # System-промпты артефактов (детерминированный резолв через taskId artifact:*)
+    ├── loader.ts                    # loadArtifactSkill(kind, op, vars?)
+    ├── text/SKILL.md + references/update.md
+    ├── markdown/SKILL.md + references/update.md
+    ├── excel/SKILL.md + references/update.md
+    ├── pptx/SKILL.md + references/update.md
+    └── reveal/SKILL.md + references/update.md
 ```
+
+> **Замечание:** skills в `artifact-generation/` отличаются от прочих категорий — это **не** AI-tool invocation skills (модель их не вызывает), а статические system-промпты для `streamText` в artifact handlers. Загружаются детерминированно по `taskId` через `loadArtifactSkill()`. Подробности → [ai-artifacts.md](ai-artifacts.md).
 
 ---
 
