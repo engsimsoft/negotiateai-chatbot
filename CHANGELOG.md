@@ -7,6 +7,35 @@
 
 ## [Unreleased]
 
+### [3.100.0] — 2026-04-27 — ТЗ-FixSimplyMemory — Simply больше не теряет память между turns
+
+**Critical fix: убран фильтр `excludeExtracted=true`, который агрессивно резал inline-историю Simply Chat по `extractedAt IS NULL`. До фикса модель «помнила только последнее сообщение» — 192 сообщения в БД, 49K tokens, использовалось 7K (3.5% окна grok-4-1-fast). Сбой Voyage = полная амнезия. Архитектурный фикс: история чата = primary source, MIND = augmentation. Compaction (provider-agnostic, ADR 054) сжимает старое автоматически.**
+
+- **Что изменилось у разработчика:**
+  - [app/(chat)/api/chat/route.ts](app/(chat)/api/chat/route.ts) — Simply больше не передаёт `excludeExtracted: true` в `getMessagesByChatId`, использует унифицированный `maxTokens=140000` (как и другие chatMode)
+  - Caller собирает `alreadyExtractedIds: Set<string>` из `messagesFromDb.filter(m => m.extractedAt !== null)` (бесплатно — поле уже приходит в SELECT)
+  - Передаётся в `prepareMessagesWithCompaction` через `CompactionContext.alreadyExtractedIds`
+  - [lib/ai/compaction/types.ts](lib/ai/compaction/types.ts) — новое поле `alreadyExtractedIds?: Set<string>` в `CompactionContext`
+  - [lib/ai/compaction/prepare-messages.ts](lib/ai/compaction/prepare-messages.ts) — pre-compact extract step фильтрует `split.toCompact` по `alreadyExtractedIds`. Если все extracted — extract скипается полностью (нет дубликатного Grok-вызова на $0.10 в пустоту). Лог расширен полем `skipped:N`
+
+- **Архитектура:**
+  - `extractedAt` колонка остаётся в схеме — продолжает использоваться cron / on-visit для своих целей
+  - Параметр `excludeExtracted` остаётся в сигнатуре `getMessagesByChatId` (для cron / on-visit caller-ов)
+  - Поведение `expertise` / `create` / `project` chatMode не затронуто — там бага не было
+
+- **Замер cost-impact (тестовый чат 192 сообщения):**
+  - До фикса: 7 156 input tokens, ₽0.15 / turn, амнезия
+  - После фикса: 82 712 input tokens, ₽1.68 / turn, помнит всё
+  - Cost вырос ~11x — ожидаемо, модель видит всю историю. Compaction в этом чате не сработал (82K < Soft 100K). Стационар после compaction (40-43K) — отложенная verification по мере роста чата
+
+- **Backlog:**
+  - `TZ_SimplyChatMemoryRegression` удалён из `_backlog/` (закрыт этим ТЗ)
+  - `TRIAGE.md` обновлён — A.2 ✅, следующий — A.1 `TZ_MindAtomicityFix` (атомарность extract при сбое Voyage)
+
+- **Версия проекта:** 3.99.3 → 3.100.0 (minor — архитектурное изменение поведения Simply chat history loading)
+
+---
+
 ### [3.99.3] — 2026-04-27 — ТЗ-MigrateArtifactPromptsToSkills — inline промпты артефактов вынесены в Anthropic Skills
 
 **Подготовка к Шагу 7 серии Simply_Migration (A/B Sonnet vs Kimi vs Grok на артефактах). Server-side рефакторинг без изменения поведения промптов.**

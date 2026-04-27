@@ -1,7 +1,7 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.99.3
-**Статус:** Active development (**ТЗ-MigrateArtifactPromptsToSkills закрыт** 2026-04-27 в v3.99.3 — inline промпты артефактов вынесены в `lib/prompts/skills/artifact-generation/`, разблокирован A/B Шаг 7 серии Simply_Migration; **ТЗ-BR-AUTHOR-KIMI закрыт** 2026-04-27 в v3.99.2 — миграция briefing pipeline с MiniMax на Kimi K2.6; **ТЗ-BriefingStuckRecovery закрыт** 2026-04-26 в v3.99.1; **ТЗ-XAI-COL-1 закрыт** 2026-04-24 в v3.99.0)
+**Версия:** 3.100.0
+**Статус:** Active development (**ТЗ-FixSimplyMemory закрыт** 2026-04-27 в v3.100.0 — Simply Chat больше не теряет память: убран фильтр `excludeExtracted=true`, дедупликация в pre-compact extract; **ТЗ-MigrateArtifactPromptsToSkills закрыт** 2026-04-27 в v3.99.3 — inline промпты артефактов вынесены в `lib/prompts/skills/artifact-generation/`, разблокирован A/B Шаг 7 серии Simply_Migration; **ТЗ-BR-AUTHOR-KIMI закрыт** 2026-04-27 в v3.99.2 — миграция briefing pipeline с MiniMax на Kimi K2.6; **ТЗ-BriefingStuckRecovery закрыт** 2026-04-26 в v3.99.1)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** snapshot «что работает прямо сейчас» на один взгляд. История изменений → [CHANGELOG.md](CHANGELOG.md). Архитектура → [docs/architecture.md](docs/architecture.md). Карта моделей → [docs/ai-chats-map.md](docs/ai-chats-map.md).
@@ -31,7 +31,7 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 
 | Компонент | Статус | Модели / стек |
 |---|---|---|
-| **Simply Chat** (persistent, один на пользователя) | ✅ | Grok 4.1 Fast (default, включая картинки через нативный vision) · Grok 4.20 reasoning (кнопка «Думать») · Claude Haiku 4.5 — fallback для PDF-сканов через `chat-vision` |
+| **Simply Chat** (persistent, один на пользователя) | ✅ | Grok 4.1 Fast (default, включая картинки через нативный vision) · Grok 4.20 reasoning (кнопка «Думать») · Claude Haiku 4.5 — fallback для PDF-сканов через `chat-vision`. История чата = primary source с budget 140K, MIND = augmentation (фикс v3.100.0) |
 | **Экспертиза** (одноразовые экспертные запросы) | ✅ | Grok 4.20 reasoning (single-agent, R-5 резолв 2026-04-16). Multi-agent вариант 🔒 зарезервирован под ТЗ-XAI-MA-1 |
 | **Создание** (одноразовые creation-чаты) | ✅ | Grok 4.20 reasoning (мигрировано 2026-04-16) |
 | **Проекты** (изолированные рабочие пространства) | ✅ | Claude Haiku / Sonnet / Opus по tier, Профессор (Opus planning/review + Haiku execute) |

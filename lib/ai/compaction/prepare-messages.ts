@@ -122,35 +122,52 @@ export async function prepareMessagesWithCompaction(
   // факт не потеряется с уходящими в summary сообщениями.
   // Graceful fallback: если extract падает — продолжаем с compact (факты
   // могут быть потеряны в этом окне, но разговор продолжается).
-  try {
-    const extractResult = await batchExtractFacts({
-      userId: context.userId,
-      chatId: context.chatId,
-      sourceType: context.sourceType,
-      sourceProjectId: context.sourceProjectId,
-      messages: split.toCompact.map((m) => ({
-        id: m.id,
-        role: m.role,
-        parts: m.parts,
-      })),
-    });
+  //
+  // ТЗ-FixSimplyMemory: фильтруем `split.toCompact` по `alreadyExtractedIds` —
+  // сообщения, чьи факты уже извлечены ранее (extractedAt != null), повторно
+  // в Grok не шлём. Если после фильтра пусто — extract step скипаем целиком.
+  const messagesToExtract = split.toCompact.filter(
+    (m) => !context.alreadyExtractedIds?.has(m.id),
+  );
+  const skippedExtractedCount = split.toCompact.length - messagesToExtract.length;
+
+  if (messagesToExtract.length === 0) {
     console.info(
       `[Compaction] chat=${context.chatId} pre-compact-extract={` +
-        `processed:${extractResult.processed},extracted:${extractResult.extracted},` +
-        `stored:${extractResult.stored}}`,
+        `processed:0,extracted:0,stored:0,skipped:${skippedExtractedCount}} ` +
+        `(all messages already extracted)`,
     );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.warn(
-      `[Compaction] Pre-compaction extract failed for chat ${context.chatId} — ` +
-        `продолжаем с compaction (факты этого окна могут быть потеряны): ${message}`,
-    );
-    if (dataStream) {
-      emitDebugWarning(dataStream, {
-        source: "compaction:extract",
-        message: `Pre-compaction extract failed (non-blocking): ${message}`,
-        context: { chatId: context.chatId, userId: context.userId },
+  } else {
+    try {
+      const extractResult = await batchExtractFacts({
+        userId: context.userId,
+        chatId: context.chatId,
+        sourceType: context.sourceType,
+        sourceProjectId: context.sourceProjectId,
+        messages: messagesToExtract.map((m) => ({
+          id: m.id,
+          role: m.role,
+          parts: m.parts,
+        })),
       });
+      console.info(
+        `[Compaction] chat=${context.chatId} pre-compact-extract={` +
+          `processed:${extractResult.processed},extracted:${extractResult.extracted},` +
+          `stored:${extractResult.stored},skipped:${skippedExtractedCount}}`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[Compaction] Pre-compaction extract failed for chat ${context.chatId} — ` +
+          `продолжаем с compaction (факты этого окна могут быть потеряны): ${message}`,
+      );
+      if (dataStream) {
+        emitDebugWarning(dataStream, {
+          source: "compaction:extract",
+          message: `Pre-compaction extract failed (non-blocking): ${message}`,
+          context: { chatId: context.chatId, userId: context.userId },
+        });
+      }
     }
   }
 

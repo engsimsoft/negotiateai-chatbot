@@ -1,10 +1,11 @@
 # Backlog Triage — план разруливания
 
-> Порядок решения 10 открытых долгов с обоснованием и зависимостями. Этот файл — рабочий план для следующих ТЗ серии Simply_Migration после ТЗ-2 (MigrateArtifactPromptsToSkills, закрыт 2026-04-27, коммит `c04e73e`).
+> Порядок решения открытых долгов с обоснованием и зависимостями. Этот файл — рабочий план для следующих ТЗ серии Simply_Migration после ТЗ-2 (MigrateArtifactPromptsToSkills, закрыт 2026-04-27, коммит `c04e73e`).
 >
 > **Источник большинства долгов:** мануальный смок-тест Этапа 7 ТЗ-MigrateArtifactPromptsToSkills выявил 7 предсуществующих багов (1 critical + 4 high + 2 medium). FINDINGS детально → `specs/_archive/Simply_Migration/TZ_MigrateArtifactPromptsToSkills/FINDINGS.md`.
 >
 > **Создан:** 2026-04-27
+> **Обновлено:** 2026-04-27 — A.2 закрыт (TZ_FixSimplyMemory, v3.100.0).
 
 ---
 
@@ -13,7 +14,7 @@
 | Блок | ТЗ | Impact | Оценка | Зависит от |
 |---|---|---|---|---|
 | **A.1** | [TZ_MindAtomicityFix](TZ_MindAtomicityFix.md) | 🟥 high | 0.3-0.5 сессии | — |
-| **A.2** | [TZ_SimplyChatMemoryRegression](TZ_SimplyChatMemoryRegression.md) | 🟥 **CRITICAL** | 1-2 сессии | A.1 |
+| ~~A.2~~ | ~~TZ_SimplyChatMemoryRegression~~ | ✅ закрыт 2026-04-27 (v3.100.0) | — | — |
 | **B.1** | [TZ_ChatModeUndefinedSubmit](TZ_ChatModeUndefinedSubmit.md) | 🟥 high | 0.5 сессии | — |
 | **B.2** | [TZ_PptxRevealUpdateRender](TZ_PptxRevealUpdateRender.md) | 🟥 high | 0.5-1 сессия | — |
 | **C.1** | [TZ_GrokSkipsUpdateDocumentTool](TZ_GrokSkipsUpdateDocumentTool.md) | 🟥 high | 0.3-0.5 сессии | A.2 |
@@ -27,13 +28,13 @@
 
 ---
 
-## Блок A — Память (CRITICAL, делать первым)
+## Блок A — Память
 
-> **Задача блока:** вернуть Simply Chat способность помнить контекст разговора. Сейчас модель помнит только последнее сообщение (см. описание в TZ_SimplyChatMemoryRegression). Это **главная UX-катастрофа** проекта.
+> **Задача блока:** вернуть Simply Chat способность помнить контекст разговора. **A.2 закрыт первым** (2026-04-27, v3.100.0) — фильтр `excludeExtracted=true` удалён, история = primary source. Главная UX-катастрофа решена. A.1 остаётся для целостности MIND между чатами при сбоях Voyage.
 
-### A.1 — TZ_MindAtomicityFix (фундамент)
+### A.1 — TZ_MindAtomicityFix (фундамент целостности MIND)
 
-**Делать первым в блоке.** Без атомарности любые улучшения памяти бессмысленны: новые факты будут продолжать теряться при сетевых сбоях Voyage. Это — обязательный фундамент.
+**Следующий приоритет.** Чинит атомарность фактов в MIND при сетевых сбоях Voyage — между чатами retrieve может быть неполным. После A.2 это уже не блокер UX, но необходимо для долгосрочной памяти.
 
 **Что:** в [lib/ai/memory/extract.ts:235-246](../../lib/ai/memory/extract.ts#L235-L246) `markMessagesExtracted` вызывается безусловно даже при провале `processAndStoreFact`. Сообщения помечаются как «обработаны», факты в БД/Voyage не записаны → потеря памяти.
 
@@ -41,16 +42,13 @@
 
 **Оценка:** 0.3-0.5 сессии (изолированный fix в одной функции + регресс-тест).
 
-### A.2 — TZ_SimplyChatMemoryRegression (главное лечение)
+### ~~A.2 — TZ_SimplyChatMemoryRegression~~ ✅ закрыт 2026-04-27 (v3.100.0)
 
-**Делать после A.1.** Архитектурный фильтр `excludeExtracted=true` режет inline-историю до сообщений с `extractedAt IS NULL`, при этом 192 сообщения чата (49k tokens) использовали бы 25% окна grok-4-1-fast (200k). История бы помещалась целиком без всякой компрессии.
+**Решение:** убран фильтр `excludeExtracted: isSimplyChat` в [route.ts:596](../../app/(chat)/api/chat/route.ts#L596), `maxTokens` 180K → 140K. Compaction (provider-agnostic, ADR 054) сжимает старое автоматически. Дедупликация в pre-compact extract через новое поле `CompactionContext.alreadyExtractedIds` — extract скипается мгновенно если все сообщения toCompact уже extracted.
 
-**Гипотезы решения** (выбрать в ANALYSIS):
-1. Адаптивный фильтр — не применять `excludeExtracted=true` пока история помещается в `soft_threshold` (100k tokens). Только при превышении — переключаться на extracted-фильтр.
-2. Гибрид — всегда грузить последние N=50-100 сообщений независимо от `extractedAt`, плюс retrieve фактов для всего что старше.
-3. Усилить retrieve — поднимать 20-30 фактов вместо 5-10 + keyword-search по entities.
+**Замер:** 192 сообщения, до фикса 7K input tokens (амнезия) → после фикса 82K input tokens, помнит всё. Cost +11x ожидаемо за полную историю. Compaction в этом чате noop (82K < Soft 100K).
 
-**Оценка:** 1-2 сессии (требует архитектурного решения + замеры).
+**Архив:** [specs/_archive/Simply_Memory/TZ_FixSimplyMemory/](../_archive/Simply_Memory/TZ_FixSimplyMemory/)
 
 ---
 
@@ -76,7 +74,7 @@ Runtime error `getChatUrl: chatMode "undefined"` блокирует submit пр�
 
 ### C.1 — TZ_GrokSkipsUpdateDocumentTool
 
-**Делать после A.2.** Grok 4.1 Fast иногда генерит ответ как обычный chat-message вместо вызова `updateDocument` tool. Частично следствие проблемы памяти — модель не «помнит» что артефакт существует, потому что сообщение про создание уже extractedAt. После лечения памяти hit-rate вызова tool должен вырасти.
+**Готов к замеру (A.2 закрыт).** Grok 4.1 Fast иногда генерит ответ как обычный chat-message вместо вызова `updateDocument` tool. Частично следствие проблемы памяти — модель не «помнит» что артефакт существует, потому что сообщение про создание уже extractedAt. После лечения памяти (v3.100.0) hit-rate вызова tool должен вырасти.
 
 **Метрика для следующей сессии:** замерить % случаев когда модель вызывает tool на запрос «отредактируй артефакт» **до** и **после** A.2.
 

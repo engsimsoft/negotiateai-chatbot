@@ -36,6 +36,10 @@ import type { MemorySourceType } from "@/lib/ai/memory/types";
  *  - `toolsTokens` — Zod inputSchema + description каждого активного tool.
  *    Свойство call site (не middleware). Compaction решает про history,
  *    не про tools registry.
+ *  - `alreadyExtractedIds` — id сообщений с `extractedAt != null` на момент
+ *    загрузки из БД. Middleware пропускает их в pre-compact extract step
+ *    чтобы не дублировать Grok-вызов на уже-извлечённых фактах. Caller
+ *    собирает Set из `messagesFromDb` (поле бесплатно приходит в SELECT).
  */
 export interface CompactionContext {
   chatId: string;
@@ -48,6 +52,7 @@ export interface CompactionContext {
   newMessageTokens: number;
   mindTokens?: number;
   toolsTokens?: number;
+  alreadyExtractedIds?: Set<string>;
 }
 
 /**

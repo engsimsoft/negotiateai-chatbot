@@ -584,19 +584,30 @@ export async function POST(request: Request) {
       `[Token Aware] Chat ${id}: New user message has ~${newMessageTokens} tokens (post file conversion)`
     );
 
-    // Загружаем сообщения с учётом токенов нового сообщения
-    // ТЗ-ExtractCompression: simply загружает только extractedAt IS NULL (safety-cap 180K)
-    // Остальные chatMode: maxTokens = 140K, оставляем ~60K для system prompt (10K) + response (50K)
+    // Загружаем сообщения с учётом токенов нового сообщения.
+    // ТЗ-FixSimplyMemory (2026-04-27): Simply больше НЕ режет историю по
+    // extractedAt — провайдер-агностичный Compaction (Soft 100K / Hard 170K)
+    // сжимает старое автоматически. История = primary source, MIND = augmentation.
+    // Все chatMode используют единый budget 140K — оставляем ~60K на
+    // system prompt + tools + MIND блок + response.
     const isSimplyChat = chatMode === "simply";
     const messagesFromDb = await getMessagesByChatId({
       id,
-      maxTokens: isSimplyChat ? 180000 - newMessageTokens : 140000 - newMessageTokens,
+      maxTokens: 140000 - newMessageTokens,
       minMessages: 20,
       maxMessages: 200,
-      excludeExtracted: isSimplyChat,
     });
 
     const uiMessages = [...convertToUIMessages(messagesFromDb), processedMessage];
+
+    // ТЗ-FixSimplyMemory: id сообщений с уже-извлечёнными фактами. Передаётся
+    // в Compaction middleware чтобы pre-compact extract step пропускал их и
+    // не дублировал Grok-вызов (см. lib/ai/compaction/prepare-messages.ts).
+    const alreadyExtractedIds = new Set(
+      messagesFromDb
+        .filter((m) => m.extractedAt !== null)
+        .map((m) => m.id),
+    );
 
     // Подсчитываем общее количество токенов в контексте
     const totalHistoryTokens = messagesFromDb.reduce((sum, msg) => {
@@ -1124,6 +1135,7 @@ export async function POST(request: Request) {
               newMessageTokens,
               mindTokens: mindTokensForCompaction,
               toolsTokens,
+              alreadyExtractedIds,
             },
             dataStream,
           );
