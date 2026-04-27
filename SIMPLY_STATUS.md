@@ -124,7 +124,13 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 
 ## Известные проблемы (открытые хвосты)
 
-SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). История закрытых: [specs/_archive/BACKLOG_CLOSED.md](specs/_archive/BACKLOG_CLOSED.md).
+SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). **План разруливания:** [specs/_backlog/TRIAGE.md](specs/_backlog/TRIAGE.md). История закрытых: [specs/_archive/BACKLOG_CLOSED.md](specs/_archive/BACKLOG_CLOSED.md).
+
+> 🚨 **ОТКРЫТАЯ КРИТИЧЕСКАЯ РЕГРЕССИЯ — Simply Chat «помнит только последнее сообщение»** ([TZ_SimplyChatMemoryRegression](specs/_backlog/TZ_SimplyChatMemoryRegression.md)).
+>
+> Архитектурный фильтр `excludeExtracted=true` режет inline-историю агрессивно: используется 3.5% окна модели grok-4-1-fast (200k) при 192 сообщениях в БД. Модель не помнит artefact, который сама создала 30 минут назад.
+>
+> **Следующее ТЗ для разруливания:** [TZ_MindAtomicityFix](specs/_backlog/TZ_MindAtomicityFix.md) — фундамент атомарности фактов (без него лечение памяти бессмысленно). Затем [TZ_SimplyChatMemoryRegression](specs/_backlog/TZ_SimplyChatMemoryRegression.md) — главное лечение. Полный порядок → [TRIAGE.md](specs/_backlog/TRIAGE.md).
 
 ### 🟥 Critical impact
 
