@@ -1,5 +1,6 @@
-// ТЗ-Briefing-1: Stage 1 — Filter & deduplicate using MiniMax M2.7
-// (migrated from Gemini 2.0 Flash, generateObject → generateText + JSON.parse + Zod)
+// Stage 1 — Filter & deduplicate news candidates.
+// Pattern: streamText → JSON.parse → Zod validation. Default model — Grok 4.1 Fast
+// non-reasoning через taskId `briefing:filter` (см. task-assignments.ts).
 
 import { streamText } from "ai";
 import { z } from "zod";
@@ -53,7 +54,7 @@ JSON-схема ответа:
 }`;
 
 /**
- * Stage 1: Filter raw content using MiniMax M2.7.
+ * Stage 1: Filter raw content through `briefing:filter` taskId.
  * - Deduplicates (same story from multiple sources → keep best)
  * - Removes ads/promo
  * - Removes stale content (>48h unless important)

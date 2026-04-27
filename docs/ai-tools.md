@@ -63,7 +63,7 @@
 
 ## Матрица доступности по режимам
 
-| Инструмент | chat (Haiku) | expertise (Sonnet) | create (Sonnet) | simply (MiniMax) | simply+Думать (Sonnet) | Project (Эксперт) |
+| Инструмент | chat (Haiku) | expertise (Grok 4.20) | create (Grok 4.20) | simply (Grok 4.1F) | simply+Думать (Grok 4.20) | Project (Эксперт) |
 |-----------|:---:|:---:|:---:|:---:|:---:|:---:|
 | `getCurrentDate` | + | + | + | + | + | + |
 | `getWeather` | + | + | + | + | + | + |
@@ -80,8 +80,8 @@
 
 **Примечания:**
 - **chat (Haiku):** `webSearch`, `deepResearch`, `fetchUrl` отфильтрованы через `CHAT_MODE_EXCLUDED_TOOLS` (дорогие для Haiku)
-- **simply (MiniMax):** 12 tools доступны (v3.79.0). `deepResearch` исключён через `SIMPLY_MODE_EXCLUDED_TOOLS` (дорогой Perplexity API). Image/file parts из истории заменяются на текстовые плейсхолдеры (`stripMediaPartsForTextModel`)
-- **simply+Думать (Sonnet):** Все 14 tools включая `deepResearch`. Модель переключается на Claude Sonnet при нажатии «Думать»
+- **simply (Grok 4.1F):** 12 tools доступны. `deepResearch` исключён через `SIMPLY_MODE_EXCLUDED_TOOLS` (дорогой Perplexity API). Vision-вложения обрабатываются через capability-driven fallback на Haiku (taskId `chat-vision`, ADR 055)
+- **simply+Думать (Grok 4.20):** Все 14 tools включая `deepResearch`. Tier upgrade на Grok 4.20 reasoning при нажатии «Думать»
 - **readDocument:** Исключён из проектных чатов (документы уже в контексте через manifest)
 - **readProjectFile:** Доступен ТОЛЬКО в проектных чатах (нужен projectId)
 
@@ -794,8 +794,8 @@ export function getStandardTools({ session, dataStream, isProjectChat, projectId
 // chatMode-фильтрация: fetchUrl + deepResearch исключены для 'chat' (Haiku)
 const CHAT_MODE_EXCLUDED_TOOLS = ["fetchUrl", "deepResearch"];
 
-// Simply Chat (MiniMax): tools отключены на уровне route.ts (isSimplyNonAnthropicModel)
-// При «Думать» (think=true) → Sonnet → tools включены
+// simply: deepResearch фильтруется через SIMPLY_MODE_EXCLUDED_TOOLS
+// При «Думать» (think=true) → Grok 4.20 reasoning → все tools доступны
 ```
 
 **Используется в:**

@@ -7,6 +7,44 @@
 
 ## [Unreleased]
 
+### [3.99.2] — 2026-04-27 — ТЗ-BR-AUTHOR-KIMI — миграция briefing pipeline с MiniMax на Kimi K2.6
+
+**Закрыт production silent hang briefing-генерации (с 23.04.2026 после апгрейда `ai@6.0.168`). Three briefing taskId переведены на Kimi K2.6 через официальный `@ai-sdk/moonshotai`. MiniMax удалён из проекта полностью.**
+
+- **Что появилось у пользователя:**
+  - Briefing-генерация снова работает в production (silent hang устранён). Author/section/podcast-script отрабатывают в 1.5–3 секунды на короткий промпт (от 60 до 120 секунд на полный длинный брифинг).
+  - В `/dev/models` появилась карточка `moonshotai` рядом с `anthropic/xai/openrouter`. Карточка `minimax` удалена.
+
+- **Архитектура:**
+  - **Один namespace `moonshotai`** в [lib/ai/registry.ts](lib/ai/registry.ts) с `AbortSignal.timeout(180_000)` через custom `fetch`. Прежние `minimax` + `minimaxLong` (две фабрики) удалены — упростило `getModel.ts` (special case для `MiniMax-M2.7-long → minimaxLong:MiniMax-M2.7` снят).
+  - **Catalog entry `kimi-k2.6`** в [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts) с `defaultParams: { temperature: 0.6, topP: 0.95, providerOptions: { moonshotai: { thinking: { type: "disabled" } } } }`. Pricing $0.95 / $4.00 / cached $0.16, контекст 256K, max output 32K.
+  - **Новый getter `getDefaultParamsForTask(taskId)`** в [lib/ai/getModel.ts](lib/ai/getModel.ts) — параметры temperature/topP/providerOptions берутся из catalog (Блок 9 концепта миграции — замена модели = одна строка), не hardcode в call-sites. Тип возврата — `DefaultTaskParams { temperature?, topP?, providerOptions? (ProviderOptions из @ai-sdk/provider-utils) }`. Все три briefing call-sites (briefing-author / briefing-section-author / podcast script-generator) спредят `...getDefaultParamsForTask(...)`.
+  - **Cache cleanup в `script-generator.ts`:** удалены два `providerOptions.anthropic.cacheControl: { type: "ephemeral" }` блока (zombie после миграции — Anthropic-обёртка больше не используется). Moonshot имеет автоматический server-side prompt cache, метрики приходят через generic `inputTokenDetails.cacheReadTokens` AI SDK v6.
+
+- **Удалено:**
+  - Пакет `vercel-minimax-ai-provider@0.0.2` (community-пакет single-maintainer, был корнем silent hang — pinned `@ai-sdk/anthropic@3.0.6` против актуальной 3.0.71)
+  - Namespaces `minimax` и `minimaxLong` в registry, special case в `getModel.ts`
+  - Catalog entries `MiniMax-M2.7` и `MiniMax-M2.7-long` (alias)
+  - ENV `MINIMAX_API_KEY` (.env.local + dev-панель PROVIDER_ENV_MAP)
+  - Скрипты `scripts/test-minimax-via-registry.ts` и `scripts/test-minimax-anthropic-compat.ts`
+  - `package-lock.json` (lockfile-конфликт: SSOT — pnpm через `packageManager: pnpm@9.12.3`)
+
+- **Добавлено:**
+  - Зависимость `@ai-sdk/moonshotai@2.0.11` (dist-tag `ai-v6` — фиксирует совместимость с `ai@^6.0.168`; latest 2.0.16 для AI SDK v7 несовместим)
+  - ENV `MOONSHOT_API_KEY` в `.env.example` + `.env.local`
+  - Скрипт `scripts/test-kimi-via-registry.ts` — smoke трёх briefing taskId через registry с реальным API. Dynamic imports после `dotenv.config()` (важно: ES module hoisting иначе инициализирует registry с пустым apiKey → 401)
+
+- **Зачистка:** ~30 комментариев в `lib/`, `app/`, `components/` обновлены (briefing-* / podcast / chat-tools / chat-mode-config / task-assignments / chat/route / dev/set-override / lib/utils / registry / getModel / usage-utils / retry-with-logging / context-limits / db/schema). `inferProviderFromModelId` детектит `kimi*` → `moonshotai`. `CLAUDE.md` команды `npm` → `pnpm` (соответствует packageManager в package.json).
+
+- **Документация:** обновлены [docs/ai-chats-map.md](docs/ai-chats-map.md), [docs/ai-providers.md](docs/ai-providers.md), [docs/architecture.md](docs/architecture.md), [docs/model-catalog-ops.md](docs/model-catalog-ops.md), [docs/ai-tools.md](docs/ai-tools.md). [docs/ai-minimax.md](docs/ai-minimax.md) оставлен как архивный (banner стоит, не правим). ADR не создаётся — это замена провайдера в существующей архитектуре, не новый паттерн.
+
+- **Найдено вне scope (в backlog):**
+  - **🟦 Low: устаревшая metadata в `lib/prompts/briefing/briefing-scriptwriter.md:4-6`** — header упоминает «Модель: MiniMax M2-Her» и «MiniMax Speech 2.8 HD TTS». SPEC ТЗ запретил трогать промпты — оформлено как `TZ_BriefingScriptwriterPromptUpdate` для PE-сессии.
+
+- **Файлы:** 22 изменённых production-файла + 5 docs/ + 1 новый скрипт + 2 удалённых скрипта + 1 удалённый lockfile.
+
+---
+
 ### [3.99.1] — 2026-04-26 — ТЗ-BriefingStuckRecovery — self-recovery для застрявшего /briefing
 
 **Утренний брифинг больше не блокируется зависшими записями `status='generating'`. Pipeline создаёт одну запись на прогон вместо двух. Watchdog автоматически отмечает stuck-записи 'failed' через 10 минут.**

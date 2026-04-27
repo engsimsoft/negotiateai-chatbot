@@ -36,7 +36,7 @@ export interface LogUsageInput {
   usage: LanguageModelUsage;
   modelId: string;
   chatMode: string;
-  /** Provider id (anthropic, minimax, xai, openrouter, voyage, deepgram, ...). ТЗ-1. */
+  /** Provider id (anthropic, moonshotai, xai, openrouter, voyage, deepgram, ...). ТЗ-1. */
   provider?: string | null;
   chatId?: string | null;
   durationMs?: number | null;
@@ -125,7 +125,7 @@ export async function logUsage({
  */
 function inferProviderFromModelId(modelId: string): string | null {
   if (modelId.startsWith("claude")) return "anthropic";
-  if (modelId.startsWith("MiniMax")) return "minimax";
+  if (modelId.startsWith("kimi")) return "moonshotai";
   if (modelId.startsWith("grok")) return "xai";
   if (modelId.startsWith("voyage")) return "voyage";
   if (modelId.startsWith("sonar")) return "perplexity";

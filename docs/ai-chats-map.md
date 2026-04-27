@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-04-24 — ТЗ-XAI-COL-1 закрыт в v3.99.0. Все 3 Library taskId (`library:auto-analyze`, `library:generate-summary`, `library-document-chat`) на Grok 4.1 Fast non-reasoning, состояние ✅
+**Обновлено:** 2026-04-27 — ТЗ-BR-AUTHOR-KIMI закрыт в v3.99.2. Briefing pipeline (`briefing:author`, `briefing:section`, `briefing:podcast-script`) переведён с MiniMax M2.7 на Kimi K2.6 (Moonshot AI, Instant mode). Закрыт production silent hang после апгрейда `ai@6.0.168`. MiniMax удалён из проекта.
 
 ---
 
@@ -10,7 +10,7 @@
 
 Все AI-точки приложения резолвят модель через единый `getModel(taskId)` и лимит output через `getMaxOutputTokensForTask(taskId)`. SSOT — [task-assignments.ts](../lib/ai/task-assignments.ts) (`DEFAULT_TASK_MODELS` — taskId → catalogId, `DEFAULT_MAX_OUTPUT_TOKENS` — taskId → maxOutputTokens), [model-catalog.ts](../lib/ai/model-catalog.ts) (pricing + capabilities), [getModel.ts](../lib/ai/getModel.ts) (resolver + safety-net: `Math.min(requested, capability)` + warnOnce при Anthropic cap > 21333). Смена модели или output cap для любой задачи = одна строка в task-assignments.ts. Детали — [ai-providers.md](ai-providers.md#core-registry), [ADR 047](decisions/047-core-model-registry.md), [ADR 053](decisions/053-aisdk-invocation-contract.md).
 
-**Активные AI-провайдеры:** Anthropic Claude (Haiku 4.5 / Sonnet 4.6 / Opus 4.6), xAI Grok (4.1 Fast / 4.20 / 4.20 Multi-Agent), MiniMax M2.7, Google Gemini (vision-ocr, Podcast TTS), Deepgram Nova-3 (voice input + meeting transcription), Perplexity Sonar (deepResearch tool).
+**Активные AI-провайдеры:** Anthropic Claude (Haiku 4.5 / Sonnet 4.6 / Opus 4.6), xAI Grok (4.1 Fast / 4.20 / 4.20 Multi-Agent), Moonshot AI Kimi K2.6 (briefing pipeline), Google Gemini (vision-ocr, Podcast TTS), Deepgram Nova-3 (voice input + meeting transcription), Perplexity Sonar (deepResearch tool).
 
 > **⚠️ Важно для разработчиков:** Этот документ описывает **чаты и UI**, а не является реестром моделей. Единственный источник правды по моделям — [`task-assignments.ts`](../lib/ai/task-assignments.ts). Если таблицы в этом документе расходятся с `task-assignments.ts` — **правда в коде**, а документ устарел и требует обновления.
 
@@ -37,9 +37,9 @@
 | **Суммаризатор задач** (Клерк) | Grok 4.1 Fast (`clerk:task-summary`) | ✅ Работает | Суммаризация результатов задачи |
 | **Клерк-анализатор** файлов | Grok 4.1 Fast (`clerk:file-analyzer`) | ✅ Работает | Автоматический анализ загруженных файлов |
 | **Briefing: Фильтр** | Grok 4.1 Fast (`briefing:filter`) | ✅ Работает | **Backend pipeline (кухня)** · Фильтрация и дедупликация новостей. Запускается cron'ом или refresh-кнопкой, пользователь не видит процесс |
-| **Briefing: Автор** | MiniMax M2.7 long (`briefing:author`) | ✅ Работает | **Backend pipeline (кухня)** · Генерация статьи из отфильтрованных новостей. MiniMax на этой роли by design (длинный output + экономика фоновых задач) |
-| **Briefing: Refresh секции** | MiniMax M2.7 long (`briefing:section`) | ✅ Работает | **Backend pipeline (кухня)** · Per-section refresh одной темы |
-| **Podcast: Скрипт** | MiniMax M2.7 (`briefing:podcast-script`) | ✅ Работает | **Backend pipeline (кухня)** · Генерация диалогового сценария для TTS |
+| **Briefing: Автор** | Kimi K2.6 (`briefing:author`) | ✅ Работает | **Backend pipeline (кухня)** · Генерация статьи из отфильтрованных новостей. Instant mode (thinking disabled), 180s fetch timeout |
+| **Briefing: Refresh секции** | Kimi K2.6 (`briefing:section`) | ✅ Работает | **Backend pipeline (кухня)** · Per-section refresh одной темы |
+| **Podcast: Скрипт** | Kimi K2.6 (`briefing:podcast-script`) | ✅ Работает | **Backend pipeline (кухня)** · Генерация диалогового сценария для TTS |
 | **Podcast: TTS** | Gemini 2.5 Flash TTS (native `@google/genai`) | ✅ Работает | Озвучка (multi-speaker: Host=Kore + Expert=Iapetus) |
 | **Meeting: Транскрипция** | Deepgram Nova-3 (native SDK) | ✅ Работает | Batch transcription аудио (русский, diarize) |
 | **Meeting: Суммаризация** | Grok 4.20 reasoning (`meeting:summary`) | ✅ Работает | Структурированное резюме встречи |
@@ -326,7 +326,7 @@ app/(chat)/api/briefing/save-profile/route.ts               # POST API сохр�
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | MiniMax M2.7 (task `briefing:author` → registry `minimaxLong` namespace с 180s timeout) |
+| **Модель** | Kimi K2.6 (task `briefing:author` → registry `moonshotai` namespace с 180s fetch timeout) |
 | **Тип** | Backend (монолитный вызов — все секции за один streamText) |
 | **Вход** | ~30 FilteredItem[] + userTopics + settings + previousBriefing (для дедупа) |
 | **Выход** | BriefingArticle (intro + sections[] + outro + meta), Zod validation + topicId dedup safety net |
@@ -336,15 +336,15 @@ app/(chat)/api/briefing/save-profile/route.ts               # POST API сохр�
 1. Endpoint получает POST с auth
 2. Загружает настройки, темы и источники пользователя из БД
 3. Параллельный fetch всех источников → RawContent[]
-4. MiniMax M2.7: фильтрация, дедупликация → FilteredItem[] (streamText + JSON.parse + Zod)
-5. MiniMax M2.7: генерация статьи → BriefingArticle (streamText + JSON.parse + Zod)
+4. Grok 4.1 Fast: фильтрация, дедупликация → FilteredItem[] (streamText + JSON.parse + Zod)
+5. Kimi K2.6: генерация статьи → BriefingArticle (streamText + JSON.parse + Zod)
 6. Сохранение в BriefingHistory
 
 **Файлы:**
 ```
 app/(chat)/api/briefing/generate/route.ts    # POST endpoint (auth, orchestration)
-lib/briefing/briefing-filter.ts              # MiniMax M2.7: filterContent() (streamText + JSON.parse + Zod)
-lib/briefing/briefing-author.ts              # MiniMax M2.7: generateArticle() (streamText + JSON.parse + Zod)
+lib/briefing/briefing-filter.ts              # Grok 4.1 Fast: filterContent() (streamText + JSON.parse + Zod)
+lib/briefing/briefing-author.ts              # Kimi K2.6: generateArticle() (streamText + JSON.parse + Zod)
 lib/briefing/briefing-config.ts              # Константы (модели, лимиты)
 lib/prompts/briefing/briefing-author.md      # Промпт автора (стиль Т—Ж)
 lib/briefing/source-fetchers/index.ts        # fetchSource() dispatcher
@@ -356,12 +356,12 @@ lib/briefing/source-fetchers/web-fetcher.ts  # Web через Readability + jsdo
 #### Podcast Engine
 **Где:** `POST /api/briefing/podcast/generate` (backend-only, streaming)
 
-**Этап 1 — Скрипт (MiniMax M2.7):**
+**Этап 1 — Скрипт (Kimi K2.6):**
 
 | Параметр | Значение |
 |----------|----------|
-| **Модель** | MiniMax M2.7 (task `briefing:podcast-script` → registry `minimax` namespace) |
-| **SDK** | `vercel-minimax-ai-provider` (`generateText`) |
+| **Модель** | Kimi K2.6 (task `briefing:podcast-script` → registry `moonshotai` namespace, Instant mode) |
+| **SDK** | `@ai-sdk/moonshotai@ai-v6` (`generateText`) |
 | **Вход** | BriefingArticleSection + ScriptContext |
 | **Выход** | ScriptLine[] (universal parser: JSON или plain text `Host: / Expert:`) |
 | **Retry** | Внутренний цикл (4 попытки) |
@@ -387,7 +387,7 @@ lib/briefing/source-fetchers/web-fetcher.ts  # Web через Readability + jsdo
 ```
 app/(chat)/api/briefing/podcast/generate/route.ts  # Streaming POST endpoint
 lib/podcast/index.ts                                # Public API (generatePodcastSegment)
-lib/podcast/script-generator.ts                     # MiniMax M2.7: generateScript()
+lib/podcast/script-generator.ts                     # Kimi K2.6: generateScript()
 lib/podcast/tts-gemini.ts                           # Gemini TTS: generateSpeechWithRetry()
 lib/podcast/audio-converter.ts                      # PCM → MP3 (lamejs)
 lib/podcast/types.ts                                # TypeScript типы
@@ -541,15 +541,22 @@ lib/prompts/agents/ben/AGENT.md                    # Промпт с frontmatter
 ```typescript
 // lib/ai/registry.ts
 import { createProviderRegistry } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
-import { minimax } from "vercel-minimax-ai-provider";
-import { xai } from "@ai-sdk/xai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createMoonshotAI } from "@ai-sdk/moonshotai";
+import { createXai } from "@ai-sdk/xai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+
+const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const moonshotai = createMoonshotAI({  // 180s fetch timeout для briefing pipeline
+  apiKey: process.env.MOONSHOT_API_KEY ?? "",
+  fetch: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(180_000) }),
+});
+const xai = createXai({ apiKey: process.env.XAI_API_KEY });
+const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
 export const registry = createProviderRegistry({
   anthropic,
-  minimax,         // default timeout
-  minimaxLong,     // 180s timeout для briefing pipelines
+  moonshotai,
   xai,
   openrouter,
 });
@@ -600,12 +607,11 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
 |---|---|---|---|---|
 | **Grok 4.1 Fast** (non-reasoning) | `grok-4-1-fast-non-reasoning` | $0.20 / $0.50 | 128K | Simply Chat (default text), MIND memory (extract-batch, consolidate, profile, dedup-verify), Briefing filter, Clerks (task-summary, file-analyzer), util (title) |
 | **Grok 4.20** (reasoning) | `grok-4.20-0309-reasoning` | $2 / $6 | 256K | Simply Chat (кнопка «Думать»), Экспертиза (chatMode=expertise), Создание (chatMode=create), Meeting summary, MIND memory (extract — mission-critical) |
-| **Grok 4.20 Multi-Agent** | `grok-4.20-multi-agent-0309` | $2 / $6 | 256K | 🔒 Reserved для taskId `expertise-multi-agent` (placeholder, не вызывать). Реализация Premium «Команда агентов» через Responses API + MCP — отдельная ветка ТЗ-XAI-MA-1. Архитектура: [BRAINSTORM_GrokMultiAgent.md](../specs/Simply_xAI/BRAINSTORM_GrokMultiAgent.md) |
+| **Grok 4.20 Multi-Agent** | `grok-4.20-multi-agent-0309` | $2 / $6 | 256K | 🔒 Reserved для taskId `expertise-multi-agent` (placeholder, не вызывать). Реализация Premium «Команда агентов» через Responses API + MCP — отдельная ветка ТЗ-XAI-MA-1. Архитектура: [BRAINSTORM_GrokMultiAgent.md](../specs/_archive/Simply_xAI/BRAINSTORM_GrokMultiAgent.md) |
 | **Claude Sonnet 4.6** | `claude-sonnet-4-6` | $3 / $15 | 200K (1M beta) | project:expert:sonnet (DEFAULT), Секретарь, Briefing Onboarding, Artifact handlers (5 типов) |
 | **Claude Haiku 4.5** | `claude-haiku-4-5-20251001` | $1 / $5 | 200K | Simply Chat vision, project:expert:haiku, Бен, Менеджер, vision:ocr |
 | **Claude Opus 4.6** | `claude-opus-4-6` | $5 / $25 | 200K (1M beta) | project:expert:opus, Профессор (planning, review, pipeline-analyze, pipeline-synthesize) |
-| **MiniMax M2.7** | `MiniMax-M2.7` | $0.30 / $1.20 | 200K | Podcast: Script |
-| **MiniMax M2.7** (long timeout) | `MiniMax-M2.7-long` | $0.30 / $1.20 | 200K | Briefing pipeline (author, section refresh) — alias с 180s fetch timeout |
+| **Kimi K2.6** (Moonshot AI) | `kimi-k2.6` | $0.95 / $4.00 (cached input $0.16) | 256K | Briefing pipeline (`briefing:author`, `briefing:section`, `briefing:podcast-script`) — Instant mode (thinking disabled), 180s fetch timeout через `moonshotai` namespace. Подключение: `@ai-sdk/moonshotai@ai-v6` |
 | **Gemini 2.5 Flash TTS** | `gemini-2.5-flash-preview-tts` | — | — | Podcast: TTS озвучка (multi-speaker Host + Expert), через native `@google/genai` SDK |
 | **Deepgram Nova-3** | — (raw API) | $0.0043 / минута | — | Voice input (Simply Chat диктовка), Meeting transcription (batch, diarize, русский) |
 | **Perplexity Sonar Pro / Deep** | — (raw API) | варьируется | — | `deepResearch` tool — вызывается из expertise / create / project chats |

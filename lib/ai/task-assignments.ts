@@ -8,7 +8,7 @@
  * Изменение default-модели = одна строка в этом файле.
  *
  * Конвенция taskId — иерархический разделитель `:`. Семантика:
- *  - simply-chat*        — Simply Chat (MiniMax / Sonnet / Haiku vision)
+ *  - simply-chat*        — Simply Chat (Grok 4.1 Fast по умолчанию)
  *  - expertise           — ветка «Экспертиза» (разовые экспертные запросы)
  *  - create              — ветка «Создание» (разовые задания на создание)
  *  - project:expert:*    — чат эксперта по задаче проекта (tier)
@@ -102,8 +102,7 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   // Обе ветки переведены на Grok 4.20 reasoning — это «зал», пользователь видит
   // результат в реальном времени, качество важнее экономии. Multi-agent variant
   // снят с обычной expertise: через Chat Completions он работает как обычный
-  // grok-4.20 (built-in tools игнорируют наши function calls). MiniMax снят
-  // с create — остаётся только в «кухне» (briefing pipeline).
+  // grok-4.20 (built-in tools игнорируют наши function calls).
   "expertise":                "grok-4.20-0309-reasoning",
 
   // ---- expertise-multi-agent: RESERVED placeholder — НЕ вызывать ----
@@ -180,17 +179,16 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   // specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md §Модель для сжатия.
   "compaction:summarize":     "grok-4-1-fast-non-reasoning",
 
-  // Briefing (ТЗ-XAI-4 2026-04-16)
-  // briefing:filter — механическая фильтрация/дедупликация новостей из потока —
-  // переведён с MiniMax M2.7-long на Grok 4.1 Fast (подсобка). Остальные три
-  // точки (author / section / podcast-script) остаются на MiniMax M2.7 —
-  // работают, проверены, в ~5× дешевле Grok 4.20 для длинных кухонных задач
-  // без пользовательского взаимодействия. author / section используют
-  // minimaxLong namespace (180s fetch timeout для больших промптов).
+  // Briefing (ТЗ-BR-AUTHOR-KIMI 2026-04-27)
+  // briefing:filter — механическая фильтрация/дедупликация новостей из потока,
+  // Grok 4.1 Fast (подсобка). Остальные три точки (author / section /
+  // podcast-script) — Kimi K2.6 (Instant mode), кухня для длинных текстов
+  // без пользовательского взаимодействия. 180s fetch timeout в registry
+  // через namespace `moonshotai`.
   "briefing:filter":          "grok-4-1-fast-non-reasoning",
-  "briefing:author":          "MiniMax-M2.7-long",
-  "briefing:section":         "MiniMax-M2.7-long",
-  "briefing:podcast-script":  "MiniMax-M2.7",
+  "briefing:author":          "kimi-k2.6",
+  "briefing:section":         "kimi-k2.6",
+  "briefing:podcast-script":  "kimi-k2.6",
 
   // Meeting (ТЗ-XAI-4 2026-04-16)
   // Длинные транскрипты встреч → нужна качественная суммаризация. Переведён

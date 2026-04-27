@@ -7,7 +7,7 @@ import { runBriefingPipeline } from "@/lib/briefing/briefing-pipeline";
 import type { BriefingProgressEvent } from "@/lib/briefing/briefing-types";
 import { isSimplyDevMode } from "@/lib/constants";
 import { ChatSDKError } from "@/lib/errors";
-export const maxDuration = 240; // ТЗ-Briefing-1: MiniMax M2.7 thinking model needs more time
+export const maxDuration = 240; // Kimi K2.6 long-form briefing — author может работать 60-120 сек
 
 export async function POST() {
   const session = await auth();

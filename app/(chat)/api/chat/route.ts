@@ -665,7 +665,7 @@ export async function POST(request: Request) {
     let guardianFlags: GuardianFlags | null = null;
     let usageLogMeta: {
       modelId: string;
-      /** ТЗ-DevPanelErrors Phase 5: provider from SSOT (anthropic | minimax | xai | ...) */
+      /** ТЗ-DevPanelErrors Phase 5: provider from SSOT (anthropic | moonshotai | xai | ...) */
       provider: string | null;
       inputTokens: number;
       outputTokens: number;
@@ -1025,13 +1025,9 @@ export async function POST(request: Request) {
         // (`compact_20260112`) больше не используется — наша логика провайдер-
         // агностична и даёт прозрачность (мы видим что сжалось, когда, какой размер).
 
-        // ТЗ-CacheAudit Этап 3: Anthropic-protocol providers — пакет
-        // `vercel-minimax-ai-provider` под капотом проксирует запросы через
-        // `AnthropicMessagesLanguageModel` из `@ai-sdk/anthropic/internal`,
-        // поэтому MiniMax принимает тот же синтаксис `providerOptions.anthropic.*`
-        // что и чистый Claude: `cacheControl`, reasoning parts и т.д.
-        const isAnthropicProtocolModel =
-          effectiveProvider === "anthropic" || effectiveProvider === "minimax";
+        // Anthropic-protocol providers: для них работает `providerOptions.anthropic.*`
+        // (cacheControl, reasoning parts). На сегодня — только сам Anthropic.
+        const isAnthropicProtocolModel = effectiveProvider === "anthropic";
 
         // ─── Подготовка tools и messages для streamText ──────────────────────
         // Выносим построение messages из inline literal до вызова streamText,
@@ -1220,8 +1216,8 @@ export async function POST(request: Request) {
           temperature:
             chatMode === "simply" ? 0.7 : chatMode === "expertise" ? 0.3 : 1.0,
           stopWhen: stepCountIs(5),
-          // ТЗ-SimplyToolsMinimax: Tools enabled for all models including MiniMax.
-          // deepResearch filtered for simply (MiniMax) via SIMPLY_MODE_EXCLUDED_TOOLS in chat-tools.ts
+          // Tools enabled for all chat models. deepResearch filtered for simply mode
+          // via SIMPLY_MODE_EXCLUDED_TOOLS in chat-tools.ts.
           experimental_activeTools: getActiveToolNames(isProjectChat, chatMode, think),
           tools: toolsForRequest,
           experimental_transform: smoothStream({ chunking: "word" }),

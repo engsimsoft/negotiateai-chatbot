@@ -44,7 +44,7 @@ export interface RetryWithLoggingOptions {
   /** Model ID for usage logging */
   modelId: string;
   /**
-   * Provider id (anthropic, minimax, xai, google, voyage, …). Required so
+   * Provider id (anthropic, moonshotai, xai, google, voyage, …). Required so
    * ai_usage_log.provider is never NULL. Resolve via getProviderForTask(taskId).
    */
   provider: string;

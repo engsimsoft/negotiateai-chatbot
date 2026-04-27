@@ -40,7 +40,7 @@ interface ChatModeEntry {
 export const CHAT_MODE_CONFIG: Record<ChatMode, ChatModeEntry> = {
   simply: {
     displayName: "Simply",
-    tools: null, // Tools disabled at route level for MiniMax/Gemini
+    tools: null, // All standard tools (deepResearch фильтруется в getActiveToolNames для simply)
   },
   expertise: {
     displayName: "Экспертиза",

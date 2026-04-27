@@ -1,5 +1,6 @@
-// ТЗ-Briefing-1: Stage 2 — Generate article using MiniMax M2.7
-// (migrated from Claude Sonnet 4.6, generateObject → generateText + JSON.parse + Zod)
+// Stage 2 — Generate briefing article.
+// Pattern: streamText → JSON.parse → Zod validation. Default model — Kimi K2.6
+// (Instant mode, thinking disabled) через taskId `briefing:author`.
 
 import fs from "fs";
 import path from "path";
@@ -9,6 +10,7 @@ import type { ModelCatalog } from "tokenlens/core";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { retryWithLogging } from "@/lib/ai/retry-with-logging";
 import {
+  getDefaultParamsForTask,
   getModel,
   getModelIdForTask,
   getProviderForTask,
@@ -157,10 +159,10 @@ const MAX_TOKENS_BY_VOLUME: Record<string, number> = {
 };
 
 /**
- * Stage 2: Generate briefing article using MiniMax M2.7.
+ * Stage 2: Generate briefing article through `briefing:author` taskId.
  * System prompt = persona + rules (from .md file) + JSON schema instruction.
  * User message = formatted candidates + user settings + date.
- * Pattern: generateText → JSON.parse → Zod validation (same as MIND pipeline).
+ * Pattern: streamText → JSON.parse → Zod validation (same as MIND pipeline).
  */
 export async function generateArticle(
   input: AuthorInput,
@@ -198,21 +200,18 @@ export async function generateArticle(
   const warnings: string[] = [];
   const resolvedModelId = getModelIdForTask(BRIEFING_AUTHOR_TASK);
 
-  // ТЗ-Briefing-1: generateText + JSON.parse + Zod (briefing:author task)
-  // JSON.parse and Zod.parse inside callback — errors trigger automatic retry via retryWithLogging
+  // streamText + JSON.parse + Zod. Errors внутри callback триггерят retryWithLogging.
   const { result: article, usage, attempts, totalDurationMs } = await retryWithLogging(
     async () => {
-      // ТЗ-CachePipelineMetrics: cache breakpoints здесь НЕ используются.
-      // Briefing генерится раз в сутки, 5-минутный TTL Anthropic кэша истекает
-      // задолго до следующего вызова — кэш-запись была бы чистым перерасходом
-      // без последующего read. Для per-topic циклов (podcast script generator)
-      // cache работает и сохранён. См. CHANGELOG.md [3.87.0] "Why briefing skip".
+      // Moonshot Kimi K2.6 имеет автоматический prompt cache (cached input $0.16
+      // vs $0.95). Briefing генерится раз в сутки — cache-hit маловероятен,
+      // явных breakpoints нет (Moonshot не поддерживает ручное управление).
       const res = streamText({
         model: getModel(BRIEFING_AUTHOR_TASK),
         system: SYSTEM_PROMPT + JSON_INSTRUCTION,
         prompt: userMessage,
         maxOutputTokens: maxTokens,
-        temperature: 0.7,
+        ...getDefaultParamsForTask(BRIEFING_AUTHOR_TASK),
         maxRetries: 0,
       });
       // Consume stream to get full text (keeps connection alive for thinking models)

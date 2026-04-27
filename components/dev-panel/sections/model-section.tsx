@@ -12,8 +12,7 @@ const MODEL_DISPLAY: Record<string, string> = {
   "grok-4.20-0309-reasoning": "Grok 4.20 (reasoning)",
   "grok-4.20-0309-non-reasoning": "Grok 4.20",
   "grok-4.20-multi-agent-0309": "Grok 4.20 Multi-Agent",
-  "MiniMax-M2.7": "MiniMax M2.7",
-  "MiniMax-M2.7-long": "MiniMax M2.7 (long)",
+  "kimi-k2.6": "Kimi K2.6",
 };
 
 const REASON_COLORS: Record<string, string> = {

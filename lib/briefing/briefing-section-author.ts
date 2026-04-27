@@ -1,5 +1,5 @@
-// ТЗ-Briefing-1: Generate a single briefing section using MiniMax M2.7
-// (migrated from Claude Sonnet 4.6, generateObject → generateText + JSON.parse + Zod)
+// Generate a single briefing section through `briefing:section` taskId.
+// Pattern: streamText → JSON.parse → Zod validation. Default model — Kimi K2.6.
 
 import fs from "fs";
 import path from "path";
@@ -10,6 +10,7 @@ import type { ModelCatalog } from "tokenlens/core";
 import { buildAiCallTrace, type PipelineStageTrace } from "@/lib/ai/pipeline-trace";
 import { retryWithLogging } from "@/lib/ai/retry-with-logging";
 import {
+  getDefaultParamsForTask,
   getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
@@ -138,7 +139,7 @@ interface SectionAuthorInput {
 
 /**
  * Generate a single briefing section for per-topic refresh.
- * Pattern: generateText → JSON.parse → Zod validation (MiniMax M2.7).
+ * Pattern: streamText → JSON.parse → Zod validation.
  */
 export async function generateSection(
   input: SectionAuthorInput,
@@ -174,24 +175,19 @@ export async function generateSection(
   const startTime = Date.now();
   const warnings: string[] = [];
 
-  // ТЗ-Briefing-1: generateText + JSON.parse + Zod (MiniMax M2.7)
-  // JSON.parse and Zod.parse inside callback — errors trigger automatic retry
+  // streamText + JSON.parse + Zod. Errors внутри callback триггерят retryWithLogging.
   const resolvedModelId = getModelIdForTask(BRIEFING_SECTION_TASK);
 
   const { result: section, usage, attempts, totalDurationMs } = await retryWithLogging(
     async () => {
-      // ТЗ-CachePipelineMetrics: cache breakpoints здесь НЕ используются.
-      // Per-section refresh — редкий UX кейс (user обычно смотрит секцию и
-      // идёт дальше, refresh нажимается 0-1 раз). Для гипотетического burst
-      // refresh'а 3-5 секций подряд экономия будет маленькая; риск cold
-      // cache write без read — больше. Оставляем без кэша до появления
-      // реальных данных о частоте burst-refresh.
+      // Moonshot Kimi K2.6 имеет автоматический prompt cache (cached input
+      // $0.16 vs $0.95). Явных breakpoints нет — провайдер не поддерживает.
       const res = streamText({
         model: getModel(BRIEFING_SECTION_TASK),
         maxOutputTokens: getMaxOutputTokensForTask(BRIEFING_SECTION_TASK),
         system: systemPrompt + SECTION_JSON_INSTRUCTION,
         prompt: userMessage,
-        temperature: 0.7,
+        ...getDefaultParamsForTask(BRIEFING_SECTION_TASK),
         maxRetries: 0,
       });
       // Consume stream to get full text (keeps connection alive for thinking models)

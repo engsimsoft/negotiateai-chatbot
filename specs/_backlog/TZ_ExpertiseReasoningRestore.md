@@ -8,7 +8,7 @@
 - [lib/ai/middleware/reasoning-reconciliation.ts](../../lib/ai/middleware/reasoning-reconciliation.ts) — существующий неактивный middleware
 - [lib/ai/task-assignments.ts](../../lib/ai/task-assignments.ts) — маппинг `expertise` → модель
 - [app/(chat)/api/chat/route.ts](../../app/(chat)/api/chat/route.ts) — streamText, stopWhen
-- [specs/Simply_xAI/SIMPLY_XAI_NOTES.md](../Simply_xAI/SIMPLY_XAI_NOTES.md) — запись 2026-04-23 с диагностикой
+- [specs/_archive/Simply_xAI/SIMPLY_XAI_NOTES.md](../_archive/Simply_xAI/SIMPLY_XAI_NOTES.md) — запись 2026-04-23 с диагностикой
 
 ---
 

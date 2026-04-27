@@ -1,7 +1,7 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.99.1
-**Статус:** Active development (**ТЗ-XAI-COL-1 закрыт** 2026-04-24 в v3.99.0 — Библиотека через xAI Collections, **ТЗ-BriefingStuckRecovery закрыт** 2026-04-26 в v3.99.1 — self-recovery для застрявшего /briefing)
+**Версия:** 3.99.2
+**Статус:** Active development (**ТЗ-BR-AUTHOR-KIMI закрыт** 2026-04-27 в v3.99.2 — миграция briefing pipeline с MiniMax на Kimi K2.6, MiniMax удалён из проекта; **ТЗ-BriefingStuckRecovery закрыт** 2026-04-26 в v3.99.1 — self-recovery для застрявшего /briefing; **ТЗ-XAI-COL-1 закрыт** 2026-04-24 в v3.99.0 — Библиотека через xAI Collections)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** snapshot «что работает прямо сейчас» на один взгляд. История изменений → [CHANGELOG.md](CHANGELOG.md). Архитектура → [docs/architecture.md](docs/architecture.md). Карта моделей → [docs/ai-chats-map.md](docs/ai-chats-map.md).
@@ -16,7 +16,7 @@
 
 **Мультипровайдерная маршрутизация (финальная после закрытия серии Simply_xAI, 4 роли / 3 production провайдера / 1 dev-инструмент):**
 - **Подсобка** — xAI Grok 4.1 Fast (`util:*`, `clerk:*`, `briefing:filter`, `memory:extract-batch/consolidate/profile/dedup-verify`, `compaction:summarize`)
-- **Кухня** — MiniMax M2.7 / M2.7-long (`briefing:author`, `briefing:section`, `briefing:podcast-script` — by design, фоновые pipelines)
+- **Кухня** — Moonshot AI Kimi K2.6 (`briefing:author`, `briefing:section`, `briefing:podcast-script` — Instant mode, 180s fetch timeout через namespace `moonshotai`, мигрировано с MiniMax в v3.99.2)
 - **Зал** — xAI Grok 4.20 reasoning (`simply-chat-think`, `expertise`, `create`, `meeting:summary`)
 - **Автор** — Anthropic Claude Opus/Sonnet/Haiku (`professor:*`, `artifact:*`, `vision:ocr`, `service-chat:*`, `chat-vision` — capability-driven fallback для PDF-сканов во всех режимах, ADR 055)
 - **Dev-инструмент** — OpenRouter (только через `/dev/models` override для тестирования новых моделей)
@@ -38,7 +38,7 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 | **База знаний — MIND** (Слой 3 RAG, auto из разговоров) | ✅ | **Hot path:** Grok 4.1 Fast (batch-extract, consolidate, profile, dedup-verify) + Voyage AI (embeddings) + pgvector. Extract пакетно из to-compact окна в момент compaction (ADR 054). **Ночная глубокая консолидация (v3.97.0):** Grok 4.20 reasoning (`memory:deep-consolidate`) в 01:00 МСК — причёсывает базу на reasoning-модели (tiered Letta sleep-time pattern), 4 действия включая `rephrase`. A/B через `/dev/models` |
 | **Simply Compaction** (автосжатие истории чата при пороге 50%/85% от 200K) | ✅ | Grok 4.1 Fast non-reasoning (`compaction:summarize`) + provider-agnostic middleware. Активен во всех chat-модах (simply, expertise, create, project). Orchestration: pre-compact batch-extract → summarize → verbatim window (ADR 054) |
 | **Библиотека — Collections** (Слой 3 RAG, явная загрузка документов) | ✅ | xAI Grok Collections API из коробки. Tool `librarySearch` подключён в Simply/Экспертизе/Создании/проектах. Авто-анализ (Grok 4.1 Fast) + развёрнутый авто-обзор после indexing. Split-view изолированного мини-чата. Source picker (до 3 коллекций / 5 документов) для scoping в Экспертизе/Создании. Закрыто в v3.99.0 (ТЗ-XAI-COL-1) |
-| **Briefing** (hourly Vercel Cron) | ✅ | Grok 4.1 Fast (filter) · MiniMax M2.7-long (author, section) · MiniMax M2.7 (podcast-script). Миграция author/section на Grok разблокирована 2026-04-16 (URL hallucination оказалась metric bug в `verifyArticleUrls`, не проблемой моделей — commit `58d9d2e`); планируется в ТЗ-XAI-6 |
+| **Briefing** (hourly Vercel Cron) | ✅ | Grok 4.1 Fast (filter) · **Kimi K2.6** (author, section, podcast-script — Instant mode, namespace `moonshotai` с 180s timeout). Мигрировано с MiniMax в v3.99.2 (ТЗ-BR-AUTHOR-KIMI) — closed silent hang после `ai@6.0.168`. Подключение через `@ai-sdk/moonshotai@ai-v6` |
 | **Podcast** (attached to briefing) | ✅ | Gemini TTS (длинный формат, blob storage) |
 | **Meeting Recorder** | ✅ | Deepgram Nova-3 (STT) + Grok 4.20 reasoning (summary, мигрировано 2026-04-16) |
 | **Telegram Bot + Groups** | ✅ | Custom bot + ingestion pipeline |
@@ -60,12 +60,15 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 
 ## Активная серия ТЗ
 
-**🎯 Simply_xAI** — миграция с MiniMax+OpenRouter на xAI Grok + Anthropic.
+**🎯 Simply_Migration** — финальная миграция на xAI Grok + Kimi K2.6 + Perplexity (Anthropic Opus только аудитор Профессор/Проекты, MiniMax уходит из проекта).
 
-- Дорожная карта: [specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md](specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md)
+- Концепт миграции: [specs/Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md](specs/Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md)
+- Концепт Briefing: [specs/Simply_Migration/SIMPLY_BRIEFING_CONCEPT.md](specs/Simply_Migration/SIMPLY_BRIEFING_CONCEPT.md)
 - Архитектура вложений (SSOT): [specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md](specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md)
-- Архитектура MIND: [specs/Simply_xAI/MIND_ARCHITECTURE.md](specs/Simply_xAI/MIND_ARCHITECTURE.md)
-- Лог решений: [specs/Simply_xAI/SIMPLY_XAI_NOTES.md](specs/Simply_xAI/SIMPLY_XAI_NOTES.md)
+- Архитектура MIND (SSOT): [specs/Simply_xAI/MIND_ARCHITECTURE.md](specs/Simply_xAI/MIND_ARCHITECTURE.md)
+- Завершённая серия Simply_xAI: [specs/_archive/Simply_xAI/](specs/_archive/Simply_xAI/)
+
+**План работ:** 11 ТЗ в 4 фазы (А — закрыть боль, Б — унификация чата, В — A/B тесты, Г — большие блоки). **ТЗ-1 BR-AUTHOR-KIMI закрыт 2026-04-27 в v3.99.2** (silent hang устранён, MiniMax удалён). Следующий — ТЗ-2 **MigrateArtifactPromptsToSkills** (Фаза А, шаг 2 — перенос inline-промптов артефактов в SKILL.md, блокер A/B теста артефактов).
 
 **Правило серии:** не отвлекаться на другие ТЗ до завершения.
 
@@ -123,18 +126,12 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 
 SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). История закрытых: [specs/_archive/BACKLOG_CLOSED.md](specs/_archive/BACKLOG_CLOSED.md).
 
-### 🟥 High impact
-
-- **[TZ_BriefingMiniMaxHang](specs/_backlog/TZ_BriefingMiniMaxHang.md)** — Pipeline briefing:author/section silent hang на `MiniMax-M2.7-long` через AI SDK 6.0.168 (>11 мин без ответа). Гипотеза — регрессия SDK на парсинге MiniMax stream с reasoning chunks. Последний успешный прогон 2026-04-23. **Briefing полностью неработоспособен в production**, watchdog (закрытого ТЗ-BriefingStuckRecovery) маскирует stuck как 'failed' через 10 мин. Подробности в [AUDIT_BRIEFING.md](specs/_archive/TZ_BriefingStuckRecovery/AUDIT_BRIEFING.md).
-
 ### 🟧 Medium impact
 
 - **[TZ_ExpertiseReasoningRestore](specs/_backlog/TZ_ExpertiseReasoningRestore.md)** — Экспертиза временно понижена с `grok-4.20-reasoning` на non-reasoning из-за регрессии `@ai-sdk/xai@3.0.83` (`reasoning part not found` при параллельных tool calls). Качество Экспертизы снижено. Существует с 2026-04-23.
-- **[TZ_BriefingConcurrencyGuard](specs/_backlog/TZ_BriefingConcurrencyGuard.md)** — Гонка cron-запуска и user-triggered «Сгенерировать» для одного userId; partial unique index или optimistic lock. Новый, найден в финализации ТЗ-BriefingStuckRecovery.
+- **[TZ_BriefingConcurrencyGuard](specs/_backlog/TZ_BriefingConcurrencyGuard.md)** — Гонка cron-запуска и user-triggered «Сгенерировать» для одного userId; partial unique index или optimistic lock.
 
-### 🟩 Low impact (косметика)
-
-- **[TZ_CompactionActualCalibration](specs/_backlog/TZ_CompactionActualCalibration.md)** — sanity-check delta `estimate` vs `actual.promptTokens` после недели Compaction MVP в production. Если ratio в 0.85-1.15 — закрыть как невостребованный, иначе калибровать `estimateTokenCount`.
+> **TZ_BriefingMiniMaxHang** перенесён в архив — закрывается через `Simply_Migration/BR-AUTHOR-KIMI` (Фаза А концепта миграции).
 
 **Правило backlog (из `specs/WORKFLOW.md`):** перед стартом нового крупного ТЗ — пройтись по списку и предложить владельцу закрыть или игнорировать. Решение за владельцем.
 
@@ -174,4 +171,4 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). История за�
 
 ---
 
-**Обновлено:** 2026-04-26 — закрыт ТЗ-BriefingStuckRecovery в v3.99.1 (watchdog stuck-записей + UPSERT pipeline + UI-баннер). Найдена и зафиксирована новая High-проблема: silent hang briefing:author на AI SDK 6.0.168 — отдельный backlog TZ_BriefingMiniMaxHang. Также добавлен пропущенный backlog TZ_ExpertiseReasoningRestore (существует с 2026-04-23) и новый TZ_BriefingConcurrencyGuard.
+**Обновлено:** 2026-04-27 — открыта новая активная серия **Simply_Migration** (концепт миграции + концепт Briefing). Серия Simply_xAI закрыта, рабочие ТЗ-папки перенесены в `specs/_archive/Simply_xAI/`. Backlog почищен: TZ_BriefingMiniMaxHang ушёл в архив (закрывается через BR-AUTHOR-KIMI), TZ_CompactionActualCalibration — как невостребованный sanity-check.

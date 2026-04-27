@@ -1,6 +1,6 @@
 {
   "name": "simply",
-  "version": "3.99.1",
+  "version": "3.99.2",
   "description": "Simply — AI agents platform for Russian market",
   "private": true,
   "scripts": {
@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
+    "@ai-sdk/moonshotai": "^2.0.11",
     "@ai-sdk/react": "^3.0.118",
     "@ai-sdk/xai": "^3.0.83",
     "@codemirror/lang-javascript": "^6.2.2",
@@ -124,7 +125,6 @@
     "use-stick-to-bottom": "^1.1.1",
     "usehooks-ts": "^3.1.0",
     "vaul": "^1.1.2",
-    "vercel-minimax-ai-provider": "^0.0.2",
     "xlsx": "^0.18.5",
     "zod": "^3.25.76"
   },

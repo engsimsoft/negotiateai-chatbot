@@ -1,8 +1,8 @@
 # AI-провайдеры и модели
 
-**Версия:** 3.83.0
-**Последнее обновление:** 2026-04-11
-**Статус:** 7 провайдеров (Anthropic, MiniMax, Google, xAI, OpenRouter, Perplexity, Voyage, Deepgram) + Core Registry v1
+**Версия:** 3.99.2
+**Последнее обновление:** 2026-04-27
+**Статус:** 7 провайдеров (Anthropic, Moonshot AI, Google, xAI, OpenRouter, Perplexity, Voyage, Deepgram) + Core Registry v1
 
 ---
 
@@ -20,7 +20,7 @@
 - [ai-chats-map.md](ai-chats-map.md) — карта чатов и UI
 - [ai-agents.md](ai-agents.md) — агенты и промпты
 - [ai-tools.md](ai-tools.md) — инструменты
-- [ai-minimax.md](ai-minimax.md) — детали MiniMax M2.7
+- [ai-minimax.md](ai-minimax.md) — 🗄 архивный (MiniMax удалён в ТЗ-BR-AUTHOR-KIMI 2026-04-27)
 - [decisions/047-core-model-registry.md](decisions/047-core-model-registry.md) — ADR архитектуры Core Registry
 
 ---
@@ -31,7 +31,7 @@
 
 | Файл | Ответственность |
 |------|-----------------|
-| [lib/ai/registry.ts](../lib/ai/registry.ts) | `createProviderRegistry` (AI SDK v6): пять namespace'ов — `anthropic`, `minimax`, `minimaxLong`, `xai`, `openrouter` |
+| [lib/ai/registry.ts](../lib/ai/registry.ts) | `createProviderRegistry` (AI SDK v6): четыре namespace'а — `anthropic`, `moonshotai` (с 180s fetch timeout), `xai`, `openrouter` |
 | [lib/ai/model-catalog.ts](../lib/ai/model-catalog.ts) | SSOT физических моделей: pricing (USD/1M), capabilities (vision/tools/thinking), contextWindow, aliasOf |
 | [lib/ai/task-assignments.ts](../lib/ai/task-assignments.ts) | `DEFAULT_TASK_MODELS: Record<TaskId, string>` — 39 taskId → catalog id |
 | [lib/ai/getModel.ts](../lib/ai/getModel.ts) | Публичный API: `getModel(taskId)`, `getModelIdForTask`, `getProviderForTask`, `taskSupportsThinking` |
@@ -105,25 +105,26 @@ Voyage (embeddings), Deepgram (speech-to-text), Perplexity (deep research), Gemi
 
 Используется для: projects expert chat (все tier), professor pipeline, artifacts, meeting:summary, simply-chat-think, simply-chat-vision, clerk'ов, всех service chats, auto-naming, vision:ocr (fallback). Полный список — через `DEFAULT_TASK_MODELS`.
 
-### MiniMax
+### Moonshot AI (Kimi K2.6)
 
 | Параметр | Значение |
 |----------|----------|
-| SDK | `vercel-minimax-ai-provider@0.0.2` (официальный пакет MiniMax, Anthropic-compatible) |
-| Factory | `createMinimax()` (default export). Под капотом — тонкая обёртка над `AnthropicMessagesLanguageModel` из `@ai-sdk/anthropic/internal` |
-| API Key | `MINIMAX_API_KEY` |
-| Endpoint | `https://api.minimax.io/anthropic/v1` |
-| Registry namespace | `minimax` (default, 60s fetch timeout) + `minimaxLong` (180s timeout для briefing/memory pipelines) |
-| Документация | https://platform.minimax.io/docs/api-reference/text-anthropic-api |
-| Детали | [ai-minimax.md](ai-minimax.md), ADR 049 |
+| SDK | `@ai-sdk/moonshotai@2.0.11` (dist-tag `ai-v6`, официальный пакет Vercel monorepo). Под капотом — `@ai-sdk/openai-compatible` |
+| Factory | `createMoonshotAI({ apiKey, fetch })` |
+| API Key | `MOONSHOT_API_KEY` |
+| Endpoint | `https://api.moonshot.ai/v1` (Global, default) |
+| Registry namespace | `moonshotai` (180s fetch timeout через `AbortSignal.timeout` для briefing pipelines) |
+| Документация | https://platform.kimi.ai/docs/guide/kimi-k2-6-quickstart |
 
-Используется для: `simply-chat`, `briefing:filter`, `briefing:author`, `briefing:section`, `briefing:podcast-script`, `memory:extract-batch`, `memory:consolidate`, `memory:profile`. **НЕ используется** для vision и TTS (MiniMax не поддерживает ни image, ни document input ни в одном режиме).
+Используется для: `briefing:author`, `briefing:section`, `briefing:podcast-script`. **НЕ используется** для vision, TTS, document input — модель только текстовая в Simply.
 
-**Prompt caching.** Режим Anthropic-compat даёт два уровня кэширования:
-- **Passive auto-cache** — срабатывает автоматически от 512 tokens, порядок prefix-matching `tools → system → messages`. Нет параметров в запросе. Метрика в response: `cache_read_input_tokens` (AI SDK v6 мапит в `inputTokenDetails.cacheReadTokens`).
-- **Explicit cache control** — `providerOptions.anthropic.cacheControl: { type: 'ephemeral' }` на content-part или tool. До 4 breakpoints, TTL 5 минут с автопродлением при hit. Идентичен синтаксису Anthropic, т.к. пакет проксирует через `AnthropicMessagesLanguageModel`. Метрики: `cache_creation_input_tokens` + `cache_read_input_tokens`.
+**Prompt caching.** Автоматический server-side cache (без явных breakpoints). Срабатывает на повторяющихся system prompt + history. Метрика в response: `prompt_tokens_details.cached_tokens` (openai-формат, AI SDK v6 мапит в `inputTokenDetails.cacheReadTokens`). Pricing cache hit: $0.16/M input vs $0.95/M base = **−83%**.
 
-Pricing (M2.7): base $0.30/M input, cache write $0.375/M (1.25×), cache read $0.03–0.06/M (~0.1× = скидка 90%), output $1.20/M.
+**Mode:** Instant (thinking disabled через `providerOptions.moonshotai.thinking: { type: 'disabled' }` — лежит в catalog `defaultParams`, подхватывается через `getDefaultParamsForTask(taskId)`). Reasoning не используется в briefing — длинный связный текст не требует CoT, thinking тратит токены без выгоды.
+
+**Параметры из catalog `defaultParams`:** `temperature: 0.6`, `topP: 0.95`, `providerOptions.moonshotai.thinking: { type: 'disabled' }` — это рекомендация Moonshot для Instant mode (см. quickstart).
+
+Pricing (Kimi K2.6): base $0.95/M input, cached input $0.16/M, output $4.00/M, cache write — нет (автоматический server-side cache).
 
 ### Google AI
 
@@ -212,12 +213,11 @@ Pricing (M2.7): base $0.30/M input, cache write $0.375/M (1.25×), cache read $0
 - `artifact-model` → `claude-sonnet-4-6`
 - `title-model` → `claude-haiku-4-5-20251001`
 
-### MiniMax
+### Moonshot AI
 
-| Модель | Catalog ID | Физический ID | Input | Output | Контекст | Примечание |
-|--------|------------|---------------|-------|--------|----------|------------|
-| MiniMax M2.7 | `MiniMax-M2.7` | `MiniMax-M2.7` | $0.30/1M | $1.20/1M | 204K | Автоматическое кэширование |
-| MiniMax M2.7 (long) | `MiniMax-M2.7-long` | `MiniMax-M2.7` | $0.30/1M | $1.20/1M | 204K | Алиас на ту же физическую модель, но через registry namespace `minimaxLong` с 180s fetch timeout (для briefing) |
+| Модель | Catalog ID | Физический ID | Input | Output | Cached input | Контекст | Max output | Примечание |
+|--------|------------|---------------|-------|--------|--------------|----------|------------|------------|
+| Kimi K2.6 | `kimi-k2.6` | `kimi-k2.6` | $0.95/1M | $4.00/1M | $0.16/1M | 256K | 32K | Instant mode (thinking disabled), автоматический prompt cache. defaultParams: temperature 0.6, topP 0.95, thinking disabled (рекомендация Moonshot quickstart) |
 
 ### Non-LLM (справочно — pricing only, в catalog для cost audit)
 
@@ -255,8 +255,8 @@ Pricing (M2.7): base $0.30/M input, cache write $0.375/M (1.25×), cache read $0
 # Anthropic (обязательно — основной провайдер)
 ANTHROPIC_API_KEY=your_anthropic_api_key
 
-# MiniMax (обязательно — Simply Chat, Briefing, Podcast Script)
-MINIMAX_API_KEY=your_minimax_api_key
+# Moonshot AI / Kimi K2.6 (обязательно — Briefing pipeline: author, section, podcast-script)
+MOONSHOT_API_KEY=your_moonshot_api_key
 
 # Google AI (обязательно — Podcast TTS)
 GOOGLE_GENERATIVE_AI_API_KEY=your_google_api_key
@@ -284,7 +284,7 @@ DEEPGRAM_API_KEY=your_deepgram_api_key
 | Провайдер | URL |
 |-----------|-----|
 | Anthropic | https://console.anthropic.com/settings/keys |
-| MiniMax | https://platform.minimax.io/user-center/basic-information/interface-key |
+| Moonshot AI / Kimi | https://platform.kimi.ai/ |
 | Google AI | https://aistudio.google.com/apikey |
 | xAI | https://console.x.ai/ |
 | OpenRouter | https://openrouter.ai/keys |
@@ -296,7 +296,7 @@ DEEPGRAM_API_KEY=your_deepgram_api_key
 
 ## Cost Calculation API
 
-### Token-based (для Anthropic / MiniMax / xAI / OpenRouter)
+### Token-based (для Anthropic / Moonshot AI / xAI / OpenRouter)
 
 ```ts
 import { calculateCostRub, calculateCostBreakdownRub, extractUsageForPricing } from "@/lib/ai/providers";
@@ -347,12 +347,14 @@ const ttsRub = calculateTtsCostRub(durationSeconds);
 | RPM / TPM | Зависит от тарифа аккаунта |
 | Concurrent requests | По тарифу |
 
-### MiniMax
+### Moonshot AI (Kimi K2.6)
 
 | Лимит | Значение |
 |-------|----------|
-| Timeout на запрос | 180s (через registry namespace `minimaxLong`) для briefing pipelines |
-| Context window | 204 800 tokens |
+| Timeout на запрос | 180s (через `AbortSignal.timeout` в registry namespace `moonshotai`) для briefing pipelines |
+| Context window | 256 000 tokens |
+| Max output | 32 768 tokens |
+| Tier (Concurrency / TPM / RPM / TPD) | Зависит от тарифа Moonshot. Tier0 free: 3/500K/20/1.5M. Tier2 после $10 пополнения: 100/3M/500/unlimited |
 
 ### Google AI (TTS)
 
@@ -367,6 +369,7 @@ const ttsRub = calculateTtsCostRub(durationSeconds);
 
 | Дата | Версия | Изменения |
 |------|--------|-----------|
+| 2026-04-27 | 3.99.2 | **ТЗ-BR-AUTHOR-KIMI:** Briefing pipeline (`briefing:author`, `briefing:section`, `briefing:podcast-script`) переведён с MiniMax M2.7 на Kimi K2.6 через официальный `@ai-sdk/moonshotai@ai-v6`. Закрыт production silent hang после апгрейда `ai@6.0.168` (был связан с pinned `@ai-sdk/anthropic@3.0.6` внутри `vercel-minimax-ai-provider@0.0.2`). Удалены: пакет `vercel-minimax-ai-provider`, namespaces `minimax`/`minimaxLong`, две catalog entries `MiniMax-M2.7`/`MiniMax-M2.7-long`, ENV `MINIMAX_API_KEY`. Добавлены: namespace `moonshotai` с 180s fetch timeout, catalog entry `kimi-k2.6` с `defaultParams` (temperature 0.6, topP 0.95, thinking disabled), новый getter `getDefaultParamsForTask(taskId)` — параметры берутся из catalog (Блок 9 концепта), не hardcode в call-sites. |
 | 2026-04-11 | 3.83.0 | **ТЗ-1 Core Registry:** `getModel(taskId)` как SSOT для 39 AI-точек. Удалены `myProvider`, `claudeHaiku/Sonnet/Opus`, `minimaxM27/Long`, env-overrides (PROFESSOR_MODEL/SUMMARIZER_MODEL/SNAPSHOT_CLERK_MODEL/EXPERT_MODEL). providers.ts стал чистым pricing/cost utility (−141 строка). Добавлены registry namespaces xAI + OpenRouter (зарезервированы). `ai_usage_log.provider` column + backfill. Capability-driven `taskSupportsThinking()`. ADR 047. |
 | 2026-04-06 | 3.3.0 | ТЗ-PIPELINE1: Removed AUTHOR_MODEL_FALLBACK, added retryWithLogging for briefing-author/section-author, artifact handlers now log usage |
 | 2026-03-01 | 3.2.0 | ТЗ-CACHE1: Prompt Caching (cacheControl: ephemeral) для всех streaming routes (per-message providerOptions на system message) |
@@ -381,4 +384,4 @@ const ttsRub = calculateTtsCostRub(durationSeconds);
 
 ---
 
-**Обновлено:** 2026-04-11
+**Обновлено:** 2026-04-27

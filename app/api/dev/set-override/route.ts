@@ -54,7 +54,7 @@ Usage:
 Examples:
   /api/dev/set-override?task=simply-chat&model=claude-haiku-4-5-20251001
   /api/dev/set-override?task=simply-chat&model=claude-sonnet-4-6
-  /api/dev/set-override?task=simply-chat&model=MiniMax-M2.7
+  /api/dev/set-override?task=briefing:author&model=kimi-k2.6
   /api/dev/set-override?clear=1`,
       current,
       null,

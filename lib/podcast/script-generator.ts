@@ -1,10 +1,11 @@
-// ТЗ-Briefing-2: Script Generator — M2-Her generates dialogue script from article section
-// Migrated from Gemini 2.5 Flash to MiniMax M2-Her for dialogue quality
+// Script Generator — generates dialogue script from article section.
+// Default model — Kimi K2.6 (Instant mode) через taskId `briefing:podcast-script`.
 
 import fs from "fs";
 import path from "path";
 import { generateText, type LanguageModelUsage } from "ai";
 import {
+  getDefaultParamsForTask,
   getMaxOutputTokensForTask,
   getModel,
   getModelIdForTask,
@@ -113,7 +114,7 @@ export async function generateScript(
   let lastFinishReason = "unknown";
 
   for (let attempt = 0; attempt <= MAX_SCRIPT_RETRIES; attempt++) {
-    // Delay between retries to avoid MiniMax API throttling
+    // Delay between retries to avoid provider API throttling
     if (attempt > 0) {
       await new Promise((r) => setTimeout(r, 3000 * attempt));
     }
@@ -122,24 +123,16 @@ export async function generateScript(
 
     const result = await generateText({
       model: getModel(PODCAST_SCRIPT_TASK),
-      // ТЗ-CachePipelineMetrics: 2 cache breakpoints (ADR 050 pattern).
-      // Главный profit — multi-topic podcast (3-5 тем): static scriptwriter
-      // system prompt (~3K tokens) переиспользуется из кэша между темами.
+      // Moonshot имеет автоматический prompt cache на стороне провайдера
+      // (cached input $0.16 vs $0.95 — без явных breakpoints). cacheReadTokens
+      // приходят через AI SDK generic `inputTokenDetails.cacheReadTokens`.
       messages: [
-        {
-          role: "system",
-          content: SYSTEM_PROMPT + JSON_INSTRUCTION,
-          providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
-        },
-        {
-          role: "user",
-          content: prompt,
-          providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
-        },
+        { role: "system", content: SYSTEM_PROMPT + JSON_INSTRUCTION },
+        { role: "user", content: prompt },
       ],
       maxOutputTokens: getMaxOutputTokensForTask(PODCAST_SCRIPT_TASK),
+      ...getDefaultParamsForTask(PODCAST_SCRIPT_TASK),
       maxRetries: 0,
-      temperature: 0.7,
     });
 
     const stepFields = extractUsageForPricing(result.usage);

@@ -121,7 +121,8 @@ npm run test             # Playwright E2E
 - [CHANGELOG.md](CHANGELOG.md) — история изменений (semver)
 
 ### Архитектурное (активная серия)
-- [specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md](specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md) — дорожная карта
+- [specs/Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md](specs/Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md) — концепт миграции
+- [specs/Simply_Migration/SIMPLY_BRIEFING_CONCEPT.md](specs/Simply_Migration/SIMPLY_BRIEFING_CONCEPT.md) — концепт Briefing
 - [specs/Simply_xAI/MIND_ARCHITECTURE.md](specs/Simply_xAI/MIND_ARCHITECTURE.md) — автоматическая память из разговоров
 - [specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md](specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md) — обработка вложений
 

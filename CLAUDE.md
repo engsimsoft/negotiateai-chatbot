@@ -109,11 +109,12 @@
 
 ## Текущий этап
 
-**Активная серия:** **Simply_xAI** — миграция с MiniMax+OpenRouter на xAI Grok + Anthropic.
-- Дорожная карта: [specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md](specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md)
+**Активная серия:** **Simply_Migration** — финальная миграция на xAI Grok + Kimi K2.6 + Perplexity (Anthropic Opus только аудитор).
+- Концепт миграции: [specs/Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md](specs/Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md)
+- Концепт Briefing: [specs/Simply_Migration/SIMPLY_BRIEFING_CONCEPT.md](specs/Simply_Migration/SIMPLY_BRIEFING_CONCEPT.md)
 - Архитектура вложений (SSOT): [specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md](specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md)
-- Архитектура MIND: [specs/Simply_xAI/MIND_ARCHITECTURE.md](specs/Simply_xAI/MIND_ARCHITECTURE.md)
-- Лог решений: [specs/Simply_xAI/SIMPLY_XAI_NOTES.md](specs/Simply_xAI/SIMPLY_XAI_NOTES.md)
+- Архитектура MIND (SSOT): [specs/Simply_xAI/MIND_ARCHITECTURE.md](specs/Simply_xAI/MIND_ARCHITECTURE.md)
+- Завершённая серия Simply_xAI: [specs/Simply_xAI/_archive/](specs/Simply_xAI/_archive/)
 
 **Правило:** не отвлекаться на другие ТЗ до завершения серии.
 
@@ -125,12 +126,12 @@
 ## Команды
 
 ```bash
-npm install              # Установка зависимостей
-npm run dev              # Dev сервер (localhost:3000)
-npm run build            # Сборка production (⚠ автоматически накатывает pending migrations)
-npm run start            # Запуск production
-npm run db:migrate       # Применить миграции вручную
-npm run db:studio        # Drizzle Studio
+pnpm install             # Установка зависимостей
+pnpm dev                 # Dev сервер (localhost:3000)
+pnpm build               # Сборка production (⚠ автоматически накатывает pending migrations)
+pnpm start               # Запуск production
+pnpm db:migrate          # Применить миграции вручную
+pnpm db:studio           # Drizzle Studio
 vercel --prod            # Deploy на Vercel
 ```
 
@@ -198,10 +199,10 @@ vercel --prod            # Deploy на Vercel
 
 **⛔ Критические правила (нарушать нельзя):**
 1. **Official docs FIRST** — перед ЛЮБОЙ работой с внешней технологией (SDK, API, модель, библиотека): WebSearch + WebFetch актуальной документации. Работа по памяти = провал. Knowledge cutoff = май 2025.
-2. **Валидация каждой задачи:** `npx tsc --noEmit` → 0 ошибок → только тогда `[x]` в ROADMAP.
-3. **Валидация каждого этапа:** `npm run build` → запросить мануальный тест → дождаться OK → следующий этап. Не «скопом».
+2. **Валидация каждой задачи:** `pnpm exec tsc --noEmit` → 0 ошибок → только тогда `[x]` в ROADMAP.
+3. **Валидация каждого этапа:** `pnpm build` → запросить мануальный тест → дождаться OK → следующий этап. Не «скопом».
 4. **ROADMAP, не TodoWrite** — основной чеклист задач живёт в `specs/TZ_XX/ROADMAP.md`.
-5. **⚠ `npm run build` автоматически накатывает pending migrations** (`tsx lib/db/migrate && next build`). Hard-to-reverse — **предупреждать владельца ДО запуска**.
+5. **⚠ `pnpm build` автоматически накатывает pending migrations** (`tsx lib/db/migrate && next build`). Hard-to-reverse — **предупреждать владельца ДО запуска**.
 6. **CLAUDE.md — не трогать при финализации ТЗ.** История → CHANGELOG, пофайловые детали → `docs/architecture.md`. См. блок ⛔ в шапке файла.
 7. **Один коммит на ТЗ.** Поэтапно валидируем (tsc + build + браузер + OK владельца), но НЕ коммитим на каждый этап. Коммит ровно один в финализации, описывает ТЗ целиком. Исключение — ТЗ длится > недели и один этап блокирует параллельную работу. Для багфиксов — один коммит на исправление.
 8. **Никаких пояснительных комментариев в коде и раздутой документации.** Код описывает себя сам (хорошие имена + структура). Комментарий — только если есть СКРЫТОЕ ограничение, которого из кода не видно. Обновлять `docs/` — только когда реально поменялся контракт (SSOT-код из таблицы Правила 6 WORKFLOW). Никаких диаграмм, ссылок на «индустриальные практики 2026», обоснований решений в коде — это в SPEC.md и ADR, не в файлах проекта.

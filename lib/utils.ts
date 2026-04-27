@@ -157,8 +157,8 @@ export function convertToUIMessages(messages: DBMessage[]): ChatMessage[] {
  *   - `output-error` carries `rawInput` (a raw JSON string that failed to
  *     parse against the tool's Zod schema) and an `errorText`. When
  *     `convertToModelMessages()` processes this, the downstream provider
- *     (MiniMax, Anthropic, etc.) gets a tool_call with unparseable
- *     arguments → 400 "invalid function arguments json string".
+ *     gets a tool_call with unparseable arguments → 400 "invalid function
+ *     arguments json string".
  *   - `input-streaming` / `input-available` represent an interrupted
  *     invocation — same problem.
  *

@@ -2,7 +2,7 @@
  * Model Catalog — SSOT для всех моделей приложения (ТЗ-1 CoreRegistry)
  *
  * Единая запись per модель содержит всё необходимое:
- *  - provider (anthropic | minimax | xai | openrouter | google | perplexity | voyage | deepgram)
+ *  - provider (anthropic | moonshotai | xai | openrouter | google | perplexity | voyage | deepgram)
  *  - modelId (физический id у провайдера)
  *  - displayName (для UI)
  *  - pricing в USD за 1M токенов (формат вендоров)
@@ -18,7 +18,7 @@
 
 export type ProviderId =
   | "anthropic"
-  | "minimax"
+  | "moonshotai"
   | "xai"
   | "openrouter"
   | "google"
@@ -122,15 +122,19 @@ const CAPS_CLAUDE: ModelCapabilities = {
   embeddings: false,
 };
 
-const CAPS_MINIMAX: ModelCapabilities = {
+const CAPS_MOONSHOT: ModelCapabilities = {
   streaming: true,
   tools: true,
   vision: false,
   documentSupport: {
     supported: false,
-    reason: "Anthropic-compat endpoint не поддерживает image/document inputs (verified 2026-04-13)",
+    reason: "Kimi K2.6 — text-only briefing model в Simply, document/image input не интегрирован",
   },
-  thinking: true,
+  // Kimi K2.6 умеет thinking mode, но в Simply используется в Instant
+  // (briefing — длинная связная статья, reasoning не даёт качества, только
+  // увеличивает latency и цену). thinking:false фиксирует это в catalog,
+  // выключение происходит через providerOptions.moonshotai.thinking.
+  thinking: false,
   embeddings: false,
 };
 
@@ -294,29 +298,35 @@ const ENTRIES: ModelEntry[] = [
   // catalog audit discovery.
 
   // =========================================================================
-  // MiniMax
+  // Moonshot AI / Kimi K2.6 — Кухня (briefing author/section/podcast-script).
+  // SDK: @ai-sdk/moonshotai@2.0.11 (dist-tag ai-v6, Vercel monorepo).
+  // Pricing: $0.95 / $4.00 / cached $0.16 — официально на platform.kimi.ai.
+  // defaultParams 0.6/0.95 — обязательная рекомендация Moonshot для Instant
+  // mode (см. quickstart). Применяются через getDefaultParamsForTask getter.
   // =========================================================================
   {
-    id: "MiniMax-M2.7",
-    provider: "minimax",
-    modelId: "MiniMax-M2.7",
-    displayName: "MiniMax M2.7",
-    pricing: { input: 0.3, output: 1.2, cachedInput: 0.06, cacheWrite: 0.375 },
-    capabilities: CAPS_MINIMAX,
-    contextWindow: 204_800,
-    maxOutput: 32_000,
-  },
-  {
-    id: "MiniMax-M2.7-long",
-    provider: "minimax",
-    modelId: "MiniMax-M2.7",
-    displayName: "MiniMax M2.7 (long timeout)",
-    pricing: { input: 0.3, output: 1.2, cachedInput: 0.06, cacheWrite: 0.375 },
-    capabilities: CAPS_MINIMAX,
-    contextWindow: 204_800,
-    maxOutput: 32_000,
-    aliasOf: "MiniMax-M2.7",
-    notes: "Extended 180s fetch timeout — for briefing/memory pipelines",
+    id: "kimi-k2.6",
+    provider: "moonshotai",
+    // TODO: при обновлении @ai-sdk/moonshotai > 2.0.11 проверить, попал ли
+    // "kimi-k2.6" в тип MoonshotAIChatModelId. Пока тип ограничен (kimi-k2,
+    // kimi-k2.5, kimi-k2-thinking, …) — строка проходит через registry как
+    // string (registry.languageModel принимает любой `${provider}:${id}`).
+    modelId: "kimi-k2.6",
+    displayName: "Kimi K2.6",
+    pricing: { input: 0.95, output: 4, cachedInput: 0.16, cacheWrite: 0 },
+    capabilities: CAPS_MOONSHOT,
+    contextWindow: 256_000,
+    maxOutput: 32_768,
+    defaultParams: {
+      temperature: 0.6,
+      topP: 0.95,
+      // Thinking disabled — без этого Kimi возвращает только reasoning_content,
+      // content приходит пустым (verified curl 2026-04-27, finish_reason: length).
+      // Передаётся в streamText/generateText через spread getDefaultParamsForTask.
+      providerOptions: { moonshotai: { thinking: { type: "disabled" } } },
+    },
+    notes:
+      "Instant mode (thinking disabled). Источник параметров: platform.kimi.ai/docs/guide/kimi-k2-6-quickstart. 180s fetch timeout в registry для длинных briefing-генераций.",
   },
 
   // =========================================================================

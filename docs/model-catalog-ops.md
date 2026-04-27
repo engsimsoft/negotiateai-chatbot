@@ -10,7 +10,7 @@
 | `lib/ai/model-catalog.ts` | SSOT — все модели, pricing, capabilities |
 | `lib/ai/task-assignments.ts` | Маппинг 39 задач → модель |
 | `lib/ai/getModel.ts` | Резолв: taskId → override check → catalog → registry |
-| `lib/ai/registry.ts` | AI SDK registry: 5 namespace (anthropic, minimax, minimaxLong, xai, openrouter) |
+| `lib/ai/registry.ts` | AI SDK registry: 4 namespace (anthropic, moonshotai, xai, openrouter) |
 | `lib/ai/model-overrides.ts` | Client-safe: dev-gate, parse overrides |
 | `lib/ai/model-overrides-node.ts` | Server-only: fs read/write `.simply-dev-overrides.json` |
 | `lib/ai/providers.ts` | Cost calculation: `calculateCostRub`, `RUB_PER_USD` |
@@ -23,7 +23,7 @@
 
 **Registry-сервисы** (через `getModel(taskId)`) — переключаемые через Dev Switchboard:
 - Anthropic Claude (Sonnet, Haiku, Opus)
-- MiniMax M2.7
+- Moonshot AI (Kimi K2.6)
 - xAI Grok (4.20, 4.1 Fast)
 - OpenRouter (GLM, Qwen)
 
@@ -57,7 +57,7 @@ model-catalog.ts → resolveModelEntry(catalogId) → registry.ts → LanguageMo
 | Провайдер | Кэш в коде | Где настраивается | Состояние |
 |-----------|-----------|-------------------|-----------|
 | **Anthropic** | `cacheControl: { type: 'ephemeral' }` на system prompt | `app/(chat)/api/chat/route.ts`, ветка `isAnthropicModel` | ✅ Работает, cache_read виден в DevPanel |
-| **MiniMax** | Нет | — | Не поддерживает prompt caching |
+| **Moonshot AI (Kimi K2.6)** | Автоматический server-side cache | — | Cached input pricing $0.16 vs $0.95 base. cacheReadTokens приходят через `inputTokenDetails.cacheReadTokens` (openai-формат адаптируется AI SDK) |
 | **xAI Grok** | Нет в коде | `cachedInput` цены есть в каталоге | ⚠️ Цены есть, но `cacheControl` не подставляется в route.ts |
 | **OpenRouter** | Нет в коде | `cachedInput` для GLM 5.1 / 5V Turbo | ⚠️ Аналогично Grok — цены есть, активация нет |
 
@@ -99,7 +99,7 @@ model-catalog.ts → resolveModelEntry(catalogId) → registry.ts → LanguageMo
 
 ```typescript
 CAPS_CLAUDE          // streaming, tools, vision, documents, thinking, compaction
-CAPS_MINIMAX         // streaming, tools, thinking (NO vision, NO documents, NO compaction)
+CAPS_MOONSHOT        // streaming, tools (NO vision, NO documents, thinking disabled by default in Simply)
 CAPS_GROK            // streaming, tools, vision, thinking (NO documents, NO compaction)
 CAPS_OPENROUTER_TEXT // streaming, tools (NO vision, NO thinking)
 CAPS_OPENROUTER_VISION // streaming, tools, vision (NO thinking)
@@ -118,7 +118,7 @@ CAPS_OPENROUTER_VISION // streaming, tools, vision (NO thinking)
 | **Anthropic** | https://docs.anthropic.com/en/docs/about-claude/models | WebFetch или ручная проверка |
 | **xAI Grok** | https://docs.x.ai/docs/models | WebFetch |
 | **OpenRouter** | `https://openrouter.ai/api/v1/models` | **WebFetch → JSON API** (лучший способ) |
-| **MiniMax** | https://platform.minimax.chat/document/Fast%20price | Ручная проверка |
+| **Moonshot AI** | https://platform.kimi.ai/docs/pricing | Ручная проверка (или WebFetch quickstart страницы модели) |
 | **Perplexity** | https://docs.perplexity.ai/guides/pricing | WebFetch |
 | **Deepgram** | https://deepgram.com/pricing | Ручная проверка |
 | **Voyage AI** | https://docs.voyageai.com/docs/pricing | WebFetch |
@@ -219,9 +219,10 @@ grep -rn '"claude-\|"MiniMax\|"grok-\|"sonar-\|"nova-\|"voyage-\|"gemini-' lib/ 
 - [ ] **Anthropic** — проверить актуальность Claude Sonnet 4.6 / Haiku 4.5 / Opus 4.6:
   - Цены, context window, max output
   - Новые модели? (Claude 4.7? Haiku 4.6?)
-- [ ] **MiniMax** — проверить M2.7:
-  - Цены, capabilities, context window
-  - Новые модели?
+- [ ] **Moonshot AI** — проверить Kimi K2.6:
+  - Цены (input / output / cached input), capabilities, context window
+  - Новые версии модели (K2.7? K3?)
+  - Версия `@ai-sdk/moonshotai` на dist-tag `ai-v6`
 - [ ] **Non-LLM** — Perplexity, Deepgram, Voyage, Gemini TTS:
   - Pricing не менялся?
   - Новые модели у провайдера?

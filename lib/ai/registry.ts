@@ -12,34 +12,22 @@
  */
 
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createXai } from "@ai-sdk/xai";
+import { createMoonshotAI } from "@ai-sdk/moonshotai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createXai } from "@ai-sdk/xai";
 import { createProviderRegistry } from "ai";
-import { createMinimax } from "vercel-minimax-ai-provider";
-
-// ---------------------------------------------------------------------------
-// Provider factories
-// ---------------------------------------------------------------------------
 
 const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// MiniMax — официально рекомендованный Anthropic-совместимый режим
-// (`api.minimax.io/anthropic/v1`). Под капотом провайдер проксирует запросы
-// через AnthropicMessagesLanguageModel из @ai-sdk/anthropic/internal, что
-// даёт нативную поддержку streamText, tool calling, generateObject, reasoning
-// parts и explicit `providerOptions.anthropic.cacheControl` (до 4 breakpoints).
-// См. ADR 049.
-const minimax = createMinimax({
-  apiKey: process.env.MINIMAX_API_KEY,
-});
-
-// Long-timeout MiniMax — 180s для briefing/memory pipelines с большими промптами.
-// Зарегистрирован как отдельный provider-namespace (minimaxLong:*) чтобы getModel()
-// мог различать их через алиасы в model-catalog.
-const minimaxLong = createMinimax({
-  apiKey: process.env.MINIMAX_API_KEY,
+// Moonshot AI / Kimi K2.6 — официальный @ai-sdk/moonshotai (Vercel monorepo,
+// dist-tag ai-v6 = 2.0.11). Все 3 briefing-задачи (author/section/podcast-script)
+// — длинные кухонные генерации до 32K output, занимающие 60-120 сек. Custom
+// fetch с 180s AbortSignal.timeout — иначе default fetch timeout (~30s)
+// прервёт длинные генерации.
+const moonshotai = createMoonshotAI({
+  apiKey: process.env.MOONSHOT_API_KEY ?? "",
   fetch: async (url, init) => {
     return fetch(url, { ...init, signal: AbortSignal.timeout(180_000) });
   },
@@ -53,15 +41,10 @@ const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
-// ---------------------------------------------------------------------------
-// Registry
-// ---------------------------------------------------------------------------
-
 export const registry = createProviderRegistry(
   {
     anthropic,
-    minimax,
-    minimaxLong,
+    moonshotai,
     xai,
     openrouter,
   },
@@ -70,7 +53,6 @@ export const registry = createProviderRegistry(
 
 export type RegistryProviderId =
   | "anthropic"
-  | "minimax"
-  | "minimaxLong"
+  | "moonshotai"
   | "xai"
   | "openrouter";

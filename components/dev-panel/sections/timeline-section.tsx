@@ -13,8 +13,7 @@ const MODEL_SHORT: Record<string, string> = {
   "grok-4.20-0309-reasoning": "Grok 4.20·R",
   "grok-4.20-0309-non-reasoning": "Grok 4.20",
   "grok-4.20-multi-agent-0309": "Grok 4.20·MA",
-  "MiniMax-M2.7": "MiniMax",
-  "MiniMax-M2.7-long": "MiniMax·L",
+  "kimi-k2.6": "Kimi K2.6",
 };
 
 export function TimelineSection({ data }: { data: DevPanelMessageData }) {

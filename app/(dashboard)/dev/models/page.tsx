@@ -37,7 +37,7 @@ const PROVIDER_ENV_MAP: Array<{
   isLlmRegistry: boolean;
 }> = [
   { provider: "anthropic",  envVar: "ANTHROPIC_API_KEY",            isLlmRegistry: true },
-  { provider: "minimax",    envVar: "MINIMAX_API_KEY",              isLlmRegistry: true },
+  { provider: "moonshotai", envVar: "MOONSHOT_API_KEY",             isLlmRegistry: true },
   { provider: "xai",        envVar: "XAI_API_KEY",                  isLlmRegistry: true },
   { provider: "openrouter", envVar: "OPENROUTER_API_KEY",           isLlmRegistry: true },
   { provider: "voyage",     envVar: "VOYAGE_API_KEY",               isLlmRegistry: false },

@@ -13,6 +13,7 @@
  * например per-user overrides из БД).
  */
 
+import type { ProviderOptions } from "@ai-sdk/provider-utils";
 import { wrapLanguageModel, type LanguageModel } from "ai";
 
 import { isTestEnvironment } from "../constants";
@@ -100,7 +101,7 @@ function getMockModel(): LanguageModel {
 
 const PROVIDER_TO_REGISTRY: Record<string, RegistryProviderId | null> = {
   anthropic: "anthropic",
-  minimax: "minimax", // дефолтный minimax; briefing использует minimaxLong (см. ниже)
+  moonshotai: "moonshotai",
   xai: "xai",
   openrouter: "openrouter",
   // Non-LLM провайдеры не в registry — возвращаем null
@@ -110,20 +111,10 @@ const PROVIDER_TO_REGISTRY: Record<string, RegistryProviderId | null> = {
   google: null,
 };
 
-/**
- * Сборка строки `provider:modelId` для registry.languageModel().
- * Специальный случай: алиас `MiniMax-M2.7-long` → registry namespace `minimaxLong`.
- */
+/** Сборка строки `provider:modelId` для registry.languageModel(). */
 function buildRegistryId(catalogId: string): string | null {
   const entry = getModelEntry(catalogId);
   if (!entry) return null;
-
-  // Специальный случай — briefing использует MiniMax с extended timeout (180s).
-  // В каталоге это алиас `MiniMax-M2.7-long` → physical `MiniMax-M2.7`, но зарегистрирован
-  // под отдельным provider namespace `minimaxLong`.
-  if (catalogId === "MiniMax-M2.7-long") {
-    return "minimaxLong:MiniMax-M2.7";
-  }
 
   const resolved = resolveModelEntry(catalogId);
   if (!resolved) return null;
@@ -229,6 +220,44 @@ export function taskSupportsThinking(
   const catalogId = overrideId ?? DEFAULT_TASK_MODELS[taskId];
   const resolved = resolveModelEntry(catalogId);
   return resolved?.capabilities.thinking ?? false;
+}
+
+/**
+ * Default-параметры из catalog entry для задачи. Возвращает {} если у модели
+ * нет `defaultParams` или поля не заданы. Call-sites спредят результат в
+ * streamText/generateText:
+ *
+ *   const params = getDefaultParamsForTask("briefing:author");
+ *   streamText({ model: getModel(...), ...params, /* override if needed *\/ });
+ *
+ * SSOT — `defaultParams` в `model-catalog.ts` ModelEntry. Замена модели для
+ * taskId автоматически подхватывает её параметры (Блок 9 концепта миграции).
+ *
+ * Поддерживаемые поля: temperature, topP, providerOptions. Расширять при
+ * добавлении других параметров через catalog.
+ */
+export interface DefaultTaskParams {
+  temperature?: number;
+  topP?: number;
+  providerOptions?: ProviderOptions;
+}
+
+export function getDefaultParamsForTask(
+  taskId: TaskId,
+  context?: GetModelContext,
+): DefaultTaskParams {
+  const overrideId = lookupOverride(taskId, context);
+  const catalogId = overrideId ?? DEFAULT_TASK_MODELS[taskId];
+  const resolved = resolveModelEntry(catalogId);
+  const params = resolved?.defaultParams;
+  if (!params) return {};
+  const result: DefaultTaskParams = {};
+  if (typeof params.temperature === "number") result.temperature = params.temperature;
+  if (typeof params.topP === "number") result.topP = params.topP;
+  if (params.providerOptions && typeof params.providerOptions === "object") {
+    result.providerOptions = params.providerOptions as ProviderOptions;
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------

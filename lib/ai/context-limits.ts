@@ -10,7 +10,7 @@
  * ADR 054 Single-strategy provider-agnostic compaction.
  */
 
-/** Simply context window limit: min(MiniMax 204K, Sonnet 200K). База всех % порогов. */
+/** Simply context window limit: min активных моделей чата (Sonnet 200K, Haiku 200K). База всех % порогов. */
 export const SIMPLY_CONTEXT_LIMIT = 200_000;
 
 /** Threshold (0-1): suggest snapshot at this % of working budget (legacy Snapshot tool). */

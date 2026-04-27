@@ -112,8 +112,6 @@ export function getStandardTools({
  *
  * Safe to apply to:
  *  - `anthropic` provider (pure Claude через `@ai-sdk/anthropic`)
- *  - `minimax` / `minimaxLong` providers (тонкая обёртка над `AnthropicMessages-
- *    LanguageModel` из `@ai-sdk/anthropic/internal`, идентичный синтаксис)
  *
  * The last key is chosen by JavaScript object-key insertion order, which is
  * deterministic since ES2015. In `getStandardTools()` the last entry is always
@@ -204,7 +202,7 @@ const ALL_TOOL_NAMES = [
 
 type ToolName = (typeof ALL_TOOL_NAMES)[number];
 
-/** Tools excluded for chatMode 'simply' (MiniMax) — expensive Perplexity API ($0.02-$0.80/call) */
+/** Tools excluded for chatMode 'simply' — deepResearch вызывает дорогой Perplexity API ($0.02-$0.80/call) */
 const SIMPLY_MODE_EXCLUDED_TOOLS: ToolName[] = ["deepResearch"];
 
 /**
@@ -212,8 +210,8 @@ const SIMPLY_MODE_EXCLUDED_TOOLS: ToolName[] = ["deepResearch"];
  * Controls which tools the model can call.
  *
  * @param isProjectChat - true for project chats (separate tool set)
- * @param chatMode - chat mode for regular chats — filters deepResearch for 'simply' (MiniMax) unless Think is active
- * @param think - true when "Думать" mode is active (Sonnet override) — unlocks all tools for simply
+ * @param chatMode - chat mode for regular chats — filters deepResearch for 'simply' unless Think is active
+ * @param think - true when "Думать" mode is active (tier upgrade) — unlocks all tools for simply
  */
 export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode, think?: boolean): ToolName[] {
   if (isProjectChat) {
@@ -251,7 +249,7 @@ export function getActiveToolNames(isProjectChat: boolean, chatMode?: ChatMode, 
     "readTelegramChannel",
   ];
 
-  // Filter out deepResearch for chatMode 'simply' (MiniMax) — unless "Думать" (Sonnet) is active
+  // Filter out deepResearch for chatMode 'simply' — unless "Думать" tier upgrade is active
   if (chatMode === "simply" && !think) {
     return baseTools.filter((t) => !SIMPLY_MODE_EXCLUDED_TOOLS.includes(t));
   }

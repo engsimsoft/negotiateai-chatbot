@@ -92,10 +92,10 @@
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  External Services                                          │
-│  ├── xAI Grok          - Simply Chat + MIND extract +     │
-│  │                       Collections RAG (Библиотека ✅)   │
-│  ├── Anthropic Claude  - Expertise, vision, artifacts, clerks │
-│  ├── MiniMax           - create chatMode + briefing pipeline │
+│  ├── xAI Grok          - Simply Chat + Expertise + Create  │
+│  │                       + MIND + Collections RAG (Библиотека ✅) │
+│  ├── Anthropic Claude  - vision, artifacts, professor, clerks │
+│  ├── Moonshot AI       - briefing pipeline (Kimi K2.6)     │
 │  ├── Google Gemini     - reserved (TTS / fallback)         │
 │  ├── Brave Search API  - Web search                        │
 │  ├── Deepgram          - Voice input (Nova-3)              │
@@ -154,14 +154,14 @@
 - **`getModel.ts`** — публичный API (`getModel`, `getModelIdForTask`, `getProviderForTask`, `taskSupportsThinking`, `getMaxOutputTokensForTask`). Порядок резолва модели: test mocks → dev overrides → task-assignments → catalog → registry. `getMaxOutputTokensForTask(taskId)` применяет двухслойную safety-net: `Math.min(requested, modelCapability)` + `warnOnce` при `provider === "anthropic" && effective > 21333` (см. ADR 053).
 - **`task-assignments.ts`** — SSOT маппинга `TaskId → catalogId` (`DEFAULT_TASK_MODELS`) + **SSOT лимитов output** (`DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number>` — compile-time check через TS). Изменение default-модели или output cap для задачи = одна строка.
 - **`model-catalog.ts`** — SSOT физических моделей: pricing (USD/1M), capabilities (vision/tools/thinking), contextWindow, алиасы.
-- **`registry.ts`** — `createProviderRegistry` (AI SDK v6) с 5 namespace: `anthropic`, `minimax`, `minimaxLong` (180s timeout), `xai`, `openrouter`.
+- **`registry.ts`** — `createProviderRegistry` (AI SDK v6) с 4 namespace: `anthropic`, `moonshotai` (180s fetch timeout для briefing), `xai`, `openrouter`.
 - **`providers.ts`** — остался как **чистый pricing/cost utility module**: `calculateCostRub`, `calculateCostBreakdownRub`, `extractUsageForPricing`, `getContextWindow`, non-LLM cost helpers (Deepgram, Gemini TTS). Больше не содержит model resolution logic.
 
 **Детали и обоснование:** [ADR 047](decisions/047-core-model-registry.md), [ai-providers.md](ai-providers.md).
 
 #### AI SDK version
 - `ai@6.x` + `@ai-sdk/anthropic@3.x` + `@ai-sdk/google@3.x` + `@ai-sdk/xai@3.x` + `@ai-sdk/react@3.x`
-- `vercel-minimax-ai-provider@0.0.2` (Anthropic-compatible для MiniMax, прокси через `@ai-sdk/anthropic/internal`, ADR 049)
+- `@ai-sdk/moonshotai@2.0.11` (dist-tag `ai-v6`, официальный Vercel пакет для Moonshot AI / Kimi K2.6)
 - `@openrouter/ai-sdk-provider` (GLM, Qwen — зарезервировано)
 
 #### Prompt System
@@ -178,7 +178,7 @@
 
 #### `lib/ai/compaction/` — Simply Compaction middleware (ТЗ-COMPACTION-1, v3.94.0)
 
-6 файлов: `types.ts` (CompactionContext / CompactionEvent / PrepareMessagesResult), `prompt.ts` (системный промпт + rolling-update паттерн), `summarize.ts` (`generateCompactionSummary` через Grok 4.1 Fast non-reasoning + Zod 5-секционная схема), `db-queries.ts` (get/saveCompactionState с собственным Neon HTTP клиентом), `prepare-messages.ts` (основная middleware с verbatim window и edge cases), `events.ts` (`emitCompactionEvent` для user-visible виджета). Capability-driven резолв через `getCompactionStrategy(modelId)` в [model-catalog.ts](../lib/ai/model-catalog.ts). Активна в `expertise` / `create` через gate в [chat/route.ts:1060](../app/(chat)/api/chat/route.ts#L1060). **Детали:** [ADR 053 § 5. context strategy](decisions/053-aisdk-invocation-contract.md), [SIMPLY_COMPACTION_ARCHITECTURE.md](../specs/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md).
+6 файлов: `types.ts` (CompactionContext / CompactionEvent / PrepareMessagesResult), `prompt.ts` (системный промпт + rolling-update паттерн), `summarize.ts` (`generateCompactionSummary` через Grok 4.1 Fast non-reasoning + Zod 5-секционная схема), `db-queries.ts` (get/saveCompactionState с собственным Neon HTTP клиентом), `prepare-messages.ts` (основная middleware с verbatim window и edge cases), `events.ts` (`emitCompactionEvent` для user-visible виджета). Capability-driven резолв через `getCompactionStrategy(modelId)` в [model-catalog.ts](../lib/ai/model-catalog.ts). Активна в `expertise` / `create` через gate в [chat/route.ts:1060](../app/(chat)/api/chat/route.ts#L1060). **Детали:** [ADR 053 § 5. context strategy](decisions/053-aisdk-invocation-contract.md), [SIMPLY_COMPACTION_ARCHITECTURE.md](../specs/_archive/Simply_xAI/SIMPLY_COMPACTION_ARCHITECTURE.md).
 
 **SSOT = [ai-tools.md](ai-tools.md)** — полный список каждого tool-а с API, примерами использования, форматами, лимитами. При добавлении нового tool обновлять **там**, не здесь.
 
@@ -278,7 +278,7 @@
 - **Pipeline:** `lib/briefing/` (fetch sources → filter → author → sections)
 - **UI:** `components/briefing/` (settings, history, topic picker)
 - **БД:** `BriefingSettings`, `BriefingSources`, `BriefingTopics`, `BriefingHistory`, `SavedBriefingTopics`
-- **Models:** `briefing:filter|author|section` (MiniMax M2.7-long), `briefing:podcast-script` (MiniMax M2.7)
+- **Models:** `briefing:filter` (Grok 4.1 Fast), `briefing:author|section|podcast-script` (Kimi K2.6, Instant mode)
 - **Детали:** [ADR 026](decisions/026-background-briefing-architecture.md)
 
 ### Podcast
@@ -324,7 +324,7 @@
 - **БД:** `library_collection`, `library_document`, `library_collection_document` (миграции 0059–0063)
 - **Models:** `library:auto-analyze` (автотип/теги/описание при upload), `library:generate-summary` (развёрнутый автообзор после indexing), `library-document-chat` (split-view мини-чат). Все на Grok 4.1 Fast non-reasoning
 - **chatMode:** `library-document` (изолированный мини-чат, MIND off, tool set = только `librarySearch` с `lockedFileId`)
-- **Архитектура:** [specs/Simply_xAI/TZ_xai_col_1/SIMPLY_LIBRARY_ARCHITECTURE.md](../specs/Simply_xAI/TZ_xai_col_1/SIMPLY_LIBRARY_ARCHITECTURE.md)
+- **Архитектура:** [SIMPLY_LIBRARY_ARCHITECTURE.md](../specs/_archive/Simply_xAI/TZ_xai_col_1/SIMPLY_LIBRARY_ARCHITECTURE.md)
 - **ADR:** [056-library-upload-collections-endpoint.md](decisions/056-library-upload-collections-endpoint.md) (почему management-api/v1/collections/{id}/documents вместо /v1/files)
 - **Принцип:** для персональной памяти (разговоры) → Voyage + pgvector. Для документов-знаний → xAI Collections из коробки, не изобретаем.
 
@@ -501,7 +501,7 @@ p-limit(3) concurrent processing
 **Мультипровайдерная маршрутизация:**
 - **xAI Grok** — Simply Chat (4.1 Fast / 4.20), MIND memory, Экспертиза Multi-Agent
 - **Anthropic Claude** — Haiku (vision OCR, утилиты, клерки), Sonnet (создание артефактов, meeting summary), Opus (профессор, project expert tier)
-- **MiniMax** — create chatMode + briefing pipeline (filter / author / section / podcast-script, long timeout алиас)
+- **Moonshot AI (Kimi K2.6)** — briefing pipeline (`briefing:author`, `briefing:section`, `briefing:podcast-script`, Instant mode, 180s fetch timeout)
 - SSOT резолва — `lib/ai/task-assignments.ts` + `lib/ai/model-catalog.ts`
 - Детали: [ai-chats-map.md](ai-chats-map.md), [ai-providers.md](ai-providers.md)
 

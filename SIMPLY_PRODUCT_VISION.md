@@ -8,7 +8,7 @@
 > — **Лимит: ~200 строк.** При достижении — STOP и доложить владельцу.
 > — Этот файл отвечает на **«зачем и куда»**, не на «что работает сегодня».
 > — НЕ писать сюда: версии продукта, конкретные модели, цены, ТЗ-теги, статусы компонентов (✅/📋), пофайловые детали, списки инструментов/агентов/моделей.
-> — Текущее состояние → [SIMPLY_STATUS.md](SIMPLY_STATUS.md). Модели → [docs/ai-chats-map.md](docs/ai-chats-map.md). История → [CHANGELOG.md](CHANGELOG.md). Дорожная карта активной серии → [specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md](specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md).
+> — Текущее состояние → [SIMPLY_STATUS.md](SIMPLY_STATUS.md). Модели → [docs/ai-chats-map.md](docs/ai-chats-map.md). История → [CHANGELOG.md](CHANGELOG.md). Активная серия → [specs/Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md](specs/Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md).
 > — Ревью по кварталам, не по релизам. Между ревью — не дописывать.
 > — Следовать [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md).
 
@@ -111,7 +111,7 @@ Simply знает пользователя через три независим�
 
 **Дальний горизонт** — Simply как ежедневный «второй мозг» бизнес-пользователя. Не инструмент, который открываешь когда нужно, а пространство, которое работает на тебя в фоне: собирает информацию, готовит решения, напоминает о важном, превращает разговоры и встречи в структурированные знания. Метрика успеха — пользователь возвращается в Simply несколько раз в день без напоминаний, потому что это выгоднее, чем любая альтернатива.
 
-Активная серия ТЗ и ближайшие приоритеты — в [specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md](specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md). Этот файл не дублирует roadmap и не обновляется при завершении отдельных ТЗ.
+Активная серия ТЗ и ближайшие приоритеты — в [specs/Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md](specs/Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md). Этот файл не дублирует roadmap и не обновляется при завершении отдельных ТЗ.
 
 ---
 
@@ -144,7 +144,8 @@ Simply знает пользователя через три независим�
 - [CHANGELOG.md](CHANGELOG.md) — история изменений по semver
 
 **Активная серия:**
-- [specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md](specs/Simply_xAI/SIMPLY_XAI_ROADMAP.md) — дорожная карта
+- [specs/Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md](specs/Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md) — концепт миграции
+- [specs/Simply_Migration/SIMPLY_BRIEFING_CONCEPT.md](specs/Simply_Migration/SIMPLY_BRIEFING_CONCEPT.md) — концепт Briefing
 - [specs/Simply_xAI/MIND_ARCHITECTURE.md](specs/Simply_xAI/MIND_ARCHITECTURE.md) — архитектура автопамяти
 - [specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md](specs/Simply_xAI/SIMPLY_ATTACHMENT_ARCHITECTURE.md) — обработка вложений и библиотека
 
