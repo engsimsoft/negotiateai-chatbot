@@ -595,7 +595,8 @@ export async function POST(request: Request) {
       id,
       maxTokens: 140000 - newMessageTokens,
       minMessages: 20,
-      maxMessages: 200,
+      // maxMessages: дефолт 10000 (см. queries.ts) — token-aware sliding window
+      // ниже сама обрежет по budget. Жёсткий лимит 200 ломал prompt cache.
     });
 
     const uiMessages = [...convertToUIMessages(messagesFromDb), processedMessage];
@@ -1221,6 +1222,10 @@ export async function POST(request: Request) {
         }
 
         // Standard streaming mode (non-professor)
+        // ТЗ-FixSimplyMemory followup: x-grok-conv-id sticky-routes запросы одного
+        // chatId на тот же физический сервер xAI — кэш у них per-server, без
+        // header'а кэш hit-rate проседает. Применяем только для xAI; Anthropic
+        // и Moonshot имеют собственные механизмы кэширования.
         const result = streamText({
           model: modelToUse,
           maxOutputTokens: getMaxOutputTokensForTask(activeTaskId),
@@ -1232,6 +1237,9 @@ export async function POST(request: Request) {
           // via SIMPLY_MODE_EXCLUDED_TOOLS in chat-tools.ts.
           experimental_activeTools: getActiveToolNames(isProjectChat, chatMode, think),
           tools: toolsForRequest,
+          ...(effectiveProvider === "xai" && {
+            headers: { "x-grok-conv-id": id },
+          }),
           experimental_transform: smoothStream({ chunking: "word" }),
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,

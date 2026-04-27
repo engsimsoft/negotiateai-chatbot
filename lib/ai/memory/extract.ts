@@ -184,6 +184,10 @@ export async function batchExtractFacts(
 
     // Single batch call for the whole conversation via native generateObject.
     // Verified 2026-04-14 that xAI generateObject works natively via @ai-sdk/xai.
+    // ТЗ-FixSimplyMemory followup: x-grok-conv-id для xAI sticky-routing —
+    // тот же chatId → тот же сервер → разогретый кэш на повторных compaction
+    // циклах одного чата.
+    const extractProvider = getProviderForTask(MEMORY_EXTRACT_BATCH_TASK);
     const { object: parsedResult, usage } = await generateObject({
       model: getModel(MEMORY_EXTRACT_BATCH_TASK),
       maxOutputTokens: getMaxOutputTokensForTask(MEMORY_EXTRACT_BATCH_TASK),
@@ -192,6 +196,9 @@ export async function batchExtractFacts(
       system: EXTRACT_BATCH_SYSTEM_PROMPT,
       prompt: conversationBlock,
       temperature: 0.1,
+      ...(extractProvider === "xai" && {
+        headers: { "x-grok-conv-id": chatId },
+      }),
     });
 
     const durationMs = Date.now() - startTime;

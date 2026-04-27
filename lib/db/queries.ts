@@ -508,7 +508,13 @@ export async function getMessagesByChatId({
   id,
   maxTokens = 140000,
   minMessages = 20,
-  maxMessages = 200, // Hard limit to prevent loading thousands of messages
+  // ТЗ-FixSimplyMemory followup: безопасный potolok. Реальный бюджет задаётся
+  // `maxTokens` через token-aware sliding window ниже. Лимит 200 ломал xAI
+  // prompt cache: при росте чата >200 «хвост» сдвигался каждый turn, первое
+  // сообщение в массиве менялось → префикс байт-в-байт расходился → cache
+  // invalidate сразу после system+tools (видели cache_read ≈ 6K при 80K
+  // истории). 10000 — заведомо недостижимо для одного чата.
+  maxMessages = 10000,
   excludeExtracted = false, // ТЗ-ExtractCompression: only load messages where extractedAt IS NULL
 }: {
   id: string;

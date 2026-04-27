@@ -7,6 +7,31 @@
 
 ## [Unreleased]
 
+### [3.100.1] — 2026-04-27 — hotfix(xai-cache) — починен xAI prompt cache на длинных Simply chats
+
+**После v3.100.0 Simply стал грузить полную историю (≈80K токенов вместо 7K) — и сразу обнаружилась дыра, которая раньше была невидима: xAI prompt cache hit-rate ≈ 7% (cache_read 6K при 80K input). Цена на каждом ответе ₽1.73 вместо потенциальных ₽0.40-0.50.**
+
+**Корень (найден через побайтный diff HTTP request body двух соседних turns в одном чате):**
+- Префикс расходился ровно на 27 244 байте — сразу после system prompt + tools
+- Причина: `getMessagesByChatId` имел `LIMIT 200`, чат вырос до 242 сообщений → каждый turn чат увеличивался на 2 сообщения (user+assistant) → выборка top-200 **сдвигала хвост**, **первое сообщение в массиве менялось turn-to-turn**
+- xAI cache работает по prefix matching → любой сдвиг ломает кэш сразу после стабильной части
+- До v3.100.0 проблема была невидима: Simply грузил ≤2 сообщений (`excludeExtracted=true`), LIMIT 200 никогда не срабатывал
+
+**Что изменилось:**
+- [lib/db/queries.ts](lib/db/queries.ts) — `maxMessages` дефолт 200 → **10000**. Реальный бюджет задаётся `maxTokens` через token-aware sliding window — это правильное ограничение. Лимит на сообщения убрали как anti-pattern (произвольное число вместо token budget).
+- [app/(chat)/api/chat/route.ts](app/(chat)/api/chat/route.ts) — убран явный override `maxMessages: 200` для всех chatMode (используется новый дефолт)
+- [app/(chat)/api/chat/route.ts](app/(chat)/api/chat/route.ts) — `streamText({ headers: { "x-grok-conv-id": id } })` для xAI provider. Header реализует sticky routing per-server (xAI cache хранится локально на каждом сервере). Условный — только для `effectiveProvider === "xai"`, Anthropic/Moonshot не трогаем
+- [lib/ai/memory/extract.ts](lib/ai/memory/extract.ts) — тот же header в `generateObject` для batch-extract: повторные compaction циклы одного чата получают разогретый кэш на той же машине xAI
+
+**Ожидаемый эффект (мануально подтверждён):**
+- 1-й turn в чате: cache miss (новый сервер)
+- 2+ turns: cache_read достигает 70-80K, fresh ≈ 5K
+- Cost / turn падает с ₽1.73 до ~₽0.40-0.50 на длинных чатах
+
+**Версия проекта:** 3.100.0 → 3.100.1 (patch — bug fix, без изменения поведения)
+
+---
+
 ### [3.100.0] — 2026-04-27 — ТЗ-FixSimplyMemory — Simply больше не теряет память между turns
 
 **Critical fix: убран фильтр `excludeExtracted=true`, который агрессивно резал inline-историю Simply Chat по `extractedAt IS NULL`. До фикса модель «помнила только последнее сообщение» — 192 сообщения в БД, 49K tokens, использовалось 7K (3.5% окна grok-4-1-fast). Сбой Voyage = полная амнезия. Архитектурный фикс: история чата = primary source, MIND = augmentation. Compaction (provider-agnostic, ADR 054) сжимает старое автоматически.**
