@@ -8,18 +8,39 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import type { CompactionEvent } from "@/lib/ai/compaction/types";
+import {
+  COMPACTION_THRESHOLD_SOFT,
+  SIMPLY_CONTEXT_LIMIT,
+} from "@/lib/ai/context-limits";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 
 export type ContextProps = ComponentProps<"button"> & {
-  /** Cumulative session usage — summed across all messages in this chat. */
+  /**
+   * Текущее заполнение контекста для прогресс-бара. Cost-секции в виджете
+   * больше нет (last-turn — плашка под сообщением, разбивка — DevPanel).
+   * Best practice (Claude Code statusline / Cursor): только % + индикатор
+   * сжатия, никаких токенов и ID моделей в UI пользователя.
+   */
   usage?: AppUsage;
 };
 
 const PERCENT_MAX = 100;
+
+/**
+ * Шкала прогресс-бара = заполнение **до Compaction Soft порога** (100K из
+ * 200K = «критическая масса» с точки зрения пользователя). Это то что
+ * реально влияет на UX: при достижении 100% сработает сжатие.
+ * Полный лимит 200K — техническая деталь, в UI не показывается.
+ */
+const COMPACTION_TRIGGER_TOKENS =
+  SIMPLY_CONTEXT_LIMIT * COMPACTION_THRESHOLD_SOFT;
+
+/** Цветовые пороги по % до сжатия (от 0 до COMPACTION_TRIGGER_TOKENS). */
+const COLOR_AMBER_THRESHOLD = 70;
+const COLOR_RED_THRESHOLD = 90;
 
 // Lucide CircleIcon geometry
 const ICON_VIEWBOX = 24;
@@ -84,16 +105,11 @@ export const ContextIcon = ({ percent, isCompacted }: ContextIconProps) => {
   );
 };
 
-function formatRub(rub: number): string {
-  if (rub <= 0) return "—";
-  if (rub < 0.01) return "< ₽0.01";
-  return `₽${rub.toFixed(2)}`;
-}
-
 // ТЗ-COMPACTION-UNIFY (ADR 054): индикатор compaction в popover виджета контекста.
 // Compaction работает молча — только факт «произошло сжатие», без warning
-// и action button. Ручной handoff в новый чат перенесён в COMPACTION-3.
+// и action button. Текст человеческий — без цифр squeezed/summary, они в DevPanel.
 function CompactionIndicator({ event }: { event: CompactionEvent }) {
+  const multiple = event.compactionCount > 1;
   return (
     <div className="flex items-start gap-2">
       <Package
@@ -101,48 +117,35 @@ function CompactionIndicator({ event }: { event: CompactionEvent }) {
         className="mt-0.5 size-4 shrink-0 text-muted-foreground"
       />
       <div className="space-y-0.5 text-xs">
-        <div className="font-medium">Разговор сжат</div>
+        <div className="font-medium">Память освобождена</div>
         <div className="text-muted-foreground">
-          {event.squeezedTokens.toLocaleString()} → ~
-          {event.summaryTokens.toLocaleString()} токенов
-          {event.compactionCount > 1 && ` · сжатий: ${event.compactionCount}`}
+          {multiple
+            ? `Старая часть разговора собрана в краткое резюме · ${event.compactionCount} раза`
+            : "Старая часть разговора собрана в краткое резюме, чтобы освободить место для новых сообщений"}
         </div>
       </div>
     </div>
   );
 }
 
-function InfoRow({
-  label,
-  tokens,
-  rub,
-  accent,
-}: {
-  label: string;
-  tokens: number;
-  rub: number;
-  /** Optional color accent: "discount" (green) for cache_read, "premium" (amber) for cache_write. */
-  accent?: "discount" | "premium";
-}) {
-  return (
-    <div className="flex items-center justify-between text-xs">
-      <span
-        className={cn(
-          "text-muted-foreground",
-          accent === "discount" && "text-emerald-600 dark:text-emerald-400",
-          accent === "premium" && "text-amber-600 dark:text-amber-400",
-        )}
-      >
-        {label}
-      </span>
-      <div className="flex items-center gap-2 font-mono">
-        <span className="min-w-[4ch] text-right">{tokens.toLocaleString()}</span>
-        <span className="text-muted-foreground min-w-[5ch] text-right">
-          {formatRub(rub)}
-        </span>
-      </div>
-    </div>
-  );
+/**
+ * Цвет прогресс-бара по % приближения к моменту сжатия:
+ *  - до 70% — нейтральный bg-primary («свободно»)
+ *  - 70-90% — янтарный («скоро сжатие»)
+ *  - 90%+ — destructive («сжатие близко»)
+ */
+function getBarColorClass(percent: number): string {
+  if (percent >= COLOR_RED_THRESHOLD) return "bg-destructive";
+  if (percent >= COLOR_AMBER_THRESHOLD)
+    return "bg-amber-500 dark:bg-amber-400";
+  return "bg-primary";
+}
+
+/** Короткая фраза-статус для пользователя по % до сжатия. */
+function getStatusLabel(percent: number): string {
+  if (percent >= COLOR_RED_THRESHOLD) return "Сжатие близко";
+  if (percent >= COLOR_AMBER_THRESHOLD) return "Скоро сжатие";
+  return "Свободно";
 }
 
 export const Context = ({
@@ -151,14 +154,16 @@ export const Context = ({
   ...props
 }: ContextProps) => {
   const contextUsed = usage?.contextWindow.used ?? 0;
-  const contextMax = usage?.contextWindow.max ?? 0;
-  const hasMax = contextMax > 0;
-  const usedPercent = hasMax
-    ? Math.min(100, (contextUsed / contextMax) * 100)
-    : 0;
-
-  const cost = usage?.costRub;
-  const totalRub = cost?.totalRub ?? 0;
+  // Шкала идёт до Soft порога (точка сжатия), не до полного лимита 200K.
+  // Когда контекст переходит порог — Compaction срабатывает, prior history
+  // ужимается в summary, used уменьшится естественно. До этого момента
+  // прогресс-бар может показывать до 100% (≥ COMPACTION_TRIGGER_TOKENS).
+  const usedPercent = Math.min(
+    PERCENT_MAX,
+    (contextUsed / COMPACTION_TRIGGER_TOKENS) * 100,
+  );
+  const barColorClass = getBarColorClass(usedPercent);
+  const statusLabel = getStatusLabel(usedPercent);
 
   // ТЗ-COMPACTION-1: подписка на data-compaction события. Извлекаем последнее
   // событие (если пришло несколько за сессию — показываем свежее состояние).
@@ -188,7 +193,7 @@ export const Context = ({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-fit p-3" side="top">
-        <div className="min-w-[260px] space-y-2">
+        <div className="min-w-65 space-y-2">
           {/* ТЗ-COMPACTION-UNIFY: compaction indicator (при наличии события) */}
           {compactionEvent && (
             <>
@@ -197,75 +202,25 @@ export const Context = ({
             </>
           )}
 
-          {/* Context window (last message fill) */}
+          {/* Заполнение контекста до момента сжатия. Только % + статус-фраза,
+              без токенов и ID моделей (best practice Claude Code/Cursor). */}
           <div className="space-y-1">
-            <div className="flex items-start justify-between text-sm">
+            <div className="flex items-baseline justify-between text-sm">
               <span className="font-medium">Контекст</span>
-              <span className="text-muted-foreground tabular-nums">
-                {hasMax
-                  ? `${contextUsed.toLocaleString()} / ${contextMax.toLocaleString()}`
-                  : `${contextUsed.toLocaleString()} tokens`}
+              <span className="font-mono font-medium tabular-nums">
+                {Math.round(usedPercent)}%
               </span>
             </div>
-            <Progress className="h-2 bg-muted" value={usedPercent} />
-            <div className="text-[10px] text-muted-foreground text-right">
-              {usedPercent.toFixed(1)}% окна модели ({usage?.modelId ?? "—"})
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn("h-full transition-all", barColorClass)}
+                style={{ width: `${usedPercent}%` }}
+              />
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              {statusLabel}
             </div>
           </div>
-
-          {usage && (
-            <>
-              <Separator />
-              {/* Cumulative session cost */}
-              <div className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">
-                  Расход за сессию
-                </div>
-                {usage.noCacheInputTokens > 0 && (
-                  <InfoRow
-                    label="Fresh input"
-                    tokens={usage.noCacheInputTokens}
-                    rub={cost?.freshInputRub ?? 0}
-                  />
-                )}
-                {usage.cacheReadTokens > 0 && (
-                  <InfoRow
-                    accent="discount"
-                    label="Cache read"
-                    tokens={usage.cacheReadTokens}
-                    rub={cost?.cacheReadRub ?? 0}
-                  />
-                )}
-                {usage.cacheWriteTokens > 0 && (
-                  <InfoRow
-                    accent="premium"
-                    label="Cache write"
-                    tokens={usage.cacheWriteTokens}
-                    rub={cost?.cacheWriteRub ?? 0}
-                  />
-                )}
-                <InfoRow
-                  label="Output"
-                  tokens={usage.outputTokens}
-                  rub={cost?.outputRub ?? 0}
-                />
-                {usage.reasoningTokens > 0 && (
-                  <InfoRow
-                    label="Reasoning"
-                    tokens={usage.reasoningTokens}
-                    rub={cost?.reasoningRub ?? 0}
-                  />
-                )}
-                <Separator className="mt-1" />
-                <div className="flex items-center justify-between pt-1 text-xs">
-                  <span className="font-medium">Итого</span>
-                  <span className="font-mono font-medium">
-                    {formatRub(totalRub)}
-                  </span>
-                </div>
-              </div>
-            </>
-          )}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -43,7 +43,11 @@ export interface AppUsage {
   /**
    * Context window fill snapshot.
    * - `used` = input tokens of the latest request (NOT cumulative)
-   * - `max` = full context window of the model (from model-catalog.ts)
+   * - `max` = `SIMPLY_CONTEXT_LIMIT` (200K) — единый внутренний бюджет
+   *    Simply, привязанный к нижней границе активных моделей чата
+   *    (Sonnet/Haiku = 200K). НЕ реальное окно модели (Grok 4.1 Fast = 2M).
+   *    Это даёт предсказуемое поведение Compaction независимо от выбранной
+   *    модели: Soft 50% = 100K, Hard 85% = 170K (см. context-limits.ts).
    * Circle indicator shows used/max for the LAST message only, because the
    * model's context resets every turn (prior messages are replayed as input).
    */

@@ -1,7 +1,7 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.100.1
-**Статус:** Active development (**hotfix(xai-cache) выпущен** 2026-04-27 в v3.100.1 — починен prompt cache xAI на длинных историях: убран `LIMIT 200` в `getMessagesByChatId`, добавлен header `x-grok-conv-id` для sticky routing; **ТЗ-FixSimplyMemory закрыт** 2026-04-27 в v3.100.0 — Simply Chat больше не теряет память: убран фильтр `excludeExtracted=true`, дедупликация в pre-compact extract; **ТЗ-MigrateArtifactPromptsToSkills закрыт** 2026-04-27 в v3.99.3 — inline промпты артефактов вынесены в `lib/prompts/skills/artifact-generation/`, разблокирован A/B Шаг 7 серии Simply_Migration; **ТЗ-BR-AUTHOR-KIMI закрыт** 2026-04-27 в v3.99.2 — миграция briefing pipeline с MiniMax на Kimi K2.6)
+**Версия:** 3.100.2
+**Статус:** Active development (**refactor(context-widget) выпущен** 2026-04-27 в v3.100.2 — виджет «Контекст» упрощён по best practices Claude Code/Cursor: только % + индикатор сжатия, никаких токенов и cost-секций для пользователя; **hotfix(xai-cache) выпущен** 2026-04-27 в v3.100.1 — починен prompt cache xAI на длинных историях: убран `LIMIT 200` в `getMessagesByChatId`, добавлен header `x-grok-conv-id` для sticky routing; **ТЗ-FixSimplyMemory закрыт** 2026-04-27 в v3.100.0 — Simply Chat больше не теряет память: убран фильтр `excludeExtracted=true`, дедупликация в pre-compact extract; **ТЗ-MigrateArtifactPromptsToSkills закрыт** 2026-04-27 в v3.99.3 — inline промпты артефактов вынесены в `lib/prompts/skills/artifact-generation/`)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** snapshot «что работает прямо сейчас» на один взгляд. История изменений → [CHANGELOG.md](CHANGELOG.md). Архитектура → [docs/architecture.md](docs/architecture.md). Карта моделей → [docs/ai-chats-map.md](docs/ai-chats-map.md).

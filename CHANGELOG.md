@@ -7,6 +7,35 @@
 
 ## [Unreleased]
 
+### [3.100.2] — 2026-04-27 — refactor(context-widget) — виджет «Контекст» по best practices Claude Code/Cursor
+
+**Виджет в плашке Simply chat был спроектирован для коротких сессионных чатов (cumulative cost — «сколько эта сессия стоила»). После того как Simply стал persistent (один вечный чат на пользователя) семантика умерла: «Расход за сессию» = lifetime cost, цифра растёт навсегда (2.3M Fresh input, ₽148+ итого), не помогает принять никакого решения. Это мой долг — не пересмотрел виджет когда Simply стал persistent.**
+
+- **Что изменилось у пользователя:**
+  - Виджет «Контекст» (popover при клике на кружок-индикатор) показывает **только %% и статус-фразу** — никаких токенов, ID моделей или cost-секций
+  - Цвет прогресс-бара по близости к Compaction: <70% нейтральный, 70-90% янтарный, 90%+ красный
+  - Статус-фраза: «Свободно» / «Скоро сжатие» / «Сжатие близко»
+  - При сжатии — блок «Память освобождена» с человеческим объяснением (раньше показывал технические squeezed/summary tokens)
+  - Шкала прогресс-бара = 0-100% **до Compaction Soft порога** (100K), не до полного лимита 200K. На 91K показывается 91%, не 45.5% — отражает реальную близость к моменту сжатия
+
+- **Удалено из виджета:**
+  - Блок «Расход за сессию» целиком (Fresh input / Cache read / Cache write / Output / Reasoning / Итого) — дубликат: last-turn cost есть в плашке под сообщением, детальная разбивка — в DevPanel
+  - Отображение токенов (`X / 200 000`) — пользователю не нужно знать что такое токен
+  - Отображение `modelId` (`grok-4-1-fast-non-reasoning`) — техническая деталь
+
+- **Архитектура:**
+  - [components/elements/context.tsx](components/elements/context.tsx) — упрощён до 2 блоков: окно модели + индикатор сжатия
+  - [lib/usage.ts:46](lib/usage.ts#L46) — JSDoc `contextWindow.max` исправлен: было «full context window of the model», стало правда «`SIMPLY_CONTEXT_LIMIT` = 200K, единый внутренний бюджет, не реальное окно модели»
+  - Best practices: [Claude Code statusline](https://code.claude.com/docs/en/statusline) (progress bar + threshold colors), [Cursor summarization](https://cursor.com/docs/agent/chat/summarization) (visible compaction event без цифр), Apple-подход «показывать только нужное» из CLAUDE.md
+
+- **Backlog (FINDINGS — 2 новых записи при работе над виджетом):**
+  - **TZ_DocumentTruncationSilent** (high) — молчаливое обрезание больших документов на upload без UI-уведомления (PDF >50K char, DOCX/CSV/Excel/TXT любого размера, PDF-сканы целиком уходят в Haiku и проедают окно). Решение: единый лимит + 413 + ссылка на Библиотеку
+  - **TZ_EstimatorIgnoresAttachments** (high) — `estimateMessageTokens` считает только text-части `parts`, image/file binary не учитываются. Compaction не срабатывает на больших PDF-сканах (замер: estimator 16 токенов vs реальные 194 977). Fix: heuristic для image/file parts
+
+- **Версия проекта:** 3.100.1 → 3.100.2 (patch — UI-refactor + backlog-заготовки, без поведенческих изменений в API/моделях)
+
+---
+
 ### [3.100.1] — 2026-04-27 — hotfix(xai-cache) — починен xAI prompt cache на длинных Simply chats
 
 **После v3.100.0 Simply стал грузить полную историю (≈80K токенов вместо 7K) — и сразу обнаружилась дыра, которая раньше была невидима: xAI prompt cache hit-rate ≈ 7% (cache_read 6K при 80K input). Цена на каждом ответе ₽1.73 вместо потенциальных ₽0.40-0.50.**

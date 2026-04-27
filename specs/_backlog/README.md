@@ -11,7 +11,7 @@
 > Этот файл и папку создаёт правило 8 WORKFLOW.md (FINDINGS → backlog).
 >
 > Создан: 2026-04-13
-> Обновлён: 2026-04-27 — **TZ_SimplyChatMemoryRegression закрыт** (ТЗ-FixSimplyMemory v3.100.0 + hotfix v3.100.1, см. [BACKLOG_CLOSED](../_archive/BACKLOG_CLOSED.md)). Ранее в этот же день добавлены 7 новых записей из FINDINGS ТЗ-MigrateArtifactPromptsToSkills.
+> Обновлён: 2026-04-27 — добавлены **TZ_DocumentTruncationSilent** + **TZ_EstimatorIgnoresAttachments** (high, обнаружены при доработке виджета контекста: молчаливое обрезание больших документов + estimator не учитывает binary attachments → Compaction не срабатывает на больших PDF). **TZ_SimplyChatMemoryRegression закрыт** (ТЗ-FixSimplyMemory v3.100.0 + hotfix v3.100.1, см. [BACKLOG_CLOSED](../_archive/BACKLOG_CLOSED.md)). Ранее в этот же день добавлены 7 новых записей из FINDINGS ТЗ-MigrateArtifactPromptsToSkills.
 
 ---
 
@@ -44,6 +44,8 @@
 | [TZ_ChatModeUndefinedSubmit](TZ_ChatModeUndefinedSubmit.md) | Runtime error `getChatUrl: chatMode "undefined"` в `submitForm` блокирует submit при открытом артефакте. Контракт `chatMode?: string` опциональный — TS не возражает, родители не передают. F5 помогает временно. | 0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #6 |
 | [TZ_GrokSkipsUpdateDocumentTool](TZ_GrokSkipsUpdateDocumentTool.md) | Grok 4.1 Fast иногда генерит ответ как обычный chat-message вместо вызова `updateDocument` tool. Артефакт не обновляется, пользователь видит «модель ничего не сделала». Усилить tool description / system prompt. | 0.3-0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #7 |
 | [TZ_PptxRevealUpdateRender](TZ_PptxRevealUpdateRender.md) | Презентации (pptx/reveal) не перерисовываются в холсте после `onUpdateDocument` — БД и blob обновлены, превью генерится, но клиент показывает старую версию. Скачанный файл свежий. Скорее всего проблема в client-side state / data-pptxComplete handler. | 0.5-1 сессия | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #1 |
+| [TZ_DocumentTruncationSilent](TZ_DocumentTruncationSilent.md) | При загрузке больших документов (PDF >50K char, DOCX/CSV/Excel/TXT любого размера до 20MB) текст обрезается **молча** без UI-уведомления. Пользователь думает что Simply «глупый», когда модель не находит данные из обрезанной части. PDF-сканы отдельно: уходят целиком в Haiku, занимают ~195K токенов из 200K. Решение: единый лимит на extracted text + 413 ответ + toast-сообщение «Загрузите в Библиотеку». | 0.5-1 сессия | Найдено 2026-04-27 в обсуждении виджета контекста (после ТЗ-FixSimplyMemory v3.100.1) |
+| [TZ_EstimatorIgnoresAttachments](TZ_EstimatorIgnoresAttachments.md) | `estimateMessageTokens` считает только text-части `parts`, image/file binary attachments игнорируются. Замер 2026-04-27: estimator показал 16 токенов на запросе где модель насчитала 194 991 (расхождение в ~12 000 раз). Compaction не срабатывает на больших PDF-сканах когда должен (action=noop при реальных 195K), виджет «Контекст» показывает заниженный %. Fix: heuristic ~1.5K/image, ~3K/page для PDF. | 0.3-0.5 сессии | Найдено 2026-04-27 при тесте PDF-скана в Simply chat |
 
 ### 🟧 Medium impact
 
