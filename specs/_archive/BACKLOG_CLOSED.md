@@ -29,6 +29,7 @@
 | TZ_UnifyContextThresholdBase | 2026-04-21 | v3.95.0 / `969b0b4` | Closed в финализации ТЗ-COMPACTION-UNIFY | [_backlog/_archive/TZ_UnifyContextThresholdBase.md](../_backlog/_archive/TZ_UnifyContextThresholdBase.md) |
 | TZ_MindConsolidationTriggers | 2026-04-21 | v3.96.0 (ТЗ-MindOnVisit) / v3.97.0 (ТЗ-MindDeepConsolidation) | Triggers пересмотрены: on-visit обработка хвостов + ночная reasoning-консолидация. Архивирован без отдельного коммита | [_backlog/_archive/TZ_MindConsolidationTriggers.md](../_backlog/_archive/TZ_MindConsolidationTriggers.md) |
 | TZ_BriefingStuckRecovery | 2026-04-26 | v3.99.1 | Watchdog (markStuckBriefingsAsFailed, 4 точки подключения) + UPSERT pipeline (один row на прогон) + UI-баннер lastAttemptFailed на /briefing | [_archive/TZ_BriefingStuckRecovery/](../TZ_BriefingStuckRecovery/) |
+| TZ_SimplyChatMemoryRegression | 2026-04-27 | v3.100.0 / `b17b932` + hotfix v3.100.1 / `3b1fcff` | Closed в ТЗ-FixSimplyMemory: убран фильтр `excludeExtracted=true` для Simply, дедупликация в pre-compact extract через `CompactionContext.alreadyExtractedIds`. Hotfix v3.100.1 добил вторую дыру (LIMIT 200 ломал prefix → xAI cache) и добавил `x-grok-conv-id`. См. ADR 057. | [_backlog/_archive/TZ_SimplyChatMemoryRegression.md](../_backlog/_archive/TZ_SimplyChatMemoryRegression.md) |
 
 ---
 

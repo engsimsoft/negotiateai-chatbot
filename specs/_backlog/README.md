@@ -11,7 +11,7 @@
 > Этот файл и папку создаёт правило 8 WORKFLOW.md (FINDINGS → backlog).
 >
 > Создан: 2026-04-13
-> Обновлён: 2026-04-27 — добавлены 7 новых записей из FINDINGS ТЗ-MigrateArtifactPromptsToSkills (1 critical: SimplyChatMemoryRegression; 4 high: MindAtomicityFix, ChatModeUndefinedSubmit, GrokSkipsUpdateDocumentTool, PptxRevealUpdateRender; 2 medium: RevealVsPptxToolSelection, ChatInputBlockedOnDocumentFetchHang). До этого: добавлен TZ_BriefingScriptwriterPromptUpdate; TZ_BriefingMiniMaxHang и TZ_CompactionActualCalibration перенесены в архив.
+> Обновлён: 2026-04-27 — **TZ_SimplyChatMemoryRegression закрыт** (ТЗ-FixSimplyMemory v3.100.0 + hotfix v3.100.1, см. [BACKLOG_CLOSED](../_archive/BACKLOG_CLOSED.md)). Ранее в этот же день добавлены 7 новых записей из FINDINGS ТЗ-MigrateArtifactPromptsToSkills.
 
 ---
 
@@ -35,12 +35,6 @@
 ---
 
 ## Открытые долги
-
-### 🟥 Critical impact
-
-| ТЗ | Описание | Оценка | Источник |
-|---|---|---|---|
-| [TZ_SimplyChatMemoryRegression](TZ_SimplyChatMemoryRegression.md) | Simply Chat «помнит только последнее сообщение». Архитектурный фильтр `excludeExtracted=true` режет inline-историю агрессивно: 192 сообщения в БД (49k tokens), используется 3.5% окна модели grok-4-1-fast (200k). Модель не помнит artefact, который сама создала 30 минут назад. Решения: адаптивный фильтр (фильтровать только при превышении soft_threshold) / гибрид (последние N + retrieve старого) / усилить retrieve / улучшить facts с привязкой к entities. | 1-2 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #5 |
 
 ### 🟥 High impact
 
