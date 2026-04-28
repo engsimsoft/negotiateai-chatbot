@@ -5,7 +5,7 @@
 > **Источник большинства долгов:** мануальный смок-тест Этапа 7 ТЗ-MigrateArtifactPromptsToSkills выявил 7 предсуществующих багов (1 critical + 4 high + 2 medium). FINDINGS детально → `specs/_archive/Simply_Migration/TZ_MigrateArtifactPromptsToSkills/FINDINGS.md`.
 >
 > **Создан:** 2026-04-27
-> **Обновлено:** 2026-04-27 — A.2 закрыт (TZ_FixSimplyMemory, v3.100.0).
+> **Обновлено:** 2026-04-28 — добавлен F.1 (TZ_SimplyChatUiScaling).
 
 ---
 
@@ -23,8 +23,9 @@
 | **E.1** | [TZ_ExpertiseReasoningRestore](TZ_ExpertiseReasoningRestore.md) | 🟧 medium | 0.5-1 сессия | — |
 | **E.2** | [TZ_BriefingConcurrencyGuard](TZ_BriefingConcurrencyGuard.md) | 🟧 medium | 0.3-0.5 сессии | — |
 | **E.3** | [TZ_BriefingScriptwriterPromptUpdate](TZ_BriefingScriptwriterPromptUpdate.md) | 🟦 low | 0.1-0.2 сессии | — |
+| **F.1** | [TZ_SimplyChatUiScaling](TZ_SimplyChatUiScaling.md) | 🟥 high | 1.5-2 сессии | — |
 
-**Итого:** ~5-9 сессий на полный разгребный pass через все 10 долгов.
+**Итого:** ~6-10 сессий на полный разгребный pass через все 11 долгов.
 
 ---
 

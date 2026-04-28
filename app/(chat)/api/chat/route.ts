@@ -310,6 +310,67 @@ async function convertTextFilesInAllMessages(
  * history would crash Grok on every follow-up. v3.90.2 restores correct
  * behaviour via SSOT capabilities from model-catalog.ts.
  */
+/**
+ * Удаляет картинки/PDF из старых сообщений истории, оставляя их только в
+ * последних N user-сообщениях. Без этого xAI/Anthropic пересчитывают vision
+ * tokens по всем накопленным attachment'ам в каждом turn — Simply chat вечный,
+ * за месяцы накапливаются десятки картинок и каждое «привет» стоит 100K+ ткн.
+ * Семантика "ранее было изображение" повторяет [adaptHistoryToCapabilities].
+ */
+const KEEP_ATTACHMENTS_IN_LAST_N_USER_MESSAGES = 2;
+
+function stripOldAttachmentsFromHistory(
+  messages: ChatMessage[],
+  keepInLastNUser: number,
+): ChatMessage[] {
+  if (messages.length === 0) return messages;
+  let userSeen = 0;
+  let cutoff = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") {
+      userSeen += 1;
+      if (userSeen >= keepInLastNUser) {
+        cutoff = i;
+        break;
+      }
+    }
+  }
+  if (userSeen < keepInLastNUser) return messages;
+
+  return messages.map((message, idx) => {
+    if (idx >= cutoff) return message;
+    const adaptedParts = message.parts.map((part: any) => {
+      if (part.type === "file") {
+        const mediaType: string = part.mediaType ?? "";
+        const fileName: string =
+          part.name || part.url?.split("/").pop() || "файл";
+        if (mediaType === "text/plain") return part;
+        if (mediaType.startsWith("image/")) {
+          return {
+            type: "text" as const,
+            text: `[Ранее было прикреплено изображение: ${fileName}]`,
+          };
+        }
+        if (mediaType === "application/pdf") {
+          return {
+            type: "text" as const,
+            text: `[Ранее был прикреплён PDF: ${fileName}]`,
+          };
+        }
+        return part;
+      }
+      if (part.type === "image") {
+        return {
+          type: "text" as const,
+          text: "[Ранее было прикреплено изображение]",
+        };
+      }
+      return part;
+    });
+    return { ...message, parts: adaptedParts } as ChatMessage;
+  });
+}
+
 function adaptHistoryToCapabilities(
   messages: ChatMessage[],
   capabilities: ModelCapabilities | undefined,
@@ -1122,6 +1183,15 @@ export async function POST(request: Request) {
               ? "simply"
               : chatMode;
 
+          // Реальный input прошлого turn'а от API модели — точный baseline для
+          // триггера Compaction (виджет контекста читает то же значение). Если
+          // чат новый или legacy lastContext — undefined, middleware fallback'ом
+          // считает по estimator-полям ниже.
+          const prevStoredUsage = normalizeStoredAppUsage(
+            chat?.lastContext as AppUsage | null | undefined,
+          );
+          const realLastInputTokens = prevStoredUsage?.contextWindow.used;
+
           const compactionResult = await prepareMessagesWithCompaction(
             activeTaskId,
             preparedHistory,
@@ -1137,12 +1207,18 @@ export async function POST(request: Request) {
               mindTokens: mindTokensForCompaction,
               toolsTokens,
               alreadyExtractedIds,
+              realLastInputTokens,
             },
             dataStream,
           );
           historyForStream = compactionResult.messages;
           simplyCompactionEvent = compactionResult.compactionEvent;
         }
+
+        historyForStream = stripOldAttachmentsFromHistory(
+          historyForStream,
+          KEEP_ATTACHMENTS_IN_LAST_N_USER_MESSAGES,
+        );
 
         // User-visible compaction event эмитится сразу после middleware, до
         // streamText — виджет контекста получает индикатор до начала ответа.

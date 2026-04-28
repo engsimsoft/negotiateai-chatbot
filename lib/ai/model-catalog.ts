@@ -149,6 +149,10 @@ const CAPS_GROK: ModelCapabilities = {
     // input_file content type. Декларативная истина (провайдер умеет) ≠ фактическая
     // (Simply не интегрирует). Будущее ТЗ-XAIFilesIntegration поднимет флаг для
     // reasoning вариантов.
+    // Подтверждено payload-level проверкой 2026-04-28: PDF в свежем Expertise-чате
+    // (0 истории) → Grok ответил «вижу только метаданные имени», `[PAYLOAD-DEBUG]`
+    // не нашёл `"file"`/`"application/pdf"` в payload xAI. Grok физически не получает
+    // PDF-контент — `adaptHistoryToCapabilities` корректно меняет на текст-плейсхолдер.
     reason: "xAI Files API не интегрирован в Simply (требует upload + input_file content type)",
   },
   thinking: true,

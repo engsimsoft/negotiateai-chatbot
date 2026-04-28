@@ -40,6 +40,14 @@ import type { MemorySourceType } from "@/lib/ai/memory/types";
  *    загрузки из БД. Middleware пропускает их в pre-compact extract step
  *    чтобы не дублировать Grok-вызов на уже-извлечённых фактах. Caller
  *    собирает Set из `messagesFromDb` (поле бесплатно приходит в SELECT).
+ *  - `realLastInputTokens` — реальный input в токенах прошлого turn'а
+ *    (`AppUsage.contextWindow.used` от API модели). Если присутствует —
+ *    используется как baseline вместо суммы estimator-полей
+ *    (`systemPromptTokens + totalHistoryTokens + mindTokens + toolsTokens`).
+ *    Это устраняет рассинхрон с виджетом контекста, который тоже читает
+ *    реальный usage. Estimator занижает русский текст на 30-40% и слеп
+ *    к binary attachments (image/file), из-за чего Compaction не срабатывал
+ *    на больших PDF и длинной русской истории.
  */
 export interface CompactionContext {
   chatId: string;
@@ -53,6 +61,7 @@ export interface CompactionContext {
   mindTokens?: number;
   toolsTokens?: number;
   alreadyExtractedIds?: Set<string>;
+  realLastInputTokens?: number;
 }
 
 /**

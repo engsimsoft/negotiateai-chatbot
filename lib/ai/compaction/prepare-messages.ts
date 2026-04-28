@@ -60,12 +60,20 @@ export async function prepareMessagesWithCompaction(
 ): Promise<PrepareMessagesResult> {
   const mindTokens = context.mindTokens ?? 0;
   const toolsTokens = context.toolsTokens ?? 0;
-  const totalContext =
-    context.systemPromptTokens +
-    context.totalHistoryTokens +
-    context.newMessageTokens +
-    mindTokens +
-    toolsTokens;
+
+  // Trigger baseline: предпочитаем реальный input прошлого turn'а от API модели
+  // (виджет контекста читает то же самое), fallback на estimator-сумму.
+  // Estimator занижает русский на 30-40% + слеп к binary attachments → раньше
+  // Compaction не срабатывал когда виджет показывал >100% (см. лог
+  // total:67479 при реальных ~110K на прошлом turn'е).
+  const usingRealUsage = typeof context.realLastInputTokens === "number";
+  const totalContext = usingRealUsage
+    ? (context.realLastInputTokens as number) + context.newMessageTokens
+    : context.systemPromptTokens +
+      context.totalHistoryTokens +
+      context.newMessageTokens +
+      mindTokens +
+      toolsTokens;
 
   const softThresholdTokens =
     COMPACTION_THRESHOLD_SOFT * SIMPLY_CONTEXT_LIMIT;
@@ -86,10 +94,12 @@ export async function prepareMessagesWithCompaction(
       : totalContext < hardThresholdTokens
         ? "compact"
         : "truncate";
+  const baselineTag = usingRealUsage
+    ? `realPrevInput:${context.realLastInputTokens}`
+    : `estimator{system:${context.systemPromptTokens},history:${context.totalHistoryTokens},mind:${mindTokens},tools:${toolsTokens}}`;
   console.info(
     `[Compaction] chat=${context.chatId} task=${_taskId} ` +
-      `tokens={system:${context.systemPromptTokens},history:${context.totalHistoryTokens},` +
-      `new:${context.newMessageTokens},mind:${mindTokens},tools:${toolsTokens},total:${totalContext}} ` +
+      `baseline=${baselineTag} new:${context.newMessageTokens} total:${totalContext} ` +
       `thresholds={soft:${softThresholdTokens},hard:${hardThresholdTokens}} action=${action}`,
   );
 
