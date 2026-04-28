@@ -8,6 +8,7 @@ import {
   type SetStateAction,
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import useSWR, { useSWRConfig } from "swr";
@@ -140,6 +141,14 @@ function PureArtifact({
   useEffect(() => {
     mutateDocuments();
   }, [mutateDocuments]);
+
+  const prevStatusRef = useRef(artifact.status);
+  useEffect(() => {
+    if (prevStatusRef.current === "streaming" && artifact.status === "idle") {
+      mutateDocuments();
+    }
+    prevStatusRef.current = artifact.status;
+  }, [artifact.status, mutateDocuments]);
 
   const { mutate } = useSWRConfig();
   const [isContentDirty, setIsContentDirty] = useState(false);
