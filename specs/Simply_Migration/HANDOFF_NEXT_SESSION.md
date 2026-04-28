@@ -1,8 +1,8 @@
 # HANDOFF — следующая сессия Claude Code
 
-**Дата:** 2026-04-28 (обновлён вечером)
+**Дата:** 2026-04-28 (обновлён ночью)
 **Текущая серия:** Simply_Migration (xAI + Kimi K2.6 + Perplexity, Anthropic Opus только аудитор)
-**Состояние:** Шаги 1-2 закрыты + 4 quick wins закрыты в v3.100.4. **Следующий — Шаг 3 (Vision/OCR cleanup).**
+**Состояние:** Шаги 1-2 закрыты + 4 quick wins (v3.100.4) + UI-фикс портянки inline-файла (v3.100.5). **Следующий — Шаг 3 (Vision/OCR cleanup).**
 **Контекст:** этот файл — точка входа для нового Claude. Прочитай его первым, дальше следуй ссылкам по необходимости.
 
 ---
@@ -53,6 +53,10 @@ Backlog был раздут до 14 ТЗ. После аудита — 8 (3 quick
 2. ✅ **TZ_ChatModeUndefinedSubmit** (`92af88e`) — `chatMode` сделан required в `MultimodalInputProps` + проброшен через `<Artifact>`. Бонус: `<ArtifactMessages>` переписан на `<Conversation>` со `StickToBottom`.
 3. ✅ **TZ_ChatInputBlockedOnDocumentFetchHang** (`a4e1c23`) — `fetcherWithTimeout(5000)` в `lib/utils.ts`.
 4. ✅ **TZ_PptxRevealUpdateRender** (`a449fac`) — useEffect в `components/artifact.tsx` на `streaming → idle` зовёт `mutateDocuments()`.
+
+### Этап 1.5 — UI-фикс «портянка» ✅ ЗАКРЫТО (v3.100.5, `b0670c3`)
+
+**TZ_InlineFilePortyanka** — после reload текстовые файлы (.docx/.md) рендерились полной портянкой с номерами строк (markdown code block). Корень: в БД лежит `type:"text"` с маркером `📄 **Файл: name**\n\`\`\`\n<content>\n\`\`\`` (xAI SDK fix 2026-04-15). Узкий UI-фикс: детектор маркера в [components/message.tsx](../../components/message.tsx) → `<PreviewAttachment>` карточкой. **Удалить после Шага 4** (TODO в коде + чек-лист в [SIMPLY_MIGRATION_CONCEPT.md Блок 3](SIMPLY_MIGRATION_CONCEPT.md)).
 
 ### Этап 2 — Возвращаемся в миграцию (← НАЧАЛО следующей сессии)
 
