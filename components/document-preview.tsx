@@ -6,13 +6,9 @@ import {
   memo,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
 } from "react";
-import useSWR from "swr";
 import { useArtifact } from "@/hooks/use-artifact";
-import type { Document } from "@/lib/db/schema";
-import { fetcher } from "@/lib/utils";
 import type { ArtifactKind, UIArtifact } from "./artifact";
 import { DocumentToolCall, DocumentToolResult } from "./document";
 import { FileIcon, ImageIcon, LoaderIcon } from "./icons";
@@ -47,12 +43,6 @@ export function DocumentPreview({
   args,
 }: DocumentPreviewProps) {
   const { artifact, setArtifact } = useArtifact();
-
-  const { data: documents, isLoading: isDocumentsFetching } = useSWR<
-    Document[]
-  >(result ? `/api/document?id=${result.id}` : null, fetcher);
-
-  const previewDocument = useMemo(() => documents?.[0], [documents]);
   const hitboxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -93,31 +83,19 @@ export function DocumentPreview({
     }
   }
 
-  if (isDocumentsFetching) {
-    return <LoadingSkeleton artifactKind={result.kind ?? args.kind} />;
-  }
+  const title =
+    result?.title ??
+    args?.title ??
+    (artifact.status === "streaming" ? artifact.title : undefined);
+  const kind: ArtifactKind | undefined =
+    result?.kind ??
+    args?.kind ??
+    (artifact.status === "streaming" ? artifact.kind : undefined);
 
-  const document: Document | null = previewDocument
-    ? previewDocument
-    : artifact.status === "streaming"
-      ? {
-          title: artifact.title,
-          kind: artifact.kind,
-          content: artifact.content,
-          id: artifact.documentId,
-          createdAt: new Date(),
-          userId: "noop",
-          isPublic: false,
-          shareToken: null,
-          sharedAt: null,
-        }
-      : null;
-
-  if (!document) {
+  if (!(title && kind)) {
     return <LoadingSkeleton artifactKind={artifact.kind} />;
   }
 
-  // Compact card preview (Anthropic style)
   return (
     <div className="relative w-fit cursor-pointer">
       <HitboxLayer
@@ -127,8 +105,8 @@ export function DocumentPreview({
       />
       <CompactDocumentCard
         isStreaming={artifact.status === "streaming"}
-        kind={document.kind as ArtifactKind}
-        title={document.title}
+        kind={kind}
+        title={title}
       />
     </div>
   );
