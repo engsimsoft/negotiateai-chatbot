@@ -154,6 +154,11 @@ Apple-подход: каждая кнопка = понятная решённа�
 
 **Стратегия резервирования:** PDF параллельно лежит в Vercel Blob. При ошибке xAI Files API → re-upload из Blob. Не зависим только от того что xAI хранит файл.
 
+**Чек-лист удаления переходного кода (Шаг 4):**
+- `convertTextFilePartsInMessage` и `convertTextFilesInAllMessages` в [app/(chat)/api/chat/route.ts:233-284](../../app/(chat)/api/chat/route.ts#L233) — после xAI Files API файлы идут по `file_id`, конверсия text/plain в inline text больше не нужна.
+- Блок `stripOldAttachmentsFromHistory` обработки `📄 **Файл:` маркера в [route.ts:343-352](../../app/(chat)/api/chat/route.ts#L343) — станет no-op.
+- UI-детектор inline-маркера в [components/message.tsx](../../components/message.tsx) (`inlineFileMatch`, регекс `^📄 \*\*Файл: ...\*\*\n\`\`\``) — был добавлен v3.100.5 как UI-фикс «портянка после reload». После Шага 4 в БД будут file parts → карточка отрисуется через `attachmentsFromMessage`, детектор станет мёртвым кодом.
+
 ### Блок 4. Vision/OCR — упрощение до одного пути
 
 - TaskId `vision:ocr` (мёртвый код, 0 вызовов) — удаляется вместе с файлом `lib/ai/vision-ocr.ts`

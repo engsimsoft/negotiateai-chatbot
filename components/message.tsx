@@ -350,6 +350,29 @@ const PurePreviewMessage = ({
 
             if (type === "text") {
               if (mode === "view") {
+                // TODO(Шаг 4 миграции / SIMPLY_MIGRATION_CONCEPT.md Блок 3):
+                // удалить этот детектор inline-маркера файла. После перехода
+                // на xAI Files API в БД будут file parts с file_id, а не
+                // text-маркеры `📄 **Файл: name**\n` — карточка вернётся в
+                // attachmentsFromMessage (выше, строка 306).
+                const inlineFileMatch =
+                  message.role === "user"
+                    ? part.text.match(/^📄 \*\*Файл: ([^*\n]+)\*\*\n```/)
+                    : null;
+                if (inlineFileMatch) {
+                  return (
+                    <div className="flex flex-row justify-end" key={key}>
+                      <PreviewAttachment
+                        attachment={{
+                          name: inlineFileMatch[1],
+                          contentType: "",
+                          url: "",
+                        }}
+                      />
+                    </div>
+                  );
+                }
+
                 // ТЗ-2: Parse action buttons from assistant messages
                 const sanitized = sanitizeText(part.text);
                 const { buttons, cleanText } = message.role === "assistant"
