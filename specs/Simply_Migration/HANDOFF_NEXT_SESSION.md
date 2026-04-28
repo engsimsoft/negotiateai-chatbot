@@ -1,8 +1,8 @@
 # HANDOFF — следующая сессия Claude Code
 
-**Дата:** 2026-04-28 (обновлён ночью)
+**Дата:** 2026-04-28 (обновлён вечером после закрытия Шага 3)
 **Текущая серия:** Simply_Migration (xAI + Kimi K2.6 + Perplexity, Anthropic Opus только аудитор)
-**Состояние:** Шаги 1-2 закрыты + 4 quick wins (v3.100.4) + UI-фикс портянки inline-файла (v3.100.5). **Следующий — Шаг 3 (Vision/OCR cleanup).**
+**Состояние:** Шаги 1-3 закрыты + 4 quick wins (v3.100.4) + UI-фикс портянки (v3.100.5) + Vision/OCR cleanup (v3.100.6, commit `bfe2446`). **Следующий — Шаг 4 (PDF на xAI Files API).**
 **Контекст:** этот файл — точка входа для нового Claude. Прочитай его первым, дальше следуй ссылкам по необходимости.
 
 ---
@@ -60,13 +60,15 @@ Backlog был раздут до 14 ТЗ. После аудита — 8 (3 quick
 
 ### Этап 2 — Возвращаемся в миграцию (← НАЧАЛО следующей сессии)
 
-**Следующий шаг — Шаг 3 (Vision/OCR cleanup)** — подготовка к Шагу 4.
+**Следующий шаг — Шаг 4 (PDF на xAI Files API)** — закрывает R3 known limitation Шага 3 + остаток billing leak.
+
+**Подход:** «архитектор готовит SPEC + ROADMAP → Claude Code реализует» — показал себя на Шаге 3 (см. `TZ_VisionOcrCleanup/`). Повторить: попросить архитектора подготовить SPEC по докам xAI Files API (input_file content type, attachment_search, pricing $10/1k вызовов, max 48 MB/PDF, cleanup старого pdf-parse pipeline).
 
 Полный список шагов:
 - ✅ Шаг 1 — BR-AUTHOR-KIMI (зарелижено)
 - ✅ Шаг 2 — MigrateArtifactPromptsToSkills (зарелижено 2026-04-27, commit `c04e73e`)
-- ⏭ **Шаг 3 — Vision/OCR cleanup** (следующий)
-- ⏭ Шаг 4 — PDF на xAI Files API ⭐ закрывает 3 backlog ТЗ + остаток billing leak
+- ✅ Шаг 3 — Vision/OCR cleanup (зафиксировано 2026-04-28, commit `bfe2446`, v3.100.6)
+- ⏭ **Шаг 4 — PDF на xAI Files API** (следующий) ⭐ закрывает 3 backlog ТЗ + R3 + остаток billing leak
 - Шаг 5 — Web Tools (xAI web_search + Perplexity tool + librarySearch)
 - Шаг 6 — UI кнопки в Simply Chat
 - Шаг 7 — Артефакты A/B (5 типов × 3 модели) ⭐ закрывает 2 backlog ТЗ
