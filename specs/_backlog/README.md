@@ -11,7 +11,7 @@
 > **Правило:** новый bug найден → НЕ создавать ТЗ автоматически. Сначала свериться с [Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md](../Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md). Если миграция закрывает в одном из 11 шагов — пометка в SPEC соответствующего шага, не отдельное ТЗ. Этот файл и папку создаёт правило 8 WORKFLOW.md.
 >
 > Создан: 2026-04-13
-> Обновлён: 2026-04-28 — после полного аудита backlog: **7 ТЗ закрыты как obsoleted by migration**, остаётся 3 quick wins + 5 deferred. См. [BACKLOG_CLOSED.md](../_archive/BACKLOG_CLOSED.md) для записей о закрытии.
+> Обновлён: 2026-04-28 — закрыты 4 quick wins (TZ_SimplyChatLoadPerf, TZ_ChatModeUndefinedSubmit, TZ_ChatInputBlockedOnDocumentFetchHang, TZ_PptxRevealUpdateRender) → v3.100.4. Остаётся 4 deferred. До этого: после полного аудита backlog 7 ТЗ закрыты как obsoleted by migration. См. [BACKLOG_CLOSED.md](../_archive/BACKLOG_CLOSED.md).
 
 ---
 
@@ -33,18 +33,7 @@
 
 ---
 
-## Открытые долги (8)
-
-### 🟥 Quick wins (чинить ДО начала миграции)
-
-| ТЗ | Описание | Оценка | Источник |
-|---|---|---|---|
-| **TZ_SimplyChatLoadPerf** *(в `/specs/`)* | 15-22 сек открытие /simply прямо сейчас. Двойной RSC рендер + 8 параллельных `/api/document`. Разморожен 2026-04-28 после partial-fix billing leak. | 1-1.5 сессии | Серия измерений Network tab + dev-логов 2026-04-28 |
-| [TZ_ChatModeUndefinedSubmit](TZ_ChatModeUndefinedSubmit.md) | Runtime error `getChatUrl: chatMode "undefined"` блокирует submit при открытом артефакте. Контракт `chatMode?: string` опциональный — TS не возражает, родители не передают. F5 помогает временно. | 0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #6 |
-| [TZ_PptxRevealUpdateRender](TZ_PptxRevealUpdateRender.md) | Презентации (pptx/reveal) не перерисовываются в холсте после `onUpdateDocument` — БД и blob обновлены, превью генерится, но клиент показывает старую версию. Скачанный файл свежий. Проблема в client-side state / data-pptxComplete handler. | 0.5-1 сессия | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #1 |
-| [TZ_ChatInputBlockedOnDocumentFetchHang](TZ_ChatInputBlockedOnDocumentFetchHang.md) | Chat input блокируется когда `GET /api/document` висит в Neon timeout 10s. UX полностью замораживается. Расцепить input ↔ artifact loading + timeout 5s + graceful UI fallback. | 0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #3 |
-
-**Итого quick wins:** 2.5-3.5 сессии. **Делать ДО Шага 3 миграции** — независимые UX-блокеры пользователей.
+## Открытые долги (4)
 
 ### 🟧 Deferred (после миграции)
 
@@ -63,13 +52,8 @@
 
 История закрытых долгов — в **[`_archive/BACKLOG_CLOSED.md`](../_archive/BACKLOG_CLOSED.md)**.
 
-**На 2026-04-28 закрыто 7 ТЗ как obsoleted by migration:**
-- TZ_SimplyChatBillingLeak (partial fix + Шаг 4 закроет остаток)
-- TZ_DocumentTruncationSilent (Шаг 4)
-- TZ_EstimatorIgnoresAttachments (Шаг 4)
-- TZ_GrokSkipsUpdateDocumentTool (Шаг 7)
-- TZ_RevealVsPptxToolSelection (Шаг 7)
-- TZ_ExpertiseReasoningRestore (Шаг 8)
-- TZ_BriefingScriptwriterPromptUpdate (Шаги 1/10)
+**На 2026-04-28 закрыто 11 ТЗ:**
+- 7 obsoleted by migration: TZ_SimplyChatBillingLeak, TZ_DocumentTruncationSilent, TZ_EstimatorIgnoresAttachments, TZ_GrokSkipsUpdateDocumentTool, TZ_RevealVsPptxToolSelection, TZ_ExpertiseReasoningRestore, TZ_BriefingScriptwriterPromptUpdate
+- 4 quick wins (v3.100.4): TZ_SimplyChatLoadPerf, TZ_ChatModeUndefinedSubmit, TZ_ChatInputBlockedOnDocumentFetchHang, TZ_PptxRevealUpdateRender
 
 Этот файл держит только открытые долги. Когда долг закрывается — запись переносится в архивный журнал, сюда не добавляется.

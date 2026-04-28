@@ -7,6 +7,27 @@
 
 ## [Unreleased]
 
+### [3.100.4] — 2026-04-28 — quick wins UX блок: 4 ТЗ закрыты до старта Шага 3 миграции
+
+**4 независимых UX-блокера (Этап 1 плана HANDOFF_NEXT_SESSION) закрыты до возврата в серию Simply_Migration. Блокировали пользователей, не зависели от миграции.**
+
+- **TZ_SimplyChatLoadPerf** (`03ae49d`) — открытие /simply 15-22 секунды → 0.35 секунды (горячий кэш). Удалён лишний `useSWR` в [components/document-preview.tsx](components/document-preview.tsx) — рендер списка сообщений делал 8 параллельных `GET /api/document` без необходимости (artifact preview подхватывает свежий content только когда холст открыт).
+
+- **TZ_ChatModeUndefinedSubmit** (`92af88e`) — runtime error `getChatUrl: chatMode "undefined"` блокировал submit при открытом артефакте. Контракт `chatMode?: string` был опциональным, родители не пробрасывали. Сделан required в [components/multimodal-input.tsx](components/multimodal-input.tsx) + проброшен через `<Artifact>` в [chat.tsx](components/chat.tsx) и [task-chat.tsx](components/task-chat.tsx). Бонус: `<ArtifactMessages>` переписан на `<Conversation>` со `StickToBottom` — чат в открытом артефакте теперь автоскроллится к новым сообщениям + кнопка «↓».
+
+- **TZ_ChatInputBlockedOnDocumentFetchHang** (`a4e1c23`) — input блокировался при висящем `GET /api/document` (Neon timeout 10s). Добавлен `fetcherWithTimeout(5000)` в [lib/utils.ts](lib/utils.ts) и применён в SWR-загрузке `<Artifact>`. Worst case 12s до error state вместо infinite hang.
+
+- **TZ_PptxRevealUpdateRender** (`a449fac`) — после обновления презентации (pptx/reveal) клиент показывал старую версию (БД и blob свежие, скачанный файл свежий, превью генерились). Корень: `useSWR(/api/document?id=X)` после возврата `artifact.status` в `idle` отдавал старый кэш — `mutateDocuments()` звался только при mount. Добавлен useEffect в [components/artifact.tsx](components/artifact.tsx) на переход `streaming → idle` → `mutateDocuments()`. Универсально для всех типов артефактов.
+
+- **Архивы:**
+  - [specs/_archive/TZ_SimplyChatLoadPerf/](specs/_archive/TZ_SimplyChatLoadPerf/) — был активным с SPEC.md + ANALYSIS.md
+  - [specs/_backlog/_archive/](specs/_backlog/_archive/) — три заготовки перенесены
+  - [specs/_archive/BACKLOG_CLOSED.md](specs/_archive/BACKLOG_CLOSED.md) — записи о закрытии
+
+- **Версия проекта:** 3.100.3 → 3.100.4 (patch — 4 UX-фикса, без поведенческих изменений в API/моделях)
+
+---
+
 ### [3.100.2] — 2026-04-27 — refactor(context-widget) — виджет «Контекст» по best practices Claude Code/Cursor
 
 **Виджет в плашке Simply chat был спроектирован для коротких сессионных чатов (cumulative cost — «сколько эта сессия стоила»). После того как Simply стал persistent (один вечный чат на пользователя) семантика умерла: «Расход за сессию» = lifetime cost, цифра растёт навсегда (2.3M Fresh input, ₽148+ итого), не помогает принять никакого решения. Это мой долг — не пересмотрел виджет когда Simply стал persistent.**

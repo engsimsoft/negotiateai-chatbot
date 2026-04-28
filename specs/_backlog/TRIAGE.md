@@ -3,7 +3,7 @@
 > Чёткий план: что делаем сейчас, что переживёт миграция, что отложено.
 >
 > **Создан:** 2026-04-27
-> **Обновлён:** 2026-04-28 — после полного аудита: 7 ТЗ закрыты как obsoleted by migration. Backlog сокращён с 14 до 8 ТЗ. Структура переделана: Quick wins → Migration → Deferred.
+> **Обновлён:** 2026-04-28 — все 4 quick wins закрыты (v3.100.4). Остаются 4 deferred — после миграции. Возврат в серию Simply_Migration с Шага 3.
 
 ---
 
@@ -24,55 +24,19 @@
 
 | Блок | ТЗ | Impact | Оценка | Когда |
 |---|---|---|---|---|
-| **A.1** | **TZ_SimplyChatLoadPerf** *(в `/specs/`)* | 🟥 high — 15-22s TTI на /simply | 1-1.5 сессии | сейчас (размотозен 2026-04-28) |
-| **A.2** | [TZ_ChatModeUndefinedSubmit](TZ_ChatModeUndefinedSubmit.md) | 🟥 high | 0.5 сессии | сейчас |
-| **A.3** | [TZ_PptxRevealUpdateRender](TZ_PptxRevealUpdateRender.md) | 🟥 high | 0.5-1 сессия | сейчас |
-| **A.4** | [TZ_ChatInputBlockedOnDocumentFetchHang](TZ_ChatInputBlockedOnDocumentFetchHang.md) | 🟧 medium | 0.5 сессии | сейчас |
-| — | **МИГРАЦИЯ Шаги 3-11** | — | — | **далее** |
+| — | **МИГРАЦИЯ Шаги 3-11** | — | — | **сейчас** |
 | **B.1** | [TZ_MindAtomicityFix](TZ_MindAtomicityFix.md) | 🟥 high (но не UX-блок) | 0.3-0.5 сессии | после миграции |
 | **B.2** | [TZ_SimplyChatUiScaling](TZ_SimplyChatUiScaling.md) | 🟧 medium | 1-1.5 сессии | после ~500 сообщений |
 | **B.3** | [TZ_SimplyCompactionDivider](TZ_SimplyCompactionDivider.md) | 🟧 medium | 1 сессия | после миграции |
 | **B.4** | [TZ_BriefingConcurrencyGuard](TZ_BriefingConcurrencyGuard.md) | 🟧 medium | 0.3-0.5 сессии | после миграции |
 
-**Итого quick wins сейчас:** 2.5-3.5 сессии. **Итого deferred:** 4 ТЗ, ~3-4 сессии после миграции.
+**Quick wins:** все 4 закрыты в v3.100.4 (см. [BACKLOG_CLOSED.md](../_archive/BACKLOG_CLOSED.md)). **Итого deferred:** 4 ТЗ, ~3-4 сессии после миграции.
 
 ---
 
-## Блок A — Quick wins ДО миграции
+## Возврат в миграцию
 
-### A.1 — TZ_SimplyChatLoadPerf (high) — СНАЧАЛА
-
-Открытие /simply занимает 15-22 секунды. Два root cause:
-1. **C** — двойной RSC рендер (`getMessagesByChatId` × 2 на одно открытие)
-2. **D** — 8 параллельных `GET /api/document` без viewport-гейтинга
-
-Размоторожен 2026-04-28 после partial-fix billing leak. SPEC: [TZ_SimplyChatLoadPerf/SPEC.md](../TZ_SimplyChatLoadPerf/SPEC.md), уже есть [ANALYSIS.md](../TZ_SimplyChatLoadPerf/ANALYSIS.md).
-
-**Оценка:** 1-1.5 сессии.
-
-### A.2 — TZ_ChatModeUndefinedSubmit (high)
-
-Runtime error `getChatUrl: chatMode "undefined"` блокирует submit при открытом артефакте. TS-fix контракта пропа `chatMode?: string` → `chatMode: string`. Найти проблемного родителя и добавить недостающий проп.
-
-**Оценка:** 0.5 сессии.
-
-### A.3 — TZ_PptxRevealUpdateRender (high)
-
-Презентации не перерисовываются в холсте после `onUpdateDocument` (БД и blob обновлены, скачанный файл свежий, но клиент показывает старую версию). Скорее всего проблема в client-side state или `data-pptxComplete` event handler.
-
-**Оценка:** 0.5-1 сессия (debug client state + правка event handler).
-
-### A.4 — TZ_ChatInputBlockedOnDocumentFetchHang (medium)
-
-Chat input блокируется при висящем `GET /api/document` (Neon timeout 10s). Расцепить input от artifact loading + 5s timeout + graceful UI fallback.
-
-**Оценка:** 0.5 сессии.
-
----
-
-## Что делаем после quick wins
-
-**Возвращаемся в Simply_Migration с Шага 1 (BR-AUTHOR-KIMI).** План миграции 11 шагов в [SIMPLY_MIGRATION_CONCEPT.md](../Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md). HANDOFF для следующей сессии — [Simply_Migration/HANDOFF_NEXT_SESSION.md](../Simply_Migration/HANDOFF_NEXT_SESSION.md).
+**Возвращаемся в Simply_Migration с Шага 3 (Vision/OCR cleanup).** План миграции 11 шагов в [SIMPLY_MIGRATION_CONCEPT.md](../Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md). HANDOFF для следующей сессии — [Simply_Migration/HANDOFF_NEXT_SESSION.md](../Simply_Migration/HANDOFF_NEXT_SESSION.md).
 
 **Закрываются по ходу миграции:**
 - Шаг 1 → TZ_BriefingScriptwriterPromptUpdate (метаданные обновятся)
@@ -118,16 +82,12 @@ Virtual scroll + cursor pagination для длинного Simply chat. Теку
 
 **Оценка:** 0.3-0.5 сессии.
 
-### B.5 — TZ_SimplyChatLoadPerf (заморожен в `/specs/`)
-
-Был заморожен на время разбора billing leak. Billing leak partial-fix применён 2026-04-28, остаток уйдёт через Шаг 4 миграции. После миграции — переоценить актуальность.
-
 ---
 
 ## Связь с серией Simply_Migration
 
-Все quick wins (A.1-A.3) **независимы от миграции** — UX-блокеры пользователей. Делаем в одной сессии, потом возвращаемся в миграцию с чистой головой.
+Все 4 quick wins закрыты в v3.100.4 — продолжаем серию Simply_Migration с Шага 3 без отвлечений.
 
-Все deferred (B.1-B.5) — **не критичны** для миграции, но могут быть подняты после Фазы Г (Шаги 9-11) если появится свободное окно.
+Все deferred (B.1-B.4) — **не критичны** для миграции, могут быть подняты после Фазы Г (Шаги 9-11) если появится свободное окно.
 
 **Backlog не должен расти во время миграции.** Каждая новая находка → сначала «закрывает ли это какой-то шаг миграции?», только если нет → отдельный TZ.

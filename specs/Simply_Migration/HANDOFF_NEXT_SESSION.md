@@ -1,8 +1,8 @@
 # HANDOFF — следующая сессия Claude Code
 
-**Дата:** 2026-04-28
+**Дата:** 2026-04-28 (обновлён вечером)
 **Текущая серия:** Simply_Migration (xAI + Kimi K2.6 + Perplexity, Anthropic Opus только аудитор)
-**Состояние:** Шаги 1-2 закрыты, готовимся к Шагу 3+
+**Состояние:** Шаги 1-2 закрыты + 4 quick wins закрыты в v3.100.4. **Следующий — Шаг 3 (Vision/OCR cleanup).**
 **Контекст:** этот файл — точка входа для нового Claude. Прочитай его первым, дальше следуй ссылкам по необходимости.
 
 ---
@@ -45,16 +45,16 @@ Backlog был раздут до 14 ТЗ. После аудита — 8 (3 quick
 
 ## План действий следующей сессии
 
-### Этап 1 — Quick wins (2.5-3.5 сессии)
+### Этап 1 — Quick wins ✅ ЗАКРЫТО (v3.100.4, 2026-04-28)
 
-Четыре независимых UX-блокера, которые не связаны с миграцией. Сделать ДО Шага 3 миграции. **TZ_SimplyChatLoadPerf делать первым** — самый острый UX-блокер (15-22s TTI):
+Четыре независимых UX-блокера закрыты до возврата в миграцию. См. [BACKLOG_CLOSED.md](../_archive/BACKLOG_CLOSED.md):
 
-1. **TZ_SimplyChatLoadPerf** ([SPEC](../TZ_SimplyChatLoadPerf/SPEC.md), [ANALYSIS](../TZ_SimplyChatLoadPerf/ANALYSIS.md)) — 1-1.5 сессии. **Размотозен 2026-04-28** после partial-fix billing leak. Открытие /simply 15-22 сек: двойной RSC рендер + 8 параллельных `/api/document`. Scope: дедупликация RSC + lazy loading артефактов через IntersectionObserver.
-2. **TZ_ChatModeUndefinedSubmit** ([SPEC](../_backlog/TZ_ChatModeUndefinedSubmit.md)) — 0.5 сессии. Runtime error блокирует submit при открытом артефакте. TS-fix контракта пропа.
-3. **TZ_PptxRevealUpdateRender** ([SPEC](../_backlog/TZ_PptxRevealUpdateRender.md)) — 0.5-1 сессия. Презентации не перерисовываются после `onUpdateDocument`. Client-side state debug.
-4. **TZ_ChatInputBlockedOnDocumentFetchHang** ([SPEC](../_backlog/TZ_ChatInputBlockedOnDocumentFetchHang.md)) — 0.5 сессии. Chat input блокируется на Neon timeout 10s. Расцепить + 5s timeout.
+1. ✅ **TZ_SimplyChatLoadPerf** (`03ae49d`) — TTI 15-22с → 0.35с. Удалён лишний `useSWR` в `components/document-preview.tsx`.
+2. ✅ **TZ_ChatModeUndefinedSubmit** (`92af88e`) — `chatMode` сделан required в `MultimodalInputProps` + проброшен через `<Artifact>`. Бонус: `<ArtifactMessages>` переписан на `<Conversation>` со `StickToBottom`.
+3. ✅ **TZ_ChatInputBlockedOnDocumentFetchHang** (`a4e1c23`) — `fetcherWithTimeout(5000)` в `lib/utils.ts`.
+4. ✅ **TZ_PptxRevealUpdateRender** (`a449fac`) — useEffect в `components/artifact.tsx` на `streaming → idle` зовёт `mutateDocuments()`.
 
-### Этап 2 — Возвращаемся в миграцию
+### Этап 2 — Возвращаемся в миграцию (← НАЧАЛО следующей сессии)
 
 **Следующий шаг — Шаг 3 (Vision/OCR cleanup)** — подготовка к Шагу 4.
 
@@ -110,22 +110,21 @@ Backlog был раздут до 14 ТЗ. После аудита — 8 (3 quick
 
 ## Состояние кода на 2026-04-28
 
-### Незакоммиченные изменения
+### Незакоммиченные изменения (НЕ моя работа — оставить как есть)
 
 ```
-M lib/ai/compaction/prepare-messages.ts  (+19 строк, фикс compaction noop)
-M app/(chat)/api/chat/route.ts           (+13 строк, переходный stripOldFile)
-M lib/ai/registry.ts                     (правка не из этой сессии — проверить)
+M lib/ai/compaction/prepare-messages.ts  (фикс compaction noop из ТЗ-SimplyChatBillingLeak — переживёт миграцию)
+M lib/ai/registry.ts                     (правка не из миграции — проверить при Шаге 3)
+M specs/_backlog/TZ_SimplyChatUiScaling.md
 ```
 
 `prepare-messages.ts` — оставить, переживёт миграцию.
-`route.ts` — оставить как переходный код до Шага 4, потом удалить (см. выше).
+Раньше также был `M app/(chat)/api/chat/route.ts` (stripOldFile) — закоммичен в `a796927` v3.100.3.
 
 ### Активные процессы / dev environment
 
-- Dev сервер запущен (`next dev` PID 88257), HMR подхватывает правки в API routes
-- Симли chat для тестов: `3353a183-37f5-498e-b461-c2e87ff65ef1` (370+ сообщений)
-- compactionIndex = 20, compactionCount = 18 (после ряда compaction-turn'ов в этой сессии)
+- Dev сервер на 3000 (PID меняется), на старте новой сессии: `lsof -i :3000` + перезапуск если упал
+- Симли chat для тестов: `3353a183-37f5-498e-b461-c2e87ff65ef1` (370+ сообщений, 701K токенов на 20 сообщений из-за inline-файлов — закроется Шагом 4)
 
 ### НЕ нужно делать
 
@@ -152,6 +151,6 @@ M lib/ai/registry.ts                     (правка не из этой сес
 
 ```
 1. Прочитать этот файл (HANDOFF_NEXT_SESSION.md)
-2. Спросить владельца: «Quick wins (3 ТЗ, 1.5-2 сессии) или сразу Шаг 3 миграции?»
-3. Действовать по ответу
+2. Quick wins закрыты — сразу к Шагу 3 миграции (Vision/OCR cleanup)
+3. SPEC: см. SIMPLY_MIGRATION_CONCEPT.md, Блок 3
 ```
