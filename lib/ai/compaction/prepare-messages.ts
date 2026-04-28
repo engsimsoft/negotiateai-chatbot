@@ -103,8 +103,25 @@ export async function prepareMessagesWithCompaction(
       `thresholds={soft:${softThresholdTokens},hard:${hardThresholdTokens}} action=${action}`,
   );
 
-  // Фаза 0 — обычная работа, middleware no-op.
+  // Фаза 0 — обычная работа: подставляем сохранённый summary вместо уже-сжатых
+  // сообщений. Без этой подстановки compaction-эффект жил один turn: следующий
+  // turn загружал из БД все исходные сообщения и слал их модели целиком (utечка
+  // ~94K токенов на каждом noop-turn'е после compaction).
+  // compactionIndex = count сообщений с головы массива, сжатых на прошлом
+  // compact-turn'е. Массив из getMessagesByChatId отсортирован по createdAt asc,
+  // synthetic summaries в БД не сохраняются (живут только в historyForStream),
+  // поэтому индекс остаётся валидным между turn'ами.
   if (action === "noop") {
+    const state = await getCompactionState(context.chatId);
+    if (
+      state.summary &&
+      state.index &&
+      state.index > 0 &&
+      state.index < messages.length
+    ) {
+      const synth = buildSyntheticSummaryMessage(state.summary);
+      return { messages: [synth, ...messages.slice(state.index)] };
+    }
     return { messages };
   }
 

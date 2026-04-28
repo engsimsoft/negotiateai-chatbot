@@ -1,6 +1,6 @@
 # Backlog ТЗ — открытые долги и находки
 
-> 📋 **План разруливания** → [TRIAGE.md](TRIAGE.md) — рекомендуемый порядок решения с зависимостями (CRITICAL: Simply Chat memory, далее quick wins).
+> 📋 **План разруливания** → [TRIAGE.md](TRIAGE.md) — Quick wins → Migration → Deferred.
 
 > Список нерешённых задач, найденных при работе над предыдущими ТЗ.
 >
@@ -8,10 +8,10 @@
 > предложить пользователю: «В backlog N открытых долгов: …. Хочешь сначала закрыть
 > какой-то из них, или они не блокируют новый ТЗ?» Решение принимает пользователь.
 >
-> Этот файл и папку создаёт правило 8 WORKFLOW.md (FINDINGS → backlog).
+> **Правило:** новый bug найден → НЕ создавать ТЗ автоматически. Сначала свериться с [Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md](../Simply_Migration/SIMPLY_MIGRATION_CONCEPT.md). Если миграция закрывает в одном из 11 шагов — пометка в SPEC соответствующего шага, не отдельное ТЗ. Этот файл и папку создаёт правило 8 WORKFLOW.md.
 >
 > Создан: 2026-04-13
-> Обновлён: 2026-04-27 — добавлены **TZ_DocumentTruncationSilent** + **TZ_EstimatorIgnoresAttachments** (high, обнаружены при доработке виджета контекста: молчаливое обрезание больших документов + estimator не учитывает binary attachments → Compaction не срабатывает на больших PDF). **TZ_SimplyChatMemoryRegression закрыт** (ТЗ-FixSimplyMemory v3.100.0 + hotfix v3.100.1, см. [BACKLOG_CLOSED](../_archive/BACKLOG_CLOSED.md)). Ранее в этот же день добавлены 7 новых записей из FINDINGS ТЗ-MigrateArtifactPromptsToSkills.
+> Обновлён: 2026-04-28 — после полного аудита backlog: **7 ТЗ закрыты как obsoleted by migration**, остаётся 3 quick wins + 5 deferred. См. [BACKLOG_CLOSED.md](../_archive/BACKLOG_CLOSED.md) для записей о закрытии.
 
 ---
 
@@ -25,48 +25,51 @@
   ```
   Дальше — обычный WORKFLOW (ANALYSIS → ROADMAP → код → финализация → архив)
 - Если долг закрыт:
-  1. Файл удаляется из `_backlog/`
-  2. ТЗ уходит в `_archive/TZ_<name>/` со своим `HANDOFF.md`
-  3. **Запись о закрытии добавляется в [`_archive/BACKLOG_CLOSED.md`](../../_archive/BACKLOG_CLOSED.md) — исторический журнал**
-  4. В этом README (в секции «Открытые долги») запись УДАЛЯЕТСЯ — не дублируется в «Закрытые»
+  1. Файл переносится в `_backlog/_archive/` (или `_archive/TZ_<name>/` если был активным)
+  2. Запись о закрытии добавляется в [`_archive/BACKLOG_CLOSED.md`](../_archive/BACKLOG_CLOSED.md) — исторический журнал
+  3. В этом README запись УДАЛЯЕТСЯ — не дублируется в «Закрытые»
 
 **Этот файл держит ТОЛЬКО открытые долги.** История закрытых — в `_archive/BACKLOG_CLOSED.md`.
 
 ---
 
-## Открытые долги
+## Открытые долги (8)
 
-### 🟥 High impact
-
-| ТЗ | Описание | Оценка | Источник |
-|---|---|---|---|
-| [TZ_MindAtomicityFix](TZ_MindAtomicityFix.md) | `markMessagesExtracted` в [lib/ai/memory/extract.ts:235-246](../../lib/ai/memory/extract.ts#L235-L246) безусловно отмечает сообщения как extracted даже при провале `processAndStoreFact` (Voyage 403). Память безвозвратно теряется. Fix: условный mark + retry с backoff. | 0.3-0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #4 |
-| [TZ_ChatModeUndefinedSubmit](TZ_ChatModeUndefinedSubmit.md) | Runtime error `getChatUrl: chatMode "undefined"` в `submitForm` блокирует submit при открытом артефакте. Контракт `chatMode?: string` опциональный — TS не возражает, родители не передают. F5 помогает временно. | 0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #6 |
-| [TZ_GrokSkipsUpdateDocumentTool](TZ_GrokSkipsUpdateDocumentTool.md) | Grok 4.1 Fast иногда генерит ответ как обычный chat-message вместо вызова `updateDocument` tool. Артефакт не обновляется, пользователь видит «модель ничего не сделала». Усилить tool description / system prompt. | 0.3-0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #7 |
-| [TZ_PptxRevealUpdateRender](TZ_PptxRevealUpdateRender.md) | Презентации (pptx/reveal) не перерисовываются в холсте после `onUpdateDocument` — БД и blob обновлены, превью генерится, но клиент показывает старую версию. Скачанный файл свежий. Скорее всего проблема в client-side state / data-pptxComplete handler. | 0.5-1 сессия | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #1 |
-| [TZ_DocumentTruncationSilent](TZ_DocumentTruncationSilent.md) | При загрузке больших документов (PDF >50K char, DOCX/CSV/Excel/TXT любого размера до 20MB) текст обрезается **молча** без UI-уведомления. Пользователь думает что Simply «глупый», когда модель не находит данные из обрезанной части. PDF-сканы отдельно: уходят целиком в Haiku, занимают ~195K токенов из 200K. Решение: единый лимит на extracted text + 413 ответ + toast-сообщение «Загрузите в Библиотеку». | 0.5-1 сессия | Найдено 2026-04-27 в обсуждении виджета контекста (после ТЗ-FixSimplyMemory v3.100.1) |
-| [TZ_EstimatorIgnoresAttachments](TZ_EstimatorIgnoresAttachments.md) | `estimateMessageTokens` считает только text-части `parts`, image/file binary attachments игнорируются. Замер 2026-04-27: estimator показал 16 токенов на запросе где модель насчитала 194 991 (расхождение в ~12 000 раз). Compaction не срабатывает на больших PDF-сканах когда должен (action=noop при реальных 195K), виджет «Контекст» показывает заниженный %. Fix: heuristic ~1.5K/image, ~3K/page для PDF. | 0.3-0.5 сессии | Найдено 2026-04-27 при тесте PDF-скана в Simply chat |
-
-### 🟧 Medium impact
+### 🟥 Quick wins (чинить ДО начала миграции)
 
 | ТЗ | Описание | Оценка | Источник |
 |---|---|---|---|
-| [TZ_ExpertiseReasoningRestore](TZ_ExpertiseReasoningRestore.md) | Экспертиза руками понижена с `grok-4.20-reasoning` → `grok-4.20-non-reasoning` из-за регрессии `@ai-sdk/xai@3.0.83`: при параллельных tool calls `webSearch+librarySearch` ломается reasoning-stream (`reasoning part not found`), запрос виснет с пустым ответом. Качество Экспертизы снижено. Что пробовали и не помогло: апдейт SDK, `reasoningEffort:high` (xAI не поддерживает), кастомный `reasoningReconciliationMiddleware`. Самый дешёвый путь — попробовать sequential tool calls (`xai.parallel_function_calling: false`). | 0.5-1 сессия | Существует с 2026-04-23 (commit `a469c51`); в README ранее не отражён, добавлен в финализации ТЗ-BriefingStuckRecovery |
-| [TZ_BriefingConcurrencyGuard](TZ_BriefingConcurrencyGuard.md) | Гонка cron-запуска и user-triggered `/api/briefing/generate` для одного userId. Оба INSERT'нут 'generating' (после ТЗ-BriefingStuckRecovery — сделают два UPDATE'а), приведёт к двойной работе и потенциальному overwrite готового брифинга. Решение: partial unique index `(userId) WHERE status='generating'` (как для simply-chat) или `SELECT FOR UPDATE` lock. | 0.3-0.5 сессии | Найден в B5 ANALYSIS ТЗ-BriefingStuckRecovery (вынесен из scope) |
-| [TZ_RevealVsPptxToolSelection](TZ_RevealVsPptxToolSelection.md) | AI выбирает `presentation-pptx` когда пользователь просит `reveal`. Reveal-артефакт практически недоступен через AI-канал. Уточнить tool description, или deprecate reveal если мало используется. | 0.2-1 сессия | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #2 |
+| **TZ_SimplyChatLoadPerf** *(в `/specs/`)* | 15-22 сек открытие /simply прямо сейчас. Двойной RSC рендер + 8 параллельных `/api/document`. Разморожен 2026-04-28 после partial-fix billing leak. | 1-1.5 сессии | Серия измерений Network tab + dev-логов 2026-04-28 |
+| [TZ_ChatModeUndefinedSubmit](TZ_ChatModeUndefinedSubmit.md) | Runtime error `getChatUrl: chatMode "undefined"` блокирует submit при открытом артефакте. Контракт `chatMode?: string` опциональный — TS не возражает, родители не передают. F5 помогает временно. | 0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #6 |
+| [TZ_PptxRevealUpdateRender](TZ_PptxRevealUpdateRender.md) | Презентации (pptx/reveal) не перерисовываются в холсте после `onUpdateDocument` — БД и blob обновлены, превью генерится, но клиент показывает старую версию. Скачанный файл свежий. Проблема в client-side state / data-pptxComplete handler. | 0.5-1 сессия | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #1 |
 | [TZ_ChatInputBlockedOnDocumentFetchHang](TZ_ChatInputBlockedOnDocumentFetchHang.md) | Chat input блокируется когда `GET /api/document` висит в Neon timeout 10s. UX полностью замораживается. Расцепить input ↔ artifact loading + timeout 5s + graceful UI fallback. | 0.5 сессии | Этап 7 ТЗ-MigrateArtifactPromptsToSkills, FINDINGS #3 |
 
-### 🟦 Low impact
+**Итого quick wins:** 2.5-3.5 сессии. **Делать ДО Шага 3 миграции** — независимые UX-блокеры пользователей.
 
-| ТЗ | Описание | Оценка | Источник |
-|---|---|---|---|
-| [TZ_BriefingScriptwriterPromptUpdate](TZ_BriefingScriptwriterPromptUpdate.md) | Header `lib/prompts/briefing/briefing-scriptwriter.md:4-6` содержит устаревшую metadata: «Модель: MiniMax M2-Her» и «MiniMax Speech 2.8 HD TTS». После ТЗ-BR-AUTHOR-KIMI весь `briefing:podcast-script` работает на Kimi K2.6, TTS — Gemini. Промпт целиком уходит в system message → модель видит вранье о своей identity. PE-сессия для обновления метаданных. | 0.1-0.2 сессии | Найден в Этапе 5 ТЗ-BR-AUTHOR-KIMI (SPEC явно запретил трогать промпты — вынесено вне scope) |
+### 🟧 Deferred (после миграции)
+
+| ТЗ | Описание | Почему отложено |
+|---|---|---|
+| [TZ_MindAtomicityFix](TZ_MindAtomicityFix.md) | `markMessagesExtracted` в [lib/ai/memory/extract.ts:235-246](../../lib/ai/memory/extract.ts#L235-L246) безусловно отмечает сообщения как extracted даже при провале `processAndStoreFact` (Voyage 403). Память может теряться. Fix: условный mark + retry с backoff. | Архитектурная корректность, не блокер UX |
+| [TZ_SimplyChatUiScaling](TZ_SimplyChatUiScaling.md) | Скоуп: virtual scroll + cursor pagination. Ждать пока Simply chat перевалит ~500 сообщений. | Нет срочности, преждевременная оптимизация |
+| [TZ_SimplyCompactionDivider](TZ_SimplyCompactionDivider.md) | Когда compaction уплотняет старые сообщения в `chat.compactionSummary`, пользователь видит их в UI как обычно — mental model расходится. Показать визуальный разделитель. | UX nice-to-have, не блокер |
+| [TZ_BriefingConcurrencyGuard](TZ_BriefingConcurrencyGuard.md) | Гонка cron-запуска и user-triggered `/api/briefing/generate`. Решение: partial unique index или `SELECT FOR UPDATE`. | Редкий race condition, не критично |
+
+**Итого deferred:** 4 ТЗ, в backlog без срочности.
 
 ---
 
 ## Закрытые долги
 
-История закрытых долгов вынесена в отдельный архивный журнал:
-**[`_archive/BACKLOG_CLOSED.md`](../../_archive/BACKLOG_CLOSED.md)**
+История закрытых долгов — в **[`_archive/BACKLOG_CLOSED.md`](../_archive/BACKLOG_CLOSED.md)**.
+
+**На 2026-04-28 закрыто 7 ТЗ как obsoleted by migration:**
+- TZ_SimplyChatBillingLeak (partial fix + Шаг 4 закроет остаток)
+- TZ_DocumentTruncationSilent (Шаг 4)
+- TZ_EstimatorIgnoresAttachments (Шаг 4)
+- TZ_GrokSkipsUpdateDocumentTool (Шаг 7)
+- TZ_RevealVsPptxToolSelection (Шаг 7)
+- TZ_ExpertiseReasoningRestore (Шаг 8)
+- TZ_BriefingScriptwriterPromptUpdate (Шаги 1/10)
 
 Этот файл держит только открытые долги. Когда долг закрывается — запись переносится в архивный журнал, сюда не добавляется.

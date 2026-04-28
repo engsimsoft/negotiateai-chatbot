@@ -340,6 +340,18 @@ function stripOldAttachmentsFromHistory(
   return messages.map((message, idx) => {
     if (idx >= cutoff) return message;
     const adaptedParts = message.parts.map((part: any) => {
+      // Inline-текст текстовых файлов (.md/.docx/.xlsx → text после
+      // convertTextFilePartsInMessage). Без этого каждый загруженный когда-либо
+      // файл копится в истории навсегда — даже после compaction slice.
+      if (part.type === "text" && typeof part.text === "string") {
+        const fileMatch = part.text.match(/^📄 \*\*Файл: ([^*]+)\*\*/);
+        if (fileMatch) {
+          return {
+            type: "text" as const,
+            text: `[Ранее был прикреплён файл: ${fileMatch[1].trim()}]`,
+          };
+        }
+      }
       if (part.type === "file") {
         const mediaType: string = part.mediaType ?? "";
         const fileName: string =
