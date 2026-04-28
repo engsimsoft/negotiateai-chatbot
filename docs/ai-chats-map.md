@@ -10,7 +10,7 @@
 
 Все AI-точки приложения резолвят модель через единый `getModel(taskId)` и лимит output через `getMaxOutputTokensForTask(taskId)`. SSOT — [task-assignments.ts](../lib/ai/task-assignments.ts) (`DEFAULT_TASK_MODELS` — taskId → catalogId, `DEFAULT_MAX_OUTPUT_TOKENS` — taskId → maxOutputTokens), [model-catalog.ts](../lib/ai/model-catalog.ts) (pricing + capabilities), [getModel.ts](../lib/ai/getModel.ts) (resolver + safety-net: `Math.min(requested, capability)` + warnOnce при Anthropic cap > 21333). Смена модели или output cap для любой задачи = одна строка в task-assignments.ts. Детали — [ai-providers.md](ai-providers.md#core-registry), [ADR 047](decisions/047-core-model-registry.md), [ADR 053](decisions/053-aisdk-invocation-contract.md).
 
-**Активные AI-провайдеры:** Anthropic Claude (Haiku 4.5 / Sonnet 4.6 / Opus 4.6), xAI Grok (4.1 Fast / 4.20 / 4.20 Multi-Agent), Moonshot AI Kimi K2.6 (briefing pipeline), Google Gemini (vision-ocr, Podcast TTS), Deepgram Nova-3 (voice input + meeting transcription), Perplexity Sonar (deepResearch tool).
+**Активные AI-провайдеры:** Anthropic Claude (Haiku 4.5 / Sonnet 4.6 / Opus 4.6), xAI Grok (4.1 Fast / 4.20 / 4.20 Multi-Agent), Moonshot AI Kimi K2.6 (briefing pipeline), Google Gemini (Podcast TTS), Deepgram Nova-3 (voice input + meeting transcription), Perplexity Sonar (deepResearch tool).
 
 > **⚠️ Важно для разработчиков:** Этот документ описывает **чаты и UI**, а не является реестром моделей. Единственный источник правды по моделям — [`task-assignments.ts`](../lib/ai/task-assignments.ts). Если таблицы в этом документе расходятся с `task-assignments.ts` — **правда в коде**, а документ устарел и требует обновления.
 
@@ -18,7 +18,7 @@
 |---|---|---|---|
 | **Simply Chat** (default text) | Grok 4.1 Fast (`simply-chat`) | ✅ Работает | Дворецкий KITT — быстрый дешёвый основной чат |
 | **Simply Chat** — кнопка «Думать» | Grok 4.20 reasoning (`simply-chat-think`) | ✅ Работает | Tier upgrade на сильную модель |
-| **Vision fallback** (все режимы, capability-driven) | Claude Haiku 4.5 (`chat-vision`) | ✅ Работает | Срабатывает когда default-модель режима не тянет тип вложения (Grok ↛ PDF). Читает capability из SSOT каталога. См. ADR 055 |
+| **Vision fallback** (все режимы, capability-driven) | Grok 4.1 Fast non-reasoning (`chat-vision`) | ✅ Работает | Срабатывает когда default-модель режима не тянет тип вложения. После Шага 3 миграции (2026-04-28) Anthropic полностью убран из image-пути чата. Читает capability из SSOT каталога. См. ADR 055 |
 | **Экспертиза** (chatMode=expertise) | Grok 4.20 reasoning (`expertise`) | ✅ Работает | Точные ответы, разовые экспертные запросы |
 | **Экспертиза Premium** (toggle «Команда агентов») | Grok 4.20 Multi-Agent (`expertise-multi-agent`) | 🔒 Reserved (ТЗ-XAI-MA-1) | Premium-режим рядом с обычной expertise через Responses API + MCP. Placeholder taskId зарезервирован, реализация в отдельном ТЗ |
 | **Создание** (chatMode=create) | Grok 4.20 reasoning (`create`) | ✅ Работает | Презентации, отчёты, длинные тексты |
@@ -46,7 +46,6 @@
 | **Artifact handlers** | Claude Sonnet 4.6 (`artifact:text\|markdown\|excel\|pptx\|reveal`) | ✅ Работает | Генерация/обновление артефактов в холсте |
 | **MIND Memory: extract/consolidate/profile/dedup** (hot path) | Grok 4.1 Fast (`memory:extract-batch` / `memory:consolidate` / `memory:profile` / `memory:dedup-verify`) | ✅ Работает | Извлечение фактов пакетно из to-compact окна в момент compaction (ADR 054) + быстрая консолидация по триггеру ≥10 новых фактов |
 | **MIND Memory: deep-consolidate** (ночной cron) | **Grok 4.20 reasoning** (`memory:deep-consolidate`) | ✅ Работает | Ночной cron `0 22 * * *` = 01:00 МСК. Глубокая tiered-консолидация (Letta sleep-time pattern) — тонкие дубли, противоречия, rephrase длинных фактов. Фильтры: активность 24ч + idempotency 12ч + факт-count ≥5. A/B с Haiku/Sonnet/Opus через `/dev/models` (ТЗ-MindDeepConsolidation) |
-| **Vision OCR** | Claude Haiku 4.5 (`vision:ocr`) | ✅ Работает | OCR-экстракция текста из изображений |
 | **Title** | Grok 4.1 Fast (`util:title`) | ✅ Работает | Автонейминг чатов |
 | **Compaction Summary** | Grok 4.1 Fast non-reasoning (`compaction:summarize`) | ✅ Работает | Simply Compaction — структурированное 5-секционное сжатие истории чата при достижении 50%/85% от `SIMPLY_CONTEXT_LIMIT=200K`. Провайдер-агностично, активен во всех chat-модах (ADR 054) |
 | **Library: Автоанализ** | Grok 4.1 Fast non-reasoning (`library:auto-analyze`) | ✅ Работает | ТЗ-XAI-COL-1 · Один вызов при upload документа в Библиотеку — определяет autoType + autoTags[3-5] + autoDescription (≤200 знаков, подпись для карточки в списке) через `generateObject` со Zod enum. Работает на локально извлечённом тексте (`extractPdfText`, `mammoth`, `xlsx`) до upload в xAI — видит только первые 4000 символов |
@@ -424,7 +423,7 @@ lib/prompts/briefing/briefing-scriptwriter.md       # Промпт скрипт�
 |---|---|---|---|---|
 | `simply` (text) | `simply-chat` | Grok 4.1 Fast | `/simply` | Дворецкий KITT — persistent чат |
 | `simply` (think) | `simply-chat-think` | Grok 4.20 reasoning | `/simply` (кнопка «Думать») | Tier upgrade на сильную модель |
-| любой (vision fallback) | `chat-vision` | Claude Haiku 4.5 | все chat modes | Capability-driven fallback через `resolveActiveTaskId` (lib/ai/routing.ts). Для Grok-режимов (simply/expertise/create) срабатывает на PDF-сканах. Для project:expert (Claude-tiers) не срабатывает — tier сам умеет. См. ADR 055 |
+| любой (vision fallback) | `chat-vision` | Grok 4.1 Fast non-reasoning | все chat modes | Capability-driven fallback через `resolveActiveTaskId` (lib/ai/routing.ts). Сканы PDF между Шагом 3 и Шагом 4 миграции деградируют (Grok PDF не понимает) — закроется через xAI Files API. См. ADR 055 |
 | `expertise` | `expertise` | Grok 4.20 reasoning | `/expertise/[id]` | Точные ответы с проверкой фактов |
 | `expertise` (Premium toggle) | `expertise-multi-agent` 🔒 | Grok 4.20 Multi-Agent | `/expertise/[id]` (toggle «Команда агентов», ТЗ-XAI-MA-1) | Premium-режим, пока reserved |
 | `create` | `create` | Grok 4.20 reasoning | `/create/[id]` | Презентации, отчёты, длинные тексты |
@@ -583,19 +582,15 @@ const result = await streamText({
 
 **API Key:** `ANTHROPIC_API_KEY`
 
-### Google Gemini (vision-ocr + Briefing фильтр + Podcast)
+### Google Gemini (Podcast TTS)
 
 ```typescript
-// lib/ai/vision-ocr.ts, lib/podcast/script-generator.ts
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
-
 // lib/podcast/tts-gemini.ts (native SDK for multi-speaker TTS)
 import { GoogleGenAI } from "@google/genai";
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
 ```
 
-**API Key:** `GOOGLE_GENERATIVE_AI_API_KEY` (vision-ocr + Briefing фильтр + Podcast)
+**API Key:** `GOOGLE_GENERATIVE_AI_API_KEY` (Podcast TTS)
 
 ---
 
@@ -605,11 +600,11 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
 
 | Модель | catalogId | Input / Output (USD/1M) | Контекст | Где используется |
 |---|---|---|---|---|
-| **Grok 4.1 Fast** (non-reasoning) | `grok-4-1-fast-non-reasoning` | $0.20 / $0.50 | 128K | Simply Chat (default text), MIND memory (extract-batch, consolidate, profile, dedup-verify), Briefing filter, Clerks (task-summary, file-analyzer), util (title) |
+| **Grok 4.1 Fast** (non-reasoning) | `grok-4-1-fast-non-reasoning` | $0.20 / $0.50 | 2M | Simply Chat (default text), Vision fallback (chat-vision), MIND memory (extract-batch, consolidate, profile, dedup-verify), Briefing filter, Clerks (task-summary, file-analyzer), util (title), Library (auto-analyze, generate-summary, document-chat), Compaction summarize |
 | **Grok 4.20** (reasoning) | `grok-4.20-0309-reasoning` | $2 / $6 | 256K | Simply Chat (кнопка «Думать»), Экспертиза (chatMode=expertise), Создание (chatMode=create), Meeting summary, MIND memory (extract — mission-critical) |
 | **Grok 4.20 Multi-Agent** | `grok-4.20-multi-agent-0309` | $2 / $6 | 256K | 🔒 Reserved для taskId `expertise-multi-agent` (placeholder, не вызывать). Реализация Premium «Команда агентов» через Responses API + MCP — отдельная ветка ТЗ-XAI-MA-1. Архитектура: [BRAINSTORM_GrokMultiAgent.md](../specs/_archive/Simply_xAI/BRAINSTORM_GrokMultiAgent.md) |
 | **Claude Sonnet 4.6** | `claude-sonnet-4-6` | $3 / $15 | 200K (1M beta) | project:expert:sonnet (DEFAULT), Секретарь, Briefing Onboarding, Artifact handlers (5 типов) |
-| **Claude Haiku 4.5** | `claude-haiku-4-5-20251001` | $1 / $5 | 200K | Simply Chat vision, project:expert:haiku, Бен, Менеджер, vision:ocr |
+| **Claude Haiku 4.5** | `claude-haiku-4-5-20251001` | $1 / $5 | 200K | project:expert:haiku, Бен, Менеджер |
 | **Claude Opus 4.6** | `claude-opus-4-6` | $5 / $25 | 200K (1M beta) | project:expert:opus, Профессор (planning, review, pipeline-analyze, pipeline-synthesize) |
 | **Kimi K2.6** (Moonshot AI) | `kimi-k2.6` | $0.95 / $4.00 (cached input $0.16) | 256K | Briefing pipeline (`briefing:author`, `briefing:section`, `briefing:podcast-script`) — Instant mode (thinking disabled), 180s fetch timeout через `moonshotai` namespace. Подключение: `@ai-sdk/moonshotai@ai-v6` |
 | **Gemini 2.5 Flash TTS** | `gemini-2.5-flash-preview-tts` | — | — | Podcast: TTS озвучка (multi-speaker Host + Expert), через native `@google/genai` SDK |

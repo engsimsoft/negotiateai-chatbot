@@ -7,6 +7,24 @@
 
 ## [Unreleased]
 
+### [3.100.6] — 2026-04-28 — feat(migration-step-3) — Vision/OCR cleanup + переключение `chat-vision` с Claude Haiku 4.5 на Grok 4.1 Fast non-reasoning
+
+**Шаг 3 серии Simply_Migration. Anthropic полностью убран из image-пути в чате — все vision-сценарии теперь на xAI Grok. Также удалён мёртвый taskId `vision:ocr` (никогда не вызывался по аудиту 2026-04-25).**
+
+- **Что изменилось у пользователя:** ничего видимого в production-default-пути (Grok 4.1 Fast уже умел vision напрямую, fallback срабатывал редко). Унификация под капотом: один провайдер для всех vision-задач в чате.
+
+- **Удалено:** `lib/ai/vision-ocr.ts` (мёртвый файл с `extractTextFromImage` / `extractTextFromPDF`, 0 call sites). taskId `vision:ocr` со всеми его записями в [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) (`TaskId` union, `DEFAULT_TASK_MODELS`, `DEFAULT_MAX_OUTPUT_TOKENS`, `TASK_DESCRIPTIONS`).
+
+- **Изменено:** `chat-vision` default `claude-haiku-4-5-20251001` → `grok-4-1-fast-non-reasoning` ([task-assignments.ts](lib/ai/task-assignments.ts)). Sanity-fix каталога: `contextWindow` обеих записей `grok-4-1-fast-{reasoning,non-reasoning}` `128_000 → 2_000_000` ([model-catalog.ts:388,398](lib/ai/model-catalog.ts#L388)) — 16x расхождение с docs.x.ai, влияло на estimator/compaction решения.
+
+- **Известное ограничение (R3):** между этим шагом и Шагом 4 (PDF на xAI Files API) сканированные PDF в `chat-vision` fallback деградируют — `adaptHistoryToCapabilities` подменяет PDF на текст-плейсхолдер (Grok 4.1 Fast non-reasoning не поддерживает PDF). Касается только dev-override через `/dev/models`, production-default не затронут. Шаг 4 закроет архитектурно через `input_file` content type + auto `attachment_search`.
+
+- **Документация:** [docs/ai-chats-map.md](docs/ai-chats-map.md), [docs/ai-providers.md](docs/ai-providers.md), [SIMPLY_STATUS.md](SIMPLY_STATUS.md) — синхронизированы; `@ai-sdk/google` больше не используется в коде (только Podcast TTS через native `@google/genai`).
+
+- **Версия проекта:** 3.100.5 → 3.100.6 (patch — миграция одного taskId на другой провайдер, без поведенческих изменений в default-пути)
+
+---
+
 ### [3.100.5] — 2026-04-28 — fix(message-render) — inline-файл показывается карточкой после reload, не портянкой с line numbers
 
 **При загрузке файла (.docx/.md/.xlsx и т.п.) свежее сообщение рендерилось красиво (карточка с именем файла), но после нескольких turn-ов или перезагрузки страницы превращалось в полный текст файла, обёрнутый в markdown code block с номерами строк. Это лежало с 2026-04-15 (ТЗ-XAI-3 fix), просто маскировалось — клиент локально хранил оригинальный `type: "file"` part и рендерил карточкой, а в БД летел уже сконвертированный `type: "text"` с маркером ` 📄 **Файл: name**\n\`\`\`\n<content>\n\`\`\` `. После reload поднимался БД-вариант, markdown-renderer видел `\`\`\`` и показывал code block.**

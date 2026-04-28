@@ -19,14 +19,13 @@
  *  - meeting:*           — транскрипция и суммаризация встреч
  *  - service-chat:*      — сервисные чаты (ben, project-creation и т.д.)
  *  - util:*              — мелкие утилитарные вызовы (title, summary, suggestions)
- *  - vision:ocr          — OCR-экстракция текста из изображений
  */
 
 export type TaskId =
   // Simply Chat (основной чат продукта)
   | "simply-chat"           // default text → Grok 4.1 Fast (non-reasoning)
   | "simply-chat-think"     // кнопка «Думать» = tier upgrade → Grok 4.20 (reasoning)
-  | "chat-vision"           // capability-driven fallback для вложений (все chat modes) → Claude Haiku 4.5
+  | "chat-vision"           // capability-driven fallback для вложений (все chat modes) → Grok 4.1 Fast non-reasoning
   // Экспертиза и Создание — разовые ветки
   | "expertise"             // chatMode=expertise → Grok 4.20 (reasoning)
   | "expertise-multi-agent" // RESERVED для ТЗ-XAI-MA-1 (Premium «Команда агентов»)
@@ -75,9 +74,7 @@ export type TaskId =
   | "artifact:markdown"
   | "artifact:excel"
   | "artifact:pptx"
-  | "artifact:reveal"
-  // Vision
-  | "vision:ocr";
+  | "artifact:reveal";
 
 /**
  * Маппинг taskId → catalog id (physical or alias).
@@ -96,7 +93,7 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   // уже в проекте (Opus).
   "simply-chat":              "grok-4-1-fast-non-reasoning",
   "simply-chat-think":        "grok-4.20-0309-reasoning",
-  "chat-vision":              "claude-haiku-4-5-20251001",
+  "chat-vision":              "grok-4-1-fast-non-reasoning",
 
   // Экспертиза и Создание (ТЗ-XAI-4 2026-04-16)
   // Обе ветки переведены на Grok 4.20 reasoning — это «зал», пользователь видит
@@ -232,9 +229,6 @@ export const DEFAULT_TASK_MODELS: Record<TaskId, string> = {
   "artifact:excel":             "claude-sonnet-4-6",
   "artifact:pptx":              "claude-sonnet-4-6",
   "artifact:reveal":            "claude-sonnet-4-6",
-
-  // Vision
-  "vision:ocr":               "claude-haiku-4-5-20251001",
 };
 
 /** Все известные taskId. */
@@ -265,7 +259,7 @@ export const DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number> = {
   // Simply Chat
   "simply-chat":              8192,   // Grok 4.1 Fast, типичные ответы 1-4K.
   "simply-chat-think":        16000,  // Grok 4.20 reasoning — потолок capability Grok.
-  "chat-vision":              4096,   // Haiku vision fallback для вложений во всех chat modes.
+  "chat-vision":              4096,   // Grok 4.1 Fast non-reasoning vision fallback для вложений во всех chat modes (Шаг 3 миграции 2026-04-28).
 
   // Экспертиза / Создание / Multi-agent
   "expertise":                16000,  // Grok 4.20 reasoning — потолок capability Grok.
@@ -332,9 +326,6 @@ export const DEFAULT_MAX_OUTPUT_TOKENS: Record<TaskId, number> = {
   "artifact:excel":           8192,
   "artifact:pptx":            16384,
   "artifact:reveal":          16384,
-
-  // Vision
-  "vision:ocr":               4096,   // Haiku non-streaming, cap критичен (capability 64K = timeout-bomb иначе).
 };
 
 /**
@@ -411,9 +402,6 @@ export const TASK_DESCRIPTIONS: Record<TaskId, string> = {
   "artifact:excel":           "Артефакт — Excel-таблица",
   "artifact:pptx":            "Артефакт — презентация PPTX",
   "artifact:reveal":          "Артефакт — презентация Reveal.js",
-
-  // Vision
-  "vision:ocr":               "Vision — OCR изображений и сканов",
 };
 
 /** Getter для описания taskId (человекочитаемое). */

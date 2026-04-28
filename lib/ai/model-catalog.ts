@@ -385,7 +385,7 @@ const ENTRIES: ModelEntry[] = [
     displayName: "Grok 4.1 Fast (reasoning)",
     pricing: { input: 0.2, output: 0.5, cachedInput: 0.05, cacheWrite: 0 },
     capabilities: CAPS_GROK,
-    contextWindow: 128_000,
+    contextWindow: 2_000_000,
     maxOutput: 16_000,
   },
   {
@@ -395,7 +395,7 @@ const ENTRIES: ModelEntry[] = [
     displayName: "Grok 4.1 Fast",
     pricing: { input: 0.2, output: 0.5, cachedInput: 0.05, cacheWrite: 0 },
     capabilities: { ...CAPS_GROK, thinking: false },
-    contextWindow: 128_000,
+    contextWindow: 2_000_000,
     maxOutput: 16_000,
   },
   // Note: legacy `grok-4` entry removed in v3.88.0 (ТЗ-XAI-1). It was not in

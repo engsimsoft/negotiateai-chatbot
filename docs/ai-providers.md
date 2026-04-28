@@ -80,7 +80,6 @@ logUsage({
 | `service-chat:*` | Сервисные чаты (ben / project-creation / project-manager / briefing-onboarding) |
 | `util:*` | Утилиты (title / project-summary) |
 | `artifact:*` | Artifact handlers (text / markdown / excel / pptx / reveal) |
-| `vision:ocr` | OCR через vision-модель |
 
 Полный список — константа `DEFAULT_TASK_MODELS` в `task-assignments.ts`. TypeScript `TaskId` union гарантирует, что опечатки ловятся компилятором.
 
@@ -103,7 +102,7 @@ Voyage (embeddings), Deepgram (speech-to-text), Perplexity (deep research), Gemi
 
 > **SDK версии:** `ai@6.x` + `@ai-sdk/anthropic@3.x` + `@ai-sdk/google@3.x` + `@ai-sdk/react@3.x`. v6 предоставляет нативные `inputTokenDetails`/`outputTokenDetails` (включая `cacheWriteTokens`, `cacheReadTokens`, `reasoningTokens`).
 
-Используется для: projects expert chat (все tier), professor pipeline, artifacts, meeting:summary, simply-chat-think, simply-chat-vision, clerk'ов, всех service chats, auto-naming, vision:ocr (fallback). Полный список — через `DEFAULT_TASK_MODELS`.
+Используется для: projects expert chat (все tier), professor pipeline, artifacts, meeting:summary, simply-chat-think, clerk'ов, всех service chats, auto-naming. Полный список — через `DEFAULT_TASK_MODELS`. После Шага 3 миграции (2026-04-28) Anthropic полностью убран из image-пути чата — `chat-vision` теперь на Grok 4.1 Fast non-reasoning.
 
 ### Moonshot AI (Kimi K2.6)
 
@@ -130,13 +129,12 @@ Pricing (Kimi K2.6): base $0.95/M input, cached input $0.16/M, output $4.00/M, c
 
 | Параметр | Значение |
 |----------|----------|
-| SDK (vision) | `@ai-sdk/google` — используется через catalog entry для OCR |
 | SDK (TTS) | `@google/genai` — напрямую в `lib/podcast/tts-gemini.ts` |
 | API Key | `GOOGLE_GENERATIVE_AI_API_KEY` |
-| Registry namespace | **НЕ в registry** — подключается через catalog `provider: "google"` и обрабатывается отдельно (non-LLM paths) |
+| Registry namespace | **НЕ в registry** — TTS вызывается напрямую через native SDK |
 | Документация | https://ai.google.dev/ |
 
-Используется для: Podcast TTS (Gemini 2.5 Flash TTS, multi-speaker Kore + Iapetus). Vision OCR сейчас на Claude Haiku (vision:ocr task), Gemini Vision зарезервирован в catalog но не активен.
+Используется для: Podcast TTS (Gemini 2.5 Flash TTS, multi-speaker Kore + Iapetus). После Шага 3 миграции (2026-04-28) `@ai-sdk/google` больше не используется — vision-ocr taskId удалён, image-сценарии чата на xAI Grok 4.1 Fast non-reasoning.
 
 ### xAI (Grok)
 

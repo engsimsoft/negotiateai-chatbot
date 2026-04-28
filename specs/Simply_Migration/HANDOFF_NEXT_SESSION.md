@@ -81,6 +81,8 @@ Backlog был раздут до 14 ТЗ. После аудита — 8 (3 quick
 
 ### При начале Шага 4 (PDF на xAI Files API)
 
+0. **Контекст после Шага 3 (2026-04-28):** между Шагом 3 и Шагом 4 PDF-fallback в `chat-vision` подменяется на текст-плейсхолдер через `adaptHistoryToCapabilities` (Grok 4.1 Fast non-reasoning не поддерживает PDF). Это касается только dev-override-сценариев, не production-default. Шаг 4 закрывает полностью через Files API.
+
 1. **Прочитать архивные TZ** для понимания контекста:
    - [TZ_DocumentTruncationSilent](../_backlog/_archive/TZ_DocumentTruncationSilent.md) — что было с обрезкой больших документов
    - [TZ_EstimatorIgnoresAttachments](../_backlog/_archive/TZ_EstimatorIgnoresAttachments.md) — что было с estimator'ом и binary

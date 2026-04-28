@@ -15,10 +15,10 @@
 **Философия:** Apple-подход (качество важнее количества) + Best-in-Class API (интегрируем лучшие решения, не изобретаем). Детали видения → [SIMPLY_PRODUCT_VISION.md](SIMPLY_PRODUCT_VISION.md).
 
 **Мультипровайдерная маршрутизация (финальная после закрытия серии Simply_xAI, 4 роли / 3 production провайдера / 1 dev-инструмент):**
-- **Подсобка** — xAI Grok 4.1 Fast (`util:*`, `clerk:*`, `briefing:filter`, `memory:extract-batch/consolidate/profile/dedup-verify`, `compaction:summarize`)
+- **Подсобка** — xAI Grok 4.1 Fast (`util:*`, `clerk:*`, `briefing:filter`, `memory:extract-batch/consolidate/profile/dedup-verify`, `compaction:summarize`, `chat-vision` — capability-driven vision fallback во всех chat modes)
 - **Кухня** — Moonshot AI Kimi K2.6 (`briefing:author`, `briefing:section`, `briefing:podcast-script` — Instant mode, 180s fetch timeout через namespace `moonshotai`, мигрировано с MiniMax в v3.99.2)
 - **Зал** — xAI Grok 4.20 reasoning (`simply-chat-think`, `expertise`, `create`, `meeting:summary`)
-- **Автор** — Anthropic Claude Opus/Sonnet/Haiku (`professor:*`, `artifact:*`, `vision:ocr`, `service-chat:*`, `chat-vision` — capability-driven fallback для PDF-сканов во всех режимах, ADR 055)
+- **Автор** — Anthropic Claude Opus/Sonnet/Haiku (`professor:*`, `artifact:*`, `service-chat:*`)
 - **Dev-инструмент** — OpenRouter (только через `/dev/models` override для тестирования новых моделей)
 
 SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) + [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts).
@@ -31,7 +31,7 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 
 | Компонент | Статус | Модели / стек |
 |---|---|---|
-| **Simply Chat** (persistent, один на пользователя) | ✅ | Grok 4.1 Fast (default, включая картинки через нативный vision) · Grok 4.20 reasoning (кнопка «Думать») · Claude Haiku 4.5 — fallback для PDF-сканов через `chat-vision`. История чата = primary source с budget 140K, MIND = augmentation (фикс v3.100.0). xAI prompt cache hit-rate стабильный благодаря `x-grok-conv-id` sticky routing + token-aware loading без жёсткого `LIMIT 200` (фикс v3.100.1) |
+| **Simply Chat** (persistent, один на пользователя) | ✅ | Grok 4.1 Fast (default, включая картинки через нативный vision) · Grok 4.20 reasoning (кнопка «Думать») · Grok 4.1 Fast non-reasoning — vision fallback через `chat-vision` (Шаг 3 миграции v3.100.6, Anthropic убран из image-пути). PDF-сканы временно деградируют до Шага 4 (xAI Files API). История чата = primary source с budget 140K, MIND = augmentation (фикс v3.100.0). xAI prompt cache hit-rate стабильный благодаря `x-grok-conv-id` sticky routing + token-aware loading без жёсткого `LIMIT 200` (фикс v3.100.1) |
 | **Экспертиза** (одноразовые экспертные запросы) | ✅ | Grok 4.20 reasoning (single-agent, R-5 резолв 2026-04-16). Multi-agent вариант 🔒 зарезервирован под ТЗ-XAI-MA-1 |
 | **Создание** (одноразовые creation-чаты) | ✅ | Grok 4.20 reasoning (мигрировано 2026-04-16) |
 | **Проекты** (изолированные рабочие пространства) | ✅ | Claude Haiku / Sonnet / Opus по tier, Профессор (Opus planning/review + Haiku execute) |
