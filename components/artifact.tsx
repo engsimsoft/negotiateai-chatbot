@@ -59,6 +59,8 @@ export type UIArtifact = {
 
 function PureArtifact({
   chatId,
+  chatMode,
+  isProjectChat,
   input,
   setInput,
   status,
@@ -75,6 +77,8 @@ function PureArtifact({
   selectedModelId,
 }: {
   chatId: string;
+  chatMode: string;
+  isProjectChat?: boolean;
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
   status: UseChatHelpers<ChatMessage>["status"];
@@ -345,8 +349,10 @@ function PureArtifact({
                   <MultimodalInput
                     attachments={attachments}
                     chatId={chatId}
+                    chatMode={chatMode}
                     className="bg-background dark:bg-muted"
                     input={input}
+                    isProjectChat={isProjectChat}
                     messages={messages}
                     selectedModelId={selectedModelId}
                     selectedVisibilityType={selectedVisibilityType}

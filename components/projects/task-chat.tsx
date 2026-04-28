@@ -296,6 +296,7 @@ export function TaskChat({
             <MultimodalInput
               attachments={attachments}
               chatId={chatId}
+              chatMode="project"
               input={input}
               messages={messages}
               sendMessage={sendMessage}
@@ -340,7 +341,9 @@ export function TaskChat({
       <Artifact
         attachments={attachments}
         chatId={chatId}
+        chatMode="project"
         input={input}
+        isProjectChat
         isReadonly={isReadonly || isCompleting}
         messages={messages}
         regenerate={regenerate}

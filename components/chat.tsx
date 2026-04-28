@@ -586,7 +586,9 @@ export function Chat({
       <Artifact
         attachments={attachments}
         chatId={id}
+        chatMode={currentChatMode}
         input={input}
+        isProjectChat={!!projectId}
         isReadonly={isReadonly}
         messages={messages}
         regenerate={regenerate}

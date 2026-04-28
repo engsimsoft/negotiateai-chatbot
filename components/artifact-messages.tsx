@@ -1,11 +1,16 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
-import { AnimatePresence, motion } from "framer-motion";
-import { memo } from "react";
-import { useMessages } from "@/hooks/use-messages";
+import { AnimatePresence } from "framer-motion";
+import { memo, useEffect, useState } from "react";
+import { useStickToBottomContext } from "use-stick-to-bottom";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import type { UIArtifact } from "./artifact";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "./elements/conversation";
 import { PreviewMessage, ThinkingMessage } from "./message";
 
 type ArtifactMessagesProps = {
@@ -19,6 +24,20 @@ type ArtifactMessagesProps = {
   artifactStatus: UIArtifact["status"];
 };
 
+function ScrollToBottomOnSubmit({
+  status,
+}: {
+  status: UseChatHelpers<ChatMessage>["status"];
+}) {
+  const { scrollToBottom } = useStickToBottomContext();
+  useEffect(() => {
+    if (status === "submitted") {
+      scrollToBottom();
+    }
+  }, [status, scrollToBottom]);
+  return null;
+}
+
 function PureArtifactMessages({
   chatId,
   status,
@@ -28,52 +47,45 @@ function PureArtifactMessages({
   regenerate,
   isReadonly,
 }: ArtifactMessagesProps) {
-  const {
-    containerRef: messagesContainerRef,
-    endRef: messagesEndRef,
-    onViewportEnter,
-    onViewportLeave,
-    hasSentMessage,
-  } = useMessages({
-    status,
-  });
+  const [hasSentMessage, setHasSentMessage] = useState(false);
+  useEffect(() => {
+    if (status === "submitted") {
+      setHasSentMessage(true);
+    }
+  }, [status]);
 
   return (
-    <div
-      className="flex h-full flex-col items-center gap-4 overflow-y-scroll px-4 pt-20"
-      ref={messagesContainerRef}
-    >
-      {messages.map((message, index) => (
-        <PreviewMessage
-          chatId={chatId}
-          isLoading={status === "streaming" && index === messages.length - 1}
-          isReadonly={isReadonly}
-          key={message.id}
-          message={message}
-          regenerate={regenerate}
-          requiresScrollPadding={
-            hasSentMessage && index === messages.length - 1
-          }
-          setMessages={setMessages}
-          vote={
-            votes
-              ? votes.find((vote) => vote.messageId === message.id)
-              : undefined
-          }
-        />
-      ))}
+    <Conversation className="flex w-full flex-1 flex-col gap-4">
+      <ScrollToBottomOnSubmit status={status} />
+      <ConversationContent className="flex flex-col items-center gap-4 px-4 pt-20">
+        {messages.map((message, index) => (
+          <PreviewMessage
+            chatId={chatId}
+            isLoading={status === "streaming" && index === messages.length - 1}
+            isReadonly={isReadonly}
+            key={message.id}
+            message={message}
+            regenerate={regenerate}
+            requiresScrollPadding={
+              hasSentMessage && index === messages.length - 1
+            }
+            setMessages={setMessages}
+            vote={
+              votes
+                ? votes.find((vote) => vote.messageId === message.id)
+                : undefined
+            }
+          />
+        ))}
 
-      <AnimatePresence mode="wait">
-        {status === "submitted" && <ThinkingMessage key="thinking" />}
-      </AnimatePresence>
+        <AnimatePresence mode="wait">
+          {status === "submitted" && <ThinkingMessage key="thinking" />}
+        </AnimatePresence>
 
-      <motion.div
-        className="min-h-[24px] min-w-[24px] shrink-0"
-        onViewportEnter={onViewportEnter}
-        onViewportLeave={onViewportLeave}
-        ref={messagesEndRef}
-      />
-    </div>
+        <div className="min-h-6 min-w-6 shrink-0" />
+      </ConversationContent>
+      <ConversationScrollButton />
+    </Conversation>
   );
 }
 

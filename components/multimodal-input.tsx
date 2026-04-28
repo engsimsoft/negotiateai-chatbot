@@ -83,7 +83,7 @@ function PureMultimodalInput({
   onClearLibrarySources,
 }: {
   chatId: string;
-  chatMode?: string;
+  chatMode: string;
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
   status: UseChatHelpers<ChatMessage>["status"];
