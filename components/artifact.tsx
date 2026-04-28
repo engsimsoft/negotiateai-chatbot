@@ -22,7 +22,7 @@ import { useArtifact } from "@/hooks/use-artifact";
 import { usePerformance } from "@/hooks/use-performance";
 import type { Document, Vote } from "@/lib/db/schema";
 import type { Attachment, ChatMessage } from "@/lib/types";
-import { fetcher } from "@/lib/utils";
+import { fetcherWithTimeout } from "@/lib/utils";
 import { ArtifactActions } from "./artifact-actions";
 import { ArtifactCloseButton } from "./artifact-close-button";
 import { ArtifactMessages } from "./artifact-messages";
@@ -107,7 +107,11 @@ function PureArtifact({
     artifact.documentId !== "init" && artifact.status !== "streaming"
       ? `/api/document?id=${artifact.documentId}`
       : null,
-    fetcher
+    fetcherWithTimeout(5000),
+    {
+      errorRetryCount: 1,
+      errorRetryInterval: 2000,
+    }
   );
 
   const [mode, setMode] = useState<"edit" | "diff">("edit");

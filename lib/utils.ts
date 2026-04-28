@@ -27,6 +27,21 @@ export const fetcher = async (url: string) => {
   return response.json();
 };
 
+export const fetcherWithTimeout = (timeoutMs: number) => async (url: string) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      const { code, cause } = await response.json();
+      throw new ChatSDKError(code as ErrorCode, cause);
+    }
+    return response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 export async function fetchWithErrorHandlers(
   input: RequestInfo | URL,
   init?: RequestInit,
