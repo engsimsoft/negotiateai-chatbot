@@ -562,6 +562,15 @@ export const aiUsageLog = pgTable(
     chatMode: varchar("chatMode", { length: 50 }).notNull(),
     durationMs: integer("durationMs"),
     guardianFlags: jsonb("guardianFlags"),
+    /**
+     * xAI Responses API server-side tool usage breakdown.
+     * Содержимое: { document_search_calls, web_search_calls, ... } из
+     * `response.usage.server_side_tool_usage_details` (Phase 1.7 R6 находка).
+     * Variable per-turn (1-6 document_search_calls в зависимости от сложности
+     * вопроса) — точное число для billing и observability.
+     * Null если запрос шёл не через Responses API (старый streamText path).
+     */
+    serverSideToolCalls: jsonb("server_side_tool_calls"),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
   },
   (table) => ({
@@ -577,6 +586,36 @@ export const aiUsageLog = pgTable(
 );
 
 export type AiUsageLog = InferSelectModel<typeof aiUsageLog>;
+
+// ============================================================================
+// Chat Attachment (TZ_FilesAPIMigration / Шаг 4) — пара (xaiFileId, blobUrl)
+// ============================================================================
+
+export const chatAttachment = pgTable(
+  "chat_attachment",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    chatId: uuid("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+    messageId: uuid("message_id")
+      .notNull()
+      .references(() => message.id, { onDelete: "cascade" }),
+    /** null если xAI upload упал — есть только Blob backup. */
+    xaiFileId: text("xai_file_id"),
+    blobUrl: text("blob_url").notNull(),
+    filename: text("filename").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    chatIdIdx: index("chat_attachment_chat_id_idx").on(table.chatId),
+    xaiFileIdIdx: index("chat_attachment_xai_file_id_idx").on(table.xaiFileId),
+  }),
+);
+
+export type ChatAttachment = InferSelectModel<typeof chatAttachment>;
 
 // ============================================================================
 // Telegram Bot (ТЗ-TG3)

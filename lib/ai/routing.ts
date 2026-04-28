@@ -1,15 +1,17 @@
 /**
  * Chat Routing — единая точка резолва `activeTaskId` для входящего запроса.
  *
- * Принцип (ТЗ-ExpertiseCreateVisionRouting, 2026-04-21):
- *   Capability-driven vision fallback. Если default-модель режима не
- *   поддерживает тип вложения (например PDF у Grok) — routing переключается
- *   на `chat-vision` (Claude Haiku 4.5). Если поддерживает (Grok с JPG,
- *   Claude tiers с чем угодно) — остаётся на модели режима.
+ * Принцип (ТЗ-ExpertiseCreateVisionRouting, 2026-04-21 + TZ_FilesAPIMigration, 2026-04-29):
+ *   - Image attachments — capability-driven fallback (если default-модель не
+ *     vision-capable → chat-vision).
+ *   - **Non-image file attachments** (PDF/DOCX/XLSX/CSV/TXT/MD) — всегда идут
+ *     на chat-vision как universal attachment routing slot (Шаг 4 SPEC v3 §5.2).
+ *     Phase 1.5 R2 показал что все Grok'и принимают input_file, но мы
+ *     централизуем file processing на chat-vision для product control:
+ *     Vladimir может в /dev/models переключить модель файлового пути одним
+ *     кликом, не меняя default моделей режимов.
  *
- * Противоречие устранено: раньше simply всегда роутил любое вложение на
- * Haiku, expertise/create вообще не имели routing'а (сканированные PDF
- * падали). Теперь один механизм для всех chat modes через SSOT-капабилити.
+ * Project chats не подпадают — tier-модель обрабатывает вложение сама.
  */
 
 import type { TaskId } from "./task-assignments";
@@ -68,22 +70,34 @@ function resolveDefaultTaskId(ctx: RoutingContext): TaskId {
 }
 
 /**
+ * Проверка наличия не-image file attachments (PDF/DOCX/XLSX/CSV/TXT/MD).
+ * Шаг 4 SPEC v3 §5.2: все такие файлы идут на chat-vision независимо от
+ * capability default-модели. Image — отдельный путь через needsVisionFallback.
+ */
+function hasNonImageFileAttachment(parts: readonly any[]): boolean {
+  return parts.some((part: any) => {
+    if (part?.type !== "file") return false;
+    const mediaType: string = part.mediaType ?? "";
+    return mediaType !== "" && !mediaType.startsWith("image/");
+  });
+}
+
+/**
  * SSOT-резолв активного taskId для запроса.
  *
  * Алгоритм:
  *   1. Резолв default taskId по chat mode / project tier.
- *   2. Если есть вложения и default-модель их не тянет — переключение на
- *      `chat-vision` (Claude Haiku 4.5, единственный fallback на все режимы).
- *   3. Иначе — default taskId.
- *
- * Для project chats (Claude-tiers) capability-check всегда возвращает false,
- * fallback не срабатывает — tier-модель обрабатывает вложение сама. Это
- * желаемое поведение: пользователь заплатил за tier, не подменяем на Haiku.
+ *   2. Project chats не роутятся — tier-модель обрабатывает вложение сама.
+ *   3. Если есть non-image file attachment (PDF/DOCX/...) — chat-vision
+ *      (universal attachment slot, Шаг 4).
+ *   4. Если есть image и default-модель не vision-capable — chat-vision.
+ *   5. Иначе — default taskId.
  */
 export function resolveActiveTaskId(ctx: RoutingContext): TaskId {
   const defaultTaskId = resolveDefaultTaskId(ctx);
-  if (ctx.parts.length > 0 && needsVisionFallback(ctx.parts, defaultTaskId)) {
-    return "chat-vision";
-  }
+  if (ctx.isProjectChat) return defaultTaskId;
+  if (ctx.parts.length === 0) return defaultTaskId;
+  if (hasNonImageFileAttachment(ctx.parts)) return "chat-vision";
+  if (needsVisionFallback(ctx.parts, defaultTaskId)) return "chat-vision";
   return defaultTaskId;
 }

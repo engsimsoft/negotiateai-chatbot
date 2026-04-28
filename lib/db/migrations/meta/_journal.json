@@ -449,6 +449,13 @@
       "when": 1778587200000,
       "tag": "0063_library-document-auto-summary",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1778673600000,
+      "tag": "0064_chat-attachment-and-cost-tracking",
+      "breakpoints": true
     }
   ]
 }

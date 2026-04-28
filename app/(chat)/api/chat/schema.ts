@@ -16,6 +16,18 @@ const filePartSchema = z.object({
   ]),
   name: z.string().min(1).max(100),
   url: z.string().url(),
+  // Шаг 4: xAI Files API file_id передаётся через providerMetadata.xai.fileId
+  // (multimodal-input.tsx ставит при upload). Без объявления здесь Zod strip'ит
+  // и xai_file_id уходит null в chat_attachment → Responses API без input_file.
+  providerMetadata: z
+    .object({
+      xai: z
+        .object({
+          fileId: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 const partSchema = z.union([textPartSchema, filePartSchema]);

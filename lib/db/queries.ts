@@ -38,6 +38,7 @@ import {
   briefingTopics,
   type Chat,
   chat,
+  chatAttachment,
   type DBMessage,
   document,
   message,
@@ -502,6 +503,108 @@ export async function saveMessages({ messages }: { messages: DBMessage[] }) {
   } catch (error) {
     throw new ChatSDKError("bad_request:database", error);
   }
+}
+
+/**
+ * Шаг 4 миграции: записать chat_attachment строки для file parts с blobUrl.
+ * Хранит пару (xaiFileId, blobUrl) для cleanup на DELETE chat и для
+ * Responses API path (резолв `file_id` по messageId в chat/route.ts).
+ *
+ * Вызывается после saveMessages в chat/route.ts. Best-effort — ошибки
+ * не throw'ятся вверх (логируются и продолжаем). Без xAI запись всё равно
+ * создаётся с xaiFileId=null — Blob-копия как fallback.
+ */
+export async function saveChatAttachmentsFromMessage(params: {
+  chatId: string;
+  messageId: string;
+  parts: Array<{
+    type: string;
+    url?: string;
+    name?: string;
+    mediaType?: string;
+    providerMetadata?: { xai?: { fileId?: string } };
+  }>;
+}): Promise<void> {
+  const rows: Array<typeof chatAttachment.$inferInsert> = [];
+  for (const part of params.parts) {
+    if (part.type !== "file" || !part.url) continue;
+    const xaiFileId = part.providerMetadata?.xai?.fileId ?? null;
+    rows.push({
+      chatId: params.chatId,
+      messageId: params.messageId,
+      xaiFileId,
+      blobUrl: part.url,
+      filename: part.name ?? "file",
+      mimeType: part.mediaType ?? "application/octet-stream",
+      sizeBytes: 0,
+    });
+  }
+  if (rows.length === 0) return;
+  try {
+    await db.insert(chatAttachment).values(rows);
+  } catch (error) {
+    console.warn(
+      "[saveChatAttachmentsFromMessage] failed:",
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+/**
+ * Получить chat_attachment записи для message (для chat/route.ts перед
+ * Responses API call'ом — нужны file_id для input_file content type).
+ */
+export async function getChatAttachmentsByMessageId(
+  messageId: string,
+): Promise<
+  Array<{
+    id: string;
+    xaiFileId: string | null;
+    blobUrl: string;
+    filename: string;
+    mimeType: string;
+  }>
+> {
+  return db
+    .select({
+      id: chatAttachment.id,
+      xaiFileId: chatAttachment.xaiFileId,
+      blobUrl: chatAttachment.blobUrl,
+      filename: chatAttachment.filename,
+      mimeType: chatAttachment.mimeType,
+    })
+    .from(chatAttachment)
+    .where(eq(chatAttachment.messageId, messageId));
+}
+
+/**
+ * Получить chat_attachment записи для всего чата (для Responses API multi-turn —
+ * история уже содержит file_id ссылки в parts, но для cleanup и для резолва
+ * blob fallback нужен список всех файлов чата).
+ */
+export async function getChatAttachmentsByChatId(
+  chatId: string,
+): Promise<
+  Array<{
+    id: string;
+    messageId: string;
+    xaiFileId: string | null;
+    blobUrl: string;
+    filename: string;
+    mimeType: string;
+  }>
+> {
+  return db
+    .select({
+      id: chatAttachment.id,
+      messageId: chatAttachment.messageId,
+      xaiFileId: chatAttachment.xaiFileId,
+      blobUrl: chatAttachment.blobUrl,
+      filename: chatAttachment.filename,
+      mimeType: chatAttachment.mimeType,
+    })
+    .from(chatAttachment)
+    .where(eq(chatAttachment.chatId, chatId));
 }
 
 export async function getMessagesByChatId({
@@ -3414,6 +3517,7 @@ export async function saveAiUsageLog({
   chatMode,
   durationMs,
   guardianFlags,
+  serverSideToolCalls,
 }: {
   chatId?: string | null;
   userId: string;
@@ -3428,6 +3532,8 @@ export async function saveAiUsageLog({
   chatMode: string;
   durationMs?: number | null;
   guardianFlags?: Record<string, unknown> | null;
+  /** Шаг 4: server-side tool breakdown из xAI Responses API. */
+  serverSideToolCalls?: Record<string, unknown> | null;
 }): Promise<void> {
   try {
     await db.insert(aiUsageLog).values({
@@ -3444,6 +3550,7 @@ export async function saveAiUsageLog({
       chatMode,
       durationMs: durationMs ?? null,
       guardianFlags: guardianFlags ?? null,
+      serverSideToolCalls: serverSideToolCalls ?? null,
     });
   } catch (error) {
     console.error("[saveAiUsageLog] Failed to save usage log:", error);

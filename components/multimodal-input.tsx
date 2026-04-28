@@ -204,6 +204,11 @@ function PureMultimodalInput({
           url: attachment.url,
           name: attachment.name,
           mediaType: attachment.contentType,
+          // Шаг 4: пробрасываем xAI file_id, дальше route.ts создаст chat_attachment
+          // запись и при наличии non-image файлов идёт через Responses API path.
+          ...(attachment.xaiFileId
+            ? { providerMetadata: { xai: { fileId: attachment.xaiFileId } } }
+            : {}),
         })),
         {
           type: "text",
@@ -250,12 +255,13 @@ function PureMultimodalInput({
 
       if (response.ok) {
         const data = await response.json();
-        const { url, pathname, contentType, originalFilename } = data;
+        const { url, pathname, contentType, originalFilename, xaiFileId } = data;
 
         return {
           url,
           name: originalFilename ?? pathname,
           contentType,
+          xaiFileId: xaiFileId ?? null,
         };
       }
       const { error } = await response.json();

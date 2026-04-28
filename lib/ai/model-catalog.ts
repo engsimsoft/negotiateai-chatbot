@@ -143,17 +143,15 @@ const CAPS_GROK: ModelCapabilities = {
   tools: true,
   vision: true,
   documentSupport: {
-    supported: false,
-    // xAI Files API существует и работает для agentic-моделей (grok-4, grok-4.20,
-    // grok-4-fast), но в Simply мы не реализовали интеграцию upload → file_id →
-    // input_file content type. Декларативная истина (провайдер умеет) ≠ фактическая
-    // (Simply не интегрирует). Будущее ТЗ-XAIFilesIntegration поднимет флаг для
-    // reasoning вариантов.
-    // Подтверждено payload-level проверкой 2026-04-28: PDF в свежем Expertise-чате
-    // (0 истории) → Grok ответил «вижу только метаданные имени», `[PAYLOAD-DEBUG]`
-    // не нашёл `"file"`/`"application/pdf"` в payload xAI. Grok физически не получает
-    // PDF-контент — `adaptHistoryToCapabilities` корректно меняет на текст-плейсхолдер.
-    reason: "xAI Files API не интегрирован в Simply (требует upload + input_file content type)",
+    supported: true,
+    method: "files-api",
+    maxSizeMb: 48,
+    notes:
+      "PDF/DOCX/XLSX/CSV/TXT/MD через xAI Files API + автоматический document_search " +
+      "(он же attachment_search в pricing $10/1k calls). Phase 1.5 R2 verified: все " +
+      "наши Grok варианты (reasoning + non-reasoning + multi-agent) принимают input_file " +
+      "и активно делают document_search. Variable per-turn cost 1-6 calls в зависимости " +
+      "от сложности вопроса (Phase 1.6 R5).",
   },
   thinking: true,
   embeddings: false,

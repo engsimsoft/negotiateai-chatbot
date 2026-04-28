@@ -3,9 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
-import { extractPdfText } from "@/lib/pdf/extract-pdf-text";
-
-const PDF_TEXT_MAX_CHARS = 50_000;
+import { xaiUploadFile } from "@/lib/ai/files/xai-files-client";
 
 // Use Blob instead of File since File is not available in Node.js environment
 const FileSchema = z.object({
@@ -48,6 +46,33 @@ const getXLSX = async () => {
   const xlsx = await import("xlsx");
   return xlsx;
 };
+
+/**
+ * Upload в xAI Files API. Best-effort — на ошибке возвращаем null, в БД
+ * запишем chat_attachment без xaiFileId (только Blob backup). Пользователь
+ * увидит файл в чате как обычно, но в этой сессии без agentic поиска по нему.
+ */
+async function uploadToXai(
+  buffer: Buffer,
+  filename: string,
+  mimeType: string,
+): Promise<string | null> {
+  try {
+    const file = await xaiUploadFile({
+      buffer,
+      filename,
+      mimeType,
+      purpose: "assistants",
+    });
+    return file.id;
+  } catch (err) {
+    console.warn(
+      `[Upload API] xAI Files upload failed for ${filename}:`,
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
+}
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -110,12 +135,11 @@ export async function POST(request: Request) {
         fileExt === "txt" ||
         fileExt === "md";
 
-      // Process Excel files (XLSX, XLS) and extract as CSV text
+      // Process Excel files (XLSX, XLS) — extract as CSV text, upload to Blob + xAI Files API.
       if (isExcelFile) {
         const xlsx = await getXLSX();
         const workbook = xlsx.read(Buffer.from(fileBuffer), { type: "buffer" });
 
-        // Convert all sheets to text format
         let extractedText = "";
         workbook.SheetNames.forEach((sheetName, index) => {
           const worksheet = workbook.Sheets[sheetName];
@@ -124,7 +148,6 @@ export async function POST(request: Request) {
           extractedText += `=== Лист: ${sheetName} ===\n${csv}`;
         });
 
-        // Upload extracted text as .txt file
         const textFilename = originalFilename.replace(/\.(xlsx|xls|xlsm)$/i, ".txt");
         const textBuffer = Buffer.from(extractedText, "utf-8");
 
@@ -132,6 +155,7 @@ export async function POST(request: Request) {
           access: "public",
           contentType: "text/plain",
         });
+        const xaiFileId = await uploadToXai(textBuffer, textFilename, "text/plain");
 
         return NextResponse.json({
           ...data,
@@ -139,91 +163,65 @@ export async function POST(request: Request) {
           originalContentType: fileType,
           processed: true,
           fileType: "excel",
+          xaiFileId,
         });
       }
 
+      // DOCX/CSV/TXT/MD — extract text, upload to Blob + xAI Files API.
       if (isDocumentFile) {
         let extractedText: string;
 
         if (fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileExt === "docx") {
-          // Extract text from DOCX
           const mammoth = await getMammoth();
           const result = await mammoth.extractRawText({ buffer: Buffer.from(fileBuffer) });
           extractedText = result.value;
         } else {
-          // Read TXT/MD as UTF-8 text
           const decoder = new TextDecoder("utf-8");
           extractedText = decoder.decode(fileBuffer);
         }
 
-        // Upload extracted text as .txt file
         const textFilename = originalFilename.replace(/\.(docx|csv|txt|md)$/i, ".txt");
-        const textBuffer = Buffer.from(extractedText, 'utf-8');
+        const textBuffer = Buffer.from(extractedText, "utf-8");
 
         const data = await put(textFilename, textBuffer, {
           access: "public",
           contentType: "text/plain",
         });
+        const xaiFileId = await uploadToXai(textBuffer, textFilename, "text/plain");
 
-        // Return with metadata indicating this was processed
         return NextResponse.json({
           ...data,
           originalFilename,
           originalContentType: fileType,
           processed: true,
+          xaiFileId,
         });
       }
 
-      // PDF: attempt server-side text extraction (Layer 0 of SIMPLY_ATTACHMENT_ARCHITECTURE).
-      // Text-based PDFs become text/plain so any model (incl. Grok without documentSupport) can read them inline.
-      // Scanned PDFs (low avg chars/page) fall through to as-is upload → Haiku native PDF handling.
+      // PDF — upload as-is to Blob (backup) + xAI Files API (primary path).
+      // No more pdf-parse / эвристика 30 chars/page / 50K trim — xAI делает
+      // OCR и layout-aware parsing на своей стороне через document_search
+      // (Шаг 4 SPEC v3 §2.1 п.10-11). Сканы и текстовые PDF — единый путь.
       const isPdfFile = fileType === "application/pdf" || fileExt === "pdf";
       if (isPdfFile) {
-        try {
-          const pdfResult = await extractPdfText(Buffer.from(fileBuffer));
+        const pdfBuffer = Buffer.from(fileBuffer);
+        const data = await put(originalFilename, fileBuffer, {
+          access: "public",
+          contentType: "application/pdf",
+        });
+        const xaiFileId = await uploadToXai(pdfBuffer, originalFilename, "application/pdf");
 
-          if (!pdfResult.isLikelyScan && pdfResult.text.length > 0) {
-            const wasTruncated = pdfResult.text.length > PDF_TEXT_MAX_CHARS;
-            const extractedText = wasTruncated
-              ? `${pdfResult.text.slice(0, PDF_TEXT_MAX_CHARS)}\n...[содержимое обрезано, показаны первые ${PDF_TEXT_MAX_CHARS} символов из ${pdfResult.text.length}, всего страниц: ${pdfResult.pageCount}]`
-              : pdfResult.text;
-
-            const textFilename = originalFilename.replace(/\.pdf$/i, ".txt");
-            const textBuffer = Buffer.from(extractedText, "utf-8");
-
-            const data = await put(textFilename, textBuffer, {
-              access: "public",
-              contentType: "text/plain",
-            });
-
-            console.log(
-              `[Upload API] PDF extracted as text: ${originalFilename} → ${textFilename} (${extractedText.length} chars, ${pdfResult.pageCount} pages, truncated=${wasTruncated})`
-            );
-
-            return NextResponse.json({
-              ...data,
-              originalFilename,
-              originalContentType: "application/pdf",
-              processed: true,
-              fileType: "pdf-text",
-              pageCount: pdfResult.pageCount,
-            });
-          }
-
-          console.log(
-            `[Upload API] PDF detected as scan/empty, falling through to native PDF upload: ${originalFilename} (${pdfResult.pageCount} pages, ${pdfResult.text.length} chars)`
-          );
-        } catch (pdfError) {
-          console.warn(
-            `[Upload API] PDF extraction failed, falling back to native PDF upload: ${originalFilename}`,
-            pdfError instanceof Error ? pdfError.message : pdfError
-          );
-          // Graceful fallback — Haiku will handle the PDF natively
-        }
+        return NextResponse.json({
+          ...data,
+          originalFilename,
+          originalContentType: "application/pdf",
+          processed: true,
+          fileType: "pdf",
+          xaiFileId,
+        });
       }
 
-      // For images and as-is PDFs (scan/encrypted/extraction-failed), upload as-is
-      // (they work with Claude multimodal API)
+      // Images (JPEG/PNG) — без xAI upload, идут через Grok native vision.
       const data = await put(originalFilename, fileBuffer, {
         access: "public",
         contentType: fileType,

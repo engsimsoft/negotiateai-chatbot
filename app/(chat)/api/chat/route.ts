@@ -16,6 +16,11 @@ import { extractUsageFields, extractUsageForPricing, logUsage } from "@/lib/ai/u
 import { auth } from "@/app/(auth)/auth";
 import { userEntitlements } from "@/lib/ai/entitlements";
 import { resolveActiveTaskId } from "@/lib/ai/routing";
+import {
+  buildResponsesInput,
+  streamXaiResponses,
+  type ResponsesUsage,
+} from "@/lib/ai/files/xai-responses";
 import { buildChatPrompt, buildExpertisePrompt, buildCreatePrompt, buildLibraryDocumentPrompt } from "@/lib/prompts/server";
 import { getLibraryDocumentById } from "@/lib/ai/library/db";
 import type { BuildContext } from "@/lib/prompts";
@@ -83,6 +88,8 @@ import {
   saveAiUsageLog,
   saveChat,
   saveMessages,
+  saveChatAttachmentsFromMessage,
+  getChatAttachmentsByChatId,
   updateChatLastContextById,
   updateChatTitleAndSummary,
   updateChatTaskStatus,
@@ -743,6 +750,16 @@ export async function POST(request: Request) {
       ],
     });
 
+    // Шаг 4: записать chat_attachment строки для file parts с blobUrl/xaiFileId.
+    // Best-effort, ошибки логируются внутри. Используется в Phase 2.6 при
+    // постройке Responses API input для multi-turn (резолв file_id) и в Phase 3
+    // pre-cascade cleanup при DELETE chat.
+    await saveChatAttachmentsFromMessage({
+      chatId: id,
+      messageId: message.id,
+      parts: processedMessage.parts as any[],
+    });
+
     const streamId = generateUUID();
     await createStreamId({ streamId, chatId: id });
 
@@ -1307,6 +1324,199 @@ export async function POST(request: Request) {
             // последовательности). Fallback на trailing system message.
             messagesForRequest.push({ role: "system" as const, content: mindDynamicBlock });
           }
+        }
+
+        // ─── Шаг 4 fork: xAI Responses API path для non-image file attachments ──
+        // SPEC v3 §3.3, §5.2: при наличии PDF/DOCX/etc в новом сообщении ИЛИ в
+        // истории чата идём через POST /v1/responses с input_file content type.
+        // attachment_search активируется автоматически (Phase 1.5 R2 verified).
+        // Tools на этом пути не подключаются: agentic document_search xAI делает сам.
+        // Только для xAI provider — Anthropic project chats обрабатывают PDF native.
+        const newMessageHasNonImageFile = (message.parts as any[]).some(
+          (p) =>
+            p?.type === "file" &&
+            typeof p.mediaType === "string" &&
+            !p.mediaType.startsWith("image/"),
+        );
+        const allAttachments = await getChatAttachmentsByChatId(id);
+        const hasHistoryXaiFile = allAttachments.some(
+          (a) =>
+            a.xaiFileId !== null && !a.mimeType.startsWith("image/"),
+        );
+        const useResponsesApiPath =
+          (newMessageHasNonImageFile || hasHistoryXaiFile) &&
+          effectiveProvider === "xai";
+        console.log(
+          `[Files API fork CHECK] activeTaskId=${activeTaskId} newMsgFile=${newMessageHasNonImageFile} historyFile=${hasHistoryXaiFile} provider=${effectiveProvider} useResponsesApi=${useResponsesApiPath}`,
+        );
+        if (useResponsesApiPath) {
+          console.log("[Files API fork] ENTERED — using xAI Responses API path");
+          const attachmentsByUrl = new Map<string, string>(
+            allAttachments
+              .filter((a) => a.xaiFileId)
+              .map((a) => [a.blobUrl, a.xaiFileId!] as const),
+          );
+          const responsesInput = buildResponsesInput({
+            messages: messagesForRequest as any,
+            attachmentsByUrl,
+          });
+
+          const textId = generateUUID();
+          let fullText = "";
+          let finalUsage: ResponsesUsage | undefined;
+          let finalRespModelId: string | undefined;
+          let streamError: string | null = null;
+
+          const assistantMessageId = generateUUID();
+          dataStream.write({ type: "start", messageId: assistantMessageId } as any);
+          dataStream.write({ type: "start-step" });
+          dataStream.write({ type: "text-start", id: textId });
+
+          try {
+            for await (const event of streamXaiResponses({
+              modelId: effectiveModelId!,
+              input: responsesInput,
+              conversationId: id,
+            })) {
+              if (event.type === "text-delta") {
+                fullText += event.delta;
+                dataStream.write({
+                  type: "text-delta",
+                  id: textId,
+                  delta: event.delta,
+                });
+              } else if (event.type === "completed") {
+                finalUsage = event.usage;
+                finalRespModelId = event.modelId;
+              } else if (event.type === "error") {
+                streamError = event.error;
+                break;
+              }
+            }
+          } catch (e) {
+            streamError = e instanceof Error ? e.message : String(e);
+          }
+
+          dataStream.write({ type: "text-end", id: textId });
+          dataStream.write({ type: "finish-step" } as any);
+          dataStream.write({ type: "finish" } as any);
+
+          if (streamError) {
+            console.error("[xai-responses] stream error:", streamError);
+            emitDebugError(dataStream, {
+              source: "server:xai-responses",
+              message: streamError,
+            });
+            dataStream.write({
+              type: "error",
+              errorText: streamError,
+            });
+            return;
+          }
+
+          if (fullText) {
+            // НЕ вызываем saveMessages — createUIMessageStream onFinish сам
+            // соберёт UI message из stream events (start/text-*/finish-step) и
+            // сохранит ассистент-сообщение через стандартный путь. Двойной save
+            // ломает onFinish (PK conflict в Message_v2).
+
+            // DevPanel data-usage: пробрасываем AppUsage чтобы виджет показывал токены/cost.
+            try {
+              const totalUsageForApp = {
+                inputTokens: finalUsage?.input_tokens ?? 0,
+                outputTokens: finalUsage?.output_tokens ?? 0,
+                cachedInputTokens:
+                  finalUsage?.input_tokens_details?.cached_tokens ?? 0,
+                reasoningTokens:
+                  finalUsage?.output_tokens_details?.reasoning_tokens ?? 0,
+                totalTokens:
+                  finalUsage?.total_tokens ??
+                  (finalUsage?.input_tokens ?? 0) +
+                    (finalUsage?.output_tokens ?? 0),
+              };
+              const appUsage = buildAppUsage(
+                finalRespModelId ?? effectiveModelId!,
+                totalUsageForApp as any,
+              );
+              dataStream.write({ type: "data-usage", data: appUsage } as any);
+            } catch (e) {
+              console.warn("[xai-responses] AppUsage build failed:", e);
+            }
+
+            if (isSimplyDevMode) {
+              const stepModelId = finalRespModelId ?? effectiveModelId!;
+              const inTok = finalUsage?.input_tokens ?? 0;
+              const cachedTok = finalUsage?.input_tokens_details?.cached_tokens ?? 0;
+              const stepUsage = {
+                noCacheInputTokens: Math.max(0, inTok - cachedTok),
+                cacheReadTokens: cachedTok,
+                cacheWriteTokens: 0,
+                outputTokens: finalUsage?.output_tokens ?? 0,
+                reasoningTokens:
+                  finalUsage?.output_tokens_details?.reasoning_tokens ?? 0,
+              };
+              const docSearchCalls =
+                finalUsage?.server_side_tool_usage_details?.document_search_calls ?? 0;
+              emitDebugStep(dataStream, {
+                schemaVersion: DEBUG_EVENT_SCHEMA_VERSION,
+                stepIndex: 0,
+                stepType: "initial",
+                modelId: stepModelId,
+                noCacheInputTokens: stepUsage.noCacheInputTokens,
+                cacheReadTokens: stepUsage.cacheReadTokens,
+                cacheWriteTokens: stepUsage.cacheWriteTokens,
+                outputTokens: stepUsage.outputTokens,
+                reasoningTokens: stepUsage.reasoningTokens,
+                finishReason: "stop",
+                stepCostRub: calcStepCostRub(stepModelId, stepUsage),
+                toolCalls: [],
+                toolResults:
+                  docSearchCalls > 0
+                    ? [{ toolName: "attachment_search", result: { calls: docSearchCalls } }]
+                    : [],
+                timestamp: Date.now(),
+              });
+              const totalDuration = Date.now() - startTime;
+              emitDebugFinish(dataStream, {
+                schemaVersion: DEBUG_EVENT_SCHEMA_VERSION,
+                totalNoCacheInputTokens: stepUsage.noCacheInputTokens,
+                totalCacheReadTokens: stepUsage.cacheReadTokens,
+                totalCacheWriteTokens: stepUsage.cacheWriteTokens,
+                totalOutputTokens: stepUsage.outputTokens,
+                totalReasoningTokens: stepUsage.reasoningTokens,
+                totalSteps: 1,
+                totalDurationMs: totalDuration,
+                timeToFirstTokenMs: totalDuration,
+                estimatedCostRub: calculateCostRub(stepModelId, stepUsage),
+                modelId: stepModelId,
+                finishReason: "stop",
+              });
+            }
+
+            // Phase 2.8: точный cost из response.usage.cost_in_usd_ticks (1 tick = 1e-10 USD).
+            const costUsd =
+              finalUsage?.cost_in_usd_ticks !== undefined
+                ? finalUsage.cost_in_usd_ticks / 1e10
+                : null;
+            await saveAiUsageLog({
+              chatId: id,
+              userId: session.user.id,
+              modelId: finalRespModelId ?? effectiveModelId!,
+              provider: "xai",
+              inputTokens: finalUsage?.input_tokens ?? 0,
+              outputTokens: finalUsage?.output_tokens ?? 0,
+              cacheReadTokens: finalUsage?.input_tokens_details?.cached_tokens ?? 0,
+              cacheWriteTokens: 0,
+              thinkingTokens:
+                finalUsage?.output_tokens_details?.reasoning_tokens ?? 0,
+              costUsd,
+              chatMode,
+              durationMs: Date.now() - startTime,
+              serverSideToolCalls:
+                finalUsage?.server_side_tool_usage_details ?? null,
+            });
+          }
+          return;
         }
 
         // Standard streaming mode (non-professor)

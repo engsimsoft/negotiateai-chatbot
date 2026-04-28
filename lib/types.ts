@@ -102,4 +102,11 @@ export type Attachment = {
   name: string;
   url: string;
   contentType: string;
+  /**
+   * xAI Files API file_id (Шаг 4 миграции). Появляется при upload PDF/DOCX/
+   * XLSX/CSV/MD/TXT в `/api/files/upload`. Image file uploads — без xaiFileId
+   * (идут через Grok native vision, не Files API).
+   * null — если xAI Files API upload упал, есть только Blob backup.
+   */
+  xaiFileId?: string | null;
 };
