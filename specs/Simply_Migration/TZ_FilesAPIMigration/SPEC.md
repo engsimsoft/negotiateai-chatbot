@@ -297,6 +297,18 @@ Reaper (cron, daily): list xAI files старше 24h → если нет в `ch
 
 ROI: экономим сотни тысяч токенов в payload, тратим $0.01-0.06 за вызов. Положительный с большим запасом.
 
+### 5.9 Phase 3.5 — Smoke-data hot-fix (post-deployment, отступление от §5.6)
+
+**Контекст (29-04 после Phase 3 деплоя):** в smoke-чате 3353a183 обнаружен биллинг-спайк (input 166K, fresh 42K + хвост 33K на следующих turn'ах vs ~5K baseline). Корень — Phase 3 коммит удалил UI-детектор маркера `📄 **Файл:` в `components/message.tsx`, нарушив §5.6 (R8). Legacy сообщения (23 шт, ~720K токенов) визуально раскрылись и продолжили уходить в xAI.
+
+**Решение для smoke-окружения:** полный DELETE данных chat 3353a183 (Message_v2, Stream, memory_entry по userId, chat_attachment cascade). Chat row сохранён, ai_usage_log сохранён.
+
+**Отступление от §5.6:** SPEC запрещал backfill — «strip покрывает». Phase 3.5 идёт другим путём (DELETE), потому что chat — smoke-only, владелец не нуждается в сохранении контента и MIND. **Для prod-deployments §5.6 остаётся в силе** — Phase 3.5 не отменяет архитектурный план, применима только к dev/staging.
+
+**Документация:** [ROADMAP Phase 3.5](ROADMAP.md#phase-35), [FINDINGS Finding #8](FINDINGS.md).
+
+---
+
 ### 5.8 🆕 Cost tracking в `ai_usage_log`
 
 В Phase 2 при обработке Responses API stream:

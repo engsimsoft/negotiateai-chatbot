@@ -539,6 +539,51 @@ VERIFICATION: specs/Simply_Migration/TZ_FilesAPIMigration/VERIFICATION.md
 
 ---
 
+## ✅ Phase 3.5 — Smoke-data hot-fix — ЗАВЕРШЕНА 2026-04-29
+
+**Триггер:** биллинг-спайк в chat 3353a183 после Phase 3 деплоя (см. [FINDINGS.md Finding #8](FINDINGS.md)).
+
+**Корень:** Phase 3 коммит `1dedf27` удалил UI-детектор маркера `📄 **Файл:` в `components/message.tsx` (TODO «удалить после Шага 4»). Удаление противоречило SPEC §5.6 «Backward compat (R8)» — стратегия архитектора была «UI маскирует legacy записи как карточки + `stripOldAttachmentsFromHistory` strip'ит их в payload xAI на лету». После удаления маски legacy записи (~720K токенов в 23 сообщениях, накоплены 14-28 апр) визуально раскрылись в чате полным текстом и продолжили уходить в xAI как часть истории — strip к моменту спайка либо не покрывал все случаи, либо не работал как ожидалось.
+
+### Отступление от SPEC
+- **SPEC §5.6 + «Что НЕ делать» (строка 560)** запрещали backfill legacy — «strip покрывает». Phase 5 пошла другим путём: **полный DELETE smoke-данных** вместо strip+restore-UI-mask. Решение владельца: chat 3353a183 — smoke-only, накопленные 273 MIND-факта тоже не нужны, миграция требует чистого листа. Для prod-deployments с реальными пользователями стратегия SPEC §5.6 (strip + UI mask) остаётся актуальной — Phase 5 не отменяет архитектурный план, она применима только к dev-окружению.
+
+### 3.5.1 ✅ DELETE legacy данных (выполнено)
+
+Одна транзакция через psql:
+```sql
+BEGIN;
+DELETE FROM memory_entry WHERE "userId" = 'bed95407-4160-492e-bdfd-9cf8819878be';   -- 273 MIND
+DELETE FROM "Stream" WHERE "chatId" = '3353a183-37f5-498e-b461-c2e87ff65ef1';        -- 232
+DELETE FROM "Message_v2" WHERE "chatId" = '3353a183-37f5-498e-b461-c2e87ff65ef1';    -- 454 + 4 chat_attachment cascade
+COMMIT;
+```
+
+Сохранено: `Chat` row (Simply persistent), `ai_usage_log` (519 записей — для baseline сравнения «до/после»), `library_*` (user-level, не привязано к чату).
+
+### 3.5.2 ✅ Верификация (выполнено)
+
+```sql
+SELECT COUNT(*) FROM "Message_v2" WHERE "chatId" = '3353a183-37f5-498e-b461-c2e87ff65ef1';   -- 0
+SELECT COUNT(*) FROM memory_entry WHERE "userId" = 'bed95407-4160-492e-bdfd-9cf8819878be';   -- 0
+SELECT COUNT(*) FROM "Chat" WHERE id = '3353a183-37f5-498e-b461-c2e87ff65ef1';               -- 1 (alive)
+```
+
+### 3.5.3 ✅ FINDINGS.md (выполнено)
+
+Finding #8 записан с полной хронологией спайка, биллинг-числами и решением.
+
+### 3.5.4 ⏳ Manual baseline test (за владельцем)
+
+В Simply на чистом чате:
+1. Отправить простой запрос без файла → DevPanel `fresh` ожидаемый ~1-3K (только system + новое сообщение).
+2. Загрузить тот же тестовый scan PDF → `fresh` ожидаемый ~23K (как в expertise-чате).
+3. Следующий turn без файла → `fresh` должен упасть к baseline (~3-6K), не застрять на 33K как до cleanup.
+
+Если на шаге 3 fresh остаётся высоким — `stripOldAttachmentsFromHistory` не покрывает file references из истории, тогда нужен **отдельный hotfix** (новый Phase 3.6) до коммита Phase 4.
+
+---
+
 ## Phase 4 — PR (Vladimir)
 
 После 2 коммитов локально:
