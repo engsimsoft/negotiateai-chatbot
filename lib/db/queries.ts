@@ -79,6 +79,7 @@ import {
   vote,
 } from "./schema";
 import { generateHashedPassword } from "./utils";
+import { xaiDeleteFile } from "@/lib/ai/files/xai-files-client";
 
 // Optionally, if not using email/pass login, you can
 // use the Drizzle adapter for Auth.js / NextAuth
@@ -339,8 +340,34 @@ export async function getUsersWithStaleSimplyMessages(
   return rows.map((r) => r.userId);
 }
 
+async function cleanupAttachmentExternals(
+  attachments: Array<{ xaiFileId: string | null; blobUrl: string }>,
+): Promise<void> {
+  if (attachments.length === 0) return;
+  const { del } = await import("@vercel/blob");
+  await Promise.allSettled([
+    ...attachments
+      .filter((a) => a.xaiFileId)
+      .map((a) =>
+        xaiDeleteFile(a.xaiFileId!).catch((err) =>
+          console.warn(`[chat-cleanup] xai delete failed for ${a.xaiFileId}`, err),
+        ),
+      ),
+    ...attachments.map((a) =>
+      del(a.blobUrl).catch((err) =>
+        console.warn(`[chat-cleanup] blob delete failed for ${a.blobUrl}`, err),
+      ),
+    ),
+  ]);
+}
+
 export async function deleteChatById({ id }: { id: string }) {
   try {
+    const attachments = await db
+      .select({ xaiFileId: chatAttachment.xaiFileId, blobUrl: chatAttachment.blobUrl })
+      .from(chatAttachment)
+      .where(eq(chatAttachment.chatId, id));
+
     await db.delete(vote).where(eq(vote.chatId, id));
     await db.delete(message).where(eq(message.chatId, id));
     await db.delete(stream).where(eq(stream.chatId, id));
@@ -350,6 +377,8 @@ export async function deleteChatById({ id }: { id: string }) {
       .delete(chat)
       .where(eq(chat.id, id))
       .returning();
+
+    await cleanupAttachmentExternals(attachments);
     return chatsDeleted;
   } catch (error) {
     throw new ChatSDKError("bad_request:database", error);
@@ -370,6 +399,11 @@ export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
 
     const chatIds = userChats.map(c => c.id);
 
+    const attachments = await db
+      .select({ xaiFileId: chatAttachment.xaiFileId, blobUrl: chatAttachment.blobUrl })
+      .from(chatAttachment)
+      .where(inArray(chatAttachment.chatId, chatIds));
+
     await db.delete(vote).where(inArray(vote.chatId, chatIds));
     await db.delete(message).where(inArray(message.chatId, chatIds));
     await db.delete(stream).where(inArray(stream.chatId, chatIds));
@@ -379,6 +413,8 @@ export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
       .delete(chat)
       .where(and(eq(chat.userId, userId), isNull(chat.projectId)))
       .returning();
+
+    await cleanupAttachmentExternals(attachments);
 
     return { deletedCount: deletedChats.length };
   } catch (error) {

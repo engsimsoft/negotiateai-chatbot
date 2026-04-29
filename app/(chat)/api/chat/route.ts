@@ -233,65 +233,6 @@ async function autoNameChat(
 }
 
 /**
- * Convert text/plain file parts to text parts in a single message
- * Claude API via OpenRouter doesn't support text files as attachments - only images
- * So we need to fetch the file content and include it as text
- */
-async function convertTextFilePartsInMessage(
-  message: ChatMessage
-): Promise<ChatMessage> {
-  const processedParts = await Promise.all(
-    message.parts.map(async (part: any) => {
-      // Only process file parts with text/plain mediaType
-      if (part.type === "file" && part.mediaType === "text/plain") {
-        const fileName = part.name || part.url?.split("/").pop() || "unknown";
-        try {
-          // Fetch the file content from the URL
-          const response = await fetch(part.url);
-          if (!response.ok) {
-            console.warn(`[Chat API] Failed to fetch text file: ${part.url}`);
-            return {
-              type: "text" as const,
-              text: `📄 Файл: ${fileName} (не удалось загрузить)`,
-            };
-          }
-          const textContent = await response.text();
-          console.log(`[Chat API] Converted text file to text part: ${fileName} (${textContent.length} chars)`);
-
-          return {
-            type: "text" as const,
-            text: `📄 **Файл: ${fileName}**\n\`\`\`\n${textContent}\n\`\`\``,
-          };
-        } catch (error) {
-          console.warn(`[Chat API] Error processing text file ${fileName}:`, error);
-          return {
-            type: "text" as const,
-            text: `📄 Файл: ${fileName} (ошибка обработки)`,
-          };
-        }
-      }
-      return part;
-    })
-  );
-
-  return {
-    ...message,
-    parts: processedParts,
-  } as ChatMessage;
-}
-
-/**
- * Convert text/plain file parts to text parts in all messages
- * This handles both new messages and history from DB
- */
-async function convertTextFilesInAllMessages(
-  messages: ChatMessage[]
-): Promise<ChatMessage[]> {
-  return Promise.all(messages.map(convertTextFilePartsInMessage));
-}
-
-
-/**
  * ТЗ-SimplyReadDocumentTool + R-6 correction (v3.90.2): Capability-aware history
  * adaptation.
  *
@@ -342,28 +283,22 @@ function stripOldAttachmentsFromHistory(
       }
     }
   }
-  if (userSeen < keepInLastNUser) return messages;
+  const cutoffApplies = userSeen >= keepInLastNUser;
 
   return messages.map((message, idx) => {
-    if (idx >= cutoff) return message;
+    const isOldMessage = cutoffApplies && idx < cutoff;
     const adaptedParts = message.parts.map((part: any) => {
-      // Inline-текст текстовых файлов (.md/.docx/.xlsx → text после
-      // convertTextFilePartsInMessage). Без этого каждый загруженный когда-либо
-      // файл копится в истории навсегда — даже после compaction slice.
-      if (part.type === "text" && typeof part.text === "string") {
-        const fileMatch = part.text.match(/^📄 \*\*Файл: ([^*]+)\*\*/);
-        if (fileMatch) {
-          return {
-            type: "text" as const,
-            text: `[Ранее был прикреплён файл: ${fileMatch[1].trim()}]`,
-          };
-        }
-      }
+      if (!isOldMessage) return part;
       if (part.type === "file") {
         const mediaType: string = part.mediaType ?? "";
         const fileName: string =
           part.name || part.url?.split("/").pop() || "файл";
-        if (mediaType === "text/plain") return part;
+        if (mediaType === "text/plain") {
+          return {
+            type: "text" as const,
+            text: `[Ранее был прикреплён файл: ${fileName}]`,
+          };
+        }
         if (mediaType.startsWith("image/")) {
           return {
             type: "text" as const,
@@ -651,15 +586,7 @@ export async function POST(request: Request) {
       // ТЗ-4: Greeting НЕ добавляется как сообщение — используем UI с заголовком + suggested actions
     }
 
-    // ТЗ-COMPACTION-1 fix #1 (2026-04-19): Конверсия file→text ДО подсчёта newMessageTokens.
-    // Иначе estimateMessageTokens видит только { type: "file" } parts и игнорирует их размер
-    // (см. lib/utils.ts:345-358 — функция обрабатывает только text parts).
-    // Для текстовых файлов это означало занижение newMessageTokens на десятки тысяч токенов.
-    // Claude API также не поддерживает text/plain как file attachment — конвертируем в text.
-    const processedMessage = await convertTextFilePartsInMessage(message as ChatMessage);
-
-    // Вычисляем токены нового user message ПОСЛЕ конверсии — теперь учитываются файлы.
-    const newMessageTokens = estimateMessageTokens(processedMessage.parts);
+    const newMessageTokens = estimateMessageTokens(message.parts);
     console.log(
       `[Token Aware] Chat ${id}: New user message has ~${newMessageTokens} tokens (post file conversion)`
     );
@@ -679,7 +606,7 @@ export async function POST(request: Request) {
       // ниже сама обрежет по budget. Жёсткий лимит 200 ломал prompt cache.
     });
 
-    const uiMessages = [...convertToUIMessages(messagesFromDb), processedMessage];
+    const uiMessages = [...convertToUIMessages(messagesFromDb), message as ChatMessage];
 
     // ТЗ-FixSimplyMemory: id сообщений с уже-извлечёнными фактами. Передаётся
     // в Compaction middleware чтобы pre-compact extract step пропускал их и
@@ -729,19 +656,13 @@ export async function POST(request: Request) {
       },
     };
 
-    // ТЗ-XAI-3 fix 2026-04-15: сохраняем уже-сконвертированные parts (processedMessage),
-    // а не оригинальные message.parts. Раньше в БД летел исходный file part с text/plain,
-    // который при следующем запросе возвращался из истории и ломал xAI SDK
-    // (AI_UnsupportedFunctionalityError). После фикса в БД всегда text parts,
-    // legacy строки от прошлых чатов подхватывает `convertTextFilesInAllMessages`
-    // на этапе preparedHistory ниже.
     await saveMessages({
       messages: [
         {
           chatId: id,
           id: message.id,
           role: "user",
-          parts: processedMessage.parts,
+          parts: message.parts,
           attachments: [],
           createdAt: new Date(),
           tokenCount: newMessageTokens,
@@ -750,14 +671,10 @@ export async function POST(request: Request) {
       ],
     });
 
-    // Шаг 4: записать chat_attachment строки для file parts с blobUrl/xaiFileId.
-    // Best-effort, ошибки логируются внутри. Используется в Phase 2.6 при
-    // постройке Responses API input для multi-turn (резолв file_id) и в Phase 3
-    // pre-cascade cleanup при DELETE chat.
     await saveChatAttachmentsFromMessage({
       chatId: id,
       messageId: message.id,
-      parts: processedMessage.parts as any[],
+      parts: message.parts as any[],
     });
 
     const streamId = generateUUID();
@@ -1158,22 +1075,9 @@ export async function POST(request: Request) {
           ? withCacheControlOnLastTool(standardTools)
           : standardTools;
 
-        // Очистка и конверсия истории сообщений — единый pipeline на все chat modes
-        // (ТЗ-ExpertiseCreateVisionRouting, 2026-04-21: gate `chatMode === "simply"`
-        // снят после унификации routing'а через resolveActiveTaskId + chat-vision).
-        //
-        // 1. stripIncompleteToolParts — универсальный (все провайдеры)
-        // 2. convertTextFilesInAllMessages — инлайнит text/plain file parts
-        //    (legacy строки БД + чаты до фикса saveMessages). Grok и Claude оба
-        //    не принимают text/plain как file part.
-        // 3. adaptHistoryToCapabilities — capability-driven R-6 correction:
-        //    file parts, которые целевая модель не поддерживает, заменяются на
-        //    текстовый placeholder. Безопасно для project chats (Claude tiers
-        //    поддерживают всё → ничего не вырезается).
         const cleanedHistory = stripIncompleteToolParts(uiMessages);
-        const textInlinedHistory = await convertTextFilesInAllMessages(cleanedHistory);
         const preparedHistory = adaptHistoryToCapabilities(
-          textInlinedHistory,
+          cleanedHistory,
           effectiveCatalogEntry?.capabilities,
         );
 
