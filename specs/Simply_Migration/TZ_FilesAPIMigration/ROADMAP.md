@@ -3,8 +3,9 @@
 **SPEC:** `specs/Simply_Migration/TZ_FilesAPIMigration/SPEC.md` (v3)
 **Phase 0 audit:** `ANALYSIS.md`, `FINDINGS.md` (выполнен)
 **Phase 1:** ✅ **ЗАВЕРШЕНА** 2026-04-28 (см. инлайн-результаты + `PHASE1_FINDINGS.md`)
-**Размер:** ~5-9 часов оставшейся работы (Phase 2 + Phase 3)
-**Стратегия коммитов:** один PR, 2 атомарных коммита (Phase 2 + Phase 3). Vladimir делает push после ревью.
+**Phase 2:** ✅ **ЗАВЕРШЕНА** 2026-04-29 — коммит `6eabfd7` (19 файлов, +4186/−87)
+**Phase 3:** ✅ **ЗАВЕРШЕНА** 2026-04-29 — коммит `1dedf27` (5 файлов, +122/−133)
+**Status:** Шаг 4 закрыт локально. Push на origin не сделан — на усмотрение Vladimir.
 **Версия ROADMAP:** v3 (обновлено 2026-04-28 после Phase 1.5-1.7 диагностик)
 
 ---
@@ -70,7 +71,10 @@ ratio Turn 2 / Turn 1 = 7300 / 4498 = **1.62** > 1.5 (формальное STOP)
 
 ---
 
-## Phase 2 — Foundation (новый код)
+## ✅ Phase 2 — Foundation (новый код) — ЗАВЕРШЕНА 2026-04-29
+
+**Коммит:** `6eabfd7 feat(migration-step-4): xAI Files API + Responses путь для PDF/DOCX/XLSX/MD`
+**Статус:** все 11 пунктов выполнены, smoke test 5 форматов (PDF/MD/DOCX/XLSX/CSV) зелёный.
 
 **Pre-condition:** Phase 1 пройдена ✅. SPEC v3 обновлён ✅. Зелёный свет.
 
@@ -308,11 +312,19 @@ pdf-parse and lib/pdf/extract-pdf-text.ts kept (Library + Projects out of scope)
 
 ---
 
-## Phase 3 — Cleanup + Lifecycle + Backward Compat
+## ✅ Phase 3 — Cleanup + Lifecycle + Backward Compat — ЗАВЕРШЕНА 2026-04-29
+
+**Коммит:** `1dedf27 feat(migration-step-4): cleanup inline-text path, cascade delete, reaper cron`
+**Статус:** все 11 пунктов выполнены, manual verification зелёный.
 
 **Pre-condition:** Phase 2 пройдена, smoke test зелёный.
 
 **Цель:** удалить inline-text path в chat, добавить cleanup, reaper и backward compat для legacy сообщений.
+
+### Отступление от плана архитектора
+
+- **3.5** `lib/repositories/chat-cleanup.ts` НЕ создан как отдельный файл. Вместо этого cleanup-логика встроена в существующие `deleteChatById` + `deleteAllChatsByUserId` в `lib/db/queries.ts` через приватный helper `cleanupAttachmentExternals`. Причина: чтобы не экспортировать private `db` instance (`const db = drizzle(...)` внутри queries.ts) и не плодить новые директории. Каскадное поведение идентичное: fetch attachments → DB cascade delete → `Promise.allSettled` для xAI files + Vercel Blob.
+- **3.3** text/plain placeholder применяется **только к старым сообщениям** (idx < cutoff в `stripOldAttachmentsFromHistory`), а не ко всей истории. Причина: после Phase 4 свежий MD/TXT в последнем user message несёт `providerMetadata.xai.fileId` для fork — placeholder бы убил file_id reference и Responses API path. PDF/Image поведение не изменилось.
 
 ### 3.1 Удалить `convertTextFilePartsInMessage` и `convertTextFilesInAllMessages`
 
