@@ -2,7 +2,7 @@
 
 > **SSOT:** Полная карта всех AI-чатов, моделей и их конфигураций
 
-**Обновлено:** 2026-04-27 — ТЗ-BR-AUTHOR-KIMI закрыт в v3.99.2. Briefing pipeline (`briefing:author`, `briefing:section`, `briefing:podcast-script`) переведён с MiniMax M2.7 на Kimi K2.6 (Moonshot AI, Instant mode). Закрыт production silent hang после апгрейда `ai@6.0.168`. MiniMax удалён из проекта.
+**Обновлено:** 2026-04-30 — TZ_FilesAPIMigration (Шаг 4 серии Simply_Migration) закрыт в v3.101.0. Чат-путь PDF/DOCX/XLSX/CSV/TXT/MD переведён на xAI Files API + Responses API (`input_file` + server-side `document_search`). Старый inline-text путь и `extractPdfText` для chat удалены. Все 7 Grok-моделей в каталоге получили `documentSupport: { supported: true, method: "files-api" }`. `chat-vision` стал universal attachment routing slot (любой не-image file part → fallback). Cost tracking точный через `response.usage.cost_in_usd_ticks`, `ai_usage_log.serverSideToolCalls jsonb` хранит per-turn `document_search_calls`. Cleanup: cascade delete xAI files + Blob при удалении чата + ночной reaper cron `0 3 * * *` для orphans. Library auto-analyze и Project files остались на старом пути (`extractPdfText` + `pdf-parse` сохранены).
 
 ---
 
@@ -18,7 +18,7 @@
 |---|---|---|---|
 | **Simply Chat** (default text) | Grok 4.1 Fast (`simply-chat`) | ✅ Работает | Дворецкий KITT — быстрый дешёвый основной чат |
 | **Simply Chat** — кнопка «Думать» | Grok 4.20 reasoning (`simply-chat-think`) | ✅ Работает | Tier upgrade на сильную модель |
-| **Vision fallback** (все режимы, capability-driven) | Grok 4.1 Fast non-reasoning (`chat-vision`) | ✅ Работает | Срабатывает когда default-модель режима не тянет тип вложения. После Шага 3 миграции (2026-04-28) Anthropic полностью убран из image-пути чата. Читает capability из SSOT каталога. См. ADR 055 |
+| **Universal attachment routing slot** (все режимы) | Grok 4.1 Fast non-reasoning (`chat-vision`) | ✅ Работает | Срабатывает на любом не-image file part (PDF/DOCX/XLSX/CSV/TXT/MD) и при image, если default-модель не vision-capable. После Шага 4 миграции (2026-04-30) chat-путь файлов идёт через xAI Files API + Responses API на этот taskId. Vladimir может переключить файловый путь одним кликом через `/dev/models`. См. ADR 055 + [SPEC v3 §5.2](../specs/Simply_Migration/_archive/TZ_FilesAPIMigration/SPEC.md) |
 | **Экспертиза** (chatMode=expertise) | Grok 4.20 reasoning (`expertise`) | ✅ Работает | Точные ответы, разовые экспертные запросы |
 | **Экспертиза Premium** (toggle «Команда агентов») | Grok 4.20 Multi-Agent (`expertise-multi-agent`) | 🔒 Reserved (ТЗ-XAI-MA-1) | Premium-режим рядом с обычной expertise через Responses API + MCP. Placeholder taskId зарезервирован, реализация в отдельном ТЗ |
 | **Создание** (chatMode=create) | Grok 4.20 reasoning (`create`) | ✅ Работает | Презентации, отчёты, длинные тексты |
@@ -423,7 +423,7 @@ lib/prompts/briefing/briefing-scriptwriter.md       # Промпт скрипт�
 |---|---|---|---|---|
 | `simply` (text) | `simply-chat` | Grok 4.1 Fast | `/simply` | Дворецкий KITT — persistent чат |
 | `simply` (think) | `simply-chat-think` | Grok 4.20 reasoning | `/simply` (кнопка «Думать») | Tier upgrade на сильную модель |
-| любой (vision fallback) | `chat-vision` | Grok 4.1 Fast non-reasoning | все chat modes | Capability-driven fallback через `resolveActiveTaskId` (lib/ai/routing.ts). Сканы PDF между Шагом 3 и Шагом 4 миграции деградируют (Grok PDF не понимает) — закроется через xAI Files API. См. ADR 055 |
+| любой (file routing) | `chat-vision` | Grok 4.1 Fast non-reasoning | все chat modes | Universal attachment routing slot. Любой не-image file part (PDF/DOCX/XLSX/CSV/TXT/MD) идёт сюда через `resolveActiveTaskId` (lib/ai/routing.ts) и обрабатывается через xAI Files API + Responses API (Шаг 4, v3.101.0). Image — capability-driven fallback по той же ветке. См. ADR 055 |
 | `expertise` | `expertise` | Grok 4.20 reasoning | `/expertise/[id]` | Точные ответы с проверкой фактов |
 | `expertise` (Premium toggle) | `expertise-multi-agent` 🔒 | Grok 4.20 Multi-Agent | `/expertise/[id]` (toggle «Команда агентов», ТЗ-XAI-MA-1) | Premium-режим, пока reserved |
 | `create` | `create` | Grok 4.20 reasoning | `/create/[id]` | Презентации, отчёты, длинные тексты |

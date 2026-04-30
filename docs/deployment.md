@@ -605,4 +605,4 @@ vercel domains   # Управление доменами
 
 ---
 
-**Обновлено:** 2026-02-26 (v3.49.0 — Telegram Bot, обновлён список env vars)
+**Обновлено:** 2026-04-30 (v3.101.0 — TZ_FilesAPIMigration: [vercel.json](../vercel.json) теперь 4 cron'а — `memory-deep-consolidate` (0 22 * * *), `memory-profile` (0 0 * * *), `briefing` (0 5 * * *), `reap-attachments` (0 3 * * *) для cleanup'а orphan xAI files. Production env требует `XAI_API_KEY`, `MOONSHOT_API_KEY`, `CRON_SECRET` — см. [docs/ai-providers.md](ai-providers.md) и [docs/setup.md](setup.md) для актуального списка).

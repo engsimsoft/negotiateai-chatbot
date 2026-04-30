@@ -1,7 +1,7 @@
 # AI-провайдеры и модели
 
-**Версия:** 3.99.2
-**Последнее обновление:** 2026-04-27
+**Версия:** 3.101.0
+**Последнее обновление:** 2026-04-30
 **Статус:** 7 провайдеров (Anthropic, Moonshot AI, Google, xAI, OpenRouter, Perplexity, Voyage, Deepgram) + Core Registry v1
 
 ---
@@ -140,12 +140,14 @@ Pricing (Kimi K2.6): base $0.95/M input, cached input $0.16/M, output $4.00/M, c
 
 | Параметр | Значение |
 |----------|----------|
-| SDK | `@ai-sdk/xai@3.0.82` |
+| SDK | `@ai-sdk/xai@3.0.82` (text/vision) + raw fetch для Files API и Responses API |
 | API Key | `XAI_API_KEY` |
 | Registry namespace | `xai` |
 | Документация | https://docs.x.ai/ |
 
-В catalog добавлены 5 моделей (grok-4.20-reasoning, grok-4.20-non-reasoning, grok-4-1-fast-reasoning, grok-4-1-fast-non-reasoning, grok-4). **В task-assignments пока не подключены** — зарезервированы для будущих ТЗ. Готовность инфраструктуры проверена в Stage 1 ТЗ-1.
+**Files API + Responses API (Шаг 4 миграции, v3.101.0).** Чат-путь PDF/DOCX/XLSX/CSV/TXT/MD идёт через `lib/ai/files/xai-files-client.ts` (multipart upload `/v1/files` с `purpose: "assistants"`, raw fetch) + `lib/ai/files/xai-responses.ts` (стрим `/v1/responses` с `input_file` parts → адаптер в UIMessage stream). Server-side `document_search` активируется автоматически при наличии `input_file`. Все 7 моделей в каталоге получили `documentSupport: { supported: true, method: "files-api", maxSizeMb: 48 }` (Phase 1.5 verified — non-reasoning тоже agentic-capable для Files API). DOCX/XLSX/CSV конвертируются в text/plain до upload (не поддерживаются как нативные content types). Cost tracking точный: `response.usage.cost_in_usd_ticks` (1 tick = $1e-7) → `ai_usage_log.costUsd`, `response.usage.server_side_tool_usage_details.document_search_calls` → `ai_usage_log.serverSideToolCalls jsonb` (1-6 calls per-turn — variable agentic depth). Lifecycle: `chat_attachment` запись на каждый file part, FK CASCADE на `Chat`/`Message_v2`, `deleteChatById`/`deleteAllChatsByUserId` каскадно дропают xAI files + Vercel Blob через `cleanupAttachmentExternals`. Ночной reaper cron `/api/cron/reap-attachments` (0 3 * * *) удаляет orphans старше 24ч.
+
+В catalog 7 Grok-моделей (grok-4, grok-4-fast, grok-4.20-reasoning, grok-4.20-non-reasoning, grok-4.20-multi-agent-0309, grok-4-1-fast-reasoning, grok-4-1-fast-non-reasoning). Активны через `task-assignments`: `simply-chat`, `simply-chat-think`, `expertise`, `create`, `meeting:summary`, `chat-vision`, `briefing:filter`, MIND memory hot path, Library, util:title, compaction:summarize.
 
 ### OpenRouter
 
@@ -228,15 +230,19 @@ Pricing (Kimi K2.6): base $0.95/M input, cached input $0.16/M, output $4.00/M, c
 | Deepgram Nova-3 | `deepgram-nova-3` | $0.0043/min batch | Voice input, meeting transcribe |
 | Gemini 2.5 Flash TTS | `gemini-2.5-flash-preview-tts` | $4/1M chars | Podcast TTS (multi-speaker) |
 
-### xAI Grok (зарезервировано в catalog, не активно в task-assignments)
+### xAI Grok
 
 | Модель | Физический ID | Статус |
 |--------|---------------|--------|
-| Grok 4.20 Reasoning | `grok-4.20-0309-reasoning` | В catalog, не назначен task |
+| Grok 4 | `grok-4` | В catalog, документ-capable (Files API), не назначен task |
+| Grok 4 Fast | `grok-4-fast` | В catalog, документ-capable (Files API), не назначен task |
+| Grok 4.20 Reasoning | `grok-4.20-0309-reasoning` | Активен: `simply-chat-think`, `expertise`, `create`, `meeting:summary`, MIND `extract`/`deep-consolidate`, professor pipeline |
 | Grok 4.20 Non-Reasoning | `grok-4.20-0309-non-reasoning` | В catalog, не назначен task |
-| Grok 4.20 Multi-Agent | `grok-4.20-multi-agent-0309` | Назначен на `expertise`, но через Chat Completions работает как обычный 4.20 (см. notes в каталоге). ТЗ-XAI-5 переключит на non-reasoning |
+| Grok 4.20 Multi-Agent | `grok-4.20-multi-agent-0309` | 🔒 Reserved для `expertise-multi-agent` (ТЗ-XAI-MA-1, Premium режим) |
 | Grok 4.1 Fast Reasoning | `grok-4-1-fast-reasoning` | В catalog, не назначен task |
-| Grok 4.1 Fast Non-Reasoning | `grok-4-1-fast-non-reasoning` | В catalog, не назначен task |
+| Grok 4.1 Fast Non-Reasoning | `grok-4-1-fast-non-reasoning` | Активен: `simply-chat`, `chat-vision` (universal attachment slot), `briefing:filter`, MIND memory hot path, Library, util:title, compaction:summarize, clerks |
+
+Все 7 моделей имеют `documentSupport: { supported: true, method: "files-api", maxSizeMb: 48 }` (Phase 1.5 ТЗ-FilesAPIMigration verified).
 
 ### OpenRouter (зарезервировано в catalog, не активно в task-assignments)
 
@@ -367,6 +373,7 @@ const ttsRub = calculateTtsCostRub(durationSeconds);
 
 | Дата | Версия | Изменения |
 |------|--------|-----------|
+| 2026-04-30 | 3.101.0 | **TZ_FilesAPIMigration (Шаг 4 серии Simply_Migration):** chat-путь PDF/DOCX/XLSX/CSV/TXT/MD переведён на xAI Files API + Responses API. Новый модуль `lib/ai/files/` (xai-files-client + xai-responses). Все 7 Grok'ов получили `documentSupport.supported = true`. Cost tracking точный через `cost_in_usd_ticks` + `server_side_tool_usage_details.document_search_calls` (1-6 per-turn). Новая таблица `chat_attachment` (FK CASCADE), новая колонка `ai_usage_log.server_side_tool_calls jsonb`, ночной reaper cron `/api/cron/reap-attachments`. ADR 058 — запрет inline file content в Message_v2. |
 | 2026-04-27 | 3.99.2 | **ТЗ-BR-AUTHOR-KIMI:** Briefing pipeline (`briefing:author`, `briefing:section`, `briefing:podcast-script`) переведён с MiniMax M2.7 на Kimi K2.6 через официальный `@ai-sdk/moonshotai@ai-v6`. Закрыт production silent hang после апгрейда `ai@6.0.168` (был связан с pinned `@ai-sdk/anthropic@3.0.6` внутри `vercel-minimax-ai-provider@0.0.2`). Удалены: пакет `vercel-minimax-ai-provider`, namespaces `minimax`/`minimaxLong`, две catalog entries `MiniMax-M2.7`/`MiniMax-M2.7-long`, ENV `MINIMAX_API_KEY`. Добавлены: namespace `moonshotai` с 180s fetch timeout, catalog entry `kimi-k2.6` с `defaultParams` (temperature 0.6, topP 0.95, thinking disabled), новый getter `getDefaultParamsForTask(taskId)` — параметры берутся из catalog (Блок 9 концепта), не hardcode в call-sites. |
 | 2026-04-11 | 3.83.0 | **ТЗ-1 Core Registry:** `getModel(taskId)` как SSOT для 39 AI-точек. Удалены `myProvider`, `claudeHaiku/Sonnet/Opus`, `minimaxM27/Long`, env-overrides (PROFESSOR_MODEL/SUMMARIZER_MODEL/SNAPSHOT_CLERK_MODEL/EXPERT_MODEL). providers.ts стал чистым pricing/cost utility (−141 строка). Добавлены registry namespaces xAI + OpenRouter (зарезервированы). `ai_usage_log.provider` column + backfill. Capability-driven `taskSupportsThinking()`. ADR 047. |
 | 2026-04-06 | 3.3.0 | ТЗ-PIPELINE1: Removed AUTHOR_MODEL_FALLBACK, added retryWithLogging for briefing-author/section-author, artifact handlers now log usage |
@@ -382,4 +389,4 @@ const ttsRub = calculateTtsCostRub(durationSeconds);
 
 ---
 
-**Обновлено:** 2026-04-27
+**Обновлено:** 2026-04-30

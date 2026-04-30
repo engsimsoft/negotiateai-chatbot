@@ -1,7 +1,7 @@
 # Simply — Текущее состояние
 
-**Версия:** 3.100.2
-**Статус:** Active development (**refactor(context-widget) выпущен** 2026-04-27 в v3.100.2 — виджет «Контекст» упрощён по best practices Claude Code/Cursor: только % + индикатор сжатия, никаких токенов и cost-секций для пользователя; **hotfix(xai-cache) выпущен** 2026-04-27 в v3.100.1 — починен prompt cache xAI на длинных историях: убран `LIMIT 200` в `getMessagesByChatId`, добавлен header `x-grok-conv-id` для sticky routing; **ТЗ-FixSimplyMemory закрыт** 2026-04-27 в v3.100.0 — Simply Chat больше не теряет память: убран фильтр `excludeExtracted=true`, дедупликация в pre-compact extract; **ТЗ-MigrateArtifactPromptsToSkills закрыт** 2026-04-27 в v3.99.3 — inline промпты артефактов вынесены в `lib/prompts/skills/artifact-generation/`)
+**Версия:** 3.101.0
+**Статус:** Active development (**TZ_FilesAPIMigration / Шаг 4 серии Simply_Migration закрыт** 2026-04-30 в v3.101.0 — chat-путь PDF/DOCX/XLSX/CSV/TXT/MD на xAI Files API + Responses API, ADR 058 — запрет inline file content в `Message_v2`, новая таблица `chat_attachment` с FK CASCADE, точный cost tracking через `cost_in_usd_ticks`, ночной reaper cron orphan'ов; **Шаг 3 / v3.100.6** — Anthropic убран из image-пути чата, `chat-vision` на Grok 4.1 Fast non-reasoning)
 **URL:** https://negotiateai-chatbot-engsimsoft-gmailcoms-projects.vercel.app
 
 > **Назначение:** snapshot «что работает прямо сейчас» на один взгляд. История изменений → [CHANGELOG.md](CHANGELOG.md). Архитектура → [docs/architecture.md](docs/architecture.md). Карта моделей → [docs/ai-chats-map.md](docs/ai-chats-map.md).
@@ -31,7 +31,7 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 
 | Компонент | Статус | Модели / стек |
 |---|---|---|
-| **Simply Chat** (persistent, один на пользователя) | ✅ | Grok 4.1 Fast (default, включая картинки через нативный vision) · Grok 4.20 reasoning (кнопка «Думать») · Grok 4.1 Fast non-reasoning — vision fallback через `chat-vision` (Шаг 3 миграции v3.100.6, Anthropic убран из image-пути). PDF-сканы временно деградируют до Шага 4 (xAI Files API). История чата = primary source с budget 140K, MIND = augmentation (фикс v3.100.0). xAI prompt cache hit-rate стабильный благодаря `x-grok-conv-id` sticky routing + token-aware loading без жёсткого `LIMIT 200` (фикс v3.100.1) |
+| **Simply Chat** (persistent, один на пользователя) | ✅ | Grok 4.1 Fast (default, картинки через нативный vision) · Grok 4.20 reasoning (кнопка «Думать») · Grok 4.1 Fast non-reasoning — universal attachment routing slot `chat-vision` для любых file parts (PDF/DOCX/XLSX/CSV/TXT/MD/image), v3.101.0. Чат-путь файлов: xAI Files API + Responses API (`input_file` + server-side `document_search`), точный cost tracking через `cost_in_usd_ticks`. История чата = primary source с budget 140K, MIND = augmentation (фикс v3.100.0). xAI prompt cache hit-rate стабильный благодаря `x-grok-conv-id` sticky routing + token-aware loading без жёсткого `LIMIT 200` (фикс v3.100.1) |
 | **Экспертиза** (одноразовые экспертные запросы) | ✅ | Grok 4.20 reasoning (single-agent, R-5 резолв 2026-04-16). Multi-agent вариант 🔒 зарезервирован под ТЗ-XAI-MA-1 |
 | **Создание** (одноразовые creation-чаты) | ✅ | Grok 4.20 reasoning (мигрировано 2026-04-16) |
 | **Проекты** (изолированные рабочие пространства) | ✅ | Claude Haiku / Sonnet / Opus по tier, Профессор (Opus planning/review + Haiku execute) |
@@ -68,7 +68,7 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 - Архитектура MIND (SSOT): [specs/Simply_xAI/MIND_ARCHITECTURE.md](specs/Simply_xAI/MIND_ARCHITECTURE.md)
 - Завершённая серия Simply_xAI: [specs/_archive/Simply_xAI/](specs/_archive/Simply_xAI/)
 
-**План работ:** 11 ТЗ в 4 фазы (А — закрыть боль, Б — унификация чата, В — A/B тесты, Г — большие блоки). **ТЗ-1 BR-AUTHOR-KIMI закрыт 2026-04-27 в v3.99.2** (silent hang устранён, MiniMax удалён). **ТЗ-2 MigrateArtifactPromptsToSkills закрыт 2026-04-27 в v3.99.3** (10 .md файлов + loader, A/B Шаг 7 разблокирован). Следующий — ТЗ-3 (план в концепте миграции, Фаза А/Б).
+**План работ:** 11 ТЗ в 4 фазы (А — закрыть боль, Б — унификация чата, В — A/B тесты, Г — большие блоки). **Шаг 1 BR-AUTHOR-KIMI закрыт 2026-04-27 в v3.99.2** (silent hang устранён, MiniMax удалён). **Шаг 2 MigrateArtifactPromptsToSkills закрыт 2026-04-27 в v3.99.3**. **Шаг 3 Vision/OCR cleanup закрыт 2026-04-28 в v3.100.6** (Anthropic убран из image-пути чата). **Шаг 4 TZ_FilesAPIMigration закрыт 2026-04-30 в v3.101.0** (PDF/DOCX/XLSX/CSV/TXT/MD на xAI Files API + Responses API, ADR 058 — запрет inline file content). Следующий — Шаг 5 (Web Tools, план в концепте миграции).
 
 **Правило серии:** не отвлекаться на другие ТЗ до завершения.
 
@@ -113,7 +113,7 @@ SSOT резолва — [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts)
 |---|---|---|
 | AI-точек маршрутизации (taskId) | 39 | [lib/ai/task-assignments.ts](lib/ai/task-assignments.ts) |
 | Моделей в каталоге | — (аудит по запросу) | [lib/ai/model-catalog.ts](lib/ai/model-catalog.ts) |
-| Таблиц БД (Drizzle `pgTable`) | 29 | [lib/db/schema.ts](lib/db/schema.ts) |
+| Таблиц БД (Drizzle `pgTable`) | 33 | [lib/db/schema.ts](lib/db/schema.ts) |
 | AI-инструментов (`lib/ai/tools/`) | 17 | [docs/ai-tools.md](docs/ai-tools.md) |
 | shadcn/ui примитивов (`components/ui/`) | 25 | [docs/design-system.md § 13.1](docs/design-system.md) |
 | AI-chat элементов (`components/elements/`) | 17 | [docs/design-system.md § 13.2](docs/design-system.md) |
@@ -190,5 +190,5 @@ SSOT: [specs/_backlog/README.md](specs/_backlog/README.md). **План разр�
 
 ---
 
-**Обновлено:** 2026-04-27 — закрыт ТЗ-MigrateArtifactPromptsToSkills (v3.99.3): inline промпты артефактов вынесены в `lib/prompts/skills/artifact-generation/`, добавлено 7 новых записей в backlog (1 critical: SimplyChatMemoryRegression; 4 high: MindAtomicityFix, ChatModeUndefinedSubmit, GrokSkipsUpdateDocumentTool, PptxRevealUpdateRender; 2 medium). Все находки выявлены через мануальный смок Этапа 7 ТЗ-2.
-**До этого:** 2026-04-27 — открыта новая активная серия **Simply_Migration** (концепт миграции + концепт Briefing).
+**Обновлено:** 2026-04-30 — закрыт TZ_FilesAPIMigration / Шаг 4 серии Simply_Migration (v3.101.0): chat-путь PDF/DOCX/XLSX/CSV/TXT/MD на xAI Files API + Responses API. Новый модуль [lib/ai/files/](lib/ai/files/), новая таблица `chat_attachment` (FK CASCADE), новая колонка `ai_usage_log.serverSideToolCalls jsonb`, ночной reaper cron. ADR 058 — запрет inline file content в Message_v2. Все 7 Grok'ов в каталоге получили `documentSupport.supported = true`. `chat-vision` стал universal attachment routing slot.
+**До этого:** 2026-04-28 — Шаг 3 Vision/OCR cleanup (v3.100.6) — Anthropic убран из image-пути чата.

@@ -174,9 +174,17 @@
 
 17 файлов в `lib/ai/tools/`, сгруппированы по пяти категориям: registration/infrastructure, web/research, artifacts/documents, context/files, utility.
 
-#### `lib/ai/routing.ts` — capability-driven attachment routing (ТЗ-ExpertiseCreateVisionRouting, v3.98.0)
+#### `lib/ai/routing.ts` — capability-driven attachment routing (ТЗ-ExpertiseCreateVisionRouting, v3.98.0; расширено в TZ_FilesAPIMigration v3.101.0)
 
-Чистый модуль без I/O. Две экспортируемые функции: `resolveActiveTaskId(ctx)` — единая SSOT-точка резолва активного taskId для запроса; `needsVisionFallback(parts, defaultTaskId)` — capability-check через `getModelEntry(getModelIdForTask(taskId))?.capabilities` из SSOT каталога. Алгоритм: резолв default taskId по `chatMode` / project tier → capability-check против типов attachments → если default-модель не тянет хотя бы один тип, fallback на `chat-vision` (Claude Haiku 4.5). Ортогонален `/dev/models` override (capability читается у реально активной модели). См. [ADR 055](decisions/055-capability-driven-attachment-routing.md).
+Чистый модуль без I/O. Две экспортируемые функции: `resolveActiveTaskId(ctx)` — единая SSOT-точка резолва активного taskId для запроса; `needsVisionFallback(parts, defaultTaskId)` — capability-check через `getModelEntry(getModelIdForTask(taskId))?.capabilities` из SSOT каталога. Алгоритм: резолв default taskId → если есть **не-image file part** (PDF/DOCX/XLSX/CSV/TXT/MD) → `chat-vision` (universal attachment routing slot, Шаг 4); если есть image и default не vision-capable → `chat-vision`; иначе → default. Ортогонален `/dev/models` override (Vladimir переключает файловый путь одним кликом). См. [ADR 055](decisions/055-capability-driven-attachment-routing.md).
+
+#### `lib/ai/files/` — xAI Files API + Responses API (TZ_FilesAPIMigration, v3.101.0)
+
+Два модуля для работы с xAI Files API в чат-пути:
+- **`xai-files-client.ts`** — raw fetch обёртки над `/v1/files`: `xaiUploadFile` (multipart), `xaiDeleteFile`, `xaiGetFileMetadata`, `xaiListFiles` (для reaper). Retry на 5xx, typed `XaiFilesApiError`.
+- **`xai-responses.ts`** — стрим `/v1/responses` с `input_file` parts. Парсит SSE chunks, адаптирует к UIMessage stream. На финальном chunk извлекает `usage.cost_in_usd_ticks` (точный USD per-turn) и `usage.server_side_tool_usage_details.document_search_calls` (1-6 calls per-turn — variable agentic depth) → запись в `ai_usage_log.costUsd` + `serverSideToolCalls jsonb`.
+
+Развилка в [chat/route.ts](../app/(chat)/api/chat/route.ts): если message содержит file part с `xaiFileId` → Responses API path. Иначе обычный `streamText`. DOCX/XLSX/CSV конвертируются в text/plain до upload (`mammoth`, `xlsx`). PDF/MD/TXT уходят в xAI напрямую. Запись в `chat_attachment` транзакционно с save Message_v2. Cleanup при удалении чата — `cleanupAttachmentExternals` в [lib/db/queries.ts](../lib/db/queries.ts) (cascade DB delete + `Promise.allSettled` для xAI + Blob). Ночной reaper `/api/cron/reap-attachments` подчищает orphans старше 24ч. **SPEC и история:** archived в `specs/Simply_Migration/_archive/TZ_FilesAPIMigration/`. **ADR 058** — запрет inline file content в `Message_v2.parts` (рецидив 4+ раза, SSOT для будущих симптомов «портянки/билинг-спайк»).
 
 #### `lib/ai/compaction/` — Simply Compaction middleware (ТЗ-COMPACTION-1, v3.94.0)
 
@@ -198,8 +206,9 @@
 
 #### Chats / Messages / Artifacts
 - `Chat` — чаты (title, summary, isStarred, projectId, chatMode)
-- `Message_v2` — сообщения (актуальная таблица)
+- `Message_v2` — сообщения (актуальная таблица). **Запрещено хранить inline file content в `parts`** — только file part с `url`/`xaiFileId`/`mediaType`/`name`. См. [ADR 058](decisions/058-no-inline-file-content-in-message-history.md)
 - `Message` — deprecated (оставлена для миграции, не писать)
+- `chat_attachment` — пара (xaiFileId, blobUrl, filename, mimeType, sizeBytes) на каждое вложение в чате. FK CASCADE на `Chat`/`Message_v2`. Индексы: `chat_id`, `xai_file_id`. Создаётся транзакционно с Message_v2, удаление каскадно через `cleanupAttachmentExternals` (xAI files + Vercel Blob) (TZ_FilesAPIMigration, v3.101.0)
 - `Vote_v2` — голосование за сообщения
 - `Vote` — deprecated
 - `Document` — артефакты (text, markdown, excel, reveal, pptx)
@@ -235,7 +244,7 @@
 - `MeetingRecord` — записи встреч (userId FK, title, durationSeconds, speakerCount, summaryLevel, transcript, summary, metadata JSONB, createdAt)
 
 #### Observability / Ops
-- `ai_usage_log` — учёт потребления AI (modelId, tokens, costUsd, chatMode, guardianFlags JSONB)
+- `ai_usage_log` — учёт потребления AI (modelId, tokens, costUsd, chatMode, guardianFlags JSONB, **serverSideToolCalls JSONB** — per-turn xAI server-side tool counters: `{document_search_calls: N, …}` из `response.usage.server_side_tool_usage_details`, добавлено в TZ_FilesAPIMigration v3.101.0)
 - `CronRunLog` — forensics каждого cron run (cronName, startedAt, finishedAt, usersProcessed, usersSkipped, usersFailed, results JSONB, durationMs)
 
 **Vercel Blob Storage:**
@@ -249,10 +258,11 @@
 > Для каждой крупной фичи — где её `app/` route, `lib/` pipeline, `components/` UI, БД-таблицы и тематический doc. **Первое место для поиска «где лежит код».** UI всегда переиспользует компоненты из `components/ui/` + `components/elements/` — см. [⛔ UI — закон](#-ui--закон-и-существующие-компоненты).
 
 ### Simply Chat (persistent)
-- **Route:** `app/(chat)/simply/`, `app/(chat)/api/chat/route.ts` (streaming endpoint)
-- **Models:** `simply-chat` / `simply-chat-think` + capability-driven fallback на `chat-vision` для PDF-сканов → Grok 4.1 Fast / Grok 4.20 / Claude Haiku (через [lib/ai/task-assignments.ts](../lib/ai/task-assignments.ts) + [lib/ai/routing.ts](../lib/ai/routing.ts))
+- **Route:** `app/(chat)/simply/`, `app/(chat)/api/chat/route.ts` (streaming endpoint), `app/(chat)/api/files/upload/route.ts` (file upload + xAI Files API), `app/api/cron/reap-attachments/route.ts` (orphan reaper)
+- **Models:** `simply-chat` / `simply-chat-think` + universal attachment routing slot `chat-vision` (Grok 4.1 Fast non-reasoning) для любого file part — через [lib/ai/task-assignments.ts](../lib/ai/task-assignments.ts) + [lib/ai/routing.ts](../lib/ai/routing.ts)
+- **Files pipeline (v3.101.0):** [lib/ai/files/](../lib/ai/files/) — Files API client + Responses API stream, развилка в chat/route.ts на наличие `xaiFileId` в parts. Cleanup в [lib/db/queries.ts](../lib/db/queries.ts) (`cleanupAttachmentExternals`)
 - **UI:** top-level `components/chat.tsx` + `components/messages.tsx` + `components/input/`
-- **БД:** `Chat` (chatMode='simply'), `Message_v2`
+- **БД:** `Chat` (chatMode='simply'), `Message_v2`, `chat_attachment` (per-attachment xaiFileId + blobUrl)
 - **Особенность:** ОДИН вечный чат на userId (нет операции «новый Simply чат»)
 
 ### Expertise (одноразовые экспертные запросы)
@@ -461,7 +471,7 @@ p-limit(3) concurrent processing
         └── waitUntil(runPodcastPipeline({ userId, briefingId }))  ← non-blocking
 ```
 
-- **Cron Schedule:** `0 * * * *` (hourly, Hobby plan). Pro plan: `*/15 * * * *`
+- **Cron Schedule:** `0 * * * *` (hourly, Hobby plan). Pro plan: `*/15 * * * *`. **Список всех Vercel cron'ов** (см. [vercel.json](../vercel.json)): `/api/cron/memory-deep-consolidate` (0 22 * * *), `/api/cron/memory-profile` (0 0 * * *), `/api/cron/briefing` (0 5 * * *), `/api/cron/reap-attachments` (0 3 * * *) — orphan xAI files cleanup, добавлен в TZ_FilesAPIMigration v3.101.0.
 - **Matching Window:** 30 min (WINDOW_MINUTES) — covers hourly cron
 - **Concurrency:** p-limit(3) users processed in parallel
 - **Idempotency:** skip if a `ready` briefing exists for today (UTC)
@@ -531,4 +541,4 @@ p-limit(3) concurrent processing
 
 ---
 
-**Обновлено:** 2026-04-15 (TZ_DocsCleanup Этап 2 — trim тегов + пофайловая карта фич + UI SSOT блок)
+**Обновлено:** 2026-04-30 (TZ_FilesAPIMigration v3.101.0 — добавлены `lib/ai/files/`, таблица `chat_attachment`, колонка `ai_usage_log.serverSideToolCalls`, cron reap-attachments, расширен `routing.ts`).

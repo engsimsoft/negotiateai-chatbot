@@ -7,6 +7,44 @@
 
 ## [Unreleased]
 
+### [3.101.0] — 2026-04-30 — feat(migration-step-4) — TZ_FilesAPIMigration: chat-путь PDF/DOCX/XLSX/CSV/TXT/MD на xAI Files API + Responses API
+
+**Шаг 4 серии Simply_Migration. Финальный архитектурный фикс «портянок» в `Message_v2.parts` — рецидив 4+ раз закрыт через ADR 058 (запрет inline file content в истории сообщений). Чат больше не хранит и не отправляет в LLM текст файлов в виде portянок — только `xaiFileId` reference.**
+
+- **Что изменилось у пользователя:**
+  - Загрузка PDF/DOCX/XLSX/CSV/TXT/MD в чат идёт через xAI Files API (`/v1/files` с `purpose: "assistants"`). Файл хранится у xAI + дублируется в Vercel Blob как backup.
+  - Чат-запросы с файлами идут через xAI Responses API (`/v1/responses` с `input_file` parts), сервер xAI автоматически делает `document_search` (server-side tool, 1-6 calls per-turn — variable agentic depth).
+  - Нет «портянок» текста файла в чате после reload или follow-up turn'ов: file part остаётся карточкой, в БД хранится только метаданные.
+  - Cost tracking точный: `response.usage.cost_in_usd_ticks` → `ai_usage_log.costUsd` (не estimation), `server_side_tool_usage_details.document_search_calls` → `ai_usage_log.serverSideToolCalls jsonb` per-turn.
+
+- **Архитектура:**
+  - **Новый модуль [lib/ai/files/](lib/ai/files/):** `xai-files-client.ts` (raw fetch wrappers — upload multipart, delete, getMetadata, listFiles для reaper), `xai-responses.ts` (стрим `/v1/responses` + адаптер к UIMessage stream + парсер `usage.cost_in_usd_ticks`).
+  - **Новая таблица `chat_attachment`** (миграция 0064): пара (xaiFileId, blobUrl, filename, mimeType, sizeBytes) на каждое вложение, FK CASCADE на `Chat`/`Message_v2`, индексы на `chat_id` и `xai_file_id`. Запись создаётся транзакционно с save Message_v2.
+  - **Новая колонка `ai_usage_log.server_side_tool_calls jsonb`** — per-turn xAI server-side tool counters.
+  - **Развилка в [chat/route.ts](app/(chat)/api/chat/route.ts):** если message содержит file part с `xaiFileId` → Responses API path. Иначе обычный `streamText`.
+  - **Capability-routing расширен** ([lib/ai/routing.ts](lib/ai/routing.ts)): любой не-image file part → `chat-vision` (universal attachment routing slot, Grok 4.1 Fast non-reasoning). Image — capability-driven fallback по той же ветке.
+  - **Все 7 Grok-моделей** в [model-catalog.ts](lib/ai/model-catalog.ts) получили `documentSupport: { supported: true, method: "files-api", maxSizeMb: 48 }` (Phase 1.5 Verified — non-reasoning тоже agentic-capable для Files API).
+  - **Cleanup:** `cleanupAttachmentExternals` в [lib/db/queries.ts](lib/db/queries.ts) каскадно дропает xAI files + Vercel Blob через `Promise.allSettled` при удалении чата (`deleteChatById` / `deleteAllChatsByUserId`).
+  - **Ночной reaper cron** [/api/cron/reap-attachments/route.ts](app/api/cron/reap-attachments/route.ts) — 0 3 * * * (vercel.json), удаляет orphan'ы старше 24ч. CRON_SECRET Bearer auth.
+
+- **Удалено (chat-only):** `convertTextFilePartsInMessage` / `convertTextFilesInAllMessages` (3 call sites в chat/route.ts), file-text strip block (Fix 2 из TZ_SimplyChatBillingLeak), `PDF_TEXT_MAX_CHARS` + `extractPdfText` import в [files/upload/route.ts](app/(chat)/api/files/upload/route.ts), TODO про инлайн-портянку в [components/message.tsx](components/message.tsx).
+
+- **Сохранено (out of scope, всё ещё используется Library auto-analyze + Project files):** [lib/pdf/extract-pdf-text.ts](lib/pdf/extract-pdf-text.ts), npm dep `pdf-parse`, `SCAN_AVG_CHARS_PER_PAGE_THRESHOLD`, `SCAN_SINGLE_PAGE_MIN_CHARS`. Library и Projects мигрируют на Files API в отдельных ТЗ.
+
+- **Backward compat (R8):** расширен `stripOldAttachmentsFromHistory` блоком strip text/plain file parts из всей истории — закрывает 28 legacy сообщений с маркером `📄 **Файл:`.
+
+- **Phase 3.5 hot-fix:** smoke chat 3353a183 после Phase 3 деплоя получил биллинг-спайк из-за legacy данных, не покрытых strip'ом — DELETE smoke-данных (Message_v2 = 0, memory_entry = 0, Chat row жив, ai_usage_log = 519 сохранён для baseline). Решение применимо только к dev-окружению. Для prod — стратегия SPEC §5.6 (strip + UI mask) остаётся.
+
+- **ADR 058** — `docs/decisions/058-no-inline-file-content-in-message-history.md`. SSOT для будущих рецидивов: при ЛЮБОМ симптоме «портянки/билинг-спайк/fresh не падает/Simply жжёт токены» — открывать ADR 058 первым.
+
+- **Документация:** [docs/ai-chats-map.md](docs/ai-chats-map.md), [docs/ai-providers.md](docs/ai-providers.md), [docs/architecture.md](docs/architecture.md), [docs/deployment.md](docs/deployment.md), [SIMPLY_STATUS.md](SIMPLY_STATUS.md) — синхронизированы.
+
+- **Архив ТЗ:** [specs/Simply_Migration/_archive/TZ_FilesAPIMigration/](specs/Simply_Migration/_archive/TZ_FilesAPIMigration/) (SPEC v3 + ROADMAP v3 + ANALYSIS + FINDINGS + PHASE1_FINDINGS).
+
+- **Версия проекта:** 3.100.6 → 3.101.0 (minor — новая папка `lib/ai/files/`, новая таблица БД, новый cron, расширение routing.ts; не patch).
+
+---
+
 ### [3.100.6] — 2026-04-28 — feat(migration-step-3) — Vision/OCR cleanup + переключение `chat-vision` с Claude Haiku 4.5 на Grok 4.1 Fast non-reasoning
 
 **Шаг 3 серии Simply_Migration. Anthropic полностью убран из image-пути в чате — все vision-сценарии теперь на xAI Grok. Также удалён мёртвый taskId `vision:ocr` (никогда не вызывался по аудиту 2026-04-25).**
